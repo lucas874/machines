@@ -32,8 +32,8 @@
     "test": "npm run test:esm && npm run test:cjs",
     "test:esm": "cross-env NODE_OPTIONS=--experimental-vm-modules cross-env jest --config examples/esm/jest.config.ts",
     "test:cjs": "npm run test:cjs:copy && jest --config examples/cjs/jest.config.ts",
-    "test:cjs:copy": "npx tsx scripts/test/cjs-copy.ts",
-    "test:cjs:remove": "npx tsx scripts/test/cjs-remove.ts"
+    "test:cjs:copy": "ts-node-esm scripts/test/cjs-copy.ts",
+    "test:cjs:remove": "ts-node-esm scripts/test/cjs-remove.ts"
   },
   "devDependencies": {
     "@actyx/machine-runner": "^0.4.4",
