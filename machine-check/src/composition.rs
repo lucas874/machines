@@ -1,4 +1,5 @@
-use composition_types::DataResult;
+use composition_swarm::ErrorReport;
+use composition_types::{CompositionInputVec, DataResult};
 
 use super::*;
 
@@ -34,6 +35,20 @@ pub fn get_wwf_sub(proto: String) -> String {
     dok(serde_json::to_string(&subscriptions).unwrap())
 }
 
+#[wasm_bindgen]
+pub fn compose_subs(input: String) -> String {
+    let protocols = match serde_json::from_str::<CompositionInputVec>(&input) {
+        Ok(p) => p,
+        Err(e) => return derr(vec![format!("parsing composition input: {}", e)]),
+    };
+
+    let (sub, error_report) = composition_swarm::compose_subscriptions(protocols);
+    if error_report.is_empty() {
+        dok(serde_json::to_string(&sub).unwrap())
+    } else {
+        derr(error_report_to_strings(error_report))
+    }
+}
 
 fn derr(errors: Vec<String>) -> String {
     serde_json::to_string(&DataResult::ERROR { errors }).unwrap()
@@ -41,4 +56,12 @@ fn derr(errors: Vec<String>) -> String {
 
 fn dok(data: String) -> String {
     serde_json::to_string(&DataResult::OK { data }).unwrap()
+}
+
+fn error_report_to_strings(error_report: ErrorReport) -> Vec<String> {
+    error_report
+        .errors()
+        .into_iter()
+        .flat_map(|(g, e)| e.map(composition::composition_swarm::Error::convert(&g)))
+        .collect()
 }

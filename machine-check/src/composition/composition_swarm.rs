@@ -1,6 +1,7 @@
+use crate::composition::composition_types::ProtoLabel;
 use crate::{
-    types::{EventType, Role, State, StateName, SwarmLabel, Transition},
-    EdgeId, MapVec, NodeId, Subscriptions, SwarmProtocol,
+    types::{EventType, Role, State, StateName, SwarmLabel},
+    EdgeId, NodeId, Subscriptions, SwarmProtocol,
 };
 use itertools::Itertools;
 use std::{
@@ -10,13 +11,13 @@ use std::{
 
 use super::{
     composition_types::{
-        unord_event_pair, EventLabel, EventTypeInfo, ProtoInfo, RoleEventMap, UnordEventPair,
+        unord_event_pair, CompositionInputVec, EventLabel, EventTypeInfo, ProtoInfo, RoleEventMap,
+        SwarmInterface, UnordEventPair,
     },
     Graph,
 };
 use petgraph::{
-    graph::EdgeReference,
-    visit::{Dfs, EdgeRef, IntoEdgesDirected, Walker},
+    visit::{Dfs, EdgeRef, Walker},
     Direction::{self, Incoming, Outgoing},
 };
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -105,11 +106,24 @@ impl<'a, N: StateName> fmt::Display for Edge<'a, N> {
     }
 }
 
+#[derive(Debug)]
+pub struct ErrorReport(pub Vec<(petgraph::Graph<State, SwarmLabel>, Vec<Error>)>);
+
+impl ErrorReport {
+    pub fn is_empty(&self) -> bool {
+        self.0.iter().all(|(_, es)| es.is_empty())
+    }
+
+    pub fn errors(&self) -> Vec<(petgraph::Graph<State, SwarmLabel>, Vec<Error>)> {
+        self.0.clone()
+    }
+}
+
 pub fn check(
     proto: SwarmProtocol,
     subs: &Subscriptions,
 ) -> (super::super::Graph, Option<NodeId>, Vec<Error>) {
-    let proto_info = prepare_graph(proto, subs);
+    let proto_info = prepare_graph::<Role>(proto, subs);
     let (graph, initial, mut errors) = match proto_info.get_ith(0) {
         Some((g, Some(i), e)) => (g, i, e),
         Some((g, None, e)) => return (g, None, e),
@@ -121,11 +135,26 @@ pub fn check(
 }
 
 // Should propagate errors?? COME BACK!
-pub fn weak_well_formed_sub(
-    proto: SwarmProtocol,
-) -> Subscriptions {
-    let proto_info = prepare_graph(proto, &BTreeMap::new());
+pub fn weak_well_formed_sub(proto: SwarmProtocol) -> Subscriptions {
+    let proto_info = prepare_graph::<Role>(proto, &BTreeMap::new());
     wwf_sub(proto_info, 0)
+}
+
+pub fn compose_subscriptions(protos: CompositionInputVec) -> (Subscriptions, ErrorReport) {
+    let protos_ifs: Vec<_> = protos
+        .iter()
+        .map(|p| {
+            (
+                prepare_graph::<Role>(p.protocol.clone(), &p.subscription),
+                p.interface.clone(),
+            )
+        })
+        .collect();
+    let result = implicit_composition_fold(protos_ifs);
+    (
+        result.subscription.clone(),
+        proto_info_to_error_report(result),
+    )
 }
 
 /*
@@ -134,7 +163,10 @@ pub fn weak_well_formed_sub(
  * command and log determinism like we do in swarm::well_formed.
  *
  */
-fn weak_well_formed(proto_info: ProtoInfo, proto_pointer: usize) -> Vec<Error> {
+fn weak_well_formed<T: SwarmInterface>(
+    proto_info: ProtoInfo<T>,
+    proto_pointer: usize,
+) -> Vec<Error> {
     // copied from swarm::well_formed
     let mut errors = Vec::new();
     let empty = BTreeSet::new(); // just for `sub` but needs its own lifetime
@@ -233,7 +265,7 @@ fn weak_well_formed(proto_info: ProtoInfo, proto_pointer: usize) -> Vec<Error> {
  * assume graph was constructed from a prepare_graph call with an empty subscription -- empty roles and active fields
  * log and command determinism?
  */
-fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
+fn wwf_sub<T: SwarmInterface>(proto_info: ProtoInfo<T>, proto_pointer: usize) -> Subscriptions {
     let mut subscriptions: BTreeMap<Role, BTreeSet<EventType>> = BTreeMap::new();
     let (graph, initial, _) = match proto_info.get_ith(proto_pointer) {
         Some((g, Some(i), e)) => (g, i, e),
@@ -257,9 +289,12 @@ fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
                 .or_insert(BTreeSet::from([event_type.clone()]));
 
             // weak causal consistency 2: a role subscribes to events that immediately preceedes its own commands
-            for active in
-                active_transitions_not_conc(edge.target(), &graph, &event_type, &proto_info.concurrent_events)
-            {
+            for active in active_transitions_not_conc(
+                edge.target(),
+                &graph,
+                &event_type,
+                &proto_info.concurrent_events,
+            ) {
                 subscriptions
                     .entry(active.role)
                     .and_modify(|curr| {
@@ -283,7 +318,12 @@ fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
 
             // weak determinacy 2. joining events. Add test for this...
             if proto_info.joining_events.contains(&event_type) {
-                let events_to_add: BTreeSet<_> = event_pairs_from_node(node, &graph, Incoming).into_iter().filter(|pair| proto_info.concurrent_events.contains(pair)).flat_map(|pair| pair).chain([event_type.clone()]).collect();
+                let events_to_add: BTreeSet<_> = event_pairs_from_node(node, &graph, Incoming)
+                    .into_iter()
+                    .filter(|pair| proto_info.concurrent_events.contains(pair))
+                    .flat_map(|pair| pair)
+                    .chain([event_type.clone()])
+                    .collect();
                 for r in involved_roles.iter() {
                     subscriptions
                         .entry(r.clone())
@@ -297,6 +337,101 @@ fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
     }
 
     subscriptions
+}
+
+fn implicit_composition<T: SwarmInterface>(
+    proto_info1: ProtoInfo<T>,
+    proto_info2: ProtoInfo<T>,
+    interface: T,
+) -> ProtoInfo<T> {
+    let errors = interface.check_interface(&proto_info1, &proto_info2);
+    if !errors.is_empty() {
+        let protocols = vec![
+            proto_info1.protocols.clone(),
+            proto_info2.protocols.clone(),
+            vec![(Graph::new(), None, errors)],
+        ]
+        .concat();
+        // Would work to construct it just like normally. but..
+        //let role_event_map = combine_maps(proto_info1.role_event_map.clone(), proto_info2.role_event_map.clone(), None);
+        //let subscription = combine_subscriptions(&proto_info1, &proto_info2, &interface);
+        //let concurrent_events = get_concurrent_events(&proto_info1, &proto_info2, &interface);
+        //let branching_events: BTreeSet<EventType> = proto_info1.branching_events.union(&proto_info2.branching_events).cloned().collect();
+        //let joining_events: BTreeSet<EventType> = proto_info1.joining_events.union(&proto_info2.joining_events).cloned().collect();
+        //let interfaces = vec![proto_info1.interfaces.clone(), proto_info2.interfaces.clone()].concat();
+        return ProtoInfo::new(
+            protocols,
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeSet::new(),
+            BTreeSet::new(),
+            BTreeSet::new(),
+            vec![],
+        );
+    }
+
+    let protocols = vec![proto_info1.protocols.clone(), proto_info2.protocols.clone()].concat();
+    let role_event_map = combine_maps(
+        proto_info1.role_event_map.clone(),
+        proto_info2.role_event_map.clone(),
+        None,
+    );
+    let subscription = combine_subscriptions(&proto_info1, &proto_info2, &interface);
+    let concurrent_events = get_concurrent_events(&proto_info1, &proto_info2, &interface);
+    let branching_events: BTreeSet<EventType> = proto_info1
+        .branching_events
+        .union(&proto_info2.branching_events)
+        .cloned()
+        .collect();
+    let joining_events: BTreeSet<EventType> = proto_info1
+        .joining_events
+        .union(&proto_info2.joining_events)
+        .cloned()
+        .collect();
+    let interfaces = vec![
+        proto_info1.interfaces.clone(),
+        proto_info2.interfaces.clone(),
+        vec![interface],
+    ]
+    .concat();
+    ProtoInfo::new(
+        protocols,
+        role_event_map,
+        subscription,
+        concurrent_events,
+        branching_events,
+        joining_events,
+        interfaces,
+    )
+}
+
+// The result<error, proto> thing here...
+fn implicit_composition_fold<T: SwarmInterface>(
+    protos: Vec<(ProtoInfo<T>, Option<T>)>,
+) -> ProtoInfo<T> {
+    if protos.is_empty()
+        || protos[0].1.is_some()
+        || protos[1..].iter().any(|(_, interface)| interface.is_none())
+    {
+        return ProtoInfo::new(
+            vec![(Graph::new(), None, vec![Error::InvalidArg])],
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeSet::new(),
+            BTreeSet::new(),
+            BTreeSet::new(),
+            vec![],
+        );
+    }
+
+    let (proto, _) = protos[0].clone();
+
+    protos[1..]
+        .to_vec()
+        .into_iter()
+        .fold(proto, |acc, (p, interface)| {
+            implicit_composition(acc, p, interface.unwrap())
+        })
 }
 
 // given some node, return the swarmlabels going out of that node that are not concurrent with 'event'
@@ -329,7 +464,7 @@ fn involved(node: NodeId, graph: &super::Graph) -> BTreeSet<Role> {
     roles
 }
 
-fn prepare_graph(proto: SwarmProtocol, subs: &Subscriptions) -> ProtoInfo {
+fn prepare_graph<T: SwarmInterface>(proto: SwarmProtocol, subs: &Subscriptions) -> ProtoInfo<T> {
     let mut event_to_command_map = BTreeMap::new();
     let mut role_event_map: RoleEventMap = BTreeMap::new();
     let mut branching_events = BTreeSet::new();
@@ -455,17 +590,15 @@ fn prepare_graph(proto: SwarmProtocol, subs: &Subscriptions) -> ProtoInfo {
         errors.append(&mut node_can_reach_zero(&graph, node_id));
     }
 
-    for even_type in event_to_command_map.keys() {
-        let (role, cmd, _) = event_to_command_map[even_type].clone();
-        let e_info = EventTypeInfo {
-            event_type: even_type.clone(),
-            role: role.clone(),
-            cmd,
-        };
+    for event_type in event_to_command_map.keys() {
+        let (role, cmd, _) = event_to_command_map[event_type].clone();
+        let e_info = EventTypeInfo::new(cmd, event_type.clone(), role.clone());
         role_event_map
             .entry(role)
-            .and_modify(|v| v.push(e_info.clone()))
-            .or_insert(vec![e_info]);
+            .and_modify(|v| {
+                v.insert(e_info.clone());
+            })
+            .or_insert(BTreeSet::from([e_info]));
     }
 
     let initial = no_empty_logs.then(|| initial);
@@ -502,6 +635,16 @@ fn swarm_to_graph(proto: &SwarmProtocol) -> (Graph, Vec<Error>, BTreeMap<State, 
     }
 
     (graph, errors, nodes)
+}
+
+fn proto_info_to_error_report<T: SwarmInterface>(proto_info: ProtoInfo<T>) -> ErrorReport {
+    ErrorReport(
+        proto_info
+            .protocols
+            .into_iter()
+            .map(|(graph, _, errors)| (graph, errors))
+            .collect(),
+    )
 }
 
 fn no_empty_log_errors(errors: &Vec<Error>) -> bool {
@@ -572,8 +715,88 @@ fn diamond_shape(graph: &Graph, node: NodeId) -> BTreeSet<BTreeSet<EventType>> {
     concurrent_events
 }
 
+// combine maps with sets as values
+fn combine_maps<K: Ord + Clone, V: Ord + Clone>(
+    map1: BTreeMap<K, BTreeSet<V>>,
+    map2: BTreeMap<K, BTreeSet<V>>,
+    extra: Option<BTreeSet<V>>,
+) -> BTreeMap<K, BTreeSet<V>> {
+    let all_keys: BTreeSet<K> = map1.keys().chain(map2.keys()).cloned().collect();
+    let extra = extra.unwrap_or(BTreeSet::new());
+    let extend_for_key = |k: &K| -> (K, BTreeSet<V>) {
+        (
+            k.clone(),
+            map1.get(k)
+                .unwrap_or(&BTreeSet::new())
+                .union(map2.get(k).unwrap_or(&BTreeSet::new()))
+                .chain(&extra)
+                .cloned()
+                .collect(),
+        )
+    };
+
+    all_keys.iter().map(extend_for_key).collect()
+}
+
+// add all branching and all interfacing events to the subscription of each role
+fn combine_subscriptions<T: SwarmInterface>(
+    proto_info1: &ProtoInfo<T>,
+    proto_info2: &ProtoInfo<T>,
+    interface: &T,
+) -> Subscriptions {
+    let interfacing_events = interface.interfacing_event_types(proto_info1, &proto_info2);
+    let branching_events = proto_info1
+        .branching_events
+        .union(&proto_info2.branching_events)
+        .cloned()
+        .collect();
+    let extra = interfacing_events
+        .union(&branching_events)
+        .cloned()
+        .collect();
+
+    combine_maps(
+        proto_info1.subscription.clone(),
+        proto_info2.subscription.clone(),
+        Some(extra),
+    )
+}
+
+// overapproximate concurrent events. anything from different protocols that are not interfacing events is considered concurrent.
+fn get_concurrent_events<T: SwarmInterface>(
+    proto_info1: &ProtoInfo<T>,
+    proto_info2: &ProtoInfo<T>,
+    interface: &T,
+) -> BTreeSet<UnordEventPair> {
+    let union: BTreeSet<UnordEventPair> = proto_info1
+        .concurrent_events
+        .union(&proto_info2.concurrent_events)
+        .cloned()
+        .collect();
+    let interfacing_events = interface.interfacing_event_types(proto_info1, &proto_info2);
+    let events_proto1: BTreeSet<EventType> = proto_info1
+        .get_event_types()
+        .difference(&interfacing_events)
+        .cloned()
+        .collect();
+    let events_proto2: BTreeSet<EventType> = proto_info2
+        .get_event_types()
+        .difference(&interfacing_events)
+        .cloned()
+        .collect();
+    let cartesian_product = events_proto1
+        .into_iter()
+        .cartesian_product(&events_proto2)
+        .map(|(a, b)| unord_event_pair(a, b.clone()))
+        .collect();
+
+    union.union(&cartesian_product).cloned().collect()
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::{composition::{composition_types::CompositionInput, error_report_to_strings}, types::Command, MapVec};
+
     use super::*;
 
     // Example from coplaws slides
@@ -714,44 +937,9 @@ mod tests {
     #[test]
     fn test_prepare_graph_confusionfree() {
         let composition = get_proto1_proto2_composed();
-        let sub = BTreeMap::from([
-            (
-                Role::from("T"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("part"),
-                    EventType::from("pos"),
-                    EventType::from("time"),
-                ]),
-            ),
-            (
-                Role::from("FL"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("pos"),
-                    EventType::from("time"),
-                ]),
-            ),
-            (
-                Role::from("D"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                ]),
-            ),
-            (
-                Role::from("F"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                ]),
-            ),
-        ]);
+        let sub = get_proto1_proto2_composed_subs();
 
-        let proto_info = prepare_graph(composition, &sub);
+        let proto_info = prepare_graph::<Role>(composition, &sub);
         assert!(proto_info.get_ith(0).is_some());
         assert!(proto_info.get_ith(0).unwrap().2.is_empty());
         assert_eq!(
@@ -766,8 +954,49 @@ mod tests {
             BTreeSet::from([EventType::new("time"), EventType::new("partID")])
         );
         assert_eq!(proto_info.joining_events, BTreeSet::new());
-
-        let proto_info = prepare_graph(get_proto1(), &get_subs1());
+        let expected_role_event_map = BTreeMap::from([
+            (
+                Role::from("T"),
+                BTreeSet::from([
+                    EventTypeInfo::new(
+                        Command::new("deliver"),
+                        EventType::new("part"),
+                        Role::new("T"),
+                    ),
+                    EventTypeInfo::new(
+                        Command::new("request"),
+                        EventType::new("partID"),
+                        Role::new("T"),
+                    ),
+                ]),
+            ),
+            (
+                Role::from("FL"),
+                BTreeSet::from([EventTypeInfo::new(
+                    Command::new("get"),
+                    EventType::new("pos"),
+                    Role::new("FL"),
+                )]),
+            ),
+            (
+                Role::from("D"),
+                BTreeSet::from([EventTypeInfo::new(
+                    Command::new("close"),
+                    EventType::new("time"),
+                    Role::new("D"),
+                )]),
+            ),
+            (
+                Role::from("F"),
+                BTreeSet::from([EventTypeInfo::new(
+                    Command::new("build"),
+                    EventType::new("car"),
+                    Role::new("F"),
+                )]),
+            ),
+        ]);
+        assert_eq!(proto_info.role_event_map, expected_role_event_map);
+        let proto_info = prepare_graph::<Role>(get_proto1(), &get_subs1());
         assert!(proto_info.get_ith(0).is_some());
         assert!(proto_info.get_ith(0).unwrap().2.is_empty());
         assert_eq!(proto_info.concurrent_events, BTreeSet::new());
@@ -777,14 +1006,14 @@ mod tests {
         );
         assert_eq!(proto_info.joining_events, BTreeSet::new());
 
-        let proto_info = prepare_graph(get_proto2(), &get_subs2());
+        let proto_info = prepare_graph::<Role>(get_proto2(), &get_subs2());
         assert!(proto_info.get_ith(0).is_some());
         assert!(proto_info.get_ith(0).unwrap().2.is_empty());
         assert_eq!(proto_info.concurrent_events, BTreeSet::new());
         assert_eq!(proto_info.branching_events, BTreeSet::new());
         assert_eq!(proto_info.joining_events, BTreeSet::new());
 
-        let proto_info = prepare_graph(get_proto3(), &get_subs3());
+        let proto_info = prepare_graph::<Role>(get_proto3(), &get_subs3());
         assert!(proto_info.get_ith(0).is_some());
         assert!(proto_info.get_ith(0).unwrap().2.is_empty());
         assert_eq!(proto_info.concurrent_events, BTreeSet::new());
@@ -799,7 +1028,7 @@ mod tests {
     fn test_prepare_graph_confusionful() {
         let proto1 = get_confusionful_proto1();
         let sub = get_subs1();
-        let proto_info = prepare_graph(proto1.clone(), &sub);
+        let proto_info = prepare_graph::<Role>(proto1.clone(), &sub);
         let mut errors = proto_info
             .get_ith(0)
             .unwrap()
@@ -819,7 +1048,7 @@ mod tests {
         let proto2 = get_confusionful_proto2();
         let sub = get_proto1_proto2_composed_subs();
 
-        let proto_info = prepare_graph(proto2, &sub);
+        let proto_info = prepare_graph::<Role>(proto2, &sub);
         let errors = proto_info
             .get_ith(0)
             .unwrap()
@@ -840,7 +1069,10 @@ mod tests {
         let (_, _, e) = check(get_proto3(), &get_subs3());
         assert!(e.is_empty());
 
-        let (_, _, e) = check(get_proto1_proto2_composed(), &get_proto1_proto2_composed_subs());
+        let (_, _, e) = check(
+            get_proto1_proto2_composed(),
+            &get_proto1_proto2_composed_subs(),
+        );
         assert!(e.is_empty());
     }
 
@@ -864,8 +1096,6 @@ mod tests {
         ];
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
-
-
 
         let (g, _, e) = check(get_proto2(), &get_subs3());
         let mut errors = e.map(Error::convert(&g));
@@ -907,6 +1137,46 @@ mod tests {
         assert_eq!(weak_well_formed_sub(get_proto1()), get_subs1());
         assert_eq!(weak_well_formed_sub(get_proto2()), get_subs2());
         assert_eq!(weak_well_formed_sub(get_proto3()), get_subs3());
-        assert_eq!(weak_well_formed_sub(get_proto1_proto2_composed()), get_proto1_proto2_composed_subs());
+        assert_eq!(
+            weak_well_formed_sub(get_proto1_proto2_composed()),
+            get_proto1_proto2_composed_subs()
+        );
+    }
+
+    #[test]
+    fn test_compose_subs() {
+        let composition_input = vec![
+            CompositionInput {
+                protocol: get_proto1(),
+                subscription: weak_well_formed_sub(get_proto1()),
+                interface: None,
+            },
+            CompositionInput {
+                protocol: get_proto2(),
+                subscription: weak_well_formed_sub(get_proto2()),
+                interface: Some(Role::from("T")),
+            },
+        ];
+
+        let (sub, errors) = compose_subscriptions(composition_input);
+        assert!(errors.is_empty());
+        let (_, _, e) = check(get_proto1_proto2_composed(), &sub);
+        assert!(e.is_empty());
+
+        let composition_input = vec![
+            CompositionInput {
+                protocol: get_proto1(),
+                subscription: weak_well_formed_sub(get_proto1()),
+                interface: None,
+            },
+            CompositionInput {
+                protocol: get_proto2(),
+                subscription: weak_well_formed_sub(get_proto2()),
+                interface: Some(Role::from("FL")),
+            },
+        ];
+
+        let (_, errors) = compose_subscriptions(composition_input);
+        assert_eq!(error_report_to_strings(errors), vec!["role FL can not be used as interface", "event type pos does not appear in both protocols"]);
     }
 }
