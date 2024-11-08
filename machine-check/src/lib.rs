@@ -4,6 +4,7 @@ use wasm_bindgen::prelude::*;
 mod machine;
 mod swarm;
 pub mod types;
+mod composition;
 
 use petgraph::visit::GraphBase;
 use types::{CheckResult, EventType, MachineLabel, Protocol, Role, State, SwarmLabel};
