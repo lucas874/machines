@@ -1,4 +1,4 @@
-import { check_swarm, check_projection } from '../pkg/machine_check.js'
+import { check_swarm, check_projection, check_wwf_swarm, get_wwf_sub } from '../pkg/machine_check.js'
 
 export type Protocol<Label> = {
   initial: string
@@ -21,6 +21,8 @@ export type Subscriptions = Record<string, string[]>
 
 export type Result = { type: 'OK' } | { type: 'ERROR'; errors: string[] }
 
+export type ResultData = { type: 'OK'; data: string } | { type: 'ERROR'; errors: string[] }
+
 export function checkSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): Result {
   const p = JSON.stringify(proto)
   const s = JSON.stringify(subscriptions)
@@ -38,5 +40,20 @@ export function checkProjection(
   const sub = JSON.stringify(subscriptions)
   const m = JSON.stringify(machine)
   const result = check_projection(sw, sub, role, m)
+  return JSON.parse(result)
+}
+
+export function checkWWFSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): Result {
+  const p = JSON.stringify(proto)
+  const s = JSON.stringify(subscriptions)
+  const result = check_wwf_swarm(p, s)
+
+  return JSON.parse(result)
+}
+
+export function getWWFSub(proto: SwarmProtocolType): ResultData {
+  const p = JSON.stringify(proto)
+  const result = get_wwf_sub(p)
+
   return JSON.parse(result)
 }

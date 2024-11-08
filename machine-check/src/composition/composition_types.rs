@@ -10,6 +10,12 @@ use crate::{
 
 use super::{NodeId, Subscriptions};
 
+#[derive(Serialize)]
+#[serde(tag = "type")]
+pub enum DataResult {
+    OK { data: String },
+    ERROR { errors: Vec<String> },
+}
 
 #[derive(Clone, Debug, Serialize)]
 pub struct EventTypeInfo {

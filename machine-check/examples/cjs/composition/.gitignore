@@ -1,0 +1,4 @@
+# separate .gitignore to include this folder that would otherwise not be included because it would be empty
+/*.ts
+/*.tsx
+/*.js
