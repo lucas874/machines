@@ -44,13 +44,12 @@ pub fn unord_event_pair(a: EventType, b: EventType) -> UnordEventPair {
 
 #[derive(Debug, Clone)]
 pub struct ProtoInfo<IF: SwarmInterface> {
-    pub protocols: Vec<(Graph, Option<NodeId>, Vec<Error>)>,
+    pub protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), Option<IF>)>,
     pub role_event_map: RoleEventMap,
     pub subscription: Subscriptions,
     pub concurrent_events: BTreeSet<UnordEventPair>, // consider to make a more specific type. unordered pair.
     pub branching_events: BTreeSet<EventType>,
     pub joining_events: BTreeSet<EventType>,
-    pub interfaces: Vec<IF>,
 }
 
 impl<IF> ProtoInfo<IF>
@@ -58,13 +57,12 @@ where
     IF: SwarmInterface,
 {
     pub fn new(
-        protocols: Vec<(Graph, Option<NodeId>, Vec<Error>)>,
+        protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), Option<IF>)>,
         role_event_map: RoleEventMap,
         subscription: Subscriptions,
         concurrent_events: BTreeSet<UnordEventPair>,
         branching_events: BTreeSet<EventType>,
-        joining_events: BTreeSet<EventType>,
-        interfaces: Vec<IF>,
+        joining_events: BTreeSet<EventType>
     ) -> Self {
         Self {
             protocols,
@@ -73,15 +71,14 @@ where
             concurrent_events,
             branching_events,
             joining_events,
-            interfaces,
         }
     }
 
-    pub fn get_ith(&self, i: usize) -> Option<(Graph, Option<NodeId>, Vec<Error>)> {
+    pub fn get_ith_proto(&self, i: usize) -> Option<(Graph, Option<NodeId>, Vec<Error>)> {
         if i >= self.protocols.len() {
             None
         } else {
-            Some(self.protocols[i].clone())
+            Some(self.protocols[i].0.clone())
         }
     }
 }
