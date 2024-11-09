@@ -198,9 +198,10 @@ fn weak_well_formed<T: SwarmInterface>(
             // subscribe to event immediately preceeding
             // unlike well-formed we do not need to check that later involved roles
             // subscribes to fewer event in log than active -- only one event pr. log
-            // active transitions gets the transitions going out of edge.target() and filters out the ones emitting events concurrent with event type
+            // active transitions not conc gets the transitions going out of edge.target()
+            // and filters out the ones emitting events concurrent with event type of 'edge'
             for successor in active_transitions_not_conc(
-                node,
+                edge.target(),
                 &graph,
                 &event_type,
                 &proto_info.concurrent_events,
@@ -1083,17 +1084,17 @@ mod tests {
         errors.sort();
         let mut expected_errors = vec![
             "active role does not subscribe to any of its emitted event types in transition (0)--[close@D<time>]-->(3)",
-            "subsequently active role D does not subscribe to events in transition (0)--[close@D<time>]-->(3)",
-            "subsequently active role T does not subscribe to events in transition (0)--[close@D<time>]-->(3)",
-            "role D does not subscribe to events in branching transition (0)--[close@D<time>]-->(3)",
-            "role FL does not subscribe to events in branching transition (0)--[close@D<time>]-->(3)",
-            "role T does not subscribe to events in branching transition (0)--[close@D<time>]-->(3)",
-            "subsequently active role D does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
-            "role D does not subscribe to events in branching transition (0)--[request@T<partID>]-->(1)",
-            "role FL does not subscribe to events in branching transition (0)--[request@T<partID>]-->(1)",
             "active role does not subscribe to any of its emitted event types in transition (1)--[get@FL<pos>]-->(2)",
-            "subsequently active role FL does not subscribe to events in transition (1)--[get@FL<pos>]-->(2)",
+            "role D does not subscribe to events in branching transition (0)--[close@D<time>]-->(3)",
+            "role D does not subscribe to events in branching transition (0)--[request@T<partID>]-->(1)",
+            "role FL does not subscribe to events in branching transition (0)--[close@D<time>]-->(3)",
+            "role FL does not subscribe to events in branching transition (0)--[request@T<partID>]-->(1)",
+            "role T does not subscribe to events in branching transition (0)--[close@D<time>]-->(3)",
+            "subsequently active role D does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
+            "subsequently active role FL does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
+            "subsequently active role T does not subscribe to events in transition (1)--[get@FL<pos>]-->(2)"
         ];
+
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
 
@@ -1104,7 +1105,7 @@ mod tests {
             "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
             "subsequently active role T does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
             "active role does not subscribe to any of its emitted event types in transition (1)--[deliver@T<part>]-->(2)",
-            "subsequently active role T does not subscribe to events in transition (1)--[deliver@T<part>]-->(2)"
+            "subsequently active role F does not subscribe to events in transition (1)--[deliver@T<part>]-->(2)"
         ];
 
         expected_errors.sort();
@@ -1115,18 +1116,17 @@ mod tests {
         errors.sort();
         let mut expected_errors = vec![
             "active role does not subscribe to any of its emitted event types in transition (0)--[build@F<car>]-->(1)",
-            "subsequently active role F does not subscribe to events in transition (0)--[build@F<car>]-->(1)",
             "active role does not subscribe to any of its emitted event types in transition (1)--[test@TR<report>]-->(2)",
-            "subsequently active role TR does not subscribe to events in transition (1)--[test@TR<report>]-->(2)",
-            "active role does not subscribe to any of its emitted event types in transition (2)--[reject@QCR<notOk>]-->(3)",
-            "subsequently active role QCR does not subscribe to events in transition (2)--[reject@QCR<notOk>]-->(3)",
-            "subsequently active role QCR does not subscribe to events in transition (2)--[reject@QCR<notOk>]-->(3)",
-            "role QCR does not subscribe to events in branching transition (2)--[reject@QCR<notOk>]-->(3)",
             "active role does not subscribe to any of its emitted event types in transition (2)--[accept@QCR<ok>]-->(3)",
-            "subsequently active role QCR does not subscribe to events in transition (2)--[accept@QCR<ok>]-->(3)",
-            "subsequently active role QCR does not subscribe to events in transition (2)--[accept@QCR<ok>]-->(3)",
-            "role QCR does not subscribe to events in branching transition (2)--[accept@QCR<ok>]-->(3)"
+            "active role does not subscribe to any of its emitted event types in transition (2)--[reject@QCR<notOk>]-->(3)",
+            "role QCR does not subscribe to events in branching transition (2)--[accept@QCR<ok>]-->(3)",
+            "role QCR does not subscribe to events in branching transition (2)--[reject@QCR<notOk>]-->(3)",
+            "subsequently active role QCR does not subscribe to events in transition (1)--[test@TR<report>]-->(2)",
+            "subsequently active role QCR does not subscribe to events in transition (1)--[test@TR<report>]-->(2)",
+            "subsequently active role TR does not subscribe to events in transition (0)--[build@F<car>]-->(1)"
         ];
+
+        // fix the duplicate situation. because of active not conc returning labels not set of roles.
 
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
