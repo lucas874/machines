@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use itertools::Itertools;
 use petgraph::{graph::EdgeReference, visit::{EdgeFiltered, EdgeRef, IntoEdgeReferences, IntoEdgesDirected, IntoNodeReferences}, Direction::{Incoming, Outgoing}};
 
-use super::{composition_types::EventLabel, types::StateName, MachineLabel, NodeId, Role, State, Subscriptions, SwarmLabel};
+use super::{composition_types::EventLabel, types::{StateName, Transition}, Machine, MachineLabel, NodeId, Role, State, Subscriptions, SwarmLabel};
 
 // types more or less copied from machine.rs.
 type Graph = petgraph::Graph<State, MachineLabel>;
@@ -37,7 +37,7 @@ pub fn project(
     // need to keep track of corresponding machine node for each swarm node. maps nodes in protocol to nodes in projection
     let mut m_nodes: Vec<NodeId> = vec![NodeId::end(); swarm.node_count()];
 
-    let interested = |edge: ERef| sub.contains(&edge.weight().get_event_type()); //edge.weight().log_type.iter().any(|ev| sub.contains(ev));
+    let interested = |edge: ERef| sub.contains(&edge.weight().get_event_type());
     let filtered = EdgeFiltered(swarm, interested);
 
     // find all nodes that should be in the projection
@@ -155,6 +155,30 @@ fn nfa_to_dfa(nfa: Graph, i: NodeId) -> (Graph, NodeId) {
 fn to_option_machine(graph: &Graph) -> OptionGraph {
     graph.map(|_, n| Some(n.state_name().clone()), |_, x| x.clone())
 }
+
+pub fn to_json_machine(graph: Graph, initial: NodeId) -> Machine {
+    let machine_label_mapper = |m: &Graph, eref: EdgeReference<'_, MachineLabel>| {
+        let label = eref.weight().clone();
+        let source = m[eref.source()].clone();
+        let target = m[eref.target()].clone();
+        Transition {
+            label,
+            source,
+            target,
+        }
+    };
+
+    let transitions: Vec<_> = graph
+        .edge_references()
+        .map(|e| machine_label_mapper(&graph, e))
+        .collect();
+
+    Machine {
+        initial: graph[initial].clone(),
+        transitions,
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

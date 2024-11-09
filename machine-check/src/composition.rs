@@ -50,6 +50,34 @@ pub fn compose_subs(input: String) -> String {
     }
 }
 
+#[wasm_bindgen]
+pub fn revised_projection(proto: String, subs: String, role: String) -> String {
+    let proto = match serde_json::from_str::<SwarmProtocol>(&proto) {
+        Ok(p) => p,
+
+        Err(e) => return derr(vec![format!("parsing swarm protocol: {}", e)]),
+    };
+    let subs = match serde_json::from_str::<Subscriptions>(&subs) {
+        Ok(s) => s,
+        Err(e) => return derr(vec![format!("parsing subscriptions: {}", e)]),
+    };
+    let (swarm, initial, errors) = composition_swarm::from_json(proto, &subs);
+    let Some(initial) = initial else {
+        return err(errors);
+    };
+    let role = Role::new(&role);
+    let (proj, initial) = composition::composition_machine::project(
+        &swarm,
+        initial,
+        &subs,
+        role
+    );
+
+    dok(serde_json::to_string(&composition::composition_machine::to_json_machine(proj, initial)).unwrap())
+
+}
+
+
 fn derr(errors: Vec<String>) -> String {
     serde_json::to_string(&DataResult::ERROR { errors }).unwrap()
 }
