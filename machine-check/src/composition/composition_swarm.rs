@@ -9,6 +9,7 @@ use std::{
     fmt,
 };
 
+use super::MapVec;
 use super::{
     composition_types::{
         unord_event_pair, CompositionInputVec, EventLabel, EventTypeInfo, ProtoInfo, RoleEventMap,
@@ -636,6 +637,16 @@ fn swarm_to_graph(proto: &SwarmProtocol) -> (Graph, Vec<Error>, BTreeMap<State, 
     }
 
     (graph, errors, nodes)
+}
+
+pub fn from_json(proto: SwarmProtocol, subs: &Subscriptions) -> (Graph, Option<NodeId>, Vec<String>) {
+    let proto_info = prepare_graph::<Role>(proto, subs);
+    let (g, i, e) = match proto_info.get_ith(0) {
+        Some((g, i, e)) => (g, i, e),
+        _ => return (Graph::new(), None, vec![]),
+    };
+    let e = e.map(Error::convert(&g));
+    (g, i, e)
 }
 
 fn proto_info_to_error_report<T: SwarmInterface>(proto_info: ProtoInfo<T>) -> ErrorReport {
