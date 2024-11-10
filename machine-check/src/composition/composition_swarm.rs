@@ -130,7 +130,7 @@ pub fn check(
         Some((g, None, e)) => return (g, None, e),
         _ => return (Graph::new(), None, vec![]),
     };
-    //errors.extend(super_error_wrapper(all_nodes_reachable(&graph, initial))); // TODO
+    errors.extend(all_nodes_reachable(&graph, initial));
     errors.extend(weak_well_formed(proto_info, 0));
     (graph, Some(initial), errors)
 }
@@ -158,7 +158,12 @@ pub fn compose_subscriptions(protos: CompositionInputVec) -> (Subscriptions, Err
     )
 }
 
-pub fn implicit_composition_swarms(protos: CompositionInputVec) -> (Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>, Subscriptions) {
+pub fn implicit_composition_swarms(
+    protos: CompositionInputVec,
+) -> (
+    Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>,
+    Subscriptions,
+) {
     let protos_ifs: Vec<_> = protos
         .iter()
         .map(|p| {
@@ -178,10 +183,7 @@ pub fn implicit_composition_swarms(protos: CompositionInputVec) -> (Vec<((Graph,
  * command and log determinism like we do in swarm::well_formed.
  *
  */
-fn weak_well_formed(
-    proto_info: ProtoInfo,
-    proto_pointer: usize,
-) -> Vec<Error> {
+fn weak_well_formed(proto_info: ProtoInfo, proto_pointer: usize) -> Vec<Error> {
     // copied from swarm::well_formed
     let mut errors = Vec::new();
     let empty = BTreeSet::new(); // just for `sub` but needs its own lifetime
@@ -408,15 +410,16 @@ fn implicit_composition<T: SwarmInterface>(
 }
 
 // The result<error, proto> thing here...
-fn implicit_composition_fold<T: SwarmInterface>(
-    protos: Vec<(ProtoInfo, Option<T>)>,
-) -> ProtoInfo {
+fn implicit_composition_fold<T: SwarmInterface>(protos: Vec<(ProtoInfo, Option<T>)>) -> ProtoInfo {
     if protos.is_empty()
         || protos[0].1.is_some()
         || protos[1..].iter().any(|(_, interface)| interface.is_none())
     {
         return ProtoInfo::new(
-            vec![((Graph::new(), None, vec![Error::InvalidArg]), BTreeSet::new())],
+            vec![(
+                (Graph::new(), None, vec![Error::InvalidArg]),
+                BTreeSet::new(),
+            )],
             BTreeMap::new(),
             BTreeMap::new(),
             BTreeSet::new(),
@@ -465,7 +468,11 @@ fn involved(node: NodeId, graph: &super::Graph) -> BTreeSet<Role> {
     roles
 }
 
-fn prepare_graph<T: SwarmInterface>(proto: SwarmProtocol, subs: &Subscriptions, interface: Option<T>) -> ProtoInfo {
+fn prepare_graph<T: SwarmInterface>(
+    proto: SwarmProtocol,
+    subs: &Subscriptions,
+    interface: Option<T>,
+) -> ProtoInfo {
     let mut event_to_command_map = BTreeMap::new();
     let mut role_event_map: RoleEventMap = BTreeMap::new();
     let mut branching_events = BTreeSet::new();
@@ -642,7 +649,10 @@ fn swarm_to_graph(proto: &SwarmProtocol) -> (Graph, Vec<Error>, BTreeMap<State, 
     (graph, errors, nodes)
 }
 
-pub fn from_json(proto: SwarmProtocol, subs: &Subscriptions) -> (Graph, Option<NodeId>, Vec<String>) {
+pub fn from_json(
+    proto: SwarmProtocol,
+    subs: &Subscriptions,
+) -> (Graph, Option<NodeId>, Vec<String>) {
     let proto_info = prepare_graph::<Role>(proto, subs, None);
     let (g, i, e) = match proto_info.get_ith_proto(0) {
         Some((g, i, e)) => (g, i, e),
@@ -662,9 +672,14 @@ fn proto_info_to_error_report(proto_info: ProtoInfo) -> ErrorReport {
     )
 }
 
-pub fn swarms_to_error_report(swarms: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>) -> ErrorReport {
+pub fn swarms_to_error_report(
+    swarms: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>,
+) -> ErrorReport {
     ErrorReport(
-        swarms.into_iter().map(|((graph, _, errors), _)| (graph, errors)).collect()
+        swarms
+            .into_iter()
+            .map(|((graph, _, errors), _)| (graph, errors))
+            .collect(),
     )
 }
 
@@ -676,6 +691,20 @@ fn no_empty_log_errors(errors: &Vec<Error>) -> bool {
         }
     }
     true
+}
+
+// copied from swarm::swarm.rs
+fn all_nodes_reachable(graph: &Graph, initial: NodeId) -> Vec<Error> {
+    // Traversal order choice (Bfs vs Dfs vs DfsPostOrder) does not matter
+    let visited = Dfs::new(&graph, initial)
+        .iter(&graph)
+        .collect::<BTreeSet<_>>();
+
+    graph
+        .node_indices()
+        .filter(|node| !visited.contains(node))
+        .map(|node| Error::SwarmError(crate::swarm::Error::StateUnreachable(node)))
+        .collect()
 }
 
 fn node_can_reach_zero<N, E>(graph: &petgraph::Graph<N, E>, node: NodeId) -> Vec<Error> {
@@ -816,7 +845,11 @@ fn get_concurrent_events<T: SwarmInterface>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{composition::{composition_types::CompositionInput, error_report_to_strings}, types::Command, MapVec};
+    use crate::{
+        composition::{composition_types::CompositionInput, error_report_to_strings},
+        types::Command,
+        MapVec,
+    };
 
     use super::*;
 
@@ -1197,6 +1230,12 @@ mod tests {
         ];
 
         let (_, errors) = compose_subscriptions(composition_input);
-        assert_eq!(error_report_to_strings(errors), vec!["role FL can not be used as interface", "event type pos does not appear in both protocols"]);
+        assert_eq!(
+            error_report_to_strings(errors),
+            vec![
+                "role FL can not be used as interface",
+                "event type pos does not appear in both protocols"
+            ]
+        );
     }
 }
