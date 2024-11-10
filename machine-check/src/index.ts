@@ -55,7 +55,12 @@ export function checkWWFSwarmProtocol(proto: SwarmProtocolType, subscriptions: S
   return JSON.parse(result)
 }
 
-export function checkComposedProjection(protos: CompositionInputVec, subscriptions: Subscriptions, role: string, machine: MachineType): Result {
+export function checkComposedProjection(
+  protos: CompositionInputVec,
+  subscriptions: Subscriptions,
+  role: string,
+  machine: MachineType,
+): Result {
   const ps = JSON.stringify(protos)
   const sub = JSON.stringify(subscriptions)
   const m = JSON.stringify(machine)
@@ -69,8 +74,14 @@ export function getWWFSub(proto: SwarmProtocolType): ResultData {
   return JSON.parse(result)
 }
 
-export function composeTwoSubs(proto1: SwarmProtocolType, subscriptions1: Subscriptions, proto2: SwarmProtocolType, subscriptions2: Subscriptions, swarm_interface: string): ResultData {
-  const ps: CompositionInputVec = [{protocol: proto1, subscription: subscriptions1, interface: null}, {protocol: proto2, subscription: subscriptions2, interface: swarm_interface}]
+export function composeTwoSubs(
+  proto1: SwarmProtocolType,
+  subscriptions1: Subscriptions,
+  proto2: SwarmProtocolType,
+  subscriptions2: Subscriptions,
+  swarm_interface: string
+): ResultData {
+  const ps: CompositionInputVec = [{ protocol: proto1, subscription: subscriptions1, interface: null }, { protocol: proto2, subscription: subscriptions2, interface: swarm_interface }]
   const ps_str = JSON.stringify(ps)
   const result = compose_subs(ps_str)
   return JSON.parse(result)
@@ -82,15 +93,26 @@ export function composeSubs(protos: CompositionInputVec): ResultData {
   return JSON.parse(result)
 }
 
-export function revisedProjection(proto: SwarmProtocolType, subscriptions: Subscriptions, role: string): ResultData {
+export function revisedProjection(
+  proto: SwarmProtocolType,
+  subscriptions: Subscriptions,
+  role: string
+): ResultData {
   const p = JSON.stringify(proto)
   const s = JSON.stringify(subscriptions)
   const result = revised_projection(p, s, role)
   return JSON.parse(result)
 }
 
-export function composeTwoMachines(proto1: SwarmProtocolType, subscriptions1: Subscriptions, proto2: SwarmProtocolType, subscriptions2: Subscriptions, swarm_interface: string, role: string): ResultData {
-  const ps: CompositionInputVec = [{protocol: proto1, subscription: subscriptions1, interface: null}, {protocol: proto2, subscription: subscriptions2, interface: swarm_interface}]
+export function composeTwoMachines(
+  proto1: SwarmProtocolType,
+  subscriptions1: Subscriptions,
+  proto2: SwarmProtocolType,
+  subscriptions2: Subscriptions,
+  swarm_interface: string,
+  role: string
+): ResultData {
+  const ps: CompositionInputVec = [{ protocol: proto1, subscription: subscriptions1, interface: null }, { protocol: proto2, subscription: subscriptions2, interface: swarm_interface }]
   const ps_str = JSON.stringify(ps)
   const result = project_combine(ps_str, role)
   return JSON.parse(result)
