@@ -97,6 +97,29 @@ pub fn project(
 
 }
 
+// precondition: the protocols interfaces on the supplied interfaces.
+// precondition: the composition of the protocols in swarms is wwf w.r.t. subs.
+// the type of the input paremeter not nice? reconsider
+pub fn project_combine(swarms: Vec<(super::Graph, NodeId, BTreeSet<EventType>)>, subs: &Subscriptions, role: Role) -> (OptionGraph, Option<NodeId>) {
+    // check this anyway
+    if swarms.is_empty() || !swarms[0].2.is_empty() || swarms[1..].iter().any(|(_,_, interface)| interface.is_empty()) {
+        return (OptionGraph::new(), None);
+    }
+
+    let mapper = |(graph, initial, interface): (super::Graph, NodeId, BTreeSet<EventType>)| -> (Graph, NodeId, BTreeSet<EventType>) {
+        let (projection, projection_initial) = project(&graph, initial, subs, role.clone());
+        (projection, projection_initial, interface)
+    };
+
+    let projections: Vec<_> = swarms.into_iter().map(mapper).collect();
+
+    let (acc_machine, acc_initial, _)  = projections[0].clone();
+    let (combined_projection, combined_initial) = projections[1..].to_vec().into_iter().fold((acc_machine, acc_initial), |(acc, acc_i), (m, i, interface)| compose(acc, acc_i, m, i, interface));
+
+    // why option here COME BACK
+    (to_option_machine(&combined_projection), Some(combined_initial))
+}
+
 // nfa to dfa using subset construction. Hopcroft, Motwani and Ullman section 2.3.5
 fn nfa_to_dfa(nfa: Graph, i: NodeId) -> (Graph, NodeId) {
     let mut dfa = Graph::new();
@@ -266,10 +289,37 @@ pub fn to_json_machine(graph: Graph, initial: NodeId) -> Machine {
     }
 }
 
+pub fn from_option_to_machine(
+    graph: petgraph::Graph<Option<State>, MachineLabel>,
+    initial: NodeId,
+) -> Machine {
+    let machine_label_mapper =
+        |m: &petgraph::Graph<Option<State>, MachineLabel>,
+         eref: EdgeReference<'_, MachineLabel>| {
+            let label = eref.weight().clone();
+            let source = m[eref.source()].clone().unwrap_or(State::from(""));
+            let target = m[eref.target()].clone().unwrap_or(State::from(""));
+            Transition {
+                label,
+                source,
+                target,
+            }
+        };
+
+    let transitions: Vec<_> = graph
+        .edge_references()
+        .map(|e| machine_label_mapper(&graph, e))
+        .collect();
+
+    Machine {
+        initial: graph[initial].clone().unwrap_or(State::from("")),
+        transitions,
+    }
+}
 
 #[cfg(test)]
 mod tests {
-    use crate::{composition::composition_swarm::{from_json, weak_well_formed_sub}, types::{Command, EventType, Role, Transition}, Machine, Subscriptions, SwarmProtocol};
+    use crate::{composition::{composition_swarm::{from_json, implicit_composition_swarms, weak_well_formed_sub}, composition_types::{CompositionInput, CompositionInputVec}}, types::{Command, EventType, Role, Transition}, Machine, Subscriptions, SwarmProtocol};
     use super::*;
 
     // Example from coplaws slides
@@ -287,16 +337,6 @@ mod tests {
         )
         .unwrap()
     }
-    fn get_subs1() -> Subscriptions {
-        serde_json::from_str::<Subscriptions>(
-            r#"{
-                "T": ["partID", "part", "pos", "time"],
-                "FL": ["partID", "pos", "time"],
-                "D": ["partID", "part", "time"]
-            }"#,
-        )
-        .unwrap()
-    }
     fn get_proto2() -> SwarmProtocol {
         serde_json::from_str::<SwarmProtocol>(
             r#"{
@@ -306,15 +346,6 @@ mod tests {
                     { "source": "1", "target": "2", "label": { "cmd": "deliver", "logType": ["part"], "role": "T" } },
                     { "source": "2", "target": "3", "label": { "cmd": "build", "logType": ["car"], "role": "F" } }
                 ]
-            }"#,
-        )
-        .unwrap()
-    }
-    fn get_subs2() -> Subscriptions {
-        serde_json::from_str::<Subscriptions>(
-            r#"{
-                "T": ["partID", "part"],
-                "F": ["part", "car"]
             }"#,
         )
         .unwrap()
@@ -329,16 +360,6 @@ mod tests {
                     { "source": "2", "target": "3", "label": { "cmd": "accept", "logType": ["ok"], "role": "QCR" } },
                     { "source": "2", "target": "3", "label": { "cmd": "reject", "logType": ["notOk"], "role": "QCR" } }
                 ]
-            }"#,
-        )
-        .unwrap()
-    }
-    fn get_subs3() -> Subscriptions {
-        serde_json::from_str::<Subscriptions>(
-            r#"{
-                "F": ["car"],
-                "TR": ["car", "report"],
-                "QCR": ["report", "ok", "notOk"]
             }"#,
         )
         .unwrap()
@@ -362,49 +383,20 @@ mod tests {
         .unwrap()
     }
 
-    fn get_proto1_proto2_composed_subs() -> Subscriptions {
-        serde_json::from_str::<Subscriptions>(
-            r#"{
-                "T": ["partID", "part", "pos", "time"],
-                "FL": ["partID", "pos", "time"],
-                "D": ["partID", "part", "time"],
-                "F": ["partID", "part", "car", "time"]
-            }"#,
-        )
-        .unwrap()
+    fn get_composition_input_vec1() -> CompositionInputVec {
+        vec![
+                CompositionInput { protocol: get_proto1(), subscription: weak_well_formed_sub(get_proto1()), interface: None },
+                CompositionInput { protocol: get_proto2(), subscription: weak_well_formed_sub(get_proto2()), interface: Some(Role::new("T")) },
+                CompositionInput { protocol: get_proto3(), subscription: weak_well_formed_sub(get_proto3()), interface: Some(Role::new("F")) },
+        ]
     }
 
-    fn get_confusionful_proto1() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "get", "logType": ["pos"], "role": "FL" } },
-                    { "source": "2", "target": "0", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
-                    { "source": "0", "target": "0", "label": { "cmd": "close", "logType": ["time", "time2"], "role": "D" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-    fn get_confusionful_proto2() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0 || 0",
-                "transitions": [
-                    { "source": "0 || 0", "target": "1 || 1", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
-                    { "source": "0 || 0", "target": "3 || 0", "label": { "cmd": "close", "logType": ["time"], "role": "D" } },
-                    { "source": "1 || 1", "target": "2 || 1", "label": { "cmd": "get", "logType": ["pos"], "role": "FL" } },
-                    { "source": "2 || 1", "target": "0 || 2", "label": { "cmd": "deliver", "logType": ["partID"], "role": "T" } },
-                    { "source": "0 || 2", "target": "0 || 3", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
-                    { "source": "0 || 2", "target": "3 || 2", "label": { "cmd": "close", "logType": ["time"], "role": "D" } },
-                    { "source": "0 || 3", "target": "3 || 3", "label": { "cmd": "close", "logType": ["time"], "role": "D" } },
-                    { "source": "3 || 2", "target": "3 || 3", "label": { "cmd": "build", "logType": ["car"], "role": "F" } }
-                ]
-            }"#,
-        )
-        .unwrap()
+    fn get_composition_input_vec2() -> CompositionInputVec {
+        vec![
+                CompositionInput { protocol: get_proto2(), subscription: weak_well_formed_sub(get_proto2()), interface: None },
+                CompositionInput { protocol: get_proto1(), subscription: weak_well_formed_sub(get_proto1()), interface: Some(Role::new("T")) },
+                CompositionInput { protocol: get_proto3(), subscription: weak_well_formed_sub(get_proto3()), interface: Some(Role::new("F")) },
+        ]
     }
 
     #[test]
@@ -587,4 +579,169 @@ mod tests {
         )
         .is_empty());
     }
+
+    #[test]
+    fn test_combine_machines_1() {
+        // Example from coplaws slides. Use generated WWF subscriptions. Project over T.
+        let role = Role::new("T");
+
+        let protos = get_composition_input_vec1()[0..2].to_vec();
+        let (swarms, subs) = implicit_composition_swarms(protos);
+        let swarms = swarms.into_iter().map(|((g, i , _), s)| (g, i.unwrap(), s)).collect();
+        let (proj_combined1, proj_combined_initial1) = project_combine(swarms, &subs, role.clone());
+
+        let protos = get_composition_input_vec2()[0..2].to_vec();
+        let (swarms, subs) = implicit_composition_swarms(protos);
+        let swarms = swarms.into_iter().map(|((g, i , _), s)| (g, i.unwrap(), s)).collect();
+        let (proj_combined2, proj_combined_initial2) = project_combine(swarms, &subs, role.clone());
+
+        // compose(a, b) should be equal to compose(b, a)
+        assert!(crate::machine::equivalent(
+            &proj_combined1,
+            proj_combined_initial1.unwrap(),
+            &proj_combined2,
+            proj_combined_initial2.unwrap()
+        )
+        .is_empty());
+
+        // sub becomes smaller when we analyse the explicitily composed protocol. so for them to be equivalent use the overapproximated sub.
+        //println!("SUBS: {}", serde_json::to_string_pretty(&subs).unwrap());
+        let proto = get_proto1_proto2_composed();
+        // Interesting to generate the WWF sub using the explicit composition and see difference!
+        //let subs = weak_well_formed_sub(proto.clone());
+        //println!("SUBS: {}", serde_json::to_string_pretty(&subs).unwrap());
+        let (g, i, _) = from_json(proto, &subs);
+        let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role.clone());
+        //println!("EXPECTED: {}", serde_json::to_string_pretty(&to_json_machine(proj.clone(), proj_initial)).unwrap());
+
+        // project(compose(proto1, proto2), r, sub) should equal compose(project(proto1, r, sub), project(proto2, r, sub))
+        assert!(crate::machine::equivalent(
+            &to_option_machine(&proj),
+            proj_initial,
+            &proj_combined1,
+            proj_combined_initial1.unwrap()
+        )
+        .is_empty());
+    }
+
+    #[test]
+    fn test_combine_machines_2() {
+        // Example from coplaws slides. Use generated WWF subscriptions. Project over T.
+        let role = Role::new("FL");
+
+        let protos = get_composition_input_vec1()[0..2].to_vec();
+        let (swarms, subs) = implicit_composition_swarms(protos);
+        let swarms = swarms.into_iter().map(|((g, i , _), s)| (g, i.unwrap(), s)).collect();
+        let (proj_combined1, proj_combined_initial1) = project_combine(swarms, &subs, role.clone());
+
+        let protos = get_composition_input_vec2()[0..2].to_vec();
+        let (swarms, subs) = implicit_composition_swarms(protos);
+        let swarms = swarms.into_iter().map(|((g, i , _), s)| (g, i.unwrap(), s)).collect();
+        let (proj_combined2, proj_combined_initial2) = project_combine(swarms, &subs, role.clone());
+
+        // compose(a, b) should be equal to compose(b, a)
+        assert!(crate::machine::equivalent(
+            &proj_combined1,
+            proj_combined_initial1.unwrap(),
+            &proj_combined2,
+            proj_combined_initial2.unwrap()
+        )
+        .is_empty());
+
+        let proto = get_proto1_proto2_composed();
+        //let subs = weak_well_formed_sub(proto.clone());
+        let (g, i, _) = from_json(proto, &subs);
+        let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role.clone());
+
+        // project(compose(proto1, proto2), r, sub) should equal compose(project(proto1, r, sub), project(proto2, r, sub))
+        assert!(crate::machine::equivalent(
+            &to_option_machine(&proj),
+            proj_initial,
+            &proj_combined1,
+            proj_combined_initial1.unwrap()
+        )
+        .is_empty());
+    }
+
+
+    #[test]
+    fn test_combine_machines_3() {
+        // Example from coplaws slides. Use generated WWF subscriptions. Project over T.
+        let role = Role::new("D");
+
+        let protos = get_composition_input_vec1()[0..2].to_vec();
+        let (swarms, subs) = implicit_composition_swarms(protos);
+        let swarms = swarms.into_iter().map(|((g, i , _), s)| (g, i.unwrap(), s)).collect();
+        let (proj_combined1, proj_combined_initial1) = project_combine(swarms, &subs, role.clone());
+
+        let protos = get_composition_input_vec2()[0..2].to_vec();
+        let (swarms, subs) = implicit_composition_swarms(protos);
+        let swarms = swarms.into_iter().map(|((g, i , _), s)| (g, i.unwrap(), s)).collect();
+        let (proj_combined2, proj_combined_initial2) = project_combine(swarms, &subs, role.clone());
+
+        // compose(a, b) should be equal to compose(b, a)
+        assert!(crate::machine::equivalent(
+            &proj_combined1,
+            proj_combined_initial1.unwrap(),
+            &proj_combined2,
+            proj_combined_initial2.unwrap()
+        )
+        .is_empty());
+
+        let proto = get_proto1_proto2_composed();
+        //let subs = weak_well_formed_sub(proto.clone());
+        let (g, i, _) = from_json(proto, &subs);
+        let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role.clone());
+
+        // project(compose(proto1, proto2), r, sub) should equal compose(project(proto1, r, sub), project(proto2, r, sub))
+        assert!(crate::machine::equivalent(
+            &to_option_machine(&proj),
+            proj_initial,
+            &proj_combined1,
+            proj_combined_initial1.unwrap()
+        )
+        .is_empty());
+    }
+
+    #[test]
+    fn test_combine_machines_4() {
+        // Example from coplaws slides. Use generated WWF subscriptions. Project over T.
+        let role = Role::new("F");
+
+        let protos = get_composition_input_vec1()[0..2].to_vec();
+        let (swarms, subs) = implicit_composition_swarms(protos);
+        let swarms = swarms.into_iter().map(|((g, i , _), s)| (g, i.unwrap(), s)).collect();
+        let (proj_combined1, proj_combined_initial1) = project_combine(swarms, &subs, role.clone());
+
+        let protos = get_composition_input_vec2()[0..2].to_vec();
+        let (swarms, subs) = implicit_composition_swarms(protos);
+        let swarms = swarms.into_iter().map(|((g, i , _), s)| (g, i.unwrap(), s)).collect();
+        let (proj_combined2, proj_combined_initial2) = project_combine(swarms, &subs, role.clone());
+
+        // compose(a, b) should be equal to compose(b, a)
+        assert!(crate::machine::equivalent(
+            &proj_combined1,
+            proj_combined_initial1.unwrap(),
+            &proj_combined2,
+            proj_combined_initial2.unwrap()
+        )
+        .is_empty());
+
+        let proto = get_proto1_proto2_composed();
+        //let subs = weak_well_formed_sub(proto.clone());
+        let (g, i, _) = from_json(proto, &subs);
+        let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role.clone());
+
+        // project(compose(proto1, proto2), r, sub) should equal compose(project(proto1, r, sub), project(proto2, r, sub))
+        assert!(crate::machine::equivalent(
+            &to_option_machine(&proj),
+            proj_initial,
+            &proj_combined1,
+            proj_combined_initial1.unwrap()
+        )
+        .is_empty());
+    }
+
+
+
 }

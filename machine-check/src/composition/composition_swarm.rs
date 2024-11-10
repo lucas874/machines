@@ -158,14 +158,28 @@ pub fn compose_subscriptions(protos: CompositionInputVec) -> (Subscriptions, Err
     )
 }
 
+pub fn implicit_composition_swarms(protos: CompositionInputVec) -> (Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>, Subscriptions) {
+    let protos_ifs: Vec<_> = protos
+        .iter()
+        .map(|p| {
+            (
+                prepare_graph::<Role>(p.protocol.clone(), &p.subscription, p.interface.clone()),
+                p.interface.clone(),
+            )
+        })
+        .collect();
+    let result = implicit_composition_fold(protos_ifs);
+    (result.protocols, result.subscription)
+}
+
 /*
  * A graph that was constructed with prepare_graph with no errors will have one event type per command.
  * Similarly, such a graph will be weakly confusion free, which means we do not have to check for
  * command and log determinism like we do in swarm::well_formed.
  *
  */
-fn weak_well_formed<T: SwarmInterface>(
-    proto_info: ProtoInfo<T>,
+fn weak_well_formed(
+    proto_info: ProtoInfo,
     proto_pointer: usize,
 ) -> Vec<Error> {
     // copied from swarm::well_formed
@@ -267,7 +281,7 @@ fn weak_well_formed<T: SwarmInterface>(
  * assume graph was constructed from a prepare_graph call with an empty subscription -- empty roles and active fields
  * log and command determinism?
  */
-fn wwf_sub<T: SwarmInterface>(proto_info: ProtoInfo<T>, proto_pointer: usize) -> Subscriptions {
+fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
     let mut subscriptions: BTreeMap<Role, BTreeSet<EventType>> = BTreeMap::new();
     let (graph, initial, _) = match proto_info.get_ith_proto(proto_pointer) {
         Some((g, Some(i), e)) => (g, i, e),
@@ -342,16 +356,16 @@ fn wwf_sub<T: SwarmInterface>(proto_info: ProtoInfo<T>, proto_pointer: usize) ->
 }
 
 fn implicit_composition<T: SwarmInterface>(
-    proto_info1: ProtoInfo<T>,
-    proto_info2: ProtoInfo<T>,
+    proto_info1: ProtoInfo,
+    proto_info2: ProtoInfo,
     interface: T,
-) -> ProtoInfo<T> {
+) -> ProtoInfo {
     let errors = interface.check_interface(&proto_info1, &proto_info2);
     if !errors.is_empty() {
         let protocols = vec![
             proto_info1.protocols.clone(),
             proto_info2.protocols.clone(),
-            vec![((Graph::new(), None, errors), Some(interface))],
+            vec![((Graph::new(), None, errors), BTreeSet::new())],
         ]
         .concat();
         // Would work to construct it just like normally. but..
@@ -395,14 +409,14 @@ fn implicit_composition<T: SwarmInterface>(
 
 // The result<error, proto> thing here...
 fn implicit_composition_fold<T: SwarmInterface>(
-    protos: Vec<(ProtoInfo<T>, Option<T>)>,
-) -> ProtoInfo<T> {
+    protos: Vec<(ProtoInfo, Option<T>)>,
+) -> ProtoInfo {
     if protos.is_empty()
         || protos[0].1.is_some()
         || protos[1..].iter().any(|(_, interface)| interface.is_none())
     {
         return ProtoInfo::new(
-            vec![((Graph::new(), None, vec![Error::InvalidArg]), None)],
+            vec![((Graph::new(), None, vec![Error::InvalidArg]), BTreeSet::new())],
             BTreeMap::new(),
             BTreeMap::new(),
             BTreeSet::new(),
@@ -451,7 +465,7 @@ fn involved(node: NodeId, graph: &super::Graph) -> BTreeSet<Role> {
     roles
 }
 
-fn prepare_graph<T: SwarmInterface>(proto: SwarmProtocol, subs: &Subscriptions, interface: Option<T>) -> ProtoInfo<T> {
+fn prepare_graph<T: SwarmInterface>(proto: SwarmProtocol, subs: &Subscriptions, interface: Option<T>) -> ProtoInfo {
     let mut event_to_command_map = BTreeMap::new();
     let mut role_event_map: RoleEventMap = BTreeMap::new();
     let mut branching_events = BTreeSet::new();
@@ -466,7 +480,7 @@ fn prepare_graph<T: SwarmInterface>(proto: SwarmProtocol, subs: &Subscriptions, 
         ));
 
         return ProtoInfo::new(
-            vec![((graph, None, errors), interface)],
+            vec![((graph, None, errors), BTreeSet::new())],
             BTreeMap::new(),
             subs.clone(),
             BTreeSet::new(),
@@ -484,7 +498,7 @@ fn prepare_graph<T: SwarmInterface>(proto: SwarmProtocol, subs: &Subscriptions, 
             (g, None, e) => {
                 let errors = e.into_iter().map(|s| Error::SwarmErrorString(s)).collect();
                 return ProtoInfo::new(
-                    vec![((g, None, errors), interface)],
+                    vec![((g, None, errors), BTreeSet::new())],
                     BTreeMap::new(),
                     subs.clone(),
                     concurrent_events,
@@ -587,7 +601,14 @@ fn prepare_graph<T: SwarmInterface>(proto: SwarmProtocol, subs: &Subscriptions, 
     }
 
     let initial = no_empty_logs.then(|| initial);
-
+    // Set interface field. If interface is some, then we want to interface this protocol
+    // with some other protocol on this set of events.
+    // We do not know if we can do that yet though.
+    let interface = if interface.is_some() {
+        interface.unwrap().interfacing_event_types_single(&graph)
+    } else {
+        BTreeSet::new()
+    };
     ProtoInfo::new(
         vec![((graph, initial, errors), interface)],
         role_event_map,
@@ -631,13 +652,19 @@ pub fn from_json(proto: SwarmProtocol, subs: &Subscriptions) -> (Graph, Option<N
     (g, i, e)
 }
 
-fn proto_info_to_error_report<T: SwarmInterface>(proto_info: ProtoInfo<T>) -> ErrorReport {
+fn proto_info_to_error_report(proto_info: ProtoInfo) -> ErrorReport {
     ErrorReport(
         proto_info
             .protocols
             .into_iter()
             .map(|((graph, _, errors), _)| (graph, errors))
             .collect(),
+    )
+}
+
+pub fn swarms_to_error_report(swarms: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>) -> ErrorReport {
+    ErrorReport(
+        swarms.into_iter().map(|((graph, _, errors), _)| (graph, errors)).collect()
     )
 }
 
@@ -734,8 +761,8 @@ fn combine_maps<K: Ord + Clone, V: Ord + Clone>(
 
 // add all branching and all interfacing events to the subscription of each role
 fn combine_subscriptions<T: SwarmInterface>(
-    proto_info1: &ProtoInfo<T>,
-    proto_info2: &ProtoInfo<T>,
+    proto_info1: &ProtoInfo,
+    proto_info2: &ProtoInfo,
     interface: &T,
 ) -> Subscriptions {
     let interfacing_events = interface.interfacing_event_types(proto_info1, &proto_info2);
@@ -758,8 +785,8 @@ fn combine_subscriptions<T: SwarmInterface>(
 
 // overapproximate concurrent events. anything from different protocols that are not interfacing events is considered concurrent.
 fn get_concurrent_events<T: SwarmInterface>(
-    proto_info1: &ProtoInfo<T>,
-    proto_info2: &ProtoInfo<T>,
+    proto_info1: &ProtoInfo,
+    proto_info2: &ProtoInfo,
     interface: &T,
 ) -> BTreeSet<UnordEventPair> {
     let union: BTreeSet<UnordEventPair> = proto_info1

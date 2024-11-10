@@ -43,8 +43,8 @@ pub fn unord_event_pair(a: EventType, b: EventType) -> UnordEventPair {
 }
 
 #[derive(Debug, Clone)]
-pub struct ProtoInfo<IF: SwarmInterface> {
-    pub protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), Option<IF>)>,
+pub struct ProtoInfo {
+    pub protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>, // maybe weird to have an interface as if it was related to one protocol. but convenient. "a graph interfaces with rest on if"
     pub role_event_map: RoleEventMap,
     pub subscription: Subscriptions,
     pub concurrent_events: BTreeSet<UnordEventPair>, // consider to make a more specific type. unordered pair.
@@ -52,12 +52,9 @@ pub struct ProtoInfo<IF: SwarmInterface> {
     pub joining_events: BTreeSet<EventType>,
 }
 
-impl<IF> ProtoInfo<IF>
-where
-    IF: SwarmInterface,
-{
+impl ProtoInfo {
     pub fn new(
-        protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), Option<IF>)>,
+        protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>,
         role_event_map: RoleEventMap,
         subscription: Subscriptions,
         concurrent_events: BTreeSet<UnordEventPair>,
@@ -147,10 +144,7 @@ impl ProtoLabel for Graph {
     }
 }
 
-impl<IF> ProtoLabel for ProtoInfo<IF>
-where
-    IF: SwarmInterface,
-{
+impl ProtoLabel for ProtoInfo {
     fn get_labels(&self) -> BTreeSet<(Command, EventType, Role)> {
         self.role_event_map
             .values()
@@ -179,6 +173,7 @@ where
 pub trait SwarmInterface: Clone + Ord {
     fn check_interface<T: ProtoLabel>(&self, a: &T, b: &T) -> Vec<Error>;
     fn interfacing_event_types<T: ProtoLabel>(&self, a: &T, b: &T) -> BTreeSet<EventType>;
+    fn interfacing_event_types_single<T: ProtoLabel>(&self, a: &T) -> BTreeSet<EventType>;
 }
 
 impl SwarmInterface for Role {
@@ -232,6 +227,15 @@ impl SwarmInterface for Role {
             return BTreeSet::new();
         }
 
+        a.get_labels()
+            .into_iter()
+            .filter(|(_, _, r)| *self == *r)
+            .map(|(_, e, _)| e)
+            .collect()
+    }
+
+    // does not check anything. just returns any labels where role matches
+    fn interfacing_event_types_single<T: ProtoLabel>(&self, a: &T) -> BTreeSet<EventType> {
         a.get_labels()
             .into_iter()
             .filter(|(_, _, r)| *self == *r)

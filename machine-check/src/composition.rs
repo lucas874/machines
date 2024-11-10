@@ -1,4 +1,4 @@
-use composition_swarm::ErrorReport;
+use composition_swarm::{swarms_to_error_report, ErrorReport};
 use composition_types::{CompositionInputVec, DataResult};
 
 use super::*;
@@ -77,6 +77,27 @@ pub fn revised_projection(proto: String, subs: String, role: String) -> String {
 
 }
 
+#[wasm_bindgen]
+pub fn project_combine(input: String, role: String) -> String {
+    let protocols = match serde_json::from_str::<CompositionInputVec>(&input) {
+        Ok(p) => p,
+        Err(e) => return derr(vec![format!("parsing composition input: {}", e)]),
+    };
+    let role = Role::new(&role);
+
+    let (composed_protos, subs) = composition_swarm::implicit_composition_swarms(protocols);
+
+    // does not look nice? reconsider
+    let swarms = match composed_protos.iter().any(|((_, i, e), _)| i.is_none() || !e.is_empty()) {
+        false => composed_protos.into_iter().map(|((g, i, _), s)| (g, i.unwrap(), s)).collect(),
+        true => return derr(error_report_to_strings(swarms_to_error_report(composed_protos))),
+    };
+
+    let (proj, proj_initial) = composition_machine::project_combine(swarms, &subs, role);
+
+    dok(serde_json::to_string(&composition::composition_machine::from_option_to_machine(proj, proj_initial.unwrap())).unwrap())
+
+}
 
 fn derr(errors: Vec<String>) -> String {
     serde_json::to_string(&DataResult::ERROR { errors }).unwrap()
