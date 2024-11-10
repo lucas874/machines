@@ -1,4 +1,4 @@
-import { check_swarm, check_projection, check_wwf_swarm, get_wwf_sub, compose_subs, revised_projection, project_combine } from '../pkg/machine_check.js'
+import { check_swarm, check_projection, check_wwf_swarm, check_composed_projection, get_wwf_sub, compose_subs, revised_projection, project_combine } from '../pkg/machine_check.js'
 
 export type Protocol<Label> = {
   initial: string
@@ -52,6 +52,14 @@ export function checkWWFSwarmProtocol(proto: SwarmProtocolType, subscriptions: S
   const p = JSON.stringify(proto)
   const s = JSON.stringify(subscriptions)
   const result = check_wwf_swarm(p, s)
+  return JSON.parse(result)
+}
+
+export function checkComposedProjection(protos: CompositionInputVec, subscriptions: Subscriptions, role: string, machine: MachineType): Result {
+  const ps = JSON.stringify(protos)
+  const sub = JSON.stringify(subscriptions)
+  const m = JSON.stringify(machine)
+  const result = check_composed_projection(ps, sub, role, m)
   return JSON.parse(result)
 }
 
