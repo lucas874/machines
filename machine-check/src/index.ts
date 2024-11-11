@@ -1,4 +1,4 @@
-import { check_swarm, check_projection, check_wwf_swarm, check_composed_projection, get_wwf_sub, compose_subs, revised_projection, project_combine, project_combine_all } from '../pkg/machine_check.js'
+import { check_swarm, check_projection, check_wwf_swarm, check_composed_projection, get_wwf_sub, compose_subs, revised_projection, project_combine, project_combine_all, compose_protocols } from '../pkg/machine_check.js'
 
 export type Protocol<Label> = {
   initial: string
@@ -121,6 +121,12 @@ export function projectCombineTwoMachines(
 export function projectCombineMachines(protos: CompositionInputVec, role: string): ResultData {
   const ps = JSON.stringify(protos)
   const result = project_combine(ps, role);
+  return JSON.parse(result)
+}
+
+export function composeProtocols(protos: CompositionInputVec): ResultData {
+  const ps = JSON.stringify(protos)
+  const result = compose_protocols(ps)
   return JSON.parse(result)
 }
 
