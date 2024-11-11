@@ -832,7 +832,7 @@ fn get_concurrent_events<T: SwarmInterface>(
     proto_info2: &ProtoInfo,
     interface: &T,
 ) -> BTreeSet<UnordEventPair> {
-    let union: BTreeSet<UnordEventPair> = proto_info1
+    let concurrent_events_union: BTreeSet<UnordEventPair> = proto_info1
         .concurrent_events
         .union(&proto_info2.concurrent_events)
         .cloned()
@@ -854,7 +854,7 @@ fn get_concurrent_events<T: SwarmInterface>(
         .map(|(a, b)| unord_event_pair(a, b.clone()))
         .collect();
 
-    union.union(&cartesian_product).cloned().collect()
+    concurrent_events_union.union(&cartesian_product).cloned().collect()
 }
 
 
