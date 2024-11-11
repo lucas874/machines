@@ -1,6 +1,6 @@
 use crate::composition::composition_types::ProtoLabel;
 use crate::{
-    types::{EventType, Role, State, StateName, SwarmLabel},
+    types::{EventType, Role, State, StateName, SwarmLabel, Transition},
     EdgeId, NodeId, Subscriptions, SwarmProtocol,
 };
 use itertools::Itertools;
@@ -18,6 +18,7 @@ use super::{
     Graph,
 };
 use petgraph::{
+    graph::EdgeReference,
     visit::{Dfs, EdgeRef, Walker},
     Direction::{self, Incoming, Outgoing},
 };
@@ -123,7 +124,7 @@ impl ErrorReport {
 pub fn check(
     proto: SwarmProtocol,
     subs: &Subscriptions,
-) -> (super::super::Graph, Option<NodeId>, Vec<Error>) {
+) -> (Graph, Option<NodeId>, Vec<Error>) {
     let proto_info = prepare_graph::<Role>(proto, subs, None);
     let (graph, initial, mut errors) = match proto_info.get_ith_proto(0) {
         Some((g, Some(i), e)) => (g, i, e),
@@ -142,15 +143,7 @@ pub fn weak_well_formed_sub(proto: SwarmProtocol) -> Subscriptions {
 }
 
 pub fn compose_subscriptions(protos: CompositionInputVec) -> (Subscriptions, ErrorReport) {
-    let protos_ifs: Vec<_> = protos
-        .iter()
-        .map(|p| {
-            (
-                prepare_graph::<Role>(p.protocol.clone(), &p.subscription, p.interface.clone()),
-                p.interface.clone(),
-            )
-        })
-        .collect();
+    let protos_ifs = prepare_graphs(protos);
     let result = implicit_composition_fold(protos_ifs);
     (
         result.subscription.clone(),
@@ -164,7 +157,31 @@ pub fn implicit_composition_swarms(
     Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>,
     Subscriptions,
 ) {
-    let protos_ifs: Vec<_> = protos
+    let protos_ifs = prepare_graphs(protos);
+    let result = implicit_composition_fold(protos_ifs);
+    (result.protocols, result.subscription)
+}
+
+// find return type
+pub fn compose_protocols(protos: CompositionInputVec) -> Result<(Graph, NodeId), ErrorReport> {
+    let protos_ifs = prepare_graphs(protos);
+    if protos_ifs.iter().any(|(proto_info, _)| !proto_info.no_errors()) {
+        let result = swarms_to_error_report(protos_ifs.into_iter().flat_map(|(proto_info, _)| proto_info.protocols).collect());
+        return Err(result);
+    }
+    // construct this to check whether the protocols interface
+    let implicit_composition = implicit_composition_fold(protos_ifs);
+    if !implicit_composition.no_errors() {
+
+        return Err(proto_info_to_error_report(implicit_composition));
+    }
+
+    let (explicit_composition, i) = explicit_composition(implicit_composition);
+    Ok((explicit_composition, i))
+}
+
+fn prepare_graphs(protos: CompositionInputVec) -> Vec<(ProtoInfo, Option<Role>)> {
+    protos
         .iter()
         .map(|p| {
             (
@@ -172,9 +189,7 @@ pub fn implicit_composition_swarms(
                 p.interface.clone(),
             )
         })
-        .collect();
-    let result = implicit_composition_fold(protos_ifs);
-    (result.protocols, result.subscription)
+        .collect()
 }
 
 /*
@@ -497,7 +512,7 @@ fn prepare_graph<T: SwarmInterface>(
     };
 
     let concurrent_events = all_concurrent_pairs(&graph);
-
+    println!("HALLOOO {:?}", concurrent_events);
     // if graph contains no concurrency, make old confusion freeness check. requires us to call swarm::prepare_graph through swarm::from_json
     let (graph, initial, mut errors) = if concurrent_events.is_empty() {
         let (graph, initial, e) = match crate::swarm::from_json(proto, subs) {
@@ -616,6 +631,7 @@ fn prepare_graph<T: SwarmInterface>(
     } else {
         BTreeSet::new()
     };
+    println!("concurrent events {:?}", concurrent_events);
     ProtoInfo::new(
         vec![((graph, initial, errors), interface)],
         role_event_map,
@@ -843,6 +859,43 @@ fn get_concurrent_events<T: SwarmInterface>(
     union.union(&cartesian_product).cloned().collect()
 }
 
+
+// precondition: the protocols can interface on the given interfaces
+fn explicit_composition(proto_info: ProtoInfo) -> (Graph, NodeId) {
+    if proto_info.protocols.is_empty() {
+        return (Graph::new(), NodeId::end());
+    }
+
+    let ((g, i, _, ), _)  = proto_info.protocols[0].clone();
+    let folder = |(acc_g, acc_i) : (Graph, NodeId), ((g, i, _), interface): ((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)| -> (Graph, NodeId) {
+        crate::composition::composition_machine::compose(acc_g, acc_i, g, i.unwrap(), interface)
+    };
+    proto_info.protocols[1..].to_vec().into_iter().fold((g, i.unwrap()), folder)
+}
+
+pub fn to_swarm_json(graph: crate::Graph, initial: NodeId) -> SwarmProtocol {
+    let machine_label_mapper = |g: &crate::Graph, eref: EdgeReference<'_, SwarmLabel>| {
+        let label = eref.weight().clone();
+        let source = g[eref.source()].state_name().clone();
+        let target = g[eref.target()].state_name().clone();
+        Transition {
+            label: label,
+            source: source,
+            target: target,
+        }
+    };
+
+    let transitions: Vec<_> = graph
+        .edge_references()
+        .map(|e| machine_label_mapper(&graph, e))
+        .collect();
+
+    SwarmProtocol {
+        initial: graph[initial].state_name().clone(),
+        transitions,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -986,6 +1039,26 @@ mod tests {
             }"#,
         )
         .unwrap()
+    }
+
+    fn get_composition_input_vec1() -> CompositionInputVec {
+        vec![
+            CompositionInput {
+                protocol: get_proto1(),
+                subscription: weak_well_formed_sub(get_proto1()),
+                interface: None,
+            },
+            CompositionInput {
+                protocol: get_proto2(),
+                subscription: weak_well_formed_sub(get_proto2()),
+                interface: Some(Role::new("T")),
+            },
+            CompositionInput {
+                protocol: get_proto3(),
+                subscription: weak_well_formed_sub(get_proto3()),
+                interface: Some(Role::new("F")),
+            },
+        ]
     }
 
     #[test]
@@ -1237,5 +1310,30 @@ mod tests {
                 "event type pos does not appear in both protocols"
             ]
         );
+    }
+
+    #[test]
+    fn test_explicit_composition() {
+        let composition = compose_protocols(get_composition_input_vec1());
+        assert!(composition.is_ok());
+
+        let (g, i) = composition.unwrap();
+        let swarm = to_swarm_json(g, i);
+        let (wwf_sub, _) = compose_subscriptions(get_composition_input_vec1());
+        let (_, _, errors) = check(swarm.clone(), &wwf_sub);
+
+        // check if subscription generated using implicit composition is actually wwf for the explicit composition.
+        assert!(errors.is_empty());
+
+        let composition = compose_protocols(get_composition_input_vec1()[..2].to_vec());
+        assert!(composition.is_ok());
+
+        let (g, i) = composition.unwrap();
+        let swarm = to_swarm_json(g, i);
+        let (wwf_sub, _) = compose_subscriptions(get_composition_input_vec1()[..2].to_vec());
+        let (_, _, errors) = check(swarm.clone(), &wwf_sub);
+
+        // check if subscription generated using implicit composition is actually wwf for the explicit composition.
+        assert!(errors.is_empty());
     }
 }

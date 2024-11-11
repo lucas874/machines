@@ -59,7 +59,7 @@ impl ProtoInfo {
         subscription: Subscriptions,
         concurrent_events: BTreeSet<UnordEventPair>,
         branching_events: BTreeSet<EventType>,
-        joining_events: BTreeSet<EventType>
+        joining_events: BTreeSet<EventType>,
     ) -> Self {
         Self {
             protocols,
@@ -77,6 +77,10 @@ impl ProtoInfo {
         } else {
             Some(self.protocols[i].0.clone())
         }
+    }
+
+    pub fn no_errors(&self) -> bool {
+        self.protocols.iter().all(|((_, _, e), _)| e.is_empty())
     }
 }
 

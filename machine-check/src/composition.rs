@@ -177,6 +177,20 @@ pub fn check_composed_projection(
     }
 }
 
+#[wasm_bindgen]
+pub fn compose_protocols(protos: String) -> String {
+    let protocols = match serde_json::from_str::<CompositionInputVec>(&protos) {
+        Ok(p) => p,
+        Err(e) => return derr(vec![format!("parsing composition input: {}", e)]),
+    };
+    let composition = composition_swarm::compose_protocols(protocols);
+
+    match composition {
+        Ok((graph, initial)) => dok(serde_json::to_string(&composition_swarm::to_swarm_json(graph, initial)).unwrap()),
+        Err(errors) => derr(error_report_to_strings(errors))
+    }
+}
+
 fn derr(errors: Vec<String>) -> String {
     serde_json::to_string(&DataResult::ERROR { errors }).unwrap()
 }
