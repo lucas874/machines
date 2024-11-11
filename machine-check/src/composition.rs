@@ -102,7 +102,7 @@ pub fn project_combine(input: String, role: String) -> String {
         }
     };
 
-    let (proj, proj_initial) = composition_machine::project_combine(swarms, &subs, role);
+    let (proj, proj_initial) = composition_machine::project_combine(&swarms, &subs, role);
 
     dok(
         serde_json::to_string(&composition::composition_machine::from_option_to_machine(
@@ -111,6 +111,41 @@ pub fn project_combine(input: String, role: String) -> String {
         ))
         .unwrap(),
     )
+}
+
+#[wasm_bindgen]
+pub fn project_combine_all(input: String) -> String {
+    let protocols = match serde_json::from_str::<CompositionInputVec>(&input) {
+        Ok(p) => p,
+        Err(e) => return derr(vec![format!("parsing composition input: {}", e)]),
+    };
+
+    let (composed_protos, subs) = composition_swarm::implicit_composition_swarms(protocols);
+
+    // does not look nice? reconsider
+    let swarms = match composed_protos
+        .iter()
+        .any(|((_, i, e), _)| i.is_none() || !e.is_empty())
+    {
+        false => composed_protos
+            .into_iter()
+            .map(|((g, i, _), s)| (g, i.unwrap(), s))
+            .collect(),
+        true => {
+            return derr(error_report_to_strings(swarms_to_error_report(
+                composed_protos,
+            )))
+        }
+    };
+
+    let projections = composition_machine::projec_combine_all(&swarms, &subs);
+    // do not think we need this check here
+    if projections.iter().any(|(_, i)| i.is_none()) {
+        return derr(vec![]);
+
+    }
+    let machines: Vec<_> = projections.into_iter().map(|(g, i)| serde_json::to_string(&composition::composition_machine::from_option_to_machine(g, i.unwrap(),)).unwrap()).collect();
+    dok(format!("[{}]", machines.join(", ")))
 }
 
 // take a sub instead of inferring one or combining the ones in the input vec...
@@ -151,7 +186,7 @@ pub fn check_composed_projection(
         }
     };
 
-    let (proj, proj_initial) = composition_machine::project_combine(swarms, &subs, role);
+    let (proj, proj_initial) = composition_machine::project_combine(&swarms, &subs, role);
     let (machine, json_initial, m_errors) = machine::from_json(machine);
     let machine_problem = !m_errors.is_empty();
     let mut errors = vec![];

@@ -512,7 +512,6 @@ fn prepare_graph<T: SwarmInterface>(
     };
 
     let concurrent_events = all_concurrent_pairs(&graph);
-    println!("HALLOOO {:?}", concurrent_events);
     // if graph contains no concurrency, make old confusion freeness check. requires us to call swarm::prepare_graph through swarm::from_json
     let (graph, initial, mut errors) = if concurrent_events.is_empty() {
         let (graph, initial, e) = match crate::swarm::from_json(proto, subs) {
@@ -631,7 +630,6 @@ fn prepare_graph<T: SwarmInterface>(
     } else {
         BTreeSet::new()
     };
-    println!("concurrent events {:?}", concurrent_events);
     ProtoInfo::new(
         vec![((graph, initial, errors), interface)],
         role_event_map,
