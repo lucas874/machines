@@ -903,6 +903,7 @@ mod tests {
     };
 
     use super::*;
+    use proptest::prelude::*;
 
     // Example from coplaws slides
     fn get_proto1() -> SwarmProtocol {
@@ -1057,6 +1058,33 @@ mod tests {
                 interface: Some(Role::new("F")),
             },
         ]
+    }
+
+    prop_compose! {
+        fn vec_swarm_label(role: Role, max_events: usize)(vec in prop::collection::vec(("cmd", "event_type"), 1..max_events)) -> Vec<SwarmLabel> {
+            vec
+            .into_iter()
+            .enumerate()
+            .map(|(i, (cmd, event))|
+                SwarmLabel { cmd: Command::new(&format!("{role}_{cmd}_{i}")), log_type: vec![EventType::new(&format!("{role}_{event}_{i}"))], role: role.clone()})
+            .collect()
+        }
+    }
+
+    prop_compose! {
+        fn vec_role(max_roles: usize)(vec in prop::collection::vec("R", 1..max_roles)) -> Vec<Role> {
+            vec
+            .into_iter()
+            .enumerate()
+            .map(|(i, role)| Role::new(&format!("{role}{i}"))).collect()
+        }
+    }
+    prop_compose! {
+        fn all_labels(max_roles: usize, max_events: usize)
+                    (r in vec_role(max_roles))
+                    (labels in r.into_iter().map(|role| vec_swarm_label(role, max_events)).collect::<Vec<_>>()) -> Vec<SwarmLabel> {
+            labels.concat()
+        }
     }
 
     #[test]
@@ -1333,5 +1361,26 @@ mod tests {
 
         // check if subscription generated using implicit composition is actually wwf for the explicit composition.
         assert!(errors.is_empty());
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(1))]
+        #[test]
+        fn test_generated_roles(vec in vec_role(10)) {
+            for (i, r) in vec.iter().enumerate() {
+                println!("ROLE IS: {:?}", r);
+                assert_eq!(*r, Role::new(&format!("R{}", i)));
+            }
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(1))]
+        #[test]
+        fn test_generated_labels(labels in all_labels(10, 10)) {
+            for l in labels {
+                println!("label: {:?}", l);
+            }
+        }
     }
 }
