@@ -269,6 +269,7 @@ dependencies = [
  "petgraph",
  "pretty_assertions",
  "proptest",
+ "rand",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
