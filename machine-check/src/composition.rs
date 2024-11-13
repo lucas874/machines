@@ -138,13 +138,21 @@ pub fn project_combine_all(input: String) -> String {
         }
     };
 
-    let projections = composition_machine::projec_combine_all(&swarms, &subs);
+    let projections = composition_machine::project_combine_all(&swarms, &subs);
     // do not think we need this check here
     if projections.iter().any(|(_, i)| i.is_none()) {
         return derr(vec![]);
-
     }
-    let machines: Vec<_> = projections.into_iter().map(|(g, i)| serde_json::to_string(&composition::composition_machine::from_option_to_machine(g, i.unwrap(),)).unwrap()).collect();
+    let machines: Vec<_> = projections
+        .into_iter()
+        .map(|(g, i)| {
+            serde_json::to_string(&composition::composition_machine::from_option_to_machine(
+                g,
+                i.unwrap(),
+            ))
+            .unwrap()
+        })
+        .collect();
     dok(format!("[{}]", machines.join(", ")))
 }
 
@@ -221,8 +229,10 @@ pub fn compose_protocols(protos: String) -> String {
     let composition = composition_swarm::compose_protocols(protocols);
 
     match composition {
-        Ok((graph, initial)) => dok(serde_json::to_string(&composition_swarm::to_swarm_json(graph, initial)).unwrap()),
-        Err(errors) => derr(error_report_to_strings(errors))
+        Ok((graph, initial)) => {
+            dok(serde_json::to_string(&composition_swarm::to_swarm_json(graph, initial)).unwrap())
+        }
+        Err(errors) => derr(error_report_to_strings(errors)),
     }
 }
 

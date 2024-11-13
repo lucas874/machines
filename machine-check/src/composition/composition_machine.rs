@@ -142,11 +142,13 @@ pub fn project_combine(
     )
 }
 
-pub fn projec_combine_all(
+pub fn project_combine_all(
     swarms: &Vec<(super::Graph, NodeId, BTreeSet<EventType>)>,
     subs: &Subscriptions,
 ) -> Vec<(OptionGraph, Option<NodeId>)> {
-    subs.keys().map(|role| project_combine(swarms, subs, role.clone())).collect()
+    subs.keys()
+        .map(|role| project_combine(swarms, subs, role.clone()))
+        .collect()
 }
 
 // nfa to dfa using subset construction. Hopcroft, Motwani and Ullman section 2.3.5
@@ -351,7 +353,9 @@ mod tests {
     use super::*;
     use crate::{
         composition::{
-            self, composition_swarm::{from_json, implicit_composition_swarms, weak_well_formed_sub}, composition_types::{CompositionInput, CompositionInputVec}
+            self,
+            composition_swarm::{from_json, implicit_composition_swarms, weak_well_formed_sub},
+            composition_types::{CompositionInput, CompositionInputVec},
         },
         types::{Command, EventType, Role, Transition},
         Machine, Subscriptions, SwarmProtocol,
@@ -650,7 +654,8 @@ mod tests {
             .into_iter()
             .map(|((g, i, _), s)| (g, i.unwrap(), s))
             .collect();
-        let (proj_combined1, proj_combined_initial1) = project_combine(&swarms, &subs, role.clone());
+        let (proj_combined1, proj_combined_initial1) =
+            project_combine(&swarms, &subs, role.clone());
 
         let protos = get_composition_input_vec2()[0..2].to_vec();
         let (swarms, subs) = implicit_composition_swarms(protos);
@@ -658,7 +663,8 @@ mod tests {
             .into_iter()
             .map(|((g, i, _), s)| (g, i.unwrap(), s))
             .collect();
-        let (proj_combined2, proj_combined_initial2) = project_combine(&swarms, &subs, role.clone());
+        let (proj_combined2, proj_combined_initial2) =
+            project_combine(&swarms, &subs, role.clone());
 
         // compose(a, b) should be equal to compose(b, a)
         assert!(crate::machine::equivalent(
@@ -700,7 +706,8 @@ mod tests {
             .into_iter()
             .map(|((g, i, _), s)| (g, i.unwrap(), s))
             .collect();
-        let (proj_combined1, proj_combined_initial1) = project_combine(&swarms, &subs, role.clone());
+        let (proj_combined1, proj_combined_initial1) =
+            project_combine(&swarms, &subs, role.clone());
 
         let protos = get_composition_input_vec2()[0..2].to_vec();
         let (swarms, subs) = implicit_composition_swarms(protos);
@@ -708,7 +715,8 @@ mod tests {
             .into_iter()
             .map(|((g, i, _), s)| (g, i.unwrap(), s))
             .collect();
-        let (proj_combined2, proj_combined_initial2) = project_combine(&swarms, &subs, role.clone());
+        let (proj_combined2, proj_combined_initial2) =
+            project_combine(&swarms, &subs, role.clone());
 
         // compose(a, b) should be equal to compose(b, a)
         assert!(crate::machine::equivalent(
@@ -745,7 +753,8 @@ mod tests {
             .into_iter()
             .map(|((g, i, _), s)| (g, i.unwrap(), s))
             .collect();
-        let (proj_combined1, proj_combined_initial1) = project_combine(&swarms, &subs, role.clone());
+        let (proj_combined1, proj_combined_initial1) =
+            project_combine(&swarms, &subs, role.clone());
 
         let protos = get_composition_input_vec2()[0..2].to_vec();
         let (swarms, subs) = implicit_composition_swarms(protos);
@@ -753,7 +762,8 @@ mod tests {
             .into_iter()
             .map(|((g, i, _), s)| (g, i.unwrap(), s))
             .collect();
-        let (proj_combined2, proj_combined_initial2) = project_combine(&swarms, &subs, role.clone());
+        let (proj_combined2, proj_combined_initial2) =
+            project_combine(&swarms, &subs, role.clone());
 
         // compose(a, b) should be equal to compose(b, a)
         assert!(crate::machine::equivalent(
@@ -790,7 +800,8 @@ mod tests {
             .into_iter()
             .map(|((g, i, _), s)| (g, i.unwrap(), s))
             .collect();
-        let (proj_combined1, proj_combined_initial1) = project_combine(&swarms, &subs, role.clone());
+        let (proj_combined1, proj_combined_initial1) =
+            project_combine(&swarms, &subs, role.clone());
 
         let protos = get_composition_input_vec2()[0..2].to_vec();
         let (swarms, subs) = implicit_composition_swarms(protos);
@@ -798,7 +809,8 @@ mod tests {
             .into_iter()
             .map(|((g, i, _), s)| (g, i.unwrap(), s))
             .collect();
-        let (proj_combined2, proj_combined_initial2) = project_combine(&swarms, &subs, role.clone());
+        let (proj_combined2, proj_combined_initial2) =
+            project_combine(&swarms, &subs, role.clone());
 
         // compose(a, b) should be equal to compose(b, a)
         assert!(crate::machine::equivalent(
@@ -835,7 +847,8 @@ mod tests {
             .into_iter()
             .map(|((g, i, _), s)| (g, i.unwrap(), s))
             .collect();
-        let (proj_combined1, proj_combined_initial1) = project_combine(&swarms, &subs, role.clone());
+        let (proj_combined1, proj_combined_initial1) =
+            project_combine(&swarms, &subs, role.clone());
 
         let protos = get_composition_input_vec2().to_vec();
         let (swarms, subs) = implicit_composition_swarms(protos);
@@ -843,7 +856,8 @@ mod tests {
             .into_iter()
             .map(|((g, i, _), s)| (g, i.unwrap(), s))
             .collect();
-        let (proj_combined2, proj_combined_initial2) = project_combine(&swarms, &subs, role.clone());
+        let (proj_combined2, proj_combined_initial2) =
+            project_combine(&swarms, &subs, role.clone());
 
         // compose(a, b) should be equal to compose(b, a)
         assert!(crate::machine::equivalent(
@@ -854,7 +868,9 @@ mod tests {
         )
         .is_empty());
 
-        let (g, i) = composition::composition_swarm::compose_protocols(get_composition_input_vec1()).unwrap();
+        let (g, i) =
+            composition::composition_swarm::compose_protocols(get_composition_input_vec1())
+                .unwrap();
         let (proj, proj_initial) = project(&g, i, &subs, role.clone());
 
         // project(compose(proto1, proto2), r, sub) should equal compose(project(proto1, r, sub), project(proto2, r, sub))
