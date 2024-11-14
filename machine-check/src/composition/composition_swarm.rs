@@ -483,6 +483,7 @@ fn involved(node: NodeId, graph: &super::Graph) -> BTreeSet<Role> {
     roles
 }
 
+// consider changing to (graph, vec error, btreemap... ) instead of swarm protocol. then call with swarm_to_graph()
 fn prepare_graph<T: SwarmInterface>(
     proto: SwarmProtocol,
     subs: &Subscriptions,
@@ -903,6 +904,8 @@ mod tests {
     };
 
     use super::*;
+    use proptest::prelude::*;
+    use rand::prelude::*;
 
     // Example from coplaws slides
     fn get_proto1() -> SwarmProtocol {
@@ -1057,6 +1060,101 @@ mod tests {
                 interface: Some(Role::new("F")),
             },
         ]
+    }
+
+    prop_compose! {
+        fn vec_swarm_label(role: Role, max_events: usize)(vec in prop::collection::vec(("cmd", "e"), 1..max_events)) -> Vec<SwarmLabel> {
+            vec
+            .into_iter()
+            .enumerate()
+            .map(|(i, (cmd, event))|
+                SwarmLabel { cmd: Command::new(&format!("{role}_{cmd}_{i}")), log_type: vec![EventType::new(&format!("{role}_{event}_{i}"))], role: role.clone()})
+            .collect()
+        }
+    }
+
+    prop_compose! {
+        fn vec_role(max_roles: usize)(vec in prop::collection::vec("R", 1..max_roles)) -> Vec<Role> {
+            vec
+            .into_iter()
+            .enumerate()
+            .map(|(i, role)| Role::new(&format!("{role}{i}"))).collect()
+        }
+    }
+    prop_compose! {
+        fn all_labels(max_roles: usize, max_events: usize)
+                    (r in vec_role(max_roles))
+                    (labels in r.into_iter().map(|role| vec_swarm_label(role, max_events)).collect::<Vec<_>>()) -> Vec<SwarmLabel> {
+            labels.concat()
+        }
+    }
+
+    // make another one for generating interfacing.
+    // this one skewed towards having more branches in the first few nodes??
+    prop_compose! {
+        // add option (role, set<SwarmLabel>) to first parameter list. interface with these if some.
+        // consider changing prepare graph to not have to switch around between json thing and graph all the time in tests.
+        fn generate_graph(max_roles: usize, max_events: usize)(mut swarm_labels in all_labels(max_roles, max_events)) -> (Graph, NodeId, BTreeMap<Role, BTreeSet<SwarmLabel>>) {
+            let mut graph = Graph::new();
+            let mut map: BTreeMap<Role, BTreeSet<SwarmLabel>> = BTreeMap::new();
+            let mut nodes = Vec::new();
+            let mut rng = rand::thread_rng();
+            let gen_state_name = |g: &Graph| -> State { State::new(&g.node_count().to_string()) };
+            let add_to_map = |label: &SwarmLabel, m: &mut BTreeMap<Role, BTreeSet<SwarmLabel>>| { m.entry(label.role.clone()).and_modify(|events| { events.insert(label.clone()); } ).or_insert(BTreeSet::from([label.clone()])); };
+            swarm_labels.shuffle(&mut rng);
+            let initial = graph.add_node(State::new(&graph.node_count().to_string()));
+            nodes.push(initial);
+
+            while let Some(label) = swarm_labels.pop() {
+                //map.entry(label.role.clone()).and_modify(|events| { events.insert(label.get_event_type()); } ).or_insert(BTreeSet::from([label.get_event_type()]));
+                add_to_map(&label, &mut map);
+                // consider bernoulli thing. and distrbutions etc. bc documentations says that these once are optimised for cases where only a single sample is needed... if just faster does not matter
+                // generate new or select old source? Generate new or select old, generate new target or select old?
+                // same because you would have to connect to graph at some point anyway...?
+                // exclusive range upper limit
+                let source_node = if rng.gen_bool(1.0/10.0) {
+                    nodes[rng.gen_range(0..nodes.len())]
+                } else {
+                    // this whole thing was to have fewer branches... idk. loop will terminate because we always can reach 0?
+                    let mut source =  nodes[rng.gen_range(0..nodes.len())];
+                    while graph.edges_directed(source, Outgoing).count() > 0 {
+                        source = nodes[rng.gen_range(0..nodes.len())];
+                    }
+
+                    source
+                };
+
+
+
+                // if generated bool then select an existing node as target
+                // otherwise generate a new node as target
+                if rng.gen_bool(1.0/10.0) && !swarm_labels.is_empty() {
+                    let index = rng.gen_range(0..nodes.len());
+                    let target_node = nodes[index];
+                    //nodes.push(graph.add_node(State::new(&graph.node_count().to_string())));
+                    graph.add_edge(source_node, target_node, label);
+                    // we should be able to reach a terminating node from all nodes.
+                    // we check that swarm_labels is not empty before entering this branch
+                    // so we should be able to generate new node and add and edge from
+                    // target node to this new node
+                    if !node_can_reach_zero(&graph, target_node).is_empty() {
+                        let new_target_node = graph.add_node(gen_state_name(&graph));
+                        // consider not pushing?
+                        nodes.push(new_target_node);
+                        let new_weight = swarm_labels.pop().unwrap();
+                        add_to_map(&new_weight, &mut map);
+                        graph.add_edge(target_node, new_target_node, new_weight);
+                    }
+                } else {
+                    let target_node = graph.add_node(gen_state_name(&graph));
+                    nodes.push(target_node);
+                    graph.add_edge(source_node, target_node, label);
+                }
+            }
+
+
+            (graph, initial, map)
+        }
     }
 
     #[test]
@@ -1334,4 +1432,44 @@ mod tests {
         // check if subscription generated using implicit composition is actually wwf for the explicit composition.
         assert!(errors.is_empty());
     }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(1))]
+        #[test]
+        fn test_vec_role(vec in vec_role(10)) {
+            for (i, r) in vec.iter().enumerate() {
+                println!("ROLE IS: {:?}", r);
+                assert_eq!(*r, Role::new(&format!("R{}", i)));
+            }
+        }
+    }
+
+    proptest! {
+        //#![proptest_config(ProptestConfig::with_cases(1))]
+        #[test]
+        fn test_all_labels(labels in all_labels(10, 10)) {
+            /* for l in labels {
+                println!("label: {:?}", l);
+            } */
+
+            let labels2 = labels.clone().into_iter().collect::<BTreeSet<SwarmLabel>>().into_iter().collect::<Vec<_>>();
+            //let sl = SwarmLabel{role: Role::new(""), log_type: vec![], cmd: Command::new("")};
+            //assert_eq!(labels, vec![lables2, vec![sl]].concat());
+            assert_eq!(labels, labels2);
+        }
+    }
+
+    // For printing:
+    /* proptest! {
+        #![proptest_config(ProptestConfig::with_cases(15))]
+        #[test]
+        fn test_generate_graph((graph, initial, _) in generate_graph(10, 10)) {
+            let swarm = to_swarm_json(graph, initial);
+            println!("{}\n$$$$\n", serde_json::to_string_pretty(&swarm).unwrap());
+            let proto_info = prepare_graph::<Role>(swarm, &BTreeMap::new(), None);
+            let g = proto_info.get_ith_proto(0).unwrap();
+            assert_eq!(g.2, vec![]);
+
+        }
+    } */
 }

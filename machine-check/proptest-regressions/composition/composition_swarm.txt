@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 20a6c1247e9e3e20fb03949bc88f3dbd1c028ff2f2a34b9eee5892478c10abd9 # shrinks to labels = [SwarmLabel { cmd: Command(Interned("R0_cmd_0")), log_type: [EventType(Interned("R0_event_type_0"))], role: Role(Interned("R0")) }]
