@@ -1063,7 +1063,7 @@ mod tests {
     }
 
     prop_compose! {
-        fn vec_swarm_label(role: Role, max_events: usize)(vec in prop::collection::vec(("cmd", "event_type"), 1..max_events)) -> Vec<SwarmLabel> {
+        fn vec_swarm_label(role: Role, max_events: usize)(vec in prop::collection::vec(("cmd", "e"), 1..max_events)) -> Vec<SwarmLabel> {
             vec
             .into_iter()
             .enumerate()
@@ -1090,6 +1090,7 @@ mod tests {
     }
 
     // make another one for generating interfacing.
+    // this one skewed towards having more branches in the first few nodes??
     prop_compose! {
         // add option (role, set<SwarmLabel>) to first parameter list. interface with these if some.
         // consider changing prepare graph to not have to switch around between json thing and graph all the time in tests.
@@ -1111,11 +1112,23 @@ mod tests {
                 // generate new or select old source? Generate new or select old, generate new target or select old?
                 // same because you would have to connect to graph at some point anyway...?
                 // exclusive range upper limit
-                let source_node = nodes[rng.gen_range(0..nodes.len())];
+                let source_node = if rng.gen_bool(1.0/10.0) {
+                    nodes[rng.gen_range(0..nodes.len())]
+                } else {
+                    // this whole thing was to have fewer branches... idk. loop will terminate because we always can reach 0?
+                    let mut source =  nodes[rng.gen_range(0..nodes.len())];
+                    while graph.edges_directed(source, Outgoing).count() > 0 {
+                        source = nodes[rng.gen_range(0..nodes.len())];
+                    }
+
+                    source
+                };
+
+
 
                 // if generated bool then select an existing node as target
                 // otherwise generate a new node as target
-                if rng.gen_bool(1.0/3.0) && !swarm_labels.is_empty() {
+                if rng.gen_bool(1.0/10.0) && !swarm_labels.is_empty() {
                     let index = rng.gen_range(0..nodes.len());
                     let target_node = nodes[index];
                     //nodes.push(graph.add_node(State::new(&graph.node_count().to_string())));
@@ -1446,16 +1459,17 @@ mod tests {
         }
     }
 
-    proptest! {
-        #![proptest_config(ProptestConfig::with_cases(5))]
+    // For printing:
+    /* proptest! {
+        #![proptest_config(ProptestConfig::with_cases(15))]
         #[test]
-        fn test_generate_graph((graph, initial, map) in generate_graph(10, 10)) {
+        fn test_generate_graph((graph, initial, _) in generate_graph(10, 10)) {
             let swarm = to_swarm_json(graph, initial);
-            println!("{}", serde_json::to_string_pretty(&swarm).unwrap());
+            println!("{}\n$$$$\n", serde_json::to_string_pretty(&swarm).unwrap());
             let proto_info = prepare_graph::<Role>(swarm, &BTreeMap::new(), None);
             let g = proto_info.get_ith_proto(0).unwrap();
             assert_eq!(g.2, vec![]);
 
         }
-    }
+    } */
 }
