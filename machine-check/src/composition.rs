@@ -31,8 +31,13 @@ pub fn get_wwf_sub(proto: String) -> String {
         Ok(p) => p,
         Err(e) => return derr(vec![format!("parsing swarm protocol: {}", e)]),
     };
-    let subscriptions = composition::composition_swarm::weak_well_formed_sub(proto);
-    dok(serde_json::to_string(&subscriptions).unwrap())
+    let (subscriptions, error_report) = composition::composition_swarm::weak_well_formed_sub(proto);
+    if error_report.is_empty() {
+        dok(serde_json::to_string(&subscriptions).unwrap())
+    } else {
+        derr(error_report_to_strings(error_report))
+    }
+
 }
 
 #[wasm_bindgen]
@@ -42,9 +47,9 @@ pub fn compose_subs(input: String) -> String {
         Err(e) => return derr(vec![format!("parsing composition input: {}", e)]),
     };
 
-    let (sub, error_report) = composition_swarm::compose_subscriptions(protocols);
+    let (subscriptions, error_report) = composition_swarm::compose_subscriptions(protocols);
     if error_report.is_empty() {
-        dok(serde_json::to_string(&sub).unwrap())
+        dok(serde_json::to_string(&subscriptions).unwrap())
     } else {
         derr(error_report_to_strings(error_report))
     }

@@ -426,17 +426,17 @@ mod tests {
         vec![
             CompositionInput {
                 protocol: get_proto1(),
-                subscription: weak_well_formed_sub(get_proto1()),
+                subscription: weak_well_formed_sub(get_proto1()).0,
                 interface: None,
             },
             CompositionInput {
                 protocol: get_proto2(),
-                subscription: weak_well_formed_sub(get_proto2()),
+                subscription: weak_well_formed_sub(get_proto2()).0,
                 interface: Some(Role::new("T")),
             },
             CompositionInput {
                 protocol: get_proto3(),
-                subscription: weak_well_formed_sub(get_proto3()),
+                subscription: weak_well_formed_sub(get_proto3()).0,
                 interface: Some(Role::new("F")),
             },
         ]
@@ -446,17 +446,17 @@ mod tests {
         vec![
             CompositionInput {
                 protocol: get_proto2(),
-                subscription: weak_well_formed_sub(get_proto2()),
+                subscription: weak_well_formed_sub(get_proto2()).0,
                 interface: None,
             },
             CompositionInput {
                 protocol: get_proto1(),
-                subscription: weak_well_formed_sub(get_proto1()),
+                subscription: weak_well_formed_sub(get_proto1()).0,
                 interface: Some(Role::new("T")),
             },
             CompositionInput {
                 protocol: get_proto3(),
-                subscription: weak_well_formed_sub(get_proto3()),
+                subscription: weak_well_formed_sub(get_proto3()).0,
                 interface: Some(Role::new("F")),
             },
         ]
@@ -541,7 +541,7 @@ mod tests {
     fn test_projection_2() {
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let subs = weak_well_formed_sub(proto.clone());
+        let subs = weak_well_formed_sub(proto.clone()).0;
         let role = Role::new("FL");
         let (g, i, _) = from_json(proto, &subs);
         let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role);
@@ -598,7 +598,7 @@ mod tests {
     fn test_projection_3() {
         // car factory from coplaws example
         let proto = get_proto2();
-        let subs = weak_well_formed_sub(proto.clone());
+        let subs = weak_well_formed_sub(proto.clone()).0;
         let role = Role::new("F");
         let (g, i, _) = from_json(proto, &subs);
         let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role);

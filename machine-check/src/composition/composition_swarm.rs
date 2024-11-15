@@ -136,11 +136,16 @@ pub fn check(
     (graph, Some(initial), errors)
 }
 
-// Should propagate errors?? COME BACK!
-pub fn weak_well_formed_sub(proto: SwarmProtocol) -> Subscriptions {
+pub fn weak_well_formed_sub(proto: SwarmProtocol) -> (Subscriptions, ErrorReport) {
     let proto_info = prepare_graph::<Role>(proto, &BTreeMap::new(), None);
-    // Check confusion freeness now that it is not done in prepare!!!
-    wwf_sub(proto_info, 0)
+    let (graph, _, mut errors) = match proto_info.get_ith_proto(0) {
+        Some((g, Some(i), e)) => (g, i, e),
+        Some((g, None, e)) => return (BTreeMap::new(), ErrorReport(vec![(g, e)])),
+        _ => return (BTreeMap::new(), ErrorReport(vec![(Graph::new(), vec![])])),
+    };
+    // Check confusion freeness now that it is not done in prepare
+    errors.append(&mut confusion_free(&proto_info, 0));
+    (wwf_sub(proto_info, 0), ErrorReport(vec![(graph, errors)]))
 }
 
 pub fn compose_subscriptions(protos: CompositionInputVec) -> (Subscriptions, ErrorReport) {
@@ -170,7 +175,7 @@ pub fn compose_protocols(protos: CompositionInputVec) -> Result<(Graph, NodeId),
         let result = swarms_to_error_report(protos_ifs.into_iter().flat_map(|(proto_info, _)| proto_info.protocols).collect());
         return Err(result);
     }
-    // construct this to check whether the protocols interface
+    // construct this to check whether the protocols interface. also checks wwf for each proto
     let implicit_composition = implicit_composition_fold(protos_ifs);
     if !implicit_composition.no_errors() {
 
@@ -191,6 +196,20 @@ fn prepare_graphs(protos: CompositionInputVec) -> Vec<(ProtoInfo, Option<Role>)>
             )
         })
         .collect()
+}
+
+// perform wwf check on every protocol in a ProtoInfo
+fn weak_well_formed_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
+    let protocols: Vec<_> = proto_info.protocols.clone()
+    .into_iter()
+    .enumerate()
+    .map(|(i, ((graph, initial, errors) , interface))| {
+        let errors = vec![errors, weak_well_formed(&proto_info, i)].concat();
+        ((graph, initial, errors), interface)
+    })
+    .collect();
+
+    ProtoInfo {protocols, ..proto_info}
 }
 
 /*
@@ -504,17 +523,21 @@ fn implicit_composition_fold<T: SwarmInterface>(protos: Vec<(ProtoInfo, Option<T
         || protos[0].1.is_some()
         || protos[1..].iter().any(|(_, interface)| interface.is_none())
     {
-        return ProtoInfo::new(
-            vec![(
+        return ProtoInfo::new_only_proto(vec![(
                 (Graph::new(), None, vec![Error::InvalidArg]),
                 BTreeSet::new(),
-            )],
-            BTreeMap::new(),
-            BTreeMap::new(),
-            BTreeSet::new(),
-            BTreeSet::new(),
-            BTreeSet::new(),
-        );
+            )]);
+    }
+
+    let protos: Vec<_> = protos
+        .into_iter()
+        .map(|(proto_info, interface)| (weak_well_formed_proto_info(proto_info), interface))
+        .collect();
+
+    // check that every proto is wwf before composing. Consider doing this elsewhere?
+    if protos.iter().any(|(proto_info, _)| !proto_info.no_errors()) {
+        let protocols: Vec<_> = protos.into_iter().flat_map(|(proto_info, _)| proto_info.protocols).collect();
+        return ProtoInfo::new_only_proto(protocols);
     }
 
     let (proto, _) = protos[0].clone();
@@ -708,16 +731,6 @@ pub fn swarms_to_error_report(
             .map(|((graph, _, errors), _)| (graph, errors))
             .collect(),
     )
-}
-
-fn no_empty_log_errors(errors: &Vec<Error>) -> bool {
-    for e in errors {
-        match e {
-            Error::SwarmError(crate::swarm::Error::LogTypeEmpty(_)) => return false,
-            _ => (),
-        }
-    }
-    true
 }
 
 // copied from swarm::swarm.rs
@@ -1089,17 +1102,17 @@ mod tests {
         vec![
             CompositionInput {
                 protocol: get_proto1(),
-                subscription: weak_well_formed_sub(get_proto1()),
+                subscription: weak_well_formed_sub(get_proto1()).0,
                 interface: None,
             },
             CompositionInput {
                 protocol: get_proto2(),
-                subscription: weak_well_formed_sub(get_proto2()),
+                subscription: weak_well_formed_sub(get_proto2()).0,
                 interface: Some(Role::new("T")),
             },
             CompositionInput {
                 protocol: get_proto3(),
-                subscription: weak_well_formed_sub(get_proto3()),
+                subscription: weak_well_formed_sub(get_proto3()).0,
                 interface: Some(Role::new("F")),
             },
         ]
@@ -1440,13 +1453,18 @@ mod tests {
 
     #[test]
     fn test_weak_well_formed_sub() {
-        assert_eq!(weak_well_formed_sub(get_proto1()), get_subs1());
-        assert_eq!(weak_well_formed_sub(get_proto2()), get_subs2());
-        assert_eq!(weak_well_formed_sub(get_proto3()), get_subs3());
-        assert_eq!(
-            weak_well_formed_sub(get_proto1_proto2_composed()),
-            get_proto1_proto2_composed_subs()
-        );
+        let (subs1, errors1) = weak_well_formed_sub(get_proto1());
+        let (subs2, errors2) = weak_well_formed_sub(get_proto2());
+        let (subs3, errors3) = weak_well_formed_sub(get_proto3());
+        let (subs4, errors4) = weak_well_formed_sub(get_proto1_proto2_composed());
+        assert_eq!(subs1, get_subs1());
+        assert!(errors1.is_empty());
+        assert_eq!(subs2, get_subs2());
+        assert!(errors2.is_empty());
+        assert_eq!(subs3, get_subs3());
+        assert!(errors3.is_empty());
+        assert_eq!(subs4, get_proto1_proto2_composed_subs());
+        assert!(errors4.is_empty());
     }
 
     #[test]
@@ -1454,12 +1472,12 @@ mod tests {
         let composition_input = vec![
             CompositionInput {
                 protocol: get_proto1(),
-                subscription: weak_well_formed_sub(get_proto1()),
+                subscription: weak_well_formed_sub(get_proto1()).0,
                 interface: None,
             },
             CompositionInput {
                 protocol: get_proto2(),
-                subscription: weak_well_formed_sub(get_proto2()),
+                subscription: weak_well_formed_sub(get_proto2()).0,
                 interface: Some(Role::from("T")),
             },
         ];
@@ -1472,12 +1490,12 @@ mod tests {
         let composition_input = vec![
             CompositionInput {
                 protocol: get_proto1(),
-                subscription: weak_well_formed_sub(get_proto1()),
+                subscription: weak_well_formed_sub(get_proto1()).0,
                 interface: None,
             },
             CompositionInput {
                 protocol: get_proto2(),
-                subscription: weak_well_formed_sub(get_proto2()),
+                subscription: weak_well_formed_sub(get_proto2()).0,
                 interface: Some(Role::from("FL")),
             },
         ];
@@ -1556,4 +1574,21 @@ mod tests {
 
         }
     } */
+
+    #[test]
+    fn test_weird_comp() {
+        let proto1 = get_proto1();
+        let proto2 = get_proto2();
+        let subs1: Subscriptions = BTreeMap::from([(Role::new("T"), BTreeSet::new())]);
+        let subs2: Subscriptions = BTreeMap::from([(Role::new("F"), BTreeSet::new())]);
+
+        let v: CompositionInputVec = Vec::from([CompositionInput{protocol: proto1, subscription: subs1, interface: None}, CompositionInput{protocol: proto2, subscription: subs2, interface: Some(Role::new("T"))}]);
+        let (c, s) = implicit_composition_swarms(v);
+        for ((_, _, e), _) in c {
+            println!("ERRORS: {:?}", e);
+        }
+
+        println!("S: {:?}", s);
+
+    }
 }

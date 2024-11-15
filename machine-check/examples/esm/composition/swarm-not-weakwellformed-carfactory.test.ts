@@ -103,19 +103,26 @@ const result_subscriptions3: ResultData = getWWFSub(G3)
 
 describe('extended subscriptions', () => {
   it('subscription1 should be ok', () => {
-    expect(result_subscriptions2.type).toBe('OK')
+    expect(result_subscriptions2).toEqual({
+      type: 'ERROR',
+      errors: [
+        "state 0 can not reach terminal node",
+        "state 1 can not reach terminal node",
+        "state 2 can not reach terminal node",
+      ]
+    })
   })
 
   it('subscription3 should be ok', () => {
-    expect(result_subscriptions3.type).toBe('OK')
+    expect(result_subscriptions3).toEqual({
+      type: 'ERROR',
+      errors: [
+        "guard event type report appears in transitions from multiple states",
+        "event type report emitted by command in transition (0)--[build@F<report>]-->(1) and command in transition (1)--[test@TR<report>]-->(2)",
+      ]
+    })
   })
 })
-
-if (result_subscriptions2.type === 'ERROR') throw new Error('error getting subscription')
-const subscriptions2: Subscriptions = JSON.parse(result_subscriptions2.data)
-
-if (result_subscriptions3.type === 'ERROR') throw new Error('error getting subscription')
-const subscriptions3: Subscriptions = JSON.parse(result_subscriptions3.data)
 
 describe('checkWWFSwarmProtocol G1', () => {
   it('should catch not well-formed protocol', () => {
@@ -126,31 +133,6 @@ describe('checkWWFSwarmProtocol G1', () => {
         "active role does not subscribe to any of its emitted event types in transition (2)--[deliver@T<part>]-->(0)",
         "subsequently active role D does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
         "subsequently active role T does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
-      ]
-    })
-  })
-})
-
-describe('checkWWFSwarmProtocol G2', () => {
-  it('should catch not well-formed protocol', () => {
-    expect(checkWWFSwarmProtocol(G2, subscriptions2)).toEqual({
-      type: 'ERROR',
-      errors: [
-        "state 0 can not reach terminal node",
-        "state 1 can not reach terminal node",
-        "state 2 can not reach terminal node",
-      ]
-    })
-  })
-})
-
-describe('checkWWFSwarmProtocol G3', () => {
-  it('should catch not well-formed protocol', () => {
-    expect(checkWWFSwarmProtocol(G3, subscriptions3)).toEqual({
-      type: 'ERROR',
-      errors: [
-        "guard event type report appears in transitions from multiple states",
-        "event type report emitted by command in transition (0)--[build@F<report>]-->(1) and command in transition (1)--[test@TR<report>]-->(2)",
       ]
     })
   })
