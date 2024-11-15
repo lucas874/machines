@@ -71,6 +71,19 @@ impl ProtoInfo {
         }
     }
 
+    pub fn new_only_proto(
+        protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>
+    ) -> Self {
+        Self {
+            protocols,
+            role_event_map: BTreeMap::new(),
+            subscription: BTreeMap::new(),
+            concurrent_events: BTreeSet::new(),
+            branching_events: BTreeSet::new(),
+            joining_events: BTreeSet::new(),
+        }
+    }
+
     pub fn get_ith_proto(&self, i: usize) -> Option<(Graph, Option<NodeId>, Vec<Error>)> {
         if i >= self.protocols.len() {
             None

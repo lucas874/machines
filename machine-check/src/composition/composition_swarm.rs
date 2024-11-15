@@ -131,15 +131,21 @@ pub fn check(
         Some((g, None, e)) => return (g, None, e),
         _ => return (Graph::new(), None, vec![]),
     };
-    errors.extend(all_nodes_reachable(&graph, initial));
-    errors.extend(weak_well_formed(proto_info, 0));
+
+    errors.extend(weak_well_formed(&proto_info, 0));
     (graph, Some(initial), errors)
 }
 
-// Should propagate errors?? COME BACK!
-pub fn weak_well_formed_sub(proto: SwarmProtocol) -> Subscriptions {
+pub fn weak_well_formed_sub(proto: SwarmProtocol) -> (Subscriptions, ErrorReport) {
     let proto_info = prepare_graph::<Role>(proto, &BTreeMap::new(), None);
-    wwf_sub(proto_info, 0)
+    let (graph, _, mut errors) = match proto_info.get_ith_proto(0) {
+        Some((g, Some(i), e)) => (g, i, e),
+        Some((g, None, e)) => return (BTreeMap::new(), ErrorReport(vec![(g, e)])),
+        _ => return (BTreeMap::new(), ErrorReport(vec![(Graph::new(), vec![])])),
+    };
+    // Check confusion freeness now that it is not done in prepare
+    errors.append(&mut confusion_free(&proto_info, 0));
+    (wwf_sub(proto_info, 0), ErrorReport(vec![(graph, errors)]))
 }
 
 pub fn compose_subscriptions(protos: CompositionInputVec) -> (Subscriptions, ErrorReport) {
@@ -169,7 +175,7 @@ pub fn compose_protocols(protos: CompositionInputVec) -> Result<(Graph, NodeId),
         let result = swarms_to_error_report(protos_ifs.into_iter().flat_map(|(proto_info, _)| proto_info.protocols).collect());
         return Err(result);
     }
-    // construct this to check whether the protocols interface
+    // construct this to check whether the protocols interface. also checks wwf for each proto
     let implicit_composition = implicit_composition_fold(protos_ifs);
     if !implicit_composition.no_errors() {
 
@@ -192,13 +198,27 @@ fn prepare_graphs(protos: CompositionInputVec) -> Vec<(ProtoInfo, Option<Role>)>
         .collect()
 }
 
+// perform wwf check on every protocol in a ProtoInfo
+fn weak_well_formed_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
+    let protocols: Vec<_> = proto_info.protocols.clone()
+    .into_iter()
+    .enumerate()
+    .map(|(i, ((graph, initial, errors) , interface))| {
+        let errors = vec![errors, weak_well_formed(&proto_info, i)].concat();
+        ((graph, initial, errors), interface)
+    })
+    .collect();
+
+    ProtoInfo {protocols, ..proto_info}
+}
+
 /*
  * A graph that was constructed with prepare_graph with no errors will have one event type per command.
  * Similarly, such a graph will be weakly confusion free, which means we do not have to check for
  * command and log determinism like we do in swarm::well_formed.
  *
  */
-fn weak_well_formed(proto_info: ProtoInfo, proto_pointer: usize) -> Vec<Error> {
+fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> {
     // copied from swarm::well_formed
     let mut errors = Vec::new();
     let empty = BTreeSet::new(); // just for `sub` but needs its own lifetime
@@ -208,6 +228,8 @@ fn weak_well_formed(proto_info: ProtoInfo, proto_pointer: usize) -> Vec<Error> {
         Some((_, None, e)) => return e,
         None => return vec![Error::InvalidArg],
     };
+
+    errors.append(&mut confusion_free(proto_info, proto_pointer));
 
     // inital statements of loop copied from swarm::well_formed
     // comment from there:
@@ -289,6 +311,77 @@ fn weak_well_formed(proto_info: ProtoInfo, proto_pointer: usize) -> Vec<Error> {
             }
         }
     }
+    errors
+}
+
+fn confusion_free(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> {
+    let mut event_to_command_map = BTreeMap::new();
+    let (graph, initial, _) = match proto_info.get_ith_proto(proto_pointer) {
+        Some((g, Some(i), e)) => (g, i, e),
+        Some((_, None, e)) => return e, // this error would be returned twice in this case?
+        None => return vec![Error::InvalidArg],
+    };
+    // compute concurrent events for this graph instead of using the field in proto_info bc. we want to now concurrency in this graph
+    let concurrent_events = all_concurrent_pairs(&graph);
+    // if graph contains no concurrency, make old confusion freeness check. requires us to call swarm::prepare_graph through swarm::from_json
+    // corresponds to rule 3 of concurrency freeness in Composing Swarm Protocols
+    let (graph, initial, mut errors) = if concurrent_events.is_empty() {
+        let (graph, initial, e) = match crate::swarm::from_json(to_swarm_json(graph, initial), &proto_info.subscription) {
+            (g, Some(i), e) => (g, i, e),
+            (_, None, e) => {
+                return e.into_iter().map(|s| Error::SwarmErrorString(s)).collect();
+            }
+        };
+        (
+            graph,
+            initial,
+            e.into_iter().map(|s| Error::SwarmErrorString(s)).collect(),
+        )
+    } else {
+        (graph, initial, Vec::new())
+    };
+
+    let mut walk = Dfs::new(&graph, initial);
+
+    // add to set of branching and joining
+    // check for weak confusion freeness. confusion freeness does not depend on subscription.
+    // nice to whether graph is weakly confusion freeness before for instance generating wwf-subscription.
+    // for each node we pass three times over its outgoing edges... awkward find better way.
+    while let Some(node_id) = walk.next(&graph) {
+        // weak confusion freeness checks
+        let mut target_map: BTreeMap<SwarmLabel, NodeId> = BTreeMap::new();
+        for e in graph.edges_directed(node_id, Outgoing) {
+            // rule 1 check. Event types only associated with one command role pair.
+            let (role, command, e_id) = event_to_command_map
+                .entry(e.weight().get_event_type())
+                .or_insert((e.weight().role.clone(), e.weight().cmd.clone(), e.id()));
+            if (role.clone(), command.clone()) != (e.weight().role.clone(), e.weight().cmd.clone())
+            {
+                errors.push(Error::EventEmittedByDifferentCommands(
+                    e.weight().get_event_type(),
+                    *e_id,
+                    e.id(),
+                ));
+            }
+
+            // rule 2 check. Determinism.
+            let dst = target_map.entry(e.weight().clone()).or_insert(e.target());
+            if *dst != e.target() {
+                errors.push(Error::SwarmError(
+                    crate::swarm::Error::NonDeterministicGuard(e.id()),
+                ));
+                errors.push(Error::SwarmError(
+                    crate::swarm::Error::NonDeterministicCommand(e.id()),
+                ));
+            }
+        }
+
+        // we do not check for weak confusion freeness rule 3 if graph contains concurrency...? can we?
+
+        // weak confusion free rule 4 check.
+        errors.append(&mut node_can_reach_zero(&graph, node_id));
+    }
+
     errors
 }
 
@@ -430,17 +523,21 @@ fn implicit_composition_fold<T: SwarmInterface>(protos: Vec<(ProtoInfo, Option<T
         || protos[0].1.is_some()
         || protos[1..].iter().any(|(_, interface)| interface.is_none())
     {
-        return ProtoInfo::new(
-            vec![(
+        return ProtoInfo::new_only_proto(vec![(
                 (Graph::new(), None, vec![Error::InvalidArg]),
                 BTreeSet::new(),
-            )],
-            BTreeMap::new(),
-            BTreeMap::new(),
-            BTreeSet::new(),
-            BTreeSet::new(),
-            BTreeSet::new(),
-        );
+            )]);
+    }
+
+    let protos: Vec<_> = protos
+        .into_iter()
+        .map(|(proto_info, interface)| (weak_well_formed_proto_info(proto_info), interface))
+        .collect();
+
+    // check that every proto is wwf before composing. Consider doing this elsewhere?
+    if protos.iter().any(|(proto_info, _)| !proto_info.no_errors()) {
+        let protocols: Vec<_> = protos.into_iter().flat_map(|(proto_info, _)| proto_info.protocols).collect();
+        return ProtoInfo::new_only_proto(protocols);
     }
 
     let (proto, _) = protos[0].clone();
@@ -483,68 +580,28 @@ fn involved(node: NodeId, graph: &super::Graph) -> BTreeSet<Role> {
     roles
 }
 
-// consider changing to (graph, vec error, btreemap... ) instead of swarm protocol. then call with swarm_to_graph()
+// turn a SwarmProtocol into a ProtoInfo. Check for errors such as initial not reachable and empty logs.
 fn prepare_graph<T: SwarmInterface>(
     proto: SwarmProtocol,
     subs: &Subscriptions,
     interface: Option<T>,
 ) -> ProtoInfo {
-    let mut event_to_command_map = BTreeMap::new();
     let mut role_event_map: RoleEventMap = BTreeMap::new();
     let mut branching_events = BTreeSet::new();
     let mut joining_events: BTreeSet<EventType> = BTreeSet::new();
-    let (graph, mut errors, nodes) = swarm_to_graph(&proto);
-
-    let initial = if let Some(idx) = nodes.get(&proto.initial) {
-        *idx
-    } else {
-        errors.push(Error::SwarmError(
-            crate::swarm::Error::InitialStateDisconnected,
-        ));
-
-        return ProtoInfo::new(
-            vec![((graph, None, errors), BTreeSet::new())],
-            BTreeMap::new(),
-            subs.clone(),
-            BTreeSet::new(),
-            BTreeSet::new(),
-            BTreeSet::new(),
-        );
-    };
+    let (graph, initial, errors) = swarm_to_graph(&proto);
+    /* match (initial, errors.is_empty()) {
+        (None, _) | (_, false) => {
+            return ProtoInfo::new_only_proto(vec![((graph, initial, errors), BTreeSet::new())]);
+        }
+        _ => ()
+    } */
+    if initial.is_none() || !errors.is_empty() {
+        return ProtoInfo::new_only_proto(vec![((graph, initial, errors), BTreeSet::new())]);
+    }
 
     let concurrent_events = all_concurrent_pairs(&graph);
-    // if graph contains no concurrency, make old confusion freeness check. requires us to call swarm::prepare_graph through swarm::from_json
-    let (graph, initial, mut errors) = if concurrent_events.is_empty() {
-        let (graph, initial, e) = match crate::swarm::from_json(proto, subs) {
-            (g, Some(i), e) => (g, i, e),
-            (g, None, e) => {
-                let errors = e.into_iter().map(|s| Error::SwarmErrorString(s)).collect();
-                return ProtoInfo::new(
-                    vec![((g, None, errors), BTreeSet::new())],
-                    BTreeMap::new(),
-                    subs.clone(),
-                    concurrent_events,
-                    BTreeSet::new(),
-                    BTreeSet::new(),
-                );
-            }
-        };
-        (
-            graph,
-            initial,
-            vec![
-                errors,
-                e.into_iter().map(|s| Error::SwarmErrorString(s)).collect(),
-            ]
-            .concat(),
-        )
-    } else {
-        (graph, initial, errors)
-    };
-
-    let no_empty_logs = no_empty_log_errors(&errors);
-
-    let mut walk = Dfs::new(&graph, initial);
+    let mut walk = Dfs::new(&graph, initial.unwrap());
 
     // add to set of branching and joining
     // check for weak confusion freeness. confusion freeness does not depend on subscription.
@@ -576,53 +633,20 @@ fn prepare_graph<T: SwarmInterface>(
             );
         }
 
-        // weak confusion freeness checks
-        let mut target_map: BTreeMap<SwarmLabel, NodeId> = BTreeMap::new();
         for e in graph.edges_directed(node_id, Outgoing) {
-            // rule 1 check. Event types only associated with one command role pair.
-            // TEST THIS
-            let (role, command, e_id) = event_to_command_map
-                .entry(e.weight().get_event_type())
-                .or_insert((e.weight().role.clone(), e.weight().cmd.clone(), e.id()));
-            if (role.clone(), command.clone()) != (e.weight().role.clone(), e.weight().cmd.clone())
-            {
-                errors.push(Error::EventEmittedByDifferentCommands(
-                    e.weight().get_event_type(),
-                    *e_id,
-                    e.id(),
-                ));
-            }
-
-            // rule 2 check. Determinism.
-            let dst = target_map.entry(e.weight().clone()).or_insert(e.target());
-            if *dst != e.target() {
-                errors.push(Error::SwarmError(
-                    crate::swarm::Error::NonDeterministicGuard(e.id()),
-                ));
-                errors.push(Error::SwarmError(
-                    crate::swarm::Error::NonDeterministicCommand(e.id()),
-                ));
-            }
+            let cmd = e.weight().cmd.clone();
+            let event_type = e.weight().get_event_type();
+            let role = e.weight().role.clone();
+            let e_info = EventTypeInfo::new(cmd, event_type, role.clone());
+                role_event_map
+                .entry(role)
+                .and_modify(|v| {
+                    v.insert(e_info.clone());
+                })
+                .or_insert(BTreeSet::from([e_info]));
         }
-
-        // we do not check for weak confusion freeness rule 3 if graph contains concurrency...? can we?
-
-        // weak confusion free rule 4 check.
-        errors.append(&mut node_can_reach_zero(&graph, node_id));
     }
 
-    for event_type in event_to_command_map.keys() {
-        let (role, cmd, _) = event_to_command_map[event_type].clone();
-        let e_info = EventTypeInfo::new(cmd, event_type.clone(), role.clone());
-        role_event_map
-            .entry(role)
-            .and_modify(|v| {
-                v.insert(e_info.clone());
-            })
-            .or_insert(BTreeSet::from([e_info]));
-    }
-
-    let initial = no_empty_logs.then(|| initial);
     // Set interface field. If interface is some, then we want to interface this protocol
     // with some other protocol on this set of events.
     // We do not know if we can do that yet though.
@@ -641,7 +665,8 @@ fn prepare_graph<T: SwarmInterface>(
     )
 }
 
-fn swarm_to_graph(proto: &SwarmProtocol) -> (Graph, Vec<Error>, BTreeMap<State, NodeId>) {
+// turn a SwarmProtocol into a petgraph. perform some checks that are not strictly related to wwf, but must be successful for any further analysis to take place
+fn swarm_to_graph(proto: &SwarmProtocol) -> (Graph, Option<NodeId>, Vec<Error>) {
     let mut graph = Graph::new();
     let mut errors = vec![];
     let mut nodes = BTreeMap::new();
@@ -661,7 +686,17 @@ fn swarm_to_graph(proto: &SwarmProtocol) -> (Graph, Vec<Error>, BTreeMap<State, 
         }
     }
 
-    (graph, errors, nodes)
+    let initial = if let Some(idx) = nodes.get(&proto.initial) {
+        errors.append(&mut all_nodes_reachable(&graph, *idx));
+        Some(*idx)
+    } else {
+        // strictly speaking we have all_nodes_reachable errors here too...
+        errors.push(Error::SwarmError(
+            crate::swarm::Error::InitialStateDisconnected,
+        ));
+        None
+    };
+    (graph, initial, errors)
 }
 
 pub fn from_json(
@@ -696,16 +731,6 @@ pub fn swarms_to_error_report(
             .map(|((graph, _, errors), _)| (graph, errors))
             .collect(),
     )
-}
-
-fn no_empty_log_errors(errors: &Vec<Error>) -> bool {
-    for e in errors {
-        match e {
-            Error::SwarmError(crate::swarm::Error::LogTypeEmpty(_)) => return false,
-            _ => (),
-        }
-    }
-    true
 }
 
 // copied from swarm::swarm.rs
@@ -1023,15 +1048,17 @@ mod tests {
         )
         .unwrap()
     }
+
+    // pos event type associated with multiple commands and nondeterminism at 0 || 0
     fn get_confusionful_proto2() -> SwarmProtocol {
         serde_json::from_str::<SwarmProtocol>(
             r#"{
                 "initial": "0 || 0",
                 "transitions": [
                     { "source": "0 || 0", "target": "1 || 1", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
-                    { "source": "0 || 0", "target": "3 || 0", "label": { "cmd": "close", "logType": ["time"], "role": "D" } },
+                    { "source": "0 || 0", "target": "3 || 0", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
                     { "source": "1 || 1", "target": "2 || 1", "label": { "cmd": "get", "logType": ["pos"], "role": "FL" } },
-                    { "source": "2 || 1", "target": "0 || 2", "label": { "cmd": "deliver", "logType": ["partID"], "role": "T" } },
+                    { "source": "2 || 1", "target": "0 || 2", "label": { "cmd": "deliver", "logType": ["pos"], "role": "T" } },
                     { "source": "0 || 2", "target": "0 || 3", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
                     { "source": "0 || 2", "target": "3 || 2", "label": { "cmd": "close", "logType": ["time"], "role": "D" } },
                     { "source": "0 || 3", "target": "3 || 3", "label": { "cmd": "close", "logType": ["time"], "role": "D" } },
@@ -1042,21 +1069,50 @@ mod tests {
         .unwrap()
     }
 
+    // initial state state unreachable
+    fn get_confusionful_proto3() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "1", "target": "2", "label": { "cmd": "get", "logType": ["pos"], "role": "FL" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "deliver", "logType": ["partID"], "role": "T" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+
+    // all states not reachable
+    fn get_confusionful_proto4() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "deliver", "logType": ["part"], "role": "T" } },
+                    { "source": "4", "target": "5", "label": { "cmd": "build", "logType": ["car"], "role": "F" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+
     fn get_composition_input_vec1() -> CompositionInputVec {
         vec![
             CompositionInput {
                 protocol: get_proto1(),
-                subscription: weak_well_formed_sub(get_proto1()),
+                subscription: weak_well_formed_sub(get_proto1()).0,
                 interface: None,
             },
             CompositionInput {
                 protocol: get_proto2(),
-                subscription: weak_well_formed_sub(get_proto2()),
+                subscription: weak_well_formed_sub(get_proto2()).0,
                 interface: Some(Role::new("T")),
             },
             CompositionInput {
                 protocol: get_proto3(),
-                subscription: weak_well_formed_sub(get_proto3()),
+                subscription: weak_well_formed_sub(get_proto3()).0,
                 interface: Some(Role::new("F")),
             },
         ]
@@ -1252,11 +1308,16 @@ mod tests {
         let proto1 = get_confusionful_proto1();
         let sub = get_subs1();
         let proto_info = prepare_graph::<Role>(proto1.clone(), &sub, None);
-        let mut errors = proto_info
+        let mut errors = vec![
+                confusion_free(&proto_info, 0),
+                proto_info.get_ith_proto(0).unwrap().2
+            ].concat()
+            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
+        /* let mut errors = proto_info
             .get_ith_proto(0)
             .unwrap()
             .2
-            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
+            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0)); */
         let mut expected_erros = vec![
             "transition (0)--[close@D<time,time2>]-->(0) emits more than one event type",
             "guard event type partID appears in transitions from multiple states",
@@ -1271,13 +1332,49 @@ mod tests {
         let proto2 = get_confusionful_proto2();
         let sub = get_proto1_proto2_composed_subs();
 
-        let proto_info = prepare_graph::<Role>(proto2, &sub, None);
+        /* let proto_info = prepare_graph::<Role>(proto2, &sub, None);
         let errors = proto_info
             .get_ith_proto(0)
             .unwrap()
             .2
+            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0)); */
+        let proto_info = prepare_graph::<Role>(proto2, &sub, None);
+        let errors = vec![
+                confusion_free(&proto_info, 0),
+                proto_info.get_ith_proto(0).unwrap().2
+            ].concat()
             .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
-        let expected_errors = vec!["event type partID emitted by command in transition (0 || 0)--[request@T<partID>]-->(1 || 1) and command in transition (2 || 1)--[deliver@T<partID>]-->(0 || 2)"];
+        let expected_errors = vec![
+                "non-deterministic event guard type partID in state 0 || 0",
+                "non-deterministic command request for role T in state 0 || 0",
+                "event type pos emitted by command in transition (1 || 1)--[get@FL<pos>]-->(2 || 1) and command in transition (2 || 1)--[deliver@T<pos>]-->(0 || 2)"
+            ];
+
+        assert_eq!(errors, expected_errors);
+
+        let proto_info = prepare_graph::<Role>(get_confusionful_proto3(), &sub, None);
+        let errors = vec![
+                confusion_free(&proto_info, 0),
+                proto_info.get_ith_proto(0).unwrap().2
+            ].concat()
+            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
+        // recorded twice fix this!
+        let expected_errors = vec!["initial swarm protocol state has no transitions", "initial swarm protocol state has no transitions"];
+        assert_eq!(errors, expected_errors);
+
+        let proto_info = prepare_graph::<Role>(get_confusionful_proto4(), &sub, None);
+        let errors = //vec![
+                //confusion_free(&proto_info, 0)
+                proto_info.get_ith_proto(0).unwrap().2
+            //].concat()
+            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
+        // recorded twice fix this!
+        let expected_errors = vec![
+                "state 2 is unreachable from initial state",
+                "state 3 is unreachable from initial state",
+                "state 4 is unreachable from initial state",
+                "state 5 is unreachable from initial state"
+            ];
         assert_eq!(errors, expected_errors);
     }
 
@@ -1356,13 +1453,18 @@ mod tests {
 
     #[test]
     fn test_weak_well_formed_sub() {
-        assert_eq!(weak_well_formed_sub(get_proto1()), get_subs1());
-        assert_eq!(weak_well_formed_sub(get_proto2()), get_subs2());
-        assert_eq!(weak_well_formed_sub(get_proto3()), get_subs3());
-        assert_eq!(
-            weak_well_formed_sub(get_proto1_proto2_composed()),
-            get_proto1_proto2_composed_subs()
-        );
+        let (subs1, errors1) = weak_well_formed_sub(get_proto1());
+        let (subs2, errors2) = weak_well_formed_sub(get_proto2());
+        let (subs3, errors3) = weak_well_formed_sub(get_proto3());
+        let (subs4, errors4) = weak_well_formed_sub(get_proto1_proto2_composed());
+        assert_eq!(subs1, get_subs1());
+        assert!(errors1.is_empty());
+        assert_eq!(subs2, get_subs2());
+        assert!(errors2.is_empty());
+        assert_eq!(subs3, get_subs3());
+        assert!(errors3.is_empty());
+        assert_eq!(subs4, get_proto1_proto2_composed_subs());
+        assert!(errors4.is_empty());
     }
 
     #[test]
@@ -1370,12 +1472,12 @@ mod tests {
         let composition_input = vec![
             CompositionInput {
                 protocol: get_proto1(),
-                subscription: weak_well_formed_sub(get_proto1()),
+                subscription: weak_well_formed_sub(get_proto1()).0,
                 interface: None,
             },
             CompositionInput {
                 protocol: get_proto2(),
-                subscription: weak_well_formed_sub(get_proto2()),
+                subscription: weak_well_formed_sub(get_proto2()).0,
                 interface: Some(Role::from("T")),
             },
         ];
@@ -1388,12 +1490,12 @@ mod tests {
         let composition_input = vec![
             CompositionInput {
                 protocol: get_proto1(),
-                subscription: weak_well_formed_sub(get_proto1()),
+                subscription: weak_well_formed_sub(get_proto1()).0,
                 interface: None,
             },
             CompositionInput {
                 protocol: get_proto2(),
-                subscription: weak_well_formed_sub(get_proto2()),
+                subscription: weak_well_formed_sub(get_proto2()).0,
                 interface: Some(Role::from("FL")),
             },
         ];
@@ -1438,7 +1540,7 @@ mod tests {
         #[test]
         fn test_vec_role(vec in vec_role(10)) {
             for (i, r) in vec.iter().enumerate() {
-                println!("ROLE IS: {:?}", r);
+                //println!("ROLE IS: {:?}", r);
                 assert_eq!(*r, Role::new(&format!("R{}", i)));
             }
         }
@@ -1472,4 +1574,21 @@ mod tests {
 
         }
     } */
+
+    #[test]
+    fn test_weird_comp() {
+        let proto1 = get_proto1();
+        let proto2 = get_proto2();
+        let subs1: Subscriptions = BTreeMap::from([(Role::new("T"), BTreeSet::new())]);
+        let subs2: Subscriptions = BTreeMap::from([(Role::new("F"), BTreeSet::new())]);
+
+        let v: CompositionInputVec = Vec::from([CompositionInput{protocol: proto1, subscription: subs1, interface: None}, CompositionInput{protocol: proto2, subscription: subs2, interface: Some(Role::new("T"))}]);
+        let (c, s) = implicit_composition_swarms(v);
+        for ((_, _, e), _) in c {
+            println!("ERRORS: {:?}", e);
+        }
+
+        println!("S: {:?}", s);
+
+    }
 }
