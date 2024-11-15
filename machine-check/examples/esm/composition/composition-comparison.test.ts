@@ -123,11 +123,11 @@ describe('checkSwarmProtocol G1 || G2 || G3', () => {
     expect(checkSwarmProtocol(composition, subscriptions)).toEqual({
       type: 'ERROR',
       errors: [
-        "guard event type ok appears in transitions from multiple states",
-        "guard event type time appears in transitions from multiple states",
         "guard event type report appears in transitions from multiple states",
-        "guard event type car appears in transitions from multiple states",
         "guard event type notOk appears in transitions from multiple states",
+        "guard event type time appears in transitions from multiple states",
+        "guard event type ok appears in transitions from multiple states",
+        "guard event type car appears in transitions from multiple states",
         "subsequently involved role D does not subscribe to guard in transition (1 || 1 || 0)--[get@FL<position>]-->(2 || 1 || 0)",
         "subsequently involved role F does not subscribe to guard in transition (1 || 1 || 0)--[get@FL<position>]-->(2 || 1 || 0)",
         "subsequently involved role QCR does not subscribe to guard in transition (1 || 1 || 0)--[get@FL<position>]-->(2 || 1 || 0)",
