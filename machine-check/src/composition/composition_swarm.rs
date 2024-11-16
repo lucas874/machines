@@ -460,7 +460,7 @@ fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
 
             // weak determinacy 2. joining events. Add test for this...
             // GO over this again
-            if proto_info.joining_events.contains(&event_type) {
+            /* if proto_info.joining_events.contains(&event_type) {
                 let events_to_add: BTreeSet<_> = event_pairs_from_node(node, &graph, Incoming)
                     .into_iter()
                     .filter(|pair| proto_info.concurrent_events.contains(pair))
@@ -480,6 +480,18 @@ fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
                             curr.append(&mut events_to_add.clone());
                         })
                         .or_insert(events_to_add.clone());
+                }
+            } */
+            // instead of approach above, tried adding events 'ea, eb, ec' to the set of joining events instead of
+            // only the actual join eb. This makes it easier here?
+            if proto_info.joining_events.contains(&event_type) {
+                for r in involved_roles.iter() {
+                    subscriptions
+                        .entry(r.clone())
+                        .and_modify(|curr| {
+                            curr.insert(event_type.clone());
+                        })
+                        .or_insert(BTreeSet::from([event_type.clone()]));
                 }
             }
         }
@@ -651,17 +663,16 @@ fn prepare_graph<T: SwarmInterface>(
         let incoming_concurrent = incoming_pairs.into_iter().filter(|pair| concurrent_events.contains(pair)).map(|set| set.into_iter().collect::<Vec<_>>());
         let outgoing = graph.edges_directed(node_id, Outgoing).map(|e| e.weight().get_event_type()).collect::<BTreeSet<_>>();
         let product: Vec<_> = incoming_concurrent.cartesian_product(&outgoing).collect();
+        // add not only joining but also the concurrent events leading up to joining to this set.
+        // we could distinguish but why though.
         let mut joining: BTreeSet<_> = product
             .into_iter()
             .filter(|(pair, event)|
                 !concurrent_events.contains(&unord_event_pair(pair[0].clone(), (*event).clone()))
                 &&  !concurrent_events.contains(&unord_event_pair(pair[1].clone(), (*event).clone()))
-            ).map(|(_, event)| event.clone()).collect();
-
+            ).flat_map(|(pair, event)| [pair[0].clone(), pair[1].clone(), event.clone()]).collect();
 
         joining_events.append(&mut joining);
-
-
 
         for e in graph.edges_directed(node_id, Outgoing) {
             let cmd = e.weight().cmd.clone();
@@ -865,15 +876,13 @@ fn combine_subscriptions<T: SwarmInterface>(
     interface: &T,
 ) -> Subscriptions {
     let interfacing_events = interface.interfacing_event_types(proto_info1, &proto_info2);
-    let branching_events = proto_info1
-        .branching_events
-        .union(&proto_info2.branching_events)
-        .cloned()
-        .collect();
     let extra = interfacing_events
-        .union(&branching_events)
-        .cloned()
-        .collect();
+        .into_iter()
+        .chain(proto_info1.branching_events.clone())
+        .chain(proto_info2.branching_events.clone())
+        .chain(proto_info1.joining_events.clone())
+        .chain(proto_info2.joining_events.clone())
+        .collect::<BTreeSet<_>>();
 
     combine_maps(
         proto_info1.subscription.clone(),
