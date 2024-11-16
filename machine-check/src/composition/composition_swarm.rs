@@ -121,10 +121,7 @@ impl ErrorReport {
     }
 }
 
-pub fn check(
-    proto: SwarmProtocol,
-    subs: &Subscriptions,
-) -> (Graph, Option<NodeId>, Vec<Error>) {
+pub fn check(proto: SwarmProtocol, subs: &Subscriptions) -> (Graph, Option<NodeId>, Vec<Error>) {
     let proto_info = prepare_graph::<Role>(proto, subs, None);
     let (graph, initial, mut errors) = match proto_info.get_ith_proto(0) {
         Some((g, Some(i), e)) => (g, i, e),
@@ -148,6 +145,7 @@ pub fn weak_well_formed_sub(proto: SwarmProtocol) -> (Subscriptions, ErrorReport
     (wwf_sub(proto_info, 0), ErrorReport(vec![(graph, errors)]))
 }
 
+// why have this function and the one below????
 pub fn compose_subscriptions(protos: CompositionInputVec) -> (Subscriptions, ErrorReport) {
     let protos_ifs = prepare_graphs(protos);
     let result = implicit_composition_fold(protos_ifs);
@@ -171,14 +169,21 @@ pub fn implicit_composition_swarms(
 // find return type
 pub fn compose_protocols(protos: CompositionInputVec) -> Result<(Graph, NodeId), ErrorReport> {
     let protos_ifs = prepare_graphs(protos);
-    if protos_ifs.iter().any(|(proto_info, _)| !proto_info.no_errors()) {
-        let result = swarms_to_error_report(protos_ifs.into_iter().flat_map(|(proto_info, _)| proto_info.protocols).collect());
+    if protos_ifs
+        .iter()
+        .any(|(proto_info, _)| !proto_info.no_errors())
+    {
+        let result = swarms_to_error_report(
+            protos_ifs
+                .into_iter()
+                .flat_map(|(proto_info, _)| proto_info.protocols)
+                .collect(),
+        );
         return Err(result);
     }
     // construct this to check whether the protocols interface. also checks wwf for each proto
     let implicit_composition = implicit_composition_fold(protos_ifs);
     if !implicit_composition.no_errors() {
-
         return Err(proto_info_to_error_report(implicit_composition));
     }
 
@@ -200,16 +205,21 @@ fn prepare_graphs(protos: CompositionInputVec) -> Vec<(ProtoInfo, Option<Role>)>
 
 // perform wwf check on every protocol in a ProtoInfo
 fn weak_well_formed_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
-    let protocols: Vec<_> = proto_info.protocols.clone()
-    .into_iter()
-    .enumerate()
-    .map(|(i, ((graph, initial, errors) , interface))| {
-        let errors = vec![errors, weak_well_formed(&proto_info, i)].concat();
-        ((graph, initial, errors), interface)
-    })
-    .collect();
+    let protocols: Vec<_> = proto_info
+        .protocols
+        .clone()
+        .into_iter()
+        .enumerate()
+        .map(|(i, ((graph, initial, errors), interface))| {
+            let errors = vec![errors, weak_well_formed(&proto_info, i)].concat();
+            ((graph, initial, errors), interface)
+        })
+        .collect();
 
-    ProtoInfo {protocols, ..proto_info}
+    ProtoInfo {
+        protocols,
+        ..proto_info
+    }
 }
 
 /*
@@ -287,14 +297,17 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> 
             if proto_info.joining_events.contains(&event_type) {
                 for incoming_pair in event_pairs_from_node(node, &graph, Incoming) {
                     if proto_info.concurrent_events.contains(&incoming_pair) {
-                        let join_set: BTreeSet<EventType> = incoming_pair
-                            .union(&BTreeSet::from([event_type.clone()]))
-                            .cloned()
-                            .collect();
+                        let pair_vec: Vec<_> = incoming_pair.into_iter().collect();
+                        let join_set = if
+                            !proto_info.concurrent_events.contains(&unord_event_pair(pair_vec[0].clone(), event_type.clone()))
+                            && !proto_info.concurrent_events.contains(&unord_event_pair(pair_vec[1].clone(), event_type.clone())) {
+                                BTreeSet::from([pair_vec[0].clone(), pair_vec[1].clone(), event_type.clone()])
+                            } else {
+                                BTreeSet::new()
+                            };
                         let involved_not_subbed = involved_roles
                             .iter()
                             .filter(|r| !join_set.is_subset(sub(r)));
-                        let pair_vec: Vec<_> = incoming_pair.into_iter().collect();
                         let mut joining_errors: Vec<_> = involved_not_subbed
                             .map(|r| {
                                 Error::RoleNotSubscribedToJoin(
@@ -326,7 +339,10 @@ fn confusion_free(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> {
     // if graph contains no concurrency, make old confusion freeness check. requires us to call swarm::prepare_graph through swarm::from_json
     // corresponds to rule 3 of concurrency freeness in Composing Swarm Protocols
     let (graph, initial, mut errors) = if concurrent_events.is_empty() {
-        let (graph, initial, e) = match crate::swarm::from_json(to_swarm_json(graph, initial), &proto_info.subscription) {
+        let (graph, initial, e) = match crate::swarm::from_json(
+            to_swarm_json(graph, initial),
+            &proto_info.subscription,
+        ) {
             (g, Some(i), e) => (g, i, e),
             (_, None, e) => {
                 return e.into_iter().map(|s| Error::SwarmErrorString(s)).collect();
@@ -443,10 +459,17 @@ fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
             }
 
             // weak determinacy 2. joining events. Add test for this...
+            // GO over this again
             if proto_info.joining_events.contains(&event_type) {
                 let events_to_add: BTreeSet<_> = event_pairs_from_node(node, &graph, Incoming)
                     .into_iter()
                     .filter(|pair| proto_info.concurrent_events.contains(pair))
+                    .filter(|pair|
+                        {
+                            let pair = pair.into_iter().collect::<Vec<_>>();
+                            !proto_info.concurrent_events.contains(&unord_event_pair(pair[0].clone(), event_type.clone()))
+                            && !proto_info.concurrent_events.contains(&unord_event_pair(pair[1].clone(), event_type.clone()))
+                        })
                     .flat_map(|pair| pair)
                     .chain([event_type.clone()])
                     .collect();
@@ -524,9 +547,9 @@ fn implicit_composition_fold<T: SwarmInterface>(protos: Vec<(ProtoInfo, Option<T
         || protos[1..].iter().any(|(_, interface)| interface.is_none())
     {
         return ProtoInfo::new_only_proto(vec![(
-                (Graph::new(), None, vec![Error::InvalidArg]),
-                BTreeSet::new(),
-            )]);
+            (Graph::new(), None, vec![Error::InvalidArg]),
+            BTreeSet::new(),
+        )]);
     }
 
     let protos: Vec<_> = protos
@@ -536,7 +559,10 @@ fn implicit_composition_fold<T: SwarmInterface>(protos: Vec<(ProtoInfo, Option<T
 
     // check that every proto is wwf before composing. Consider doing this elsewhere?
     if protos.iter().any(|(proto_info, _)| !proto_info.no_errors()) {
-        let protocols: Vec<_> = protos.into_iter().flat_map(|(proto_info, _)| proto_info.protocols).collect();
+        let protocols: Vec<_> = protos
+            .into_iter()
+            .flat_map(|(proto_info, _)| proto_info.protocols)
+            .collect();
         return ProtoInfo::new_only_proto(protocols);
     }
 
@@ -621,24 +647,28 @@ fn prepare_graph<T: SwarmInterface>(
         let incoming_pairs = event_pairs_from_node(node_id, &graph, Incoming);
 
         // add joining events. if there are concurrent incoming edges, add the event types of all outgoing edges to set of joining events.
-        if incoming_pairs
+        // MORE CONDITIONS FOR JOINING SHOULD NOT BE CONCURRENT WITH eb
+        let incoming_concurrent = incoming_pairs.into_iter().filter(|pair| concurrent_events.contains(pair)).map(|set| set.into_iter().collect::<Vec<_>>());
+        let outgoing = graph.edges_directed(node_id, Outgoing).map(|e| e.weight().get_event_type()).collect::<BTreeSet<_>>();
+        let product: Vec<_> = incoming_concurrent.cartesian_product(&outgoing).collect();
+        let mut joining: BTreeSet<_> = product
             .into_iter()
-            .any(|pair| concurrent_events.contains(&pair))
-        {
-            joining_events.append(
-                &mut graph
-                    .edges_directed(node_id, Outgoing)
-                    .map(|e| e.weight().get_event_type())
-                    .collect(),
-            );
-        }
+            .filter(|(pair, event)|
+                !concurrent_events.contains(&unord_event_pair(pair[0].clone(), (*event).clone()))
+                &&  !concurrent_events.contains(&unord_event_pair(pair[1].clone(), (*event).clone()))
+            ).map(|(_, event)| event.clone()).collect();
+
+
+        joining_events.append(&mut joining);
+
+
 
         for e in graph.edges_directed(node_id, Outgoing) {
             let cmd = e.weight().cmd.clone();
             let event_type = e.weight().get_event_type();
             let role = e.weight().role.clone();
             let e_info = EventTypeInfo::new(cmd, event_type, role.clone());
-                role_event_map
+            role_event_map
                 .entry(role)
                 .and_modify(|v| {
                     v.insert(e_info.clone());
@@ -880,9 +910,11 @@ fn get_concurrent_events<T: SwarmInterface>(
         .map(|(a, b)| unord_event_pair(a, b.clone()))
         .collect();
 
-    concurrent_events_union.union(&cartesian_product).cloned().collect()
+    concurrent_events_union
+        .union(&cartesian_product)
+        .cloned()
+        .collect()
 }
-
 
 // precondition: the protocols can interface on the given interfaces
 fn explicit_composition(proto_info: ProtoInfo) -> (Graph, NodeId) {
@@ -890,11 +922,17 @@ fn explicit_composition(proto_info: ProtoInfo) -> (Graph, NodeId) {
         return (Graph::new(), NodeId::end());
     }
 
-    let ((g, i, _, ), _)  = proto_info.protocols[0].clone();
-    let folder = |(acc_g, acc_i) : (Graph, NodeId), ((g, i, _), interface): ((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)| -> (Graph, NodeId) {
-        crate::composition::composition_machine::compose(acc_g, acc_i, g, i.unwrap(), interface)
-    };
-    proto_info.protocols[1..].to_vec().into_iter().fold((g, i.unwrap()), folder)
+    let ((g, i, _), _) = proto_info.protocols[0].clone();
+    let folder =
+        |(acc_g, acc_i): (Graph, NodeId),
+         ((g, i, _), interface): ((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)|
+         -> (Graph, NodeId) {
+            crate::composition::composition_machine::compose(acc_g, acc_i, g, i.unwrap(), interface)
+        };
+    proto_info.protocols[1..]
+        .to_vec()
+        .into_iter()
+        .fold((g, i.unwrap()), folder)
 }
 
 pub fn to_swarm_json(graph: crate::Graph, initial: NodeId) -> SwarmProtocol {
@@ -922,6 +960,8 @@ pub fn to_swarm_json(graph: crate::Graph, initial: NodeId) -> SwarmProtocol {
 
 #[cfg(test)]
 mod tests {
+    use std::{iter::zip, sync::Mutex};
+
     use crate::{
         composition::{composition_types::CompositionInput, error_report_to_strings},
         types::Command,
@@ -1129,12 +1169,20 @@ mod tests {
         }
     }
 
+    // for uniquely named roles. not strictly necessary? but nice. little ugly idk
+    static ROLE_COUNTER_MUTEX: Mutex<u32> = Mutex::new(0);
+
     prop_compose! {
         fn vec_role(max_roles: usize)(vec in prop::collection::vec("R", 1..max_roles)) -> Vec<Role> {
             vec
             .into_iter()
-            .enumerate()
-            .map(|(i, role)| Role::new(&format!("{role}{i}"))).collect()
+
+            .map(|role| {
+                let mut mut_guard = ROLE_COUNTER_MUTEX.lock().unwrap();
+                let i: u32 = *mut_guard;
+                *mut_guard += 1;
+                Role::new(&format!("{role}{i}"))
+            }).collect()
         }
     }
     prop_compose! {
@@ -1145,10 +1193,30 @@ mod tests {
         }
     }
 
+    prop_compose! {
+        fn all_labels_and_if(max_roles: usize, max_events: usize)
+                    (roles in vec_role(max_roles))
+                    (index in 0..roles.len(), labels in roles.into_iter().map(|role| vec_swarm_label(role, max_events)).collect::<Vec<_>>())
+                    -> (Vec<SwarmLabel>, Vec<SwarmLabel>) {
+            let interfacing = labels[index].clone();
+            (labels.concat(), interfacing)
+        }
+    }
+
+    prop_compose! {
+        fn all_labels_composition(max_roles: usize, max_events: usize, max_protos: usize)
+                                 (tuples in prop::collection::vec(all_labels_and_if(max_roles, max_events), 1..max_protos))
+                                 -> Vec<(Option<Role>, Vec<SwarmLabel>)> {
+            let (labels, interfaces): (Vec<_>, Vec<_>) = tuples.into_iter().unzip();
+            let tmp: Vec<(Option<Role>, Vec<SwarmLabel>)>  = interfaces[..interfaces.len()].to_vec().into_iter().map(|interface| (Some(interface[0].role.clone()), interface)).collect();
+            let interfaces: Vec<(Option<Role>, Vec<SwarmLabel>)> = vec![vec![(None, vec![])], tmp].concat();
+            labels.into_iter().zip(interfaces.into_iter()).map(|(labels, (interface, interfacing_cmds))| (interface, vec![labels, interfacing_cmds].concat())).collect()
+        }
+    }
     // make another one for generating interfacing.
     // this one skewed towards having more branches in the first few nodes??
     prop_compose! {
-        // add option (role, set<SwarmLabel>) to first parameter list. interface with these if some.
+        // return graph and map: role -> vec swarmlabel, the map is to allow interfacing in CompositionInputVec generator
         // consider changing prepare graph to not have to switch around between json thing and graph all the time in tests.
         fn generate_graph(max_roles: usize, max_events: usize)(mut swarm_labels in all_labels(max_roles, max_events)) -> (Graph, NodeId, BTreeMap<Role, BTreeSet<SwarmLabel>>) {
             let mut graph = Graph::new();
@@ -1157,6 +1225,7 @@ mod tests {
             let mut rng = rand::thread_rng();
             let gen_state_name = |g: &Graph| -> State { State::new(&g.node_count().to_string()) };
             let add_to_map = |label: &SwarmLabel, m: &mut BTreeMap<Role, BTreeSet<SwarmLabel>>| { m.entry(label.role.clone()).and_modify(|events| { events.insert(label.clone()); } ).or_insert(BTreeSet::from([label.clone()])); };
+            // shuffling might not be a good idea when composing. not wrong composition, but...
             swarm_labels.shuffle(&mut rng);
             let initial = graph.add_node(State::new(&graph.node_count().to_string()));
             nodes.push(initial);
@@ -1179,8 +1248,6 @@ mod tests {
 
                     source
                 };
-
-
 
                 // if generated bool then select an existing node as target
                 // otherwise generate a new node as target
@@ -1210,6 +1277,79 @@ mod tests {
 
 
             (graph, initial, map)
+        }
+    }
+
+
+    // this one skewed towards having more branches in the first few nodes??
+    fn generate_graph1(interface: Option<Role>, mut swarm_labels: Vec<SwarmLabel>) -> (Graph, NodeId, Option<Role>) {
+        let mut graph = Graph::new();
+        let mut nodes = Vec::new();
+        let mut rng = rand::thread_rng();
+        let gen_state_name = |g: &Graph| -> State { State::new(&g.node_count().to_string()) };
+        swarm_labels.shuffle(&mut rng);
+        let initial = graph.add_node(State::new(&graph.node_count().to_string()));
+        nodes.push(initial);
+
+        while let Some(label) = swarm_labels.pop() {
+            // consider bernoulli thing. and distrbutions etc. bc documentations says that these once are optimised for cases where only a single sample is needed... if just faster does not matter
+            // generate new or select old source? Generate new or select old, generate new target or select old?
+            // same because you would have to connect to graph at some point anyway...?
+            // exclusive range upper limit
+            let source_node = if rng.gen_bool(1.0/10.0) {
+                nodes[rng.gen_range(0..nodes.len())]
+            } else {
+                // this whole thing was to have fewer branches... idk. loop will terminate because we always can reach 0?
+                let mut source =  nodes[rng.gen_range(0..nodes.len())];
+                while graph.edges_directed(source, Outgoing).count() > 0 {
+                    source = nodes[rng.gen_range(0..nodes.len())];
+                }
+
+                source
+            };
+
+            // if generated bool then select an existing node as target
+            // otherwise generate a new node as target
+            if rng.gen_bool(1.0/10.0) && !swarm_labels.is_empty() {
+                let index = rng.gen_range(0..nodes.len());
+                let target_node = nodes[index];
+                //nodes.push(graph.add_node(State::new(&graph.node_count().to_string())));
+                graph.add_edge(source_node, target_node, label);
+                // we should be able to reach a terminating node from all nodes.
+                // we check that swarm_labels is not empty before entering this branch
+                // so we should be able to generate new node and add and edge from
+                // target node to this new node
+                if !node_can_reach_zero(&graph, target_node).is_empty() {
+                    let new_target_node = graph.add_node(gen_state_name(&graph));
+                    // consider not pushing?
+                    nodes.push(new_target_node);
+                    let new_weight = swarm_labels.pop().unwrap();
+                    graph.add_edge(target_node, new_target_node, new_weight);
+                }
+            } else {
+                let target_node = graph.add_node(gen_state_name(&graph));
+                nodes.push(target_node);
+                graph.add_edge(source_node, target_node, label);
+            }
+        }
+
+
+        (graph, initial, interface)
+    }
+
+    prop_compose! {
+        fn generate_composition_input_vec(max_roles: usize, max_events: usize, max_protos: usize)
+                          (vec in all_labels_composition(max_roles, max_events, max_protos))
+                          -> CompositionInputVec {
+            vec.into_iter()
+                .map(|(interface, swarm_labels)| generate_graph1(interface, swarm_labels))
+                .map(|(graph, initial, interface)| {
+                    let protocol = to_swarm_json(graph, initial);
+                    let (subscription, _) = weak_well_formed_sub(protocol.clone());
+                    CompositionInput { protocol, subscription, interface }
+                    }
+                ).collect()
+
         }
     }
 
@@ -1309,15 +1449,16 @@ mod tests {
         let sub = get_subs1();
         let proto_info = prepare_graph::<Role>(proto1.clone(), &sub, None);
         let mut errors = vec![
-                confusion_free(&proto_info, 0),
-                proto_info.get_ith_proto(0).unwrap().2
-            ].concat()
-            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
+            confusion_free(&proto_info, 0),
+            proto_info.get_ith_proto(0).unwrap().2,
+        ]
+        .concat()
+        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
         /* let mut errors = proto_info
-            .get_ith_proto(0)
-            .unwrap()
-            .2
-            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0)); */
+        .get_ith_proto(0)
+        .unwrap()
+        .2
+        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0)); */
         let mut expected_erros = vec![
             "transition (0)--[close@D<time,time2>]-->(0) emits more than one event type",
             "guard event type partID appears in transitions from multiple states",
@@ -1340,10 +1481,11 @@ mod tests {
             .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0)); */
         let proto_info = prepare_graph::<Role>(proto2, &sub, None);
         let errors = vec![
-                confusion_free(&proto_info, 0),
-                proto_info.get_ith_proto(0).unwrap().2
-            ].concat()
-            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
+            confusion_free(&proto_info, 0),
+            proto_info.get_ith_proto(0).unwrap().2,
+        ]
+        .concat()
+        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
         let expected_errors = vec![
                 "non-deterministic event guard type partID in state 0 || 0",
                 "non-deterministic command request for role T in state 0 || 0",
@@ -1354,12 +1496,16 @@ mod tests {
 
         let proto_info = prepare_graph::<Role>(get_confusionful_proto3(), &sub, None);
         let errors = vec![
-                confusion_free(&proto_info, 0),
-                proto_info.get_ith_proto(0).unwrap().2
-            ].concat()
-            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
+            confusion_free(&proto_info, 0),
+            proto_info.get_ith_proto(0).unwrap().2,
+        ]
+        .concat()
+        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
         // recorded twice fix this!
-        let expected_errors = vec!["initial swarm protocol state has no transitions", "initial swarm protocol state has no transitions"];
+        let expected_errors = vec![
+            "initial swarm protocol state has no transitions",
+            "initial swarm protocol state has no transitions",
+        ];
         assert_eq!(errors, expected_errors);
 
         let proto_info = prepare_graph::<Role>(get_confusionful_proto4(), &sub, None);
@@ -1370,11 +1516,11 @@ mod tests {
             .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
         // recorded twice fix this!
         let expected_errors = vec![
-                "state 2 is unreachable from initial state",
-                "state 3 is unreachable from initial state",
-                "state 4 is unreachable from initial state",
-                "state 5 is unreachable from initial state"
-            ];
+            "state 2 is unreachable from initial state",
+            "state 3 is unreachable from initial state",
+            "state 4 is unreachable from initial state",
+            "state 5 is unreachable from initial state",
+        ];
         assert_eq!(errors, expected_errors);
     }
 
@@ -1535,29 +1681,188 @@ mod tests {
         assert!(errors.is_empty());
     }
 
-    proptest! {
-        #![proptest_config(ProptestConfig::with_cases(1))]
+    #[test]
+    fn test_compose_non_wwf_swarms() {
+        let proto1 = get_proto1();
+        let proto2 = get_proto2();
+        let subs1: Subscriptions = BTreeMap::from([(Role::new("T"), BTreeSet::new())]);
+        let subs2: Subscriptions = BTreeMap::from([(Role::new("F"), BTreeSet::new())]);
+
+        let composition_input: CompositionInputVec = Vec::from([
+            CompositionInput {
+                protocol: proto1,
+                subscription: subs1,
+                interface: None,
+            },
+            CompositionInput {
+                protocol: proto2,
+                subscription: subs2,
+                interface: Some(Role::new("T")),
+            },
+        ]);
+        let (swarms, subscriptions) = implicit_composition_swarms(composition_input);
+        let errors1 = vec![
+            "active role does not subscribe to any of its emitted event types in transition (0)--[close@D<time>]-->(3)",
+            "role D does not subscribe to events in branching transition (0)--[close@D<time>]-->(3)",
+            "role FL does not subscribe to events in branching transition (0)--[close@D<time>]-->(3)",
+            "role T does not subscribe to events in branching transition (0)--[close@D<time>]-->(3)",
+            "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
+            "subsequently active role FL does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
+            "role D does not subscribe to events in branching transition (0)--[request@T<partID>]-->(1)",
+            "role FL does not subscribe to events in branching transition (0)--[request@T<partID>]-->(1)",
+            "role T does not subscribe to events in branching transition (0)--[request@T<partID>]-->(1)",
+            "active role does not subscribe to any of its emitted event types in transition (1)--[get@FL<pos>]-->(2)",
+            "subsequently active role T does not subscribe to events in transition (1)--[get@FL<pos>]-->(2)",
+            "active role does not subscribe to any of its emitted event types in transition (2)--[deliver@T<part>]-->(0)",
+            "subsequently active role D does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
+            "subsequently active role T does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)"
+        ];
+
+        let errors2 = vec![
+            "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
+            "subsequently active role T does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
+            "active role does not subscribe to any of its emitted event types in transition (1)--[deliver@T<part>]-->(2)",
+            "subsequently active role F does not subscribe to events in transition (1)--[deliver@T<part>]-->(2)",
+            "active role does not subscribe to any of its emitted event types in transition (2)--[build@F<car>]-->(3)"
+        ];
+
+        let errors = vec![errors1, errors2];
+
+        for (((g, _, e), _), expected) in zip(swarms, errors) {
+            assert_eq!(e.map(Error::convert(&g)), expected);
+        }
+
+        assert!(subscriptions.is_empty());
+    }
+
+    // test that vectors of roles are generated as expected
+    /* proptest! {
         #[test]
-        fn test_vec_role(vec in vec_role(10)) {
+        fn test_vec_role(vec in vec_role(100)) {
             for (i, r) in vec.iter().enumerate() {
-                //println!("ROLE IS: {:?}", r);
                 assert_eq!(*r, Role::new(&format!("R{}", i)));
             }
+        }
+    } */
+
+    // test that vectors of swarm labels are generated as expected
+    /* proptest! {
+        #[test]
+        fn test_vec_swarm_label(vec in vec_swarm_label(Role::new("R"), 100)) {
+            for (i, label) in vec.iter().enumerate() {
+                assert_eq!(*label, SwarmLabel {cmd: Command::new(&format!("R_cmd_{i}")), log_type: vec![EventType::new(&format!("R_e_{i}"))], role: Role::new("R")})
+
+            }
+        }
+    } */
+
+    // test that we do not generate duplicate labels
+    proptest! {
+        #[test]
+        fn test_all_labels(mut labels in all_labels(10, 10)) {
+            labels.sort();
+            let mut labels2 = labels.clone().into_iter().collect::<BTreeSet<SwarmLabel>>().into_iter().collect::<Vec<_>>();
+            labels2.sort();
+            assert_eq!(labels, labels2);
+            //let sl = SwarmLabel{role: Role::new(""), log_type: vec![], cmd: Command::new("")};
+            //assert_eq!(labels, vec![lables2, vec![sl]].concat());
+
+        }
+    }
+
+    // test that we only generate confusion free protocols and that going back and forth between swarm and graph does not change the meaning of the protocol
+    // lower with_cases arg or max roles and events to make test run faster
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(50))]
+        #[test]
+        fn test_generate_graph((graph, initial, _) in generate_graph(50, 50)) {
+            let swarm = to_swarm_json(graph.clone(), initial);
+            let (g, i, e) = crate::swarm::from_json(to_swarm_json(graph.clone(), initial), &BTreeMap::new());
+            assert!(e.is_empty());
+            let swarm1 = to_swarm_json(g, i.unwrap());
+            assert_eq!(swarm, swarm1);
+            assert!(confusion_free(&prepare_graph::<Role>(swarm, &BTreeMap::new(), None), 0).is_empty());
         }
     }
 
     proptest! {
-        //#![proptest_config(ProptestConfig::with_cases(1))]
         #[test]
-        fn test_all_labels(labels in all_labels(10, 10)) {
-            /* for l in labels {
-                println!("label: {:?}", l);
-            } */
+        fn test_labels_and_interface((labels, interfacing) in all_labels_and_if(10, 10)) {
+            let interfacing_set = interfacing.clone().into_iter().collect::<BTreeSet<_>>();
+            let labels_set = labels.into_iter().collect::<BTreeSet<_>>();
+            assert!(interfacing_set.is_subset(&labels_set));
+            let first = interfacing[0].clone();
+            assert!(interfacing[1..].into_iter().all(|label| first.role == label.role));
+        }
+    }
 
-            let labels2 = labels.clone().into_iter().collect::<BTreeSet<SwarmLabel>>().into_iter().collect::<Vec<_>>();
-            //let sl = SwarmLabel{role: Role::new(""), log_type: vec![], cmd: Command::new("")};
-            //assert_eq!(labels, vec![lables2, vec![sl]].concat());
-            assert_eq!(labels, labels2);
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(3))]
+        #[test]
+        fn test_labels_composition(labels in all_labels_composition(10, 10, 4)) {
+            /* let interfacing_set = interfacing.clone().into_iter().collect::<BTreeSet<_>>();
+            let labels_set = labels.into_iter().collect::<BTreeSet<_>>();
+            assert!(interfacing_set.is_subset(&labels_set));
+            let first = interfacing[0].clone();
+            assert!(interfacing[1..].into_iter().all(|label| first.role == label.role)); */
+            for label in labels {
+                println!("thing: {:?} \n", label.0);
+                for l in label.1 {
+                    println!("\t label: {:?}", l);
+                }
+                println!("----------------\n\n")
+            }
+            println!("\n------------DONE------------\n")
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(0))]
+        #[test]
+        fn test_composition_generation(vec in generate_composition_input_vec(10, 10, 4)) {
+            /* let interfacing_set = interfacing.clone().into_iter().collect::<BTreeSet<_>>();
+            let labels_set = labels.into_iter().collect::<BTreeSet<_>>();
+            assert!(interfacing_set.is_subset(&labels_set));
+            let first = interfacing[0].clone();
+            assert!(interfacing[1..].into_iter().all(|label| first.role == label.role)); */
+            for proto in vec {
+                println!("interface: {:?}", proto.interface);
+                println!("proto: {} \n", serde_json::to_string_pretty(&proto.protocol).unwrap());
+                println!("subs: {}\n", serde_json::to_string_pretty(&proto.subscription).unwrap());
+                println!("----------------\n\n")
+            }
+            println!("\n------------DONE------------\n")
+
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(0))]
+        #[test]
+        fn test_overapprox(vec in generate_composition_input_vec(5, 5, 4)) {
+            println!("---------------------");
+            for s in vec.clone() {
+                println!("swarm component: {}", serde_json::to_string_pretty(&s.protocol).unwrap());
+                println!("interface: {:?}", s.interface);
+            }
+            let (subs, errors) = compose_subscriptions(vec.clone());
+            println!("subs: {}\n", serde_json::to_string_pretty(&subs).unwrap());
+            assert!(errors.is_empty());
+            let result = compose_protocols(vec);
+            assert!(result.is_ok());
+            let (composed_graph, composed_initial) = result.unwrap();
+            let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
+            let (g, _, e) = check(swarm.clone(), &subs);
+            println!("swarm: {}", serde_json::to_string_pretty(&swarm).unwrap());
+            println!("errors: {:?}", e.map(Error::convert(&g)));
+
+            let thing = prepare_graph::<Role>(swarm, &BTreeMap::new(), None);
+            println!("thing concurrent {:?}", thing.concurrent_events);
+            /* let mut proto_info = ProtoInfo::new_only_proto(vec![((composed_graph.clone(), Some(composed_initial), vec![]), BTreeSet::new())]);
+            proto_info.subscription = subs;
+            let errors = weak_well_formed(&proto_info, 0);
+            println!("errors: {:?}", errors.map(Error::convert(&composed_graph))); */
+
         }
     }
 
@@ -1575,20 +1880,5 @@ mod tests {
         }
     } */
 
-    #[test]
-    fn test_weird_comp() {
-        let proto1 = get_proto1();
-        let proto2 = get_proto2();
-        let subs1: Subscriptions = BTreeMap::from([(Role::new("T"), BTreeSet::new())]);
-        let subs2: Subscriptions = BTreeMap::from([(Role::new("F"), BTreeSet::new())]);
 
-        let v: CompositionInputVec = Vec::from([CompositionInput{protocol: proto1, subscription: subs1, interface: None}, CompositionInput{protocol: proto2, subscription: subs2, interface: Some(Role::new("T"))}]);
-        let (c, s) = implicit_composition_swarms(v);
-        for ((_, _, e), _) in c {
-            println!("ERRORS: {:?}", e);
-        }
-
-        println!("S: {:?}", s);
-
-    }
 }
