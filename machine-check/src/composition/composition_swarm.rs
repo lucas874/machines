@@ -29,7 +29,7 @@ pub enum Error {
     InvalidInterfaceRole(Role),
     InterfaceEventNotInBothProtocols(EventType),
     RoleNotSubscribedToBranch(EdgeId, Role),
-    RoleNotSubscribedToJoin(EventType, EventType, EdgeId, Role),
+    RoleNotSubscribedToJoin(Vec<EventType>, EdgeId, Role),
     MoreThanOneEventTypeInCommand(EdgeId),
     EventEmittedByDifferentCommands(EventType, EdgeId, EdgeId),
     StateCanNotReachTerminal(NodeId),
@@ -53,9 +53,10 @@ impl Error {
                     Edge(graph, *edge)
                 )
             }
-            Error::RoleNotSubscribedToJoin(event_type1, event_type2, edge, role) => {
+            Error::RoleNotSubscribedToJoin(preceding_events, edge, role) => {
+                let events = preceding_events.join(",");
                 format!(
-                    "role {role} does not subscribe to concurrent event types {event_type1} and {event_type2} leading to joining event in transition {}",
+                    "role {role} does not subscribe to concurrent event types {events} leading to joining event in transition {}",
                     Edge(graph, *edge),
                 )
             }
@@ -296,7 +297,23 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> 
             // corresponds to joining rule of weak determinacy.
             // very ugly srsly need to redo this
             if proto_info.joining_events.contains(&event_type) {
-                for incoming_pair in event_pairs_from_node(node, &graph, Incoming) {
+                // not sure if this is to coarse?
+                let join_set: BTreeSet<EventType> = proto_info.immediately_pre[&event_type].clone().into_iter().chain([event_type.clone()]).collect();
+                let involved_not_subbed = involved_roles
+                    .iter()
+                    .filter(|r| !join_set.is_subset(sub(r)));
+                let pre: Vec<_> = proto_info.immediately_pre[&event_type].clone().into_iter().collect();
+                let mut joining_errors: Vec<_> = involved_not_subbed
+                    .map(|r| {
+                        Error::RoleNotSubscribedToJoin(
+                            pre.clone(),
+                            edge.id(),
+                            r.clone(),
+                        )
+                    })
+                    .collect();
+                errors.append(&mut joining_errors);
+                /* for incoming_pair in event_pairs_from_node(node, &graph, Incoming) {
                     if proto_info.concurrent_events.contains(&incoming_pair) {
                         let pair_vec: Vec<_> = incoming_pair.into_iter().collect();
                         let join_set = if
@@ -321,7 +338,7 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> 
                             .collect();
                         errors.append(&mut joining_errors);
                     }
-                }
+                } */
             }
         }
     }
@@ -495,7 +512,7 @@ fn implicit_composition<T: SwarmInterface>(
         // Would work to construct it just like normally. but..
         return ProtoInfo::new_only_proto(protocols);
     }
-
+    let interfacing_event_types = interface.interfacing_event_types(&proto_info1, &proto_info2);
     let protocols = vec![proto_info1.protocols.clone(), proto_info2.protocols.clone()].concat();
     let role_event_map = combine_maps(
         proto_info1.role_event_map.clone(),
@@ -511,8 +528,11 @@ fn implicit_composition<T: SwarmInterface>(
         .collect();
     let joining_events: BTreeSet<EventType> = proto_info1
         .joining_events
-        .union(&proto_info2.joining_events)
-        .cloned()
+        .into_iter()
+        .chain(proto_info2.joining_events.into_iter())
+        .chain(interfacing_event_types.into_iter())
+        //.union(&proto_info2.joining_events)
+        //.cloned()
         .collect();
     let immediately_pre = combine_maps(proto_info1.immediately_pre.clone(), proto_info2.immediately_pre.clone(), None);
     ProtoInfo::new(
@@ -1860,7 +1880,7 @@ mod tests {
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(0))]
         #[test]
-        fn test_overapprox(vec in generate_composition_input_vec(5, 5, 4)) {
+        fn test_overapprox(vec in generate_composition_input_vec(10, 10, 10)) {
             println!("---------------------");
             for s in vec.clone() {
                 println!("swarm component: {}", serde_json::to_string_pretty(&s.protocol).unwrap());
@@ -1878,7 +1898,10 @@ mod tests {
             println!("errors: {:?}", e.map(Error::convert(&g)));
 
             let thing = prepare_graph::<Role>(swarm, &BTreeMap::new(), None);
-            println!("thing concurrent {:?}", thing.concurrent_events);
+            /* println!("thing concurrent {:?}", thing.concurrent_events);
+            println!("thing joins: {:?}", thing.joining_events);
+            println!("thing branches: {:?}", thing.branching_events);
+            println!("thing pres: {}", serde_json::to_string_pretty(&thing.immediately_pre).unwrap()); */
             /* let mut proto_info = ProtoInfo::new_only_proto(vec![((composed_graph.clone(), Some(composed_initial), vec![]), BTreeSet::new())]);
             proto_info.subscription = subs;
             let errors = weak_well_formed(&proto_info, 0);
