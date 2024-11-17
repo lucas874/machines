@@ -12,7 +12,7 @@ use std::{
 use super::MapVec;
 use super::{
     composition_types::{
-        unord_event_pair, CompositionInputVec, EventLabel, EventTypeInfo, ProtoInfo, RoleEventMap,
+        unord_event_pair, CompositionInputVec, EventLabel, ProtoInfo, RoleEventMap,
         SwarmInterface, UnordEventPair,
     },
     Graph,
@@ -294,6 +294,7 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> 
             }
 
             // corresponds to joining rule of weak determinacy.
+            // very ugly srsly need to redo this
             if proto_info.joining_events.contains(&event_type) {
                 for incoming_pair in event_pairs_from_node(node, &graph, Incoming) {
                     if proto_info.concurrent_events.contains(&incoming_pair) {
@@ -514,14 +515,7 @@ fn implicit_composition<T: SwarmInterface>(
         ]
         .concat();
         // Would work to construct it just like normally. but..
-        return ProtoInfo::new(
-            protocols,
-            BTreeMap::new(),
-            BTreeMap::new(),
-            BTreeSet::new(),
-            BTreeSet::new(),
-            BTreeSet::new(),
-        );
+        return ProtoInfo::new_only_proto(protocols);
     }
 
     let protocols = vec![proto_info1.protocols.clone(), proto_info2.protocols.clone()].concat();
@@ -529,7 +523,7 @@ fn implicit_composition<T: SwarmInterface>(
         proto_info1.role_event_map.clone(),
         proto_info2.role_event_map.clone(),
         None,
-    );
+    ); //combine_role_event_maps(&proto_info1.role_event_map, &proto_info2.role_event_map);
     let subscription = combine_subscriptions(&proto_info1, &proto_info2, &interface);
     let concurrent_events = get_concurrent_events(&proto_info1, &proto_info2, &interface);
     let branching_events: BTreeSet<EventType> = proto_info1
@@ -542,6 +536,7 @@ fn implicit_composition<T: SwarmInterface>(
         .union(&proto_info2.joining_events)
         .cloned()
         .collect();
+    let immediately_pre = combine_maps(proto_info1.immediately_pre.clone(), proto_info2.immediately_pre.clone(), None);
     ProtoInfo::new(
         protocols,
         role_event_map,
@@ -549,6 +544,7 @@ fn implicit_composition<T: SwarmInterface>(
         concurrent_events,
         branching_events,
         joining_events,
+        immediately_pre,
     )
 }
 
@@ -627,16 +623,20 @@ fn prepare_graph<T: SwarmInterface>(
     let mut role_event_map: RoleEventMap = BTreeMap::new();
     let mut branching_events = BTreeSet::new();
     let mut joining_events: BTreeSet<EventType> = BTreeSet::new();
+    let mut immediately_pre_map: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
     let (graph, initial, errors) = swarm_to_graph(&proto);
-    /* match (initial, errors.is_empty()) {
-        (None, _) | (_, false) => {
-            return ProtoInfo::new_only_proto(vec![((graph, initial, errors), BTreeSet::new())]);
-        }
-        _ => ()
-    } */
     if initial.is_none() || !errors.is_empty() {
         return ProtoInfo::new_only_proto(vec![((graph, initial, errors), BTreeSet::new())]);
     }
+
+    // If interface is some, then we want to interface this protocol
+    // with some other protocol on this set of events.
+    // We do not know if we can do that yet though, but we prepare as if we can.
+    let interface = if interface.is_some() {
+        interface.unwrap().interfacing_event_types_single(&graph)
+    } else {
+        BTreeSet::new()
+    };
 
     let concurrent_events = all_concurrent_pairs(&graph);
     let mut walk = Dfs::new(&graph, initial.unwrap());
@@ -670,12 +670,42 @@ fn prepare_graph<T: SwarmInterface>(
             .filter(|(pair, event)|
                 !concurrent_events.contains(&unord_event_pair(pair[0].clone(), (*event).clone()))
                 &&  !concurrent_events.contains(&unord_event_pair(pair[1].clone(), (*event).clone()))
-            ).flat_map(|(pair, event)| [pair[0].clone(), pair[1].clone(), event.clone()]).collect();
+            ).map(|(_, event)| event.clone()).collect();
 
         joining_events.append(&mut joining);
+        /* // since we add more to joining than the actual joins add events prior to interfacing as well. consider new field in proto info...
+        let mut pre_interfacing: BTreeSet<EventType> = if graph.edges_directed(node_id, Outgoing).any(|e| interface.contains(&e.weight().get_event_type())) {
+            graph.edges_directed(node_id, Incoming).map(|e| e.weight().get_event_type()).collect()
+        } else {
+            BTreeSet::new()
+        };
+        println!("HEEEEEEJ PRE IF: {:?}", pre_interfacing)
+        joining_events.append(&mut pre_interfacing); */
+        //let immediately_pre_node: Vec<_> = graph.edges_directed(node_id, Incoming).map(|e| e.weight().get_event_type()).collect();
 
-        for e in graph.edges_directed(node_id, Outgoing) {
-            let cmd = e.weight().cmd.clone();
+        for edge in graph.edges_directed(node_id, Outgoing) {
+            /* let mut immediately_pre: BTreeSet<_> = immediately_pre_node
+                .iter()
+                .filter(|e|{
+                    let pair = unord_event_pair((*e).clone(), edge.weight().get_event_type());
+                    !concurrent_events.contains(&pair)
+                })
+                .cloned()
+                .collect(); */
+            role_event_map
+                .entry(edge.weight().role.clone())
+                .and_modify(|role_info|{
+                    role_info.insert(edge.weight().clone());
+                })
+                .or_insert(BTreeSet::from([edge.weight().clone()]));
+            let mut pre = get_immediately_pre(&graph, edge, &concurrent_events);
+            immediately_pre_map
+                .entry(edge.weight().get_event_type())
+                .and_modify(|events| {
+                    events.append(&mut pre);
+                })
+                .or_insert(pre);
+            /* let cmd = e.weight().cmd.clone();
             let event_type = e.weight().get_event_type();
             let role = e.weight().role.clone();
             let e_info = EventTypeInfo::new(cmd, event_type, role.clone());
@@ -684,18 +714,10 @@ fn prepare_graph<T: SwarmInterface>(
                 .and_modify(|v| {
                     v.insert(e_info.clone());
                 })
-                .or_insert(BTreeSet::from([e_info]));
+                .or_insert(BTreeSet::from([e_info])); */
         }
     }
 
-    // Set interface field. If interface is some, then we want to interface this protocol
-    // with some other protocol on this set of events.
-    // We do not know if we can do that yet though.
-    let interface = if interface.is_some() {
-        interface.unwrap().interfacing_event_types_single(&graph)
-    } else {
-        BTreeSet::new()
-    };
     ProtoInfo::new(
         vec![((graph, initial, errors), interface)],
         role_event_map,
@@ -703,6 +725,7 @@ fn prepare_graph<T: SwarmInterface>(
         concurrent_events,
         branching_events,
         joining_events,
+        immediately_pre_map
     )
 }
 
@@ -846,6 +869,30 @@ fn diamond_shape(graph: &Graph, node: NodeId) -> BTreeSet<BTreeSet<EventType>> {
     concurrent_events
 }
 
+fn get_immediately_pre(graph: &Graph, edge: EdgeReference<'_, SwarmLabel>, concurrent_events: &BTreeSet<BTreeSet<EventType>>) -> BTreeSet<EventType> {
+    let node = edge.source();
+    let event_type = edge.weight().get_event_type();
+    let mut visited = BTreeSet::from([node]);
+    let mut to_visit = Vec::from([node]);
+    let mut immediately_pre = BTreeSet::new();
+
+    while let Some(node) = to_visit.pop() {
+        for e in graph.edges_directed(node, Incoming) {
+            if !concurrent_events.contains(&unord_event_pair(event_type.clone(), e.weight().get_event_type())) {
+                immediately_pre.insert(e.weight().get_event_type());
+            } else { // not sure this else branch is actually needed. when concurrency, one of the incoming will be noncurrent with event?
+                let source = e.source();
+                if !visited.contains(&source) {
+                    visited.insert(source);
+                    to_visit.push(source);
+                }
+            }
+        }
+    }
+
+    immediately_pre
+}
+
 // combine maps with sets as values
 fn combine_maps<K: Ord + Clone, V: Ord + Clone>(
     map1: BTreeMap<K, BTreeSet<V>>,
@@ -876,12 +923,19 @@ fn combine_subscriptions<T: SwarmInterface>(
     interface: &T,
 ) -> Subscriptions {
     let interfacing_events = interface.interfacing_event_types(proto_info1, &proto_info2);
-    let extra = interfacing_events
+
+    let extra = interfacing_events.clone()
         .into_iter()
         .chain(proto_info1.branching_events.clone())
         .chain(proto_info2.branching_events.clone())
-        .chain(proto_info1.joining_events.clone())
+        .chain(proto_info1.joining_events.clone()) // this is not how joining should be handled
         .chain(proto_info2.joining_events.clone())
+        .chain(interfacing_events
+            .iter()
+            .flat_map(|e| proto_info1.immediately_pre[e].clone()))
+        .chain(interfacing_events
+            .iter()
+            .flat_map(|e| proto_info2.immediately_pre[e].clone()))
         .collect::<BTreeSet<_>>();
 
     combine_maps(
@@ -1386,41 +1440,41 @@ mod tests {
             (
                 Role::from("T"),
                 BTreeSet::from([
-                    EventTypeInfo::new(
-                        Command::new("deliver"),
-                        EventType::new("part"),
-                        Role::new("T"),
-                    ),
-                    EventTypeInfo::new(
-                        Command::new("request"),
-                        EventType::new("partID"),
-                        Role::new("T"),
-                    ),
+                    SwarmLabel {
+                        cmd: Command::new("deliver"),
+                        log_type: vec![EventType::new("part")],
+                        role: Role::new("T"),
+                    },
+                    SwarmLabel {
+                        cmd: Command::new("request"),
+                        log_type: vec![EventType::new("partID")],
+                        role: Role::new("T"),
+                    },
                 ]),
             ),
             (
                 Role::from("FL"),
-                BTreeSet::from([EventTypeInfo::new(
-                    Command::new("get"),
-                    EventType::new("pos"),
-                    Role::new("FL"),
-                )]),
+                BTreeSet::from([SwarmLabel {
+                    cmd: Command::new("get"),
+                    log_type: vec![EventType::new("pos")],
+                    role: Role::new("FL"),
+                }]),
             ),
             (
                 Role::from("D"),
-                BTreeSet::from([EventTypeInfo::new(
-                    Command::new("close"),
-                    EventType::new("time"),
-                    Role::new("D"),
-                )]),
+                BTreeSet::from([SwarmLabel {
+                    cmd: Command::new("close"),
+                    log_type: vec![EventType::new("time")],
+                    role: Role::new("D"),
+                }]),
             ),
             (
                 Role::from("F"),
-                BTreeSet::from([EventTypeInfo::new(
-                    Command::new("build"),
-                    EventType::new("car"),
-                    Role::new("F"),
-                )]),
+                BTreeSet::from([SwarmLabel {
+                    cmd: Command::new("build"),
+                    log_type: vec![EventType::new("car")],
+                    role: Role::new("F"),
+                }]),
             ),
         ]);
         assert_eq!(proto_info.role_event_map, expected_role_event_map);

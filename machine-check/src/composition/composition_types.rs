@@ -17,7 +17,7 @@ pub enum DataResult {
     ERROR { errors: Vec<String> },
 }
 
-#[derive(Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+/* #[derive(Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EventTypeInfo {
     pub cmd: Command,
     pub event_type: EventType,
@@ -32,9 +32,59 @@ impl EventTypeInfo {
             event_type,
         }
     }
-}
+} */
 
-pub type RoleEventMap = BTreeMap<Role, BTreeSet<EventTypeInfo>>;
+/* #[derive(Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct RoleInfo {
+    pub swarm_labels: BTreeSet<SwarmLabel>,
+    pub immediately_pre: BTreeSet<EventType>,
+} */
+
+/* impl RoleInfo {
+    pub fn new(swarm_labels: BTreeSet<SwarmLabel>, immediately_pre: BTreeSet<EventType>) -> Self {
+        Self {
+            swarm_labels,
+            immediately_pre,
+        }
+    }
+
+    pub fn same_commands(&self, other: &RoleInfo) -> bool {
+        self.swarm_labels == other.swarm_labels
+    }
+
+    pub fn combine(&self, other: &RoleInfo) -> RoleInfo {
+        RoleInfo::new(
+            self.swarm_labels.clone().into_iter().chain(other.swarm_labels.clone().into_iter()).collect(),
+            self.immediately_pre.clone().into_iter().chain(other.immediately_pre.clone().into_iter()).collect(),
+        )
+    }
+} */
+
+pub type RoleEventMap = BTreeMap<Role, BTreeSet<SwarmLabel>>;//RoleInfo>;//BTreeSet<EventTypeInfo>>;
+
+/* pub fn combine_role_event_maps(a: &RoleEventMap, b: &RoleEventMap) -> RoleEventMap {
+    let all_keys: BTreeSet<Role> = a.keys().chain(a.keys()).cloned().collect();
+    let mapper = |role: Role| -> (Role, RoleInfo) {
+        let empty1 = RoleInfo::new(BTreeSet::new(), BTreeSet::new());
+        let empty2 = RoleInfo::new(BTreeSet::new(), BTreeSet::new());
+        let role_in_a = a.get(&role).unwrap_or(&empty1);
+        let role_in_b = b.get(&role).unwrap_or(&empty2);
+        (role, role_in_a.combine(role_in_b))
+    };
+
+    all_keys.into_iter().map(mapper).collect()
+    //unimplemented!()
+} */
+
+/* pub fn combine_role_event_maps(a: &RoleEventMap, b: &RoleEventMap) -> RoleEventMap {
+    let intersection: BTreeSet<Role> = a.keys().cloned().collect::<BTreeSet<_>>().union(&b.keys().cloned().collect::<BTreeSet<_>>()).cloned().collect();
+    intersection
+        .iter()
+        .map(|role| (role.clone(), a[role].combine(&b[role])))
+        .chain(a.keys().cloned().collect::<BTreeSet<_>>().difference(&intersection).map(|role| (role.clone(), a[role].clone())))
+        .chain(b.keys().cloned().collect::<BTreeSet<_>>().difference(&intersection).map(|role| (role.clone(), b[role].clone())))
+        .collect()
+} */
 
 pub type UnordEventPair = BTreeSet<EventType>;
 
@@ -50,6 +100,7 @@ pub struct ProtoInfo {
     pub concurrent_events: BTreeSet<UnordEventPair>, // consider to make a more specific type. unordered pair.
     pub branching_events: BTreeSet<EventType>,
     pub joining_events: BTreeSet<EventType>,
+    pub immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
 }
 
 impl ProtoInfo {
@@ -60,6 +111,7 @@ impl ProtoInfo {
         concurrent_events: BTreeSet<UnordEventPair>,
         branching_events: BTreeSet<EventType>,
         joining_events: BTreeSet<EventType>,
+        immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
     ) -> Self {
         Self {
             protocols,
@@ -68,6 +120,7 @@ impl ProtoInfo {
             concurrent_events,
             branching_events,
             joining_events,
+            immediately_pre,
         }
     }
 
@@ -81,6 +134,7 @@ impl ProtoInfo {
             concurrent_events: BTreeSet::new(),
             branching_events: BTreeSet::new(),
             joining_events: BTreeSet::new(),
+            immediately_pre: BTreeMap::new(),
         }
     }
 
@@ -165,10 +219,10 @@ impl ProtoLabel for ProtoInfo {
     fn get_labels(&self) -> BTreeSet<(Command, EventType, Role)> {
         self.role_event_map
             .values()
-            .flat_map(|event_infos| {
-                event_infos
-                    .into_iter()
-                    .map(|e| (e.cmd.clone(), e.event_type.clone(), e.role.clone()))
+            .flat_map(|role_info| {
+                role_info
+                    .iter()
+                    .map(|sl| (sl.cmd.clone(), sl.get_event_type(), sl.role.clone()))
             })
             .collect()
     }
