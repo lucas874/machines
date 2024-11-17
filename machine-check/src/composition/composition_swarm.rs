@@ -259,7 +259,7 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> 
 
             // weak causal consistency
             // corresponds to condition 2
-            // subscribe to event immediately preceeding
+            // subscribe to event immediately preceding
             // unlike well-formed we do not need to check that later involved roles
             // subscribes to fewer event in log than active -- only one event pr. log
             // active transitions not conc gets the transitions going out of edge.target()
@@ -431,7 +431,7 @@ fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
                 })
                 .or_insert(BTreeSet::from([event_type.clone()]));
 
-            // weak causal consistency 2: a role subscribes to events that immediately preceedes its own commands
+            // weak causal consistency 2: a role subscribes to events that immediately precedes its own commands
             for active in active_transitions_not_conc(
                 edge.target(),
                 &graph,
@@ -460,20 +460,10 @@ fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
             }
 
             // weak determinacy 2. joining events. Add test for this...
-            // GO over this again
-            /* if proto_info.joining_events.contains(&event_type) {
-                let events_to_add: BTreeSet<_> = event_pairs_from_node(node, &graph, Incoming)
-                    .into_iter()
-                    .filter(|pair| proto_info.concurrent_events.contains(pair))
-                    .filter(|pair|
-                        {
-                            let pair = pair.into_iter().collect::<Vec<_>>();
-                            !proto_info.concurrent_events.contains(&unord_event_pair(pair[0].clone(), event_type.clone()))
-                            && !proto_info.concurrent_events.contains(&unord_event_pair(pair[1].clone(), event_type.clone()))
-                        })
-                    .flat_map(|pair| pair)
-                    .chain([event_type.clone()])
-                    .collect();
+            // go over this again. But right now if joining add joining and all
+            // events immediately preceding the joining event
+            if proto_info.joining_events.contains(&event_type) {
+                let events_to_add: BTreeSet<EventType> = proto_info.immediately_pre[&event_type].clone().into_iter().chain([event_type.clone()]).collect();
                 for r in involved_roles.iter() {
                     subscriptions
                         .entry(r.clone())
@@ -481,18 +471,6 @@ fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
                             curr.append(&mut events_to_add.clone());
                         })
                         .or_insert(events_to_add.clone());
-                }
-            } */
-            // instead of approach above, tried adding events 'ea, eb, ec' to the set of joining events instead of
-            // only the actual join eb. This makes it easier here?
-            if proto_info.joining_events.contains(&event_type) {
-                for r in involved_roles.iter() {
-                    subscriptions
-                        .entry(r.clone())
-                        .and_modify(|curr| {
-                            curr.insert(event_type.clone());
-                        })
-                        .or_insert(BTreeSet::from([event_type.clone()]));
                 }
             }
         }
@@ -658,13 +636,11 @@ fn prepare_graph<T: SwarmInterface>(
 
         let incoming_pairs = event_pairs_from_node(node_id, &graph, Incoming);
 
-        // add joining events. if there are concurrent incoming edges, add the event types of all outgoing edges to set of joining events.
-        // MORE CONDITIONS FOR JOINING SHOULD NOT BE CONCURRENT WITH eb
+        // add joining events. if there are concurrent incoming edges, add the event types of all outgoing edges not concurrent with identified incoming to set of joining events.
         let incoming_concurrent = incoming_pairs.into_iter().filter(|pair| concurrent_events.contains(pair)).map(|set| set.into_iter().collect::<Vec<_>>());
         let outgoing = graph.edges_directed(node_id, Outgoing).map(|e| e.weight().get_event_type()).collect::<BTreeSet<_>>();
         let product: Vec<_> = incoming_concurrent.cartesian_product(&outgoing).collect();
-        // add not only joining but also the concurrent events leading up to joining to this set.
-        // we could distinguish but why though.
+        // if we have Ga-ea->Gb-eb->Gc, Gd-ec->Gb, with ea, ec concurrent, but not concurrent with eb then eb is joining
         let mut joining: BTreeSet<_> = product
             .into_iter()
             .filter(|(pair, event)|
@@ -673,31 +649,15 @@ fn prepare_graph<T: SwarmInterface>(
             ).map(|(_, event)| event.clone()).collect();
 
         joining_events.append(&mut joining);
-        /* // since we add more to joining than the actual joins add events prior to interfacing as well. consider new field in proto info...
-        let mut pre_interfacing: BTreeSet<EventType> = if graph.edges_directed(node_id, Outgoing).any(|e| interface.contains(&e.weight().get_event_type())) {
-            graph.edges_directed(node_id, Incoming).map(|e| e.weight().get_event_type()).collect()
-        } else {
-            BTreeSet::new()
-        };
-        println!("HEEEEEEJ PRE IF: {:?}", pre_interfacing)
-        joining_events.append(&mut pre_interfacing); */
-        //let immediately_pre_node: Vec<_> = graph.edges_directed(node_id, Incoming).map(|e| e.weight().get_event_type()).collect();
 
         for edge in graph.edges_directed(node_id, Outgoing) {
-            /* let mut immediately_pre: BTreeSet<_> = immediately_pre_node
-                .iter()
-                .filter(|e|{
-                    let pair = unord_event_pair((*e).clone(), edge.weight().get_event_type());
-                    !concurrent_events.contains(&pair)
-                })
-                .cloned()
-                .collect(); */
             role_event_map
                 .entry(edge.weight().role.clone())
                 .and_modify(|role_info|{
                     role_info.insert(edge.weight().clone());
                 })
                 .or_insert(BTreeSet::from([edge.weight().clone()]));
+
             let mut pre = get_immediately_pre(&graph, edge, &concurrent_events);
             immediately_pre_map
                 .entry(edge.weight().get_event_type())
@@ -705,16 +665,6 @@ fn prepare_graph<T: SwarmInterface>(
                     events.append(&mut pre);
                 })
                 .or_insert(pre);
-            /* let cmd = e.weight().cmd.clone();
-            let event_type = e.weight().get_event_type();
-            let role = e.weight().role.clone();
-            let e_info = EventTypeInfo::new(cmd, event_type, role.clone());
-            role_event_map
-                .entry(role)
-                .and_modify(|v| {
-                    v.insert(e_info.clone());
-                })
-                .or_insert(BTreeSet::from([e_info])); */
         }
     }
 
@@ -869,6 +819,8 @@ fn diamond_shape(graph: &Graph, node: NodeId) -> BTreeSet<BTreeSet<EventType>> {
     concurrent_events
 }
 
+// get events that are immediately before some event and not concurrent.
+// backtrack if immediately preceding is concurrent. not sure if this is needed or ok though
 fn get_immediately_pre(graph: &Graph, edge: EdgeReference<'_, SwarmLabel>, concurrent_events: &BTreeSet<BTreeSet<EventType>>) -> BTreeSet<EventType> {
     let node = edge.source();
     let event_type = edge.weight().get_event_type();
@@ -928,8 +880,14 @@ fn combine_subscriptions<T: SwarmInterface>(
         .into_iter()
         .chain(proto_info1.branching_events.clone())
         .chain(proto_info2.branching_events.clone())
-        .chain(proto_info1.joining_events.clone()) // this is not how joining should be handled
+        .chain(proto_info1.joining_events.clone()) // think joins could be handled in a better way...
+        .chain(proto_info1.joining_events
+            .iter()
+            .flat_map(|e| proto_info1.immediately_pre[e].clone()))
         .chain(proto_info2.joining_events.clone())
+        .chain(proto_info2.joining_events
+            .iter()
+            .flat_map(|e| proto_info2.immediately_pre[e].clone()))
         .chain(interfacing_events
             .iter()
             .flat_map(|e| proto_info1.immediately_pre[e].clone()))

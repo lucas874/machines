@@ -17,74 +17,7 @@ pub enum DataResult {
     ERROR { errors: Vec<String> },
 }
 
-/* #[derive(Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct EventTypeInfo {
-    pub cmd: Command,
-    pub event_type: EventType,
-    pub role: Role,
-}
-
-impl EventTypeInfo {
-    pub fn new(cmd: Command, event_type: EventType, role: Role) -> Self {
-        Self {
-            cmd,
-            role,
-            event_type,
-        }
-    }
-} */
-
-/* #[derive(Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct RoleInfo {
-    pub swarm_labels: BTreeSet<SwarmLabel>,
-    pub immediately_pre: BTreeSet<EventType>,
-} */
-
-/* impl RoleInfo {
-    pub fn new(swarm_labels: BTreeSet<SwarmLabel>, immediately_pre: BTreeSet<EventType>) -> Self {
-        Self {
-            swarm_labels,
-            immediately_pre,
-        }
-    }
-
-    pub fn same_commands(&self, other: &RoleInfo) -> bool {
-        self.swarm_labels == other.swarm_labels
-    }
-
-    pub fn combine(&self, other: &RoleInfo) -> RoleInfo {
-        RoleInfo::new(
-            self.swarm_labels.clone().into_iter().chain(other.swarm_labels.clone().into_iter()).collect(),
-            self.immediately_pre.clone().into_iter().chain(other.immediately_pre.clone().into_iter()).collect(),
-        )
-    }
-} */
-
 pub type RoleEventMap = BTreeMap<Role, BTreeSet<SwarmLabel>>;//RoleInfo>;//BTreeSet<EventTypeInfo>>;
-
-/* pub fn combine_role_event_maps(a: &RoleEventMap, b: &RoleEventMap) -> RoleEventMap {
-    let all_keys: BTreeSet<Role> = a.keys().chain(a.keys()).cloned().collect();
-    let mapper = |role: Role| -> (Role, RoleInfo) {
-        let empty1 = RoleInfo::new(BTreeSet::new(), BTreeSet::new());
-        let empty2 = RoleInfo::new(BTreeSet::new(), BTreeSet::new());
-        let role_in_a = a.get(&role).unwrap_or(&empty1);
-        let role_in_b = b.get(&role).unwrap_or(&empty2);
-        (role, role_in_a.combine(role_in_b))
-    };
-
-    all_keys.into_iter().map(mapper).collect()
-    //unimplemented!()
-} */
-
-/* pub fn combine_role_event_maps(a: &RoleEventMap, b: &RoleEventMap) -> RoleEventMap {
-    let intersection: BTreeSet<Role> = a.keys().cloned().collect::<BTreeSet<_>>().union(&b.keys().cloned().collect::<BTreeSet<_>>()).cloned().collect();
-    intersection
-        .iter()
-        .map(|role| (role.clone(), a[role].combine(&b[role])))
-        .chain(a.keys().cloned().collect::<BTreeSet<_>>().difference(&intersection).map(|role| (role.clone(), a[role].clone())))
-        .chain(b.keys().cloned().collect::<BTreeSet<_>>().difference(&intersection).map(|role| (role.clone(), b[role].clone())))
-        .collect()
-} */
 
 pub type UnordEventPair = BTreeSet<EventType>;
 
