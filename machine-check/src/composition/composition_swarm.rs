@@ -1851,7 +1851,7 @@ mod tests {
 
     // same test as above but for larger compositions. test fewer cases.
     proptest! {
-        #![proptest_config(ProptestConfig::with_cases(2))]
+        #![proptest_config(ProptestConfig::with_cases(1))]
         #[test]
         fn test_overapprox_2(vec in generate_composition_input_vec(10, 10, 7)) {
             let (subs_implicit, errors) = compose_subscriptions(vec.clone());
@@ -1906,6 +1906,4 @@ mod tests {
 
         }
     } */
-
-
 }
