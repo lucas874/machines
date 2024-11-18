@@ -293,7 +293,7 @@ pub(in crate::composition) fn compose<N: StateName + From<String>, E: EventLabel
     (machine, combined_initial)
 }
 
-fn to_option_machine(graph: &Graph) -> OptionGraph {
+pub(in crate::composition) fn to_option_machine(graph: &Graph) -> OptionGraph {
     graph.map(|_, n| Some(n.state_name().clone()), |_, x| x.clone())
 }
 
