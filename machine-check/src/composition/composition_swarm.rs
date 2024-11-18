@@ -518,7 +518,7 @@ fn implicit_composition<T: SwarmInterface>(
         proto_info1.role_event_map.clone(),
         proto_info2.role_event_map.clone(),
         None,
-    ); //combine_role_event_maps(&proto_info1.role_event_map, &proto_info2.role_event_map);
+    );
     let subscription = combine_subscriptions(&proto_info1, &proto_info2, &interface);
     let concurrent_events = get_concurrent_events(&proto_info1, &proto_info2, &interface);
     let branching_events: BTreeSet<EventType> = proto_info1
@@ -526,13 +526,12 @@ fn implicit_composition<T: SwarmInterface>(
         .union(&proto_info2.branching_events)
         .cloned()
         .collect();
+    // add the interfacing events to the set of joining events
     let joining_events: BTreeSet<EventType> = proto_info1
         .joining_events
         .into_iter()
         .chain(proto_info2.joining_events.into_iter())
         .chain(interfacing_event_types.into_iter())
-        //.union(&proto_info2.joining_events)
-        //.cloned()
         .collect();
     let immediately_pre = combine_maps(proto_info1.immediately_pre.clone(), proto_info2.immediately_pre.clone(), None);
     ProtoInfo::new(
@@ -1877,27 +1876,106 @@ mod tests {
         }
     }
 
-    proptest! {
-        #![proptest_config(ProptestConfig::with_cases(0))]
-        #[test]
-        fn test_overapprox(vec in generate_composition_input_vec(10, 10, 10)) {
-            println!("---------------------");
-            for s in vec.clone() {
-                println!("swarm component: {}", serde_json::to_string_pretty(&s.protocol).unwrap());
-                println!("interface: {:?}", s.interface);
+    // true if subs1 is a subset of subs2
+    fn is_sub_subscription(subs1: Subscriptions, subs2: Subscriptions) -> bool {
+        if !subs1.keys().cloned().collect::<BTreeSet<Role>>().is_subset(&subs2.keys().cloned().collect::<BTreeSet<Role>>()) {
+            return false;
+        }
+
+        for role in subs1.keys() {
+            //println!("explicit size: {} implicit size: {}", subs1[role].len(), subs2[role].len());
+            if !subs1[role].is_subset(&subs2[role]) {
+                return false;
             }
-            let (subs, errors) = compose_subscriptions(vec.clone());
-            println!("subs: {}\n", serde_json::to_string_pretty(&subs).unwrap());
+        }
+
+        true
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(1))]
+        #[test]
+        fn test_overapprox(vec in generate_composition_input_vec(5, 5, 10)) {
+            let (subs_implicit, errors) = compose_subscriptions(vec.clone());
             assert!(errors.is_empty());
-            let result = compose_protocols(vec);
+            let result = compose_protocols(vec.clone());
             assert!(result.is_ok());
+            for v in vec {
+                println!("interface: {:?}", v.interface);
+            }
             let (composed_graph, composed_initial) = result.unwrap();
             let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
-            let (g, _, e) = check(swarm.clone(), &subs);
-            println!("swarm: {}", serde_json::to_string_pretty(&swarm).unwrap());
-            println!("errors: {:?}", e.map(Error::convert(&g)));
+            let (subs_explicit, _) = weak_well_formed_sub(swarm.clone());
+            //println!("wwf sub obtained using explicit");
+            //assert!(is_sub_subscription(subs_explicit.clone(), subs_implicit));
 
-            let thing = prepare_graph::<Role>(swarm, &BTreeMap::new(), None);
+
+            let subs_explicit2 = wwf_sub(ProtoInfo::new_only_proto(vec![((composed_graph.clone(), Some(composed_initial), vec![]), BTreeSet::new())]), 0);
+            println!("explicit == explicit2: {}", subs_explicit == subs_explicit2);
+            let (g, i, e) = swarm_to_graph(&swarm);
+
+            let swarm1 = to_swarm_json(g, i.unwrap());
+            println!("swarm == swarm1: {}", swarm == swarm1);
+            println!("explicit: {}", serde_json::to_string_pretty(&subs_explicit).unwrap());
+            println!("explicit2: {}", serde_json::to_string_pretty(&subs_explicit2).unwrap());
+            //assert!(is_sub_subscription(subs_explicit.clone(), subs_implicit.clone()));
+
+            /* if !is_sub_subscription(subs_explicit.clone(), subs_implicit.clone()) {
+                println!("explicit: {}", serde_json::to_string_pretty(&subs_explicit).unwrap());
+                println!("implicit: {}", serde_json::to_string_pretty(&subs_implicit).unwrap());
+            } */
+    }
+}
+
+    /* proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+        #[test]
+        fn test_overapprox_printing(vec in generate_composition_input_vec(10, 10, 10)) {
+            println!("---------------------");
+            /* for s in vec.clone() {
+                println!("swarm component: {}", serde_json::to_string_pretty(&s.protocol).unwrap());
+                println!("interface: {:?}", s.interface);
+            } */
+            let mut event_count = 0;
+            for input in &vec {
+                event_count = event_count + input.protocol.transitions.len();
+                println!("component |E|: {}", input.protocol.transitions.len());
+            }
+            println!("total events: {}", event_count);
+            let (subs_implicit, errors) = compose_subscriptions(vec.clone());
+            //println!("subs: {}\n", serde_json::to_string_pretty(&subs).unwrap());
+            println!("implicit done");
+            assert!(errors.is_empty());
+            let result = compose_protocols(vec);
+            println!("protocol composed");
+            assert!(result.is_ok());
+            let (composed_graph, composed_initial) = result.unwrap();
+            println!("composed |E|: {}", composed_graph.edge_count());
+            //let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
+            //let (subs_explicit, _) = weak_well_formed_sub(swarm);
+            //println!("wwf sub obtained using explicit");
+            //assert!(is_sub_subscription(subs_explicit, subs_implicit));
+            //println!("implicit: {}", serde_json::to_string_pretty(&subs_implicit).unwrap());
+            //println!("explicit: {}", serde_json::to_string_pretty(&subs_explicit).unwrap());
+            //let subs_implicit_set: BTreeSet<(Role, BTreeSet<EventType>)> = subs_implicit.into_iter().collect();
+            //let subs_explicit_set: BTreeSet<(Role, BTreeSet<EventType>)> = subs_explicit.into_iter().collect();
+            //println!("implicit: {:?}", subs_implicit_set);
+            //println!("explicit: {:?}", subs_explicit_set);
+            //println!("implicit size: {}\nexplicit size: {}", subs_implicit_set.len(), subs_explicit_set.len());
+            //println!("explicit is subset implicit {}", subs_explicit_set.is_subset(&subs_implicit_set))
+            //println!("explicit is subset implicit {}", is_sub_subscription(subs_explicit, subs_implicit));
+            /* println!("explicit is subset implicit {}", subs_explicit_set.is_subset(&subs_implicit_set));
+            let difference1: BTreeSet<_> = subs_explicit_set.difference(&subs_implicit_set).collect();
+            println!("explicit \\ implicit: {:?}", difference1);
+            let difference2: BTreeSet<_> = subs_implicit_set.difference(&subs_explicit_set).collect();
+            println!("implicit \\ explicit: {:?}", difference2); */
+            //assert!(subs_implicit_set.is_subset(&subs_explicit_set))
+            //let (g, _, e) = check(swarm.clone(), &subs);
+            //println!("explicit done");
+            //println!("swarm: {}", serde_json::to_string_pretty(&swarm).unwrap());
+            //println!("errors: {:?}", e.map(Error::convert(&g)));
+
+            //let thing = prepare_graph::<Role>(swarm, &BTreeMap::new(), None);
             /* println!("thing concurrent {:?}", thing.concurrent_events);
             println!("thing joins: {:?}", thing.joining_events);
             println!("thing branches: {:?}", thing.branching_events);
@@ -1908,7 +1986,7 @@ mod tests {
             println!("errors: {:?}", errors.map(Error::convert(&composed_graph))); */
 
         }
-    }
+    } */
 
     // For printing:
     /* proptest! {
