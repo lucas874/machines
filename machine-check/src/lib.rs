@@ -5,6 +5,7 @@ mod machine;
 mod swarm;
 pub mod types;
 mod composition;
+pub use self::composition::{get_wwf_sub, compose_subs, compose_protocols};
 
 use petgraph::visit::GraphBase;
 use types::{CheckResult, EventType, MachineLabel, Protocol, Role, State, SwarmLabel};

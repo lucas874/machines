@@ -1,0 +1,1 @@
+[{"protocol":{"initial":"0","transitions":[{"label":{"cmd":"R209_cmd_0","logType":["R209_e_0"],"role":"R209"},"source":"0","target":"1"},{"label":{"cmd":"R208_cmd_0","logType":["R208_e_0"],"role":"R208"},"source":"1","target":"2"}]},"subscription":{"R208":["R208_e_0","R209_e_0"],"R209":["R209_e_0"]},"interface":null}]

@@ -1,0 +1,1 @@
+[{"protocol":{"initial":"0","transitions":[{"label":{"cmd":"R202_cmd_0","logType":["R202_e_0"],"role":"R202"},"source":"0","target":"1"}]},"subscription":{"R202":["R202_e_0"]},"interface":null}]

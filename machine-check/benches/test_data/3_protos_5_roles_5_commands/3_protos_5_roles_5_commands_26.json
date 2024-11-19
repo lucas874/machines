@@ -1,0 +1,1 @@
+[{"protocol":{"initial":"0","transitions":[{"label":{"cmd":"R90_cmd_0","logType":["R90_e_0"],"role":"R90"},"source":"0","target":"1"},{"label":{"cmd":"R91_cmd_0","logType":["R91_e_0"],"role":"R91"},"source":"1","target":"2"}]},"subscription":{"R90":["R90_e_0"],"R91":["R90_e_0","R91_e_0"]},"interface":null}]

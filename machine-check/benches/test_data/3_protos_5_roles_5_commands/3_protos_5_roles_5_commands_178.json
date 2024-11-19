@@ -1,0 +1,1 @@
+[{"protocol":{"initial":"0","transitions":[{"label":{"cmd":"R672_cmd_1","logType":["R672_e_1"],"role":"R672"},"source":"0","target":"1"},{"label":{"cmd":"R672_cmd_0","logType":["R672_e_0"],"role":"R672"},"source":"1","target":"2"}]},"subscription":{"R672":["R672_e_0","R672_e_1"]},"interface":null}]

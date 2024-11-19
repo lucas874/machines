@@ -1,0 +1,1 @@
+[{"protocol":{"initial":"0","transitions":[{"label":{"cmd":"R764_cmd_0","logType":["R764_e_0"],"role":"R764"},"source":"0","target":"1"}]},"subscription":{"R764":["R764_e_0"]},"interface":null}]

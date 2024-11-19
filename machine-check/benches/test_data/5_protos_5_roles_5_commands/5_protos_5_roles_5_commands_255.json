@@ -1,0 +1,1 @@
+[{"protocol":{"initial":"0","transitions":[{"label":{"cmd":"R1663_cmd_0","logType":["R1663_e_0"],"role":"R1663"},"source":"0","target":"0"},{"label":{"cmd":"R1663_cmd_1","logType":["R1663_e_1"],"role":"R1663"},"source":"0","target":"1"}]},"subscription":{"R1663":["R1663_e_0","R1663_e_1"]},"interface":null}]

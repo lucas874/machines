@@ -1,0 +1,1 @@
+[{"protocol":{"initial":"0","transitions":[{"label":{"cmd":"R411_cmd_1","logType":["R411_e_1"],"role":"R411"},"source":"0","target":"0"},{"label":{"cmd":"R411_cmd_0","logType":["R411_e_0"],"role":"R411"},"source":"0","target":"1"}]},"subscription":{"R411":["R411_e_0","R411_e_1"]},"interface":null}]

@@ -1000,7 +1000,7 @@ pub fn to_swarm_json(graph: crate::Graph, initial: NodeId) -> SwarmProtocol {
 
 #[cfg(test)]
 mod tests {
-    use std::{iter::zip, sync::Mutex};
+    use std::{iter::zip, path::Path, sync::Mutex, fs::File, io::prelude::*};
 
     use crate::{
         composition::{composition_machine::{project, project_combine, to_option_machine}, composition_types::CompositionInput, error_report_to_strings},
@@ -1889,6 +1889,36 @@ mod tests {
                     proj_combined_initial.unwrap()
                 )
                 .is_empty());
+            }
+        }
+    }
+
+    // for uniquely named roles. not strictly necessary? but nice. little ugly idk
+    static FILE_COUNTER_MUTEX: Mutex<u32> = Mutex::new(0);
+
+    // For printing composition input vecs
+    proptest! {
+        //#![proptest_config(ProptestConfig::with_cases(1))]
+        #[test]
+        fn test_generate_composition_input_vec(vec in generate_composition_input_vec(10, 10, 10)) {
+            let vec = serde_json::to_string(&vec)?;
+            let mut mut_guard = FILE_COUNTER_MUTEX.lock().unwrap();
+            let i: u32 = *mut_guard;
+            *mut_guard += 1;
+            let file_name = format!("test_data/10_protos_10_roles_10_commands/10_protos_10_roles_10_commands_{}.json", i);
+            let path = Path::new(&file_name);
+            let display = path.display();
+
+            // Open a file in write-only mode, returns `io::Result<File>`
+            let mut file = match File::create(&path) {
+                Err(why) => panic!("couldn't create {}: {}", display, why),
+                Ok(file) => file,
+            };
+
+            // Write the `LOREM_IPSUM` string to `file`, returns `io::Result<()>`
+            match file.write_all(vec.as_bytes()) {
+                Err(why) => panic!("couldn't write to {}: {}", display, why),
+                Ok(_) => println!("successfully wrote to {}", display),
             }
         }
     }

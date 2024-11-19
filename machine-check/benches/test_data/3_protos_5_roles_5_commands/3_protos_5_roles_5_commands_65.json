@@ -1,0 +1,1 @@
+[{"protocol":{"initial":"0","transitions":[{"label":{"cmd":"R240_cmd_0","logType":["R240_e_0"],"role":"R240"},"source":"0","target":"1"},{"label":{"cmd":"R240_cmd_1","logType":["R240_e_1"],"role":"R240"},"source":"1","target":"2"}]},"subscription":{"R240":["R240_e_0","R240_e_1"]},"interface":null}]

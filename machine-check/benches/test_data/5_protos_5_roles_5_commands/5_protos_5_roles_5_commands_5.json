@@ -1,0 +1,1 @@
+[{"protocol":{"initial":"0","transitions":[{"label":{"cmd":"R29_cmd_1","logType":["R29_e_1"],"role":"R29"},"source":"0","target":"1"},{"label":{"cmd":"R29_cmd_0","logType":["R29_e_0"],"role":"R29"},"source":"1","target":"2"}]},"subscription":{"R29":["R29_e_0","R29_e_1"]},"interface":null}]

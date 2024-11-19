@@ -1,0 +1,1 @@
+[{"protocol":{"initial":"0","transitions":[{"label":{"cmd":"R3958_cmd_0","logType":["R3958_e_0"],"role":"R3958"},"source":"0","target":"1"}]},"subscription":{"R3958":["R3958_e_0"]},"interface":null}]
