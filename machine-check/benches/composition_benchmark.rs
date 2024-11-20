@@ -49,7 +49,7 @@ fn bench_composition(c: &mut Criterion) {
     let composition_input_2 = prepare_files_in_directory(String::from("./benches/test_data/5_protos_10_roles_10_commands/"));
     let composition_input_3 = prepare_files_in_directory(String::from("./benches/test_data/7_protos_10_roles_10_commands/"));
     let composition_input_4 = prepare_files_in_directory(String::from("./benches/test_data/10_protos_10_roles_10_commands/"));
-    let mut composition_input: Vec<(String, String)> = vec![composition_input_1[100..103].to_vec(), composition_input_2[100..103].to_vec(), composition_input_3[100..103].to_vec(), composition_input_4[100..103].to_vec()].concat();
+    let mut composition_input: Vec<(String, String)> = vec![composition_input_1[1..5].to_vec(), composition_input_2[1..5].to_vec(), composition_input_3[1..5].to_vec(), composition_input_4[1..5].to_vec()].concat();
     composition_input.sort_by(|(_, a), (_, b)| a.len().cmp(&b.len()));
     for (i, _) in &composition_input {
         println!("{}", i);
@@ -57,9 +57,9 @@ fn bench_composition(c: &mut Criterion) {
     //group.measurement_time(Duration::new(20, 0));
 
     for (i, (id, composition_input)) in composition_input.iter().enumerate() {
-        group.bench_with_input(BenchmarkId::new("Implicit", i), composition_input,
+        group.bench_with_input(BenchmarkId::new("Overapproximation", i), composition_input,
         |b, input| b.iter(|| machine_check::compose_subs(input.clone())));
-        group.bench_with_input(BenchmarkId::new("Explicit", i), composition_input,
+        group.bench_with_input(BenchmarkId::new("Exact", i), composition_input,
         |b, input| b.iter(|| machine_check::get_wwf_sub(machine_check::compose_protocols(input.clone()))));
 
     }
