@@ -3,9 +3,9 @@ use composition_types::{CompositionInputVec, DataResult};
 
 use super::*;
 
-pub mod composition_machine;
-pub mod composition_swarm;
-pub mod composition_types;
+mod composition_machine;
+mod composition_swarm;
+mod composition_types;
 
 #[wasm_bindgen]
 pub fn check_wwf_swarm(proto: String, subs: String) -> String {

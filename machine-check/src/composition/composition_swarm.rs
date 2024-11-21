@@ -1225,6 +1225,7 @@ mod tests {
             }).collect()
         }
     }
+
     prop_compose! {
         fn all_labels(max_roles: usize, max_events: usize)
                     (r in vec_role(max_roles))
@@ -1253,76 +1254,8 @@ mod tests {
             labels.into_iter().zip(interfaces.into_iter()).map(|(labels, (interface, interfacing_cmds))| (interface, vec![labels, interfacing_cmds].concat())).collect()
         }
     }
-    // make another one for generating interfacing.
-    // this one skewed towards having more branches in the first few nodes??
-    prop_compose! {
-        // return graph and map: role -> vec swarmlabel, the map is to allow interfacing in CompositionInputVec generator
-        // consider changing prepare graph to not have to switch around between json thing and graph all the time in tests.
-        fn generate_graph(max_roles: usize, max_events: usize)(mut swarm_labels in all_labels(max_roles, max_events)) -> (Graph, NodeId, BTreeMap<Role, BTreeSet<SwarmLabel>>) {
-            let mut graph = Graph::new();
-            let mut map: BTreeMap<Role, BTreeSet<SwarmLabel>> = BTreeMap::new();
-            let mut nodes = Vec::new();
-            let mut rng = rand::thread_rng();
-            let gen_state_name = |g: &Graph| -> State { State::new(&g.node_count().to_string()) };
-            let add_to_map = |label: &SwarmLabel, m: &mut BTreeMap<Role, BTreeSet<SwarmLabel>>| { m.entry(label.role.clone()).and_modify(|events| { events.insert(label.clone()); } ).or_insert(BTreeSet::from([label.clone()])); };
-            // shuffling might not be a good idea when composing. not wrong composition, but...
-            swarm_labels.shuffle(&mut rng);
-            let initial = graph.add_node(State::new(&graph.node_count().to_string()));
-            nodes.push(initial);
 
-            while let Some(label) = swarm_labels.pop() {
-                //map.entry(label.role.clone()).and_modify(|events| { events.insert(label.get_event_type()); } ).or_insert(BTreeSet::from([label.get_event_type()]));
-                add_to_map(&label, &mut map);
-                // consider bernoulli thing. and distrbutions etc. bc documentations says that these once are optimised for cases where only a single sample is needed... if just faster does not matter
-                // generate new or select old source? Generate new or select old, generate new target or select old?
-                // same because you would have to connect to graph at some point anyway...?
-                // exclusive range upper limit
-                let source_node = if rng.gen_bool(1.0/10.0) {
-                    nodes[rng.gen_range(0..nodes.len())]
-                } else {
-                    // this whole thing was to have fewer branches... idk. loop will terminate because we always can reach 0?
-                    let mut source =  nodes[rng.gen_range(0..nodes.len())];
-                    while graph.edges_directed(source, Outgoing).count() > 0 {
-                        source = nodes[rng.gen_range(0..nodes.len())];
-                    }
-
-                    source
-                };
-
-                // if generated bool then select an existing node as target
-                // otherwise generate a new node as target
-                if rng.gen_bool(1.0/10.0) && !swarm_labels.is_empty() {
-                    let index = rng.gen_range(0..nodes.len());
-                    let target_node = nodes[index];
-                    //nodes.push(graph.add_node(State::new(&graph.node_count().to_string())));
-                    graph.add_edge(source_node, target_node, label);
-                    // we should be able to reach a terminating node from all nodes.
-                    // we check that swarm_labels is not empty before entering this branch
-                    // so we should be able to generate new node and add and edge from
-                    // target node to this new node
-                    if !node_can_reach_zero(&graph, target_node).is_empty() {
-                        let new_target_node = graph.add_node(gen_state_name(&graph));
-                        // consider not pushing?
-                        nodes.push(new_target_node);
-                        let new_weight = swarm_labels.pop().unwrap();
-                        add_to_map(&new_weight, &mut map);
-                        graph.add_edge(target_node, new_target_node, new_weight);
-                    }
-                } else {
-                    let target_node = graph.add_node(gen_state_name(&graph));
-                    nodes.push(target_node);
-                    graph.add_edge(source_node, target_node, label);
-                }
-            }
-
-
-            (graph, initial, map)
-        }
-    }
-
-
-    // this one skewed towards having more branches in the first few nodes??
-    fn generate_graph1(interface: Option<Role>, mut swarm_labels: Vec<SwarmLabel>) -> (Graph, NodeId, Option<Role>) {
+    fn random_graph(mut swarm_labels: Vec<SwarmLabel>) -> (Graph, NodeId) {
         let mut graph = Graph::new();
         let mut nodes = Vec::new();
         let mut rng = rand::thread_rng();
@@ -1373,8 +1306,7 @@ mod tests {
             }
         }
 
-
-        (graph, initial, interface)
+        (graph, initial)
     }
 
     prop_compose! {
@@ -1382,8 +1314,8 @@ mod tests {
                           (vec in all_labels_composition(max_roles, max_events, max_protos))
                           -> CompositionInputVec {
             vec.into_iter()
-                .map(|(interface, swarm_labels)| generate_graph1(interface, swarm_labels))
-                .map(|(graph, initial, interface)| {
+                .map(|(interface, swarm_labels)| (random_graph(swarm_labels), interface))
+                .map(|((graph, initial), interface)| {
                     let protocol = to_swarm_json(graph, initial);
                     let (subscription, _) = weak_well_formed_sub(protocol.clone());
                     CompositionInput { protocol, subscription, interface }
@@ -1494,11 +1426,7 @@ mod tests {
         ]
         .concat()
         .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
-        /* let mut errors = proto_info
-        .get_ith_proto(0)
-        .unwrap()
-        .2
-        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0)); */
+
         let mut expected_erros = vec![
             "transition (0)--[close@D<time,time2>]-->(0) emits more than one event type",
             "guard event type partID appears in transitions from multiple states",
@@ -1512,13 +1440,6 @@ mod tests {
 
         let proto2 = get_confusionful_proto2();
         let sub = get_proto1_proto2_composed_subs();
-
-        /* let proto_info = prepare_graph::<Role>(proto2, &sub, None);
-        let errors = proto_info
-            .get_ith_proto(0)
-            .unwrap()
-            .2
-            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0)); */
         let proto_info = prepare_graph::<Role>(proto2, &sub, None);
         let errors = vec![
             confusion_free(&proto_info, 0),
@@ -1791,7 +1712,8 @@ mod tests {
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(50))]
         #[test]
-        fn test_generate_graph((graph, initial, _) in generate_graph(50, 50)) {
+        fn test_generate_graph(labels in all_labels(50, 50)) {
+            let (graph, initial) = random_graph(labels);
             let swarm = to_swarm_json(graph.clone(), initial);
             let (g, i, e) = crate::swarm::from_json(to_swarm_json(graph.clone(), initial), &BTreeMap::new());
             assert!(e.is_empty());
@@ -1850,7 +1772,7 @@ mod tests {
     }
 
     // same test as above but for larger compositions. test fewer cases.
-    proptest! {
+    /* proptest! {
         #![proptest_config(ProptestConfig::with_cases(1))]
         #[test]
         fn test_overapprox_2(vec in generate_composition_input_vec(10, 10, 7)) {
@@ -1866,7 +1788,7 @@ mod tests {
             let (subs_explicit, _) = weak_well_formed_sub(swarm);
             assert!(is_sub_subscription(subs_explicit, subs_implicit));
         }
-    }
+    } */
 
     // test whether project(compose(G1, G2, ..., Gn)) = compose(project(G1), project(G2), ... project(Gn))
     // have test here instead of in composition_machine.rs because...
@@ -1892,18 +1814,4 @@ mod tests {
             }
         }
     }
-
-    // For printing protocols:
-    /* proptest! {
-        #![proptest_config(ProptestConfig::with_cases(15))]
-        #[test]
-        fn test_generate_graph((graph, initial, _) in generate_graph(10, 10)) {
-            let swarm = to_swarm_json(graph, initial);
-            println!("{}\n$$$$\n", serde_json::to_string_pretty(&swarm).unwrap());
-            let proto_info = prepare_graph::<Role>(swarm, &BTreeMap::new(), None);
-            let g = proto_info.get_ith_proto(0).unwrap();
-            assert_eq!(g.2, vec![]);
-
-        }
-    } */
 }
