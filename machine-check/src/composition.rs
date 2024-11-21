@@ -5,7 +5,7 @@ use super::*;
 
 mod composition_machine;
 mod composition_swarm;
-mod composition_types;
+pub mod composition_types;
 
 #[wasm_bindgen]
 pub fn check_wwf_swarm(proto: String, subs: String) -> String {

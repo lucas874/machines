@@ -17,7 +17,7 @@ pub enum DataResult {
     ERROR { errors: Vec<String> },
 }
 
-pub type RoleEventMap = BTreeMap<Role, BTreeSet<SwarmLabel>>;//RoleInfo>;//BTreeSet<EventTypeInfo>>;
+pub type RoleEventMap = BTreeMap<Role, BTreeSet<SwarmLabel>>;
 
 pub type UnordEventPair = BTreeSet<EventType>;
 
