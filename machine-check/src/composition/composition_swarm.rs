@@ -182,7 +182,7 @@ pub fn compose_protocols(protos: CompositionInputVec) -> Result<(Graph, NodeId),
         );
         return Err(result);
     }
-    // construct this to check whether the protocols interface. also checks wwf for each proto
+    // construct this to check whether the protocols interface. also checks wwf for each proto. not sure if good idea to check wwf.
     let implicit_composition = implicit_composition_fold(protos_ifs);
     if !implicit_composition.no_errors() {
         return Err(proto_info_to_error_report(implicit_composition));
@@ -724,6 +724,7 @@ fn swarm_to_graph(proto: &SwarmProtocol) -> (Graph, Option<NodeId>, Vec<Error>) 
         Some(*idx)
     } else {
         // strictly speaking we have all_nodes_reachable errors here too...
+        // if there is only an initial state no transitions whatsoever then thats ok? but gives an error here.
         errors.push(Error::SwarmError(
             crate::swarm::Error::InitialStateDisconnected,
         ));
@@ -1000,7 +1001,7 @@ pub fn to_swarm_json(graph: crate::Graph, initial: NodeId) -> SwarmProtocol {
 
 #[cfg(test)]
 mod tests {
-    use std::{iter::zip, sync::Mutex};
+    use std::{cmp, iter::zip, sync::Mutex};
 
     use crate::{
         composition::{composition_machine::{project, project_combine, to_option_machine}, composition_types::CompositionInput, error_report_to_strings},
@@ -1009,6 +1010,7 @@ mod tests {
     };
 
     use super::*;
+    use petgraph::visit::Reversed;
     use proptest::prelude::*;
     use rand::prelude::*;
 
@@ -1245,8 +1247,8 @@ mod tests {
     }
 
     prop_compose! {
-        fn all_labels_composition(max_roles: usize, max_events: usize, max_protos: usize)
-                                 (tuples in prop::collection::vec(all_labels_and_if(max_roles, max_events), 1..max_protos))
+        fn all_labels_composition(max_roles: usize, max_events: usize, max_protos: usize, exactly_max: bool)
+                                 (tuples in prop::collection::vec(all_labels_and_if(max_roles, max_events), if exactly_max {max_protos..=max_protos} else {1..=max_protos}))
                                  -> Vec<(Option<Role>, Vec<SwarmLabel>)> {
             let (labels, interfaces): (Vec<_>, Vec<_>) = tuples.into_iter().unzip();
             let tmp: Vec<(Option<Role>, Vec<SwarmLabel>)>  = interfaces[..interfaces.len()].to_vec().into_iter().map(|interface| (Some(interface[0].role.clone()), interface)).collect();
@@ -1310,21 +1312,118 @@ mod tests {
     }
 
     prop_compose! {
-        fn generate_composition_input_vec(max_roles: usize, max_events: usize, max_protos: usize)
-                          (vec in all_labels_composition(max_roles, max_events, max_protos))
+        fn generate_composition_input_vec(max_roles: usize, max_events: usize, max_protos: usize, exactly_max: bool)
+                          (vec in all_labels_composition(max_roles, max_events, max_protos, exactly_max))
                           -> CompositionInputVec {
             vec.into_iter()
                 .map(|(interface, swarm_labels)| (random_graph(swarm_labels), interface))
                 .map(|((graph, initial), interface)| {
                     let protocol = to_swarm_json(graph, initial);
-                    let (subscription, _) = weak_well_formed_sub(protocol.clone());
-                    CompositionInput { protocol, subscription, interface }
+                    //let (subscription, _) = weak_well_formed_sub(protocol.clone());
+                    CompositionInput { protocol, subscription: BTreeMap::new(), interface }
                     }
                 ).collect()
 
         }
     }
 
+    fn refinement_initial_proto() -> (Graph, NodeId) {
+        let mut graph = Graph::new();
+        let initial = graph.add_node(State::new("0"));
+        let middle = graph.add_node(State::new("1"));
+        let last = graph.add_node(State::new("2"));
+
+        let start_label =
+            SwarmLabel { cmd: Command::new("IFR_0_cmd_0"), log_type: vec![EventType::new("IFR_0_e_0")], role: Role::new("IFR_0")};
+        let end_label =
+            SwarmLabel { cmd: Command::new("IFR_0_cmd_1"), log_type: vec![EventType::new("IFR_0_e_1")], role: Role::new("IFR_0")};
+
+
+        graph.add_edge(initial, middle, start_label);
+        graph.add_edge(middle, last, end_label);
+
+        (graph, initial)
+    }
+
+    // consider a version where we change existing labels instead of adding new edges. still adding new edges for if, but not next if.
+    fn refinement_shape(level: usize, mut proto: Graph, initial: NodeId) -> (Graph, NodeId) {
+        let terminal_nodes: Vec<_> = proto.node_indices().filter(|node| proto.edges_directed(*node, Outgoing).count() == 0).collect();
+        let mut rng = rand::thread_rng();
+        let index = terminal_nodes[rng.gen_range(0..terminal_nodes.len())];
+        let reversed_graph = Reversed(&proto);
+        let mut dfs = Dfs::new(&reversed_graph, index);
+        let mut nodes_on_path = Vec::new();
+        while let Some(node) = dfs.next(&reversed_graph) {
+            nodes_on_path.push(node);
+            if node == initial {
+                break;
+            }
+        }
+
+        let next_ifr = format!("IFR_{next_level}", next_level=level+1);
+        let next_if_label_0 =
+            SwarmLabel {cmd: Command::new(&format!("{next_ifr}_cmd_0")), log_type: vec![EventType::new(&format!("{next_ifr}_e_0"))], role: Role::new(&next_ifr)};
+        let next_if_label_1 =
+            SwarmLabel {cmd: Command::new(&format!("{next_ifr}_cmd_1")), log_type: vec![EventType::new(&format!("{next_ifr}_e_1"))], role: Role::new(&next_ifr)};
+
+        let index = rng.gen_range(0..nodes_on_path.len());
+        let source_node = nodes_on_path[index];
+        let next_if_end = if index == 0 {
+            let next_if_middle = proto.add_node(State::new(&proto.node_count().to_string()));
+            let next_if_end = proto.add_node(State::new(&proto.node_count().to_string()));
+            proto.add_edge(source_node, next_if_middle, next_if_label_0);
+            proto.add_edge(next_if_middle, next_if_end, next_if_label_1);
+            next_if_end
+        } else {
+            let target_node = nodes_on_path[index-1];
+            let edge_to_remove = proto.find_edge(source_node, target_node).unwrap();
+            let weight = proto[edge_to_remove].clone();
+            let old_size = proto.node_count();
+            proto.remove_edge(edge_to_remove);
+            let next_if_start = proto.add_node(State::new(&format!("{old_size}")));
+            proto.add_edge(source_node, next_if_start, weight);
+            let next_if_middle = proto.add_node(State::new(&proto.node_count().to_string()));
+            proto.add_edge(next_if_start, next_if_middle, next_if_label_0);
+            proto.add_edge(next_if_middle, target_node, next_if_label_1);
+            target_node
+        };
+
+        let ifr = format!("IFR_{level}");
+        let if_label_0 =
+            SwarmLabel {cmd: Command::new(&format!("{ifr}_cmd_0")), log_type: vec![EventType::new(&format!("{ifr}_e_0"))], role: Role::new(&ifr)};
+        let if_label_1 =
+            SwarmLabel {cmd: Command::new(&format!("{ifr}_cmd_1")), log_type: vec![EventType::new(&format!("{ifr}_e_1"))], role: Role::new(&ifr)};
+
+        let new_initial = proto.add_node(State::new(&proto.node_count().to_string()));
+        let new_end = proto.add_node(State::new(&proto.node_count().to_string()));
+        proto.add_edge(new_initial, initial, if_label_0);
+        proto.add_edge(next_if_end, new_end, if_label_1);
+
+        (proto, new_initial)
+    }
+
+    prop_compose! {
+        fn generate_composition_input_vec_refinement(max_roles: usize, max_events: usize, num_protos: usize)
+                          (vec in prop::collection::vec(all_labels(max_roles, max_events), cmp::max(0, num_protos-1)))
+                          -> CompositionInputVec {
+            let level_0_proto = refinement_initial_proto();
+            let mut graphs = vec![CompositionInput {protocol: to_swarm_json(level_0_proto.0, level_0_proto.1), subscription: BTreeMap::new(), interface: None}];
+            let mut vec = vec
+                .into_iter()
+                .map(|swarm_labels| (random_graph(swarm_labels)))
+                .enumerate()
+                .map(|(level, (proto, initial))| (level, refinement_shape(level, proto, initial)))
+                .map(|(level, (proto, initial))|
+                        CompositionInput { protocol: to_swarm_json(proto, initial), subscription: BTreeMap::new(), interface: Some(Role::new(&format!("IFR_{level}")))}
+                    )
+                .collect();
+            graphs.append(&mut vec);
+
+            graphs
+        }
+    }
+
+//(tuples in prop::collection::vec(all_labels_and_if(max_roles, max_events), if exactly_max {max_protos..=max_protos} else {1..=max_protos}))
     #[test]
     fn test_prepare_graph_confusionfree() {
         let composition = get_proto1_proto2_composed();
@@ -1755,8 +1854,16 @@ mod tests {
     // i.e. is the approximation safe. max five protocols, max five roles
     // in each, max five commands per role. relatively small.
     proptest! {
+        //#![proptest_config(ProptestConfig::with_cases(1))]
         #[test]
-        fn test_overapprox_1(vec in generate_composition_input_vec(5, 5, 5)) {
+        fn test_overapprox_1(vec in generate_composition_input_vec(5, 5, 5, false)) {
+            let vec: CompositionInputVec = vec
+                .into_iter()
+                .map(|composition_input| {
+                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
+                    CompositionInput {subscription, ..composition_input}
+                })
+                .collect();
             let (subs_implicit, errors) = compose_subscriptions(vec.clone());
             assert!(errors.is_empty());
             let result = compose_protocols(vec.clone());
@@ -1789,12 +1896,42 @@ mod tests {
             assert!(is_sub_subscription(subs_explicit, subs_implicit));
         }
     } */
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(1))]
+        #[test]
+        fn test_refinement_pattern(vec in generate_composition_input_vec_refinement(10, 10, 3)) {
+            for v in &vec {
+                println!("protocol: {}", serde_json::to_string_pretty(&v.protocol).unwrap());
+                println!("protocol: {:?}", v.interface);
+            }
+            println!("--------");
+            let vec: CompositionInputVec = vec
+                .into_iter()
+                .map(|composition_input| {
+                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
+                    CompositionInput {subscription, ..composition_input}
+                })
+                .collect();
+            let result = compose_protocols(vec.clone());
+            assert!(result.is_ok());
+            let (composed_graph, composed_initial) = result.unwrap();
+            let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
+            println!("composition: {}", serde_json::to_string_pretty(&swarm).unwrap());
+        }
+    }
 
     // test whether project(compose(G1, G2, ..., Gn)) = compose(project(G1), project(G2), ... project(Gn))
     // have test here instead of in composition_machine.rs because...
     proptest! {
         #[test]
-        fn test_project_combine(vec in generate_composition_input_vec(5, 5, 5)) {
+        fn test_project_combine(vec in generate_composition_input_vec(5, 5, 5, false)) {
+            let vec: CompositionInputVec = vec
+                .into_iter()
+                .map(|composition_input| {
+                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
+                    CompositionInput {subscription, ..composition_input}
+                })
+                .collect();
             let (protos, subs_implicit) = implicit_composition_swarms(vec.clone());
             let protos = protos.into_iter().map(|((g, i, _), set)| (g, i.unwrap(), set)).collect();
             let result = compose_protocols(vec.clone());
@@ -1814,4 +1951,40 @@ mod tests {
             }
         }
     }
+
+    // Confusion free thing come back to this!
+/*     proptest! {
+        #![proptest_config(ProptestConfig::with_cases(1))]
+        #[test]
+        fn test_confusion_free_comp(vec in generate_composition_input_vec(5, 5, 2)) {
+            let vec: CompositionInputVec = vec
+                .into_iter()
+                .map(|composition_input| {
+                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
+                    CompositionInput {subscription, ..composition_input}
+                })
+                .collect();
+            let result = compose_protocols(vec.clone());
+            //println!("{:?}", result);
+            assert!(result.is_ok());
+            /* match result {
+                Ok(_) => (),
+                Err(e) => println!("{:?}", error_report_to_strings(e)),
+            } */
+            let (composed_graph, composed_initial) = result.unwrap();
+            let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
+            let (subs_explicit, e) = weak_well_formed_sub(swarm.clone());
+            //
+            if !e.is_empty() {
+                //println!("e: {:?}", e);
+                println!("e strings: {:?}", error_report_to_strings(e));
+                /* println!("g: {}", serde_json::to_string_pretty(&swarm).unwrap());
+                for v in vec {
+                    println!("g component: {}", serde_json::to_string_pretty(&v.protocol).unwrap());
+                    println!("g inteface: {:?}", v.interface);
+                } */
+            }
+            //assert!(is_sub_subscription(subs_explicit.clone(), subs_implicit));
+        }
+    } */
 }
