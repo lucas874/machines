@@ -1301,6 +1301,13 @@ mod tests {
         }
     }
 
+    // shuffle labels before calling, then call random graph
+    fn random_graph_shuffle_labels(mut swarm_labels: Vec<SwarmLabel>) -> (Graph, NodeId) {
+        let mut rng = rand::thread_rng();
+        swarm_labels.shuffle(&mut rng);
+        random_graph(swarm_labels)
+    }
+
     fn random_graph(mut swarm_labels: Vec<SwarmLabel>) -> (Graph, NodeId) {
         let mut graph = Graph::new();
         let mut nodes = Vec::new();
@@ -1308,7 +1315,7 @@ mod tests {
         let b_dist = Bernoulli::new(0.1).unwrap(); // bernoulli distribution with propability 0.1 of success
         let gen_state_name = |g: &Graph| -> State { State::new(&g.node_count().to_string()) };
 
-        swarm_labels.shuffle(&mut rng); // Back to shuffling here again. Do not know if it is better to shuffle here or shuffle the labels before calling.
+        //swarm_labels.shuffle(&mut rng); // Back to shuffling here again. Do not know if it is better to shuffle here or shuffle the labels before calling.
         let initial = graph.add_node(State::new(&graph.node_count().to_string()));
         nodes.push(initial);
 
@@ -1364,7 +1371,7 @@ mod tests {
                           (vec in all_labels_composition(max_roles, max_events, max_protos, exactly_max))
                           -> CompositionInputVec {
             vec.into_iter()
-                .map(|(interface, swarm_labels)| (random_graph(swarm_labels), interface))
+                .map(|(interface, swarm_labels)| (random_graph_shuffle_labels(swarm_labels), interface))
                 .map(|((graph, initial), interface)| {
                     let protocol = to_swarm_json(graph, initial);
                     CompositionInput { protocol, subscription: BTreeMap::new(), interface }
@@ -1383,7 +1390,7 @@ mod tests {
             let mut graphs = vec![CompositionInput {protocol: to_swarm_json(level_0_proto.0, level_0_proto.1), subscription: BTreeMap::new(), interface: None}];
             let mut vec = vec
                 .into_iter()
-                .map(|swarm_labels| random_graph(swarm_labels))
+                .map(|swarm_labels| random_graph_shuffle_labels(swarm_labels))
                 .enumerate()
                 .map(|(level, (proto, initial))| (level, refinement_shape(level, proto, initial)))
                 .map(|(level, (proto, initial))|
@@ -1393,47 +1400,6 @@ mod tests {
             graphs.append(&mut vec);
 
             graphs
-        }
-    }
-
-    // generate a number of protocols that interface. interfacing events of a protocol appear along a single branch.
-    // the interfacing events appear in the same order in the protocols. consider max roles thing... more than max now.
-    prop_compose! {
-        fn generate_composition_input_vec_ordered_branch(max_roles: usize, max_events: usize, num_protos: usize)
-                          (vec in prop::collection::vec(all_labels(max_roles, max_events), num_protos))
-                          -> CompositionInputVec {
-            let mut rng = rand::thread_rng();
-            let graphs: Vec<_> = vec.into_iter().map(|swarm_labels| random_graph(swarm_labels)).collect();
-            let ir_labels: Vec<Vec<SwarmLabel>> = (0..cmp::max(0, graphs.len()-1)).map(|i| {
-                let num_events = rng.gen_range(0..=max_events);
-                (0..num_events).map(|j|
-                    SwarmLabel {
-                        cmd: Command::new(&format!("{IR_BASE}_{i}_{CMD_BASE}_{j}")),
-                        log_type: vec![EventType::new(&format!("{IR_BASE}_{i}_{E_BASE}_{j}"))],
-                        role: Role::new(&format!("{IR_BASE}_{i}")),
-                    }).collect()
-            }).collect();
-            let n_graphs = graphs.len();
-            let graphs_interfaces: Vec<((Graph, NodeId), Vec<Vec<SwarmLabel>>, Option<Role>)> = graphs.into_iter()
-                .enumerate()
-                .map(|(i, g)|{
-                    let (interfacing_cmds, interface) = if i == 0 {
-                        (vec![ir_labels[i].clone()], None)
-                    } else if i == n_graphs-1 {
-                        (vec![ir_labels[i-1].clone()], Some(Role::new(&format!("{IR_BASE}_{ir_id}", ir_id=i-1))))
-                    } else {
-                        (vec![ir_labels[i-1].clone(), ir_labels[i].clone()], Some(Role::new(&format!("{IR_BASE}_{ir_id}", ir_id=i-1))))
-                    };
-                    (g, interfacing_cmds, interface)
-                }).collect();
-
-            graphs_interfaces.into_iter()
-                .map(|((graph, initial), interfacing_cmds, interface)| {
-                let (graph, initial) = ordered_interfaces_shape(graph, initial, interfacing_cmds);
-                CompositionInput { protocol: to_swarm_json(graph, initial), subscription: BTreeMap::new(), interface: interface }
-                }).collect()
-
-            //unimplemented!()
         }
     }
 
@@ -1534,10 +1500,6 @@ mod tests {
         proto.add_edge(nodes_on_path[nodes_on_path.len()-1], new_end, if_label_1);
 
         (proto, new_initial)
-    }
-
-    fn ordered_interfaces_shape(graph: Graph, initial: NodeId, interfaces: Vec<Vec<SwarmLabel>>) -> (Graph, NodeId) {
-        unimplemented!()
     }
 
     #[test]
@@ -1928,7 +1890,7 @@ mod tests {
         #![proptest_config(ProptestConfig::with_cases(50))]
         #[test]
         fn test_generate_graph(labels in all_labels(50, 50)) {
-            let (graph, initial) = random_graph(labels);
+            let (graph, initial) = random_graph_shuffle_labels(labels);
             let swarm = to_swarm_json(graph.clone(), initial);
             let (g, i, e) = crate::swarm::from_json(to_swarm_json(graph.clone(), initial), &BTreeMap::new());
             assert!(e.is_empty());
