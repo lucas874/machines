@@ -1448,10 +1448,11 @@ mod tests {
         fn generate_composition_input_vec_refinement_2(max_roles: usize, max_events: usize, num_protos: usize)
                     (protos in protos_refinement_22(max_roles, max_events, num_protos))
                     -> CompositionInputVec {
+            let mut rng = rand::thread_rng();
             let protos_altered: Vec<_> = protos.clone()
                 .into_iter()
                 .enumerate()
-                .map(|(i, ((graph, initial), labels))| {
+                .map(|(i, ((graph, initial), mut labels))| {
                     let (graph, initial) = if i == 0 {
                         (graph, initial)
                     } else {
@@ -1459,7 +1460,8 @@ mod tests {
                         insert_into(protos[i-1].0.clone(), (graph, initial))
                     };
                     //(graph, initial)
-                    random_graph_shuffle_labels(Some((graph, initial)), labels)
+                    labels.shuffle(&mut rng);
+                    expand_graph(graph, initial, labels)
                 }).collect();
 
             protos_altered.into_iter()
@@ -1605,23 +1607,7 @@ mod tests {
                 graph2_terminals.push(node);
             }
         }
-        /* // make all edges starting at connecting_old_target start at this node and remove connecting_old_target
-        let connecting_node = *graph2_terminals.choose(&mut rng).unwrap();
-        // fill the vectors below, then remove, then add.
-        let mut edges_to_remove: Vec<EdgeId> = vec![];
-        let mut edges_to_add: Vec<(NodeId, NodeId, SwarmLabel)> = vec![];
-        for e in graph1.edges_directed(connecting_old_target, Outgoing) {
-            let target = e.target();
-            let weight = e.weight();
-            edges_to_remove.push(e.id());
-            edges_to_add.push((node_map[&connecting_node], target, weight.clone()));
-        }
-        for e_id in edges_to_remove {
-            graph1.remove_edge(e_id);
-        }
-        for (source, target, weight) in edges_to_add {
-            graph1.add_edge(source, target, weight);
-        } */
+
         // select a terminal node in graph2. make all incoming point to connecting old target instead. remove this terminal node.
         let graph2_terminal = *graph2_terminals.choose(&mut rng).unwrap();
         let mut edges_to_remove: Vec<EdgeId> = vec![];
@@ -1641,6 +1627,67 @@ mod tests {
         graph1.remove_node(node_map[&graph2_terminal]);
 
         (graph1, initial1)
+    }
+
+    fn expand_graph(mut graph: Graph, initial: NodeId, mut swarm_labels: Vec<SwarmLabel>) -> (Graph, NodeId) {
+        let mut nodes: Vec<NodeId> = graph.node_indices().into_iter().collect();
+        let mut rng = rand::thread_rng();
+        let b_dist = Bernoulli::new(0.1).unwrap(); // bernoulli distribution with propability 0.1 of success
+        let b_dist_2 = Bernoulli::new(0.5).unwrap(); // bernoulli distribution with propability 0.5 of success
+        let gen_state_name = || -> State { State::new(&fresh_i().to_string()) };
+
+        while let Some(label) = swarm_labels.pop() {
+
+            if b_dist_2.sample(&mut rng) {
+                let source_node = if b_dist.sample(&mut rng) {
+                    nodes[rng.gen_range(0..nodes.len())]
+                } else {
+                    // this whole thing was to have fewer branches... idk. loop will terminate because we always can reach 0?
+                    let mut source = nodes[rng.gen_range(0..nodes.len())];
+                    while graph.edges_directed(source, Outgoing).count() > 0 {
+                        source = nodes[rng.gen_range(0..nodes.len())];
+                    }
+
+                    source
+                };
+
+                // if generated bool then select an existing node as target
+                // otherwise generate a new node as target
+                if b_dist.sample(&mut rng) && swarm_labels.len() > 0 {
+                    let index = rng.gen_range(0..nodes.len());
+                    let target_node = nodes[index];
+                    //nodes.push(graph.add_node(State::new(&graph.node_count().to_string())));
+                    graph.add_edge(source_node, target_node, label);
+                    // we should be able to reach a terminating node from all nodes.
+                    // we check that swarm_labels is not empty before entering this branch
+                    // so we should be able to generate new node and add and edge from
+                    // target node to this new node
+                    if !node_can_reach_zero(&graph, target_node).is_empty() {
+                        let new_target_node = graph.add_node(gen_state_name());
+                        // consider not pushing?
+                        nodes.push(new_target_node);
+                        let new_weight = swarm_labels.pop().unwrap();
+                        graph.add_edge(target_node, new_target_node, new_weight);
+                    }
+                } else {
+                    let target_node = graph.add_node(gen_state_name());
+                    nodes.push(target_node);
+                    graph.add_edge(source_node, target_node, label);
+                }
+            } else {
+                let connecting_edge = graph.edge_references().choose(&mut rng).unwrap();
+                let connecting_source = connecting_edge.source();
+                let connecting_old_target = connecting_edge.target();
+                let connecting_weight = connecting_edge.weight().clone();
+                graph.remove_edge(connecting_edge.id());
+
+                let new_node = graph.add_node(gen_state_name());
+                graph.add_edge(connecting_source, new_node, connecting_weight);
+                graph.add_edge(new_node, connecting_old_target, label);
+            }
+        }
+
+        (graph, initial)
     }
 
     #[test]
@@ -2176,7 +2223,7 @@ mod tests {
     }
 
     proptest! {
-        //#![proptest_config(ProptestConfig::with_cases(20))]
+        //#![proptest_config(ProptestConfig::with_cases(2))]
         #[test]
         fn test_refinement_pattern_2(vec in generate_composition_input_vec_refinement_2(5, 5, 5)) {
             for v in &vec {
