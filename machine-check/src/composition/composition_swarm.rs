@@ -1332,8 +1332,6 @@ mod tests {
     fn random_graph(base_graph: Option<(Graph, NodeId)>, mut swarm_labels: Vec<SwarmLabel>) -> (Graph, NodeId) {
         let (mut graph, initial, mut nodes) = if base_graph.is_some() {
             let (base, base_initial) = base_graph.unwrap();
-            //println!("--------begin-------\nall nodes reachable: {:?}", all_nodes_reachable(&base.clone(), base_initial).map(Error::convert(&base)));
-            //println!("graph: {}\n\n", serde_json::to_string_pretty(&to_swarm_json(base.clone(), base_initial)).unwrap());
             let nodes: Vec<NodeId> = base.node_indices().into_iter().collect();
             (base, base_initial, nodes)
         } else {
@@ -1375,15 +1373,11 @@ mod tests {
                 // so we should be able to generate new node and add and edge from
                 // target node to this new node
                 if !node_can_reach_zero(&graph, target_node).is_empty() {
-                    //println!("HELLLLOOOOOO: {:?}", target_node);
-                    //println!("graph before: {}", serde_json::to_string_pretty(&to_swarm_json(graph.clone(), initial)).unwrap());
                     let new_target_node = graph.add_node(gen_state_name());
                     // consider not pushing?
                     nodes.push(new_target_node);
                     let new_weight = swarm_labels.pop().unwrap();
                     graph.add_edge(target_node, new_target_node, new_weight);
-                    //println!("graph after: {}", serde_json::to_string_pretty(&to_swarm_json(graph.clone(), initial)).unwrap());
-                    //println!("after: {}", node_can_reach_zero(&graph, target_node).is_empty());
                 }
             } else {
                 let target_node = graph.add_node(gen_state_name());
@@ -1391,14 +1385,6 @@ mod tests {
                 graph.add_edge(source_node, target_node, label);
             }
         }
-        // remove this
-        //assert!(all_nodes_reachable(&graph, initial).is_empty());
-        let reachable =  all_nodes_reachable(&graph, initial);
-        if !reachable.is_empty() {
-            //println!("all nodes reachable: {:?}\n ----end----", all_nodes_reachable(&graph, initial).map(Error::convert(&graph)));
-            //println!("graph after: {}\n ----end----", serde_json::to_string_pretty(&to_swarm_json(graph.clone(), initial)).unwrap());
-        }
-
 
         (graph, initial)
     }
@@ -2117,11 +2103,17 @@ mod tests {
         }
     }
 
-    // same test as above but for larger compositions. test fewer cases.
-    /* proptest! {
-        #![proptest_config(ProptestConfig::with_cases(1))]
+    // same test as above but for refinement pattern
+    proptest! {
         #[test]
-        fn test_overapprox_2(vec in generate_composition_input_vec(10, 10, 7)) {
+        fn test_overapprox_2(vec in generate_composition_input_vec_refinement(5, 5, 5)) {
+            let vec: CompositionInputVec = vec
+                .into_iter()
+                .map(|composition_input| {
+                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
+                    CompositionInput {subscription, ..composition_input}
+                })
+                .collect();
             let (subs_implicit, errors) = compose_subscriptions(vec.clone());
             assert!(errors.is_empty());
             let result = compose_protocols(vec.clone());
@@ -2134,16 +2126,40 @@ mod tests {
             let (subs_explicit, _) = weak_well_formed_sub(swarm);
             assert!(is_sub_subscription(subs_explicit, subs_implicit));
         }
-    } */
+    }
+
+    // same test as above but for refinement pattern 2 smaller composition
     proptest! {
-        #![proptest_config(ProptestConfig::with_cases(1))]
         #[test]
-        fn test_refinement_pattern(vec in generate_composition_input_vec_refinement(10, 10, 3)) {
+        fn test_overapprox_3(vec in generate_composition_input_vec_refinement_2(5, 5, 3)) {
+            let vec: CompositionInputVec = vec
+                .into_iter()
+                .map(|composition_input| {
+                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
+                    CompositionInput {subscription, ..composition_input}
+                })
+                .collect();
+            let (subs_implicit, errors) = compose_subscriptions(vec.clone());
+            assert!(errors.is_empty());
+            let result = compose_protocols(vec.clone());
+            assert!(result.is_ok());
+            let (composed_graph, composed_initial) = result.unwrap();
+            // we want to turn it to swarm and call weak_well_well_formed_sub
+            // instead of calling wwf_sub with graph because we want to
+            // prepare the graph and obtain concurrent events etc.
+            let swarm = to_swarm_json(composed_graph, composed_initial);
+            let (subs_explicit, _) = weak_well_formed_sub(swarm);
+            assert!(is_sub_subscription(subs_explicit, subs_implicit));
+        }
+    }
+    proptest! {
+        //#![proptest_config(ProptestConfig::with_cases(1))]
+        #[test]
+        fn test_refinement_pattern(vec in generate_composition_input_vec_refinement(7, 7, 7)) {
             for v in &vec {
-                println!("protocol: {}", serde_json::to_string_pretty(&v.protocol).unwrap());
-                println!("protocol: {:?}", v.interface);
+                assert!(confusion_free(&prepare_graph::<Role>(v.protocol.clone(), &BTreeMap::new(), None), 0).is_empty());
             }
-            println!("--------");
+
             let vec: CompositionInputVec = vec
                 .into_iter()
                 .map(|composition_input| {
@@ -2153,28 +2169,20 @@ mod tests {
                 .collect();
             let result = compose_protocols(vec.clone());
             assert!(result.is_ok());
-            let (composed_graph, composed_initial) = result.unwrap();
-            let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
-            println!("composition: {}", serde_json::to_string_pretty(&swarm).unwrap());
+            //let (composed_graph, composed_initial) = result.unwrap();
+            //let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
+            //println!("composition: {}", serde_json::to_string_pretty(&swarm).unwrap());
         }
     }
 
     proptest! {
         //#![proptest_config(ProptestConfig::with_cases(20))]
         #[test]
-        fn test_refinement_pattern_2(vec in generate_composition_input_vec_refinement_2(5, 5, 3)) {
+        fn test_refinement_pattern_2(vec in generate_composition_input_vec_refinement_2(5, 5, 5)) {
             for v in &vec {
-                //println!("protocol: {}", serde_json::to_string_pretty(&v.protocol).unwrap());
-                //println!("protocol: {:?}", v.interface);
-                let thing = confusion_free(&prepare_graph::<Role>(v.protocol.clone(), &BTreeMap::new(), v.interface.clone()), 0);
-                if !thing.is_empty() {
-                    println!("ERRORRRRR: {:?}", thing);
-                    println!("error proto: {}", serde_json::to_string_pretty(&v.protocol.clone()).unwrap());
-                }
-                assert!(thing.is_empty());
-
+                assert!(confusion_free(&prepare_graph::<Role>(v.protocol.clone(), &BTreeMap::new(), None), 0).is_empty());
             }
-            //println!("--------");
+
             let vec: CompositionInputVec = vec
                 .into_iter()
                 .map(|composition_input| {
@@ -2183,16 +2191,7 @@ mod tests {
                 })
                 .collect();
             let result = compose_protocols(vec.clone());
-            let is_ok = match result {
-                Ok((composed_graph, composed_initial)) =>
-                    { //let (composed_graph, composed_initial) = result.unwrap();
-                     let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
-                     //println!("composition: {}", serde_json::to_string_pretty(&swarm).unwrap());
-                     true
-                    },
-                Err(e) => { println!("errors: {:?}", error_report_to_strings(e)); false},
-            };
-            assert!(is_ok);
+            assert!(result.is_ok());
     }
 }
 
