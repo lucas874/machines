@@ -12,8 +12,8 @@ use std::{
 use super::MapVec;
 use super::{
     composition_types::{
-        unord_event_pair, CompositionInputVec, EventLabel, ProtoInfo, RoleEventMap,
-        SwarmInterface, UnordEventPair,
+        unord_event_pair, CompositionInputVec, EventLabel, ProtoInfo, RoleEventMap, SwarmInterface,
+        UnordEventPair,
     },
     Graph,
 };
@@ -182,7 +182,7 @@ pub fn compose_protocols(protos: CompositionInputVec) -> Result<(Graph, NodeId),
         );
         return Err(result);
     }
-    // construct this to check whether the protocols interface. also checks wwf for each proto
+    // construct this to check whether the protocols interface. also checks wwf for each proto. not sure if good idea to check wwf.
     let implicit_composition = implicit_composition_fold(protos_ifs);
     if !implicit_composition.no_errors() {
         return Err(proto_info_to_error_report(implicit_composition));
@@ -298,19 +298,20 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> 
             // very ugly srsly need to redo this
             if proto_info.joining_events.contains(&event_type) {
                 // not sure if this is to coarse?
-                let join_set: BTreeSet<EventType> = proto_info.immediately_pre[&event_type].clone().into_iter().chain([event_type.clone()]).collect();
+                let join_set: BTreeSet<EventType> = proto_info.immediately_pre[&event_type]
+                    .clone()
+                    .into_iter()
+                    .chain([event_type.clone()])
+                    .collect();
                 let involved_not_subbed = involved_roles
                     .iter()
                     .filter(|r| !join_set.is_subset(sub(r)));
-                let pre: Vec<_> = proto_info.immediately_pre[&event_type].clone().into_iter().collect();
+                let pre: Vec<_> = proto_info.immediately_pre[&event_type]
+                    .clone()
+                    .into_iter()
+                    .collect();
                 let mut joining_errors: Vec<_> = involved_not_subbed
-                    .map(|r| {
-                        Error::RoleNotSubscribedToJoin(
-                            pre.clone(),
-                            edge.id(),
-                            r.clone(),
-                        )
-                    })
+                    .map(|r| Error::RoleNotSubscribedToJoin(pre.clone(), edge.id(), r.clone()))
                     .collect();
                 errors.append(&mut joining_errors);
                 /* for incoming_pair in event_pairs_from_node(node, &graph, Incoming) {
@@ -480,7 +481,11 @@ fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
             // go over this again. But right now if joining add joining and all
             // events immediately preceding the joining event
             if proto_info.joining_events.contains(&event_type) {
-                let events_to_add: BTreeSet<EventType> = proto_info.immediately_pre[&event_type].clone().into_iter().chain([event_type.clone()]).collect();
+                let events_to_add: BTreeSet<EventType> = proto_info.immediately_pre[&event_type]
+                    .clone()
+                    .into_iter()
+                    .chain([event_type.clone()])
+                    .collect();
                 for r in involved_roles.iter() {
                     subscriptions
                         .entry(r.clone())
@@ -533,7 +538,11 @@ fn implicit_composition<T: SwarmInterface>(
         .chain(proto_info2.joining_events.into_iter())
         .chain(interfacing_event_types.into_iter())
         .collect();
-    let immediately_pre = combine_maps(proto_info1.immediately_pre.clone(), proto_info2.immediately_pre.clone(), None);
+    let immediately_pre = combine_maps(
+        proto_info1.immediately_pre.clone(),
+        proto_info2.immediately_pre.clone(),
+        None,
+    );
     ProtoInfo::new(
         protocols,
         role_event_map,
@@ -656,23 +665,32 @@ fn prepare_graph<T: SwarmInterface>(
         let incoming_pairs = event_pairs_from_node(node_id, &graph, Incoming);
 
         // add joining events. if there are concurrent incoming edges, add the event types of all outgoing edges not concurrent with identified incoming to set of joining events.
-        let incoming_concurrent = incoming_pairs.into_iter().filter(|pair| concurrent_events.contains(pair)).map(|set| set.into_iter().collect::<Vec<_>>());
-        let outgoing = graph.edges_directed(node_id, Outgoing).map(|e| e.weight().get_event_type()).collect::<BTreeSet<_>>();
+        let incoming_concurrent = incoming_pairs
+            .into_iter()
+            .filter(|pair| concurrent_events.contains(pair))
+            .map(|set| set.into_iter().collect::<Vec<_>>());
+        let outgoing = graph
+            .edges_directed(node_id, Outgoing)
+            .map(|e| e.weight().get_event_type())
+            .collect::<BTreeSet<_>>();
         let product: Vec<_> = incoming_concurrent.cartesian_product(&outgoing).collect();
         // if we have Ga-ea->Gb-eb->Gc, Gd-ec->Gb, with ea, ec concurrent, but not concurrent with eb then eb is joining
         let mut joining: BTreeSet<_> = product
             .into_iter()
-            .filter(|(pair, event)|
+            .filter(|(pair, event)| {
                 !concurrent_events.contains(&unord_event_pair(pair[0].clone(), (*event).clone()))
-                &&  !concurrent_events.contains(&unord_event_pair(pair[1].clone(), (*event).clone()))
-            ).map(|(_, event)| event.clone()).collect();
+                    && !concurrent_events
+                        .contains(&unord_event_pair(pair[1].clone(), (*event).clone()))
+            })
+            .map(|(_, event)| event.clone())
+            .collect();
 
         joining_events.append(&mut joining);
 
         for edge in graph.edges_directed(node_id, Outgoing) {
             role_event_map
                 .entry(edge.weight().role.clone())
-                .and_modify(|role_info|{
+                .and_modify(|role_info| {
                     role_info.insert(edge.weight().clone());
                 })
                 .or_insert(BTreeSet::from([edge.weight().clone()]));
@@ -694,7 +712,7 @@ fn prepare_graph<T: SwarmInterface>(
         concurrent_events,
         branching_events,
         joining_events,
-        immediately_pre_map
+        immediately_pre_map,
     )
 }
 
@@ -724,6 +742,7 @@ fn swarm_to_graph(proto: &SwarmProtocol) -> (Graph, Option<NodeId>, Vec<Error>) 
         Some(*idx)
     } else {
         // strictly speaking we have all_nodes_reachable errors here too...
+        // if there is only an initial state no transitions whatsoever then thats ok? but gives an error here.
         errors.push(Error::SwarmError(
             crate::swarm::Error::InitialStateDisconnected,
         ));
@@ -840,7 +859,11 @@ fn diamond_shape(graph: &Graph, node: NodeId) -> BTreeSet<BTreeSet<EventType>> {
 
 // get events that are immediately before some event and not concurrent.
 // backtrack if immediately preceding is concurrent. not sure if this is needed or ok though
-fn get_immediately_pre(graph: &Graph, edge: EdgeReference<'_, SwarmLabel>, concurrent_events: &BTreeSet<BTreeSet<EventType>>) -> BTreeSet<EventType> {
+fn get_immediately_pre(
+    graph: &Graph,
+    edge: EdgeReference<'_, SwarmLabel>,
+    concurrent_events: &BTreeSet<BTreeSet<EventType>>,
+) -> BTreeSet<EventType> {
     let node = edge.source();
     let event_type = edge.weight().get_event_type();
     let mut visited = BTreeSet::from([node]);
@@ -849,9 +872,13 @@ fn get_immediately_pre(graph: &Graph, edge: EdgeReference<'_, SwarmLabel>, concu
 
     while let Some(node) = to_visit.pop() {
         for e in graph.edges_directed(node, Incoming) {
-            if !concurrent_events.contains(&unord_event_pair(event_type.clone(), e.weight().get_event_type())) {
+            if !concurrent_events.contains(&unord_event_pair(
+                event_type.clone(),
+                e.weight().get_event_type(),
+            )) {
                 immediately_pre.insert(e.weight().get_event_type());
-            } else { // not sure this else branch is actually needed. when concurrency, one of the incoming will be noncurrent with event?
+            } else {
+                // not sure this else branch is actually needed. when concurrency, one of the incoming will be noncurrent with event?
                 let source = e.source();
                 if !visited.contains(&source) {
                     visited.insert(source);
@@ -895,24 +922,35 @@ fn combine_subscriptions<T: SwarmInterface>(
 ) -> Subscriptions {
     let interfacing_events = interface.interfacing_event_types(proto_info1, &proto_info2);
 
-    let extra = interfacing_events.clone()
+    let extra = interfacing_events
+        .clone()
         .into_iter()
         .chain(proto_info1.branching_events.clone())
         .chain(proto_info2.branching_events.clone())
         .chain(proto_info1.joining_events.clone()) // think joins could be handled in a better way...
-        .chain(proto_info1.joining_events
-            .iter()
-            .flat_map(|e| proto_info1.immediately_pre[e].clone()))
+        .chain(
+            proto_info1
+                .joining_events
+                .iter()
+                .flat_map(|e| proto_info1.immediately_pre[e].clone()),
+        )
         .chain(proto_info2.joining_events.clone())
-        .chain(proto_info2.joining_events
-            .iter()
-            .flat_map(|e| proto_info2.immediately_pre[e].clone()))
-        .chain(interfacing_events
-            .iter()
-            .flat_map(|e| proto_info1.immediately_pre[e].clone()))
-        .chain(interfacing_events
-            .iter()
-            .flat_map(|e| proto_info2.immediately_pre[e].clone()))
+        .chain(
+            proto_info2
+                .joining_events
+                .iter()
+                .flat_map(|e| proto_info2.immediately_pre[e].clone()),
+        )
+        .chain(
+            interfacing_events
+                .iter()
+                .flat_map(|e| proto_info1.immediately_pre[e].clone()),
+        )
+        .chain(
+            interfacing_events
+                .iter()
+                .flat_map(|e| proto_info2.immediately_pre[e].clone()),
+        )
         .collect::<BTreeSet<_>>();
 
     combine_maps(
@@ -1000,17 +1038,22 @@ pub fn to_swarm_json(graph: crate::Graph, initial: NodeId) -> SwarmProtocol {
 
 #[cfg(test)]
 mod tests {
-    use std::{iter::zip, sync::Mutex};
+    use std::{cmp, iter::zip, sync::Mutex};
 
     use crate::{
-        composition::{composition_machine::{project, project_combine, to_option_machine}, composition_types::CompositionInput, error_report_to_strings},
+        composition::{
+            composition_machine::{project, project_combine, to_option_machine},
+            composition_types::CompositionInput,
+            error_report_to_strings,
+        },
         types::Command,
         MapVec,
     };
 
     use super::*;
+    use petgraph::visit::Reversed;
     use proptest::prelude::*;
-    use rand::prelude::*;
+    use rand::{distributions::Bernoulli, prelude::*};
 
     // Example from coplaws slides
     fn get_proto1() -> SwarmProtocol {
@@ -1198,10 +1241,23 @@ mod tests {
         ]
     }
 
+    // for uniquely named roles. not strictly necessary? but nice. little ugly idk
+    static ROLE_COUNTER_MUTEX: Mutex<u32> = Mutex::new(0);
+    fn fresh_i() -> u32 {
+        let mut mut_guard = ROLE_COUNTER_MUTEX.lock().unwrap();
+        let i: u32 = *mut_guard;
+        *mut_guard += 1;
+        i
+    }
+
+    static R_BASE: &str = "R";
+    static IR_BASE: &str = "IR";
+    static CMD_BASE: &str = "cmd";
+    static E_BASE: &str = "e";
+
     prop_compose! {
-        fn vec_swarm_label(role: Role, max_events: usize)(vec in prop::collection::vec(("cmd", "e"), 1..max_events)) -> Vec<SwarmLabel> {
-            vec
-            .into_iter()
+        fn vec_swarm_label(role: Role, max_events: usize)(vec in prop::collection::vec((CMD_BASE, E_BASE), 1..max_events)) -> Vec<SwarmLabel> {
+            vec.into_iter()
             .enumerate()
             .map(|(i, (cmd, event))|
                 SwarmLabel { cmd: Command::new(&format!("{role}_{cmd}_{i}")), log_type: vec![EventType::new(&format!("{role}_{event}_{i}"))], role: role.clone()})
@@ -1209,18 +1265,12 @@ mod tests {
         }
     }
 
-    // for uniquely named roles. not strictly necessary? but nice. little ugly idk
-    static ROLE_COUNTER_MUTEX: Mutex<u32> = Mutex::new(0);
-
     prop_compose! {
-        fn vec_role(max_roles: usize)(vec in prop::collection::vec("R", 1..max_roles)) -> Vec<Role> {
+        fn vec_role(max_roles: usize)(vec in prop::collection::vec(R_BASE, 1..max_roles)) -> Vec<Role> {
             vec
             .into_iter()
-
             .map(|role| {
-                let mut mut_guard = ROLE_COUNTER_MUTEX.lock().unwrap();
-                let i: u32 = *mut_guard;
-                *mut_guard += 1;
+                let i = fresh_i();
                 Role::new(&format!("{role}{i}"))
             }).collect()
         }
@@ -1228,26 +1278,41 @@ mod tests {
 
     prop_compose! {
         fn all_labels(max_roles: usize, max_events: usize)
-                    (r in vec_role(max_roles))
-                    (labels in r.into_iter().map(|role| vec_swarm_label(role, max_events)).collect::<Vec<_>>()) -> Vec<SwarmLabel> {
+                    (roles in vec_role(max_roles))
+                    (labels in roles.into_iter().map(|role| vec_swarm_label(role, max_events)).collect::<Vec<_>>()) -> Vec<SwarmLabel> {
             labels.concat()
         }
     }
 
     prop_compose! {
+        fn all_labels_1(roles: Vec<Role>, max_events: usize)
+                    (labels in roles.into_iter().map(|role| vec_swarm_label(role, max_events)).collect::<Vec<_>>()) -> Vec<Vec<SwarmLabel>> {
+            labels
+        }
+    }
+
+    prop_compose! {
+        fn all_labels_2(roles: Vec<Role>, max_roles: usize, max_events: usize)
+                    ((labels, ir_labels) in (prop::collection::vec(all_labels(max_roles, max_events), roles.len()), roles.into_iter().map(|role| vec_swarm_label(role, max_events)).collect::<Vec<_>>()))
+                    -> Vec<(Vec<SwarmLabel>, Vec<SwarmLabel>)> {
+            zip(ir_labels, labels).collect()
+        }
+    }
+
+    prop_compose! {
         fn all_labels_and_if(max_roles: usize, max_events: usize)
-                    (roles in vec_role(max_roles))
-                    (index in 0..roles.len(), labels in roles.into_iter().map(|role| vec_swarm_label(role, max_events)).collect::<Vec<_>>())
-                    -> (Vec<SwarmLabel>, Vec<SwarmLabel>) {
+                (roles in vec_role(max_roles))
+                (index in 0..roles.len(), labels in roles.into_iter().map(|role| vec_swarm_label(role, max_events)).collect::<Vec<_>>())
+                -> (Vec<SwarmLabel>, Vec<SwarmLabel>) {
             let interfacing = labels[index].clone();
             (labels.concat(), interfacing)
         }
     }
 
     prop_compose! {
-        fn all_labels_composition(max_roles: usize, max_events: usize, max_protos: usize)
-                                 (tuples in prop::collection::vec(all_labels_and_if(max_roles, max_events), 1..max_protos))
-                                 -> Vec<(Option<Role>, Vec<SwarmLabel>)> {
+        fn all_labels_composition(max_roles: usize, max_events: usize, max_protos: usize, exactly_max: bool)
+                (tuples in prop::collection::vec(all_labels_and_if(max_roles, max_events), if exactly_max {max_protos..=max_protos} else {1..=max_protos}))
+                -> Vec<(Option<Role>, Vec<SwarmLabel>)> {
             let (labels, interfaces): (Vec<_>, Vec<_>) = tuples.into_iter().unzip();
             let tmp: Vec<(Option<Role>, Vec<SwarmLabel>)>  = interfaces[..interfaces.len()].to_vec().into_iter().map(|interface| (Some(interface[0].role.clone()), interface)).collect();
             let interfaces: Vec<(Option<Role>, Vec<SwarmLabel>)> = vec![vec![(None, vec![])], tmp].concat();
@@ -1255,25 +1320,40 @@ mod tests {
         }
     }
 
-    fn random_graph(mut swarm_labels: Vec<SwarmLabel>) -> (Graph, NodeId) {
-        let mut graph = Graph::new();
-        let mut nodes = Vec::new();
+    // shuffle labels before calling, then call random graph
+    fn random_graph_shuffle_labels(base_graph: Option<(Graph, NodeId)>, mut swarm_labels: Vec<SwarmLabel>) -> (Graph, NodeId) {
         let mut rng = rand::thread_rng();
-        let gen_state_name = |g: &Graph| -> State { State::new(&g.node_count().to_string()) };
         swarm_labels.shuffle(&mut rng);
-        let initial = graph.add_node(State::new(&graph.node_count().to_string()));
-        nodes.push(initial);
+        random_graph(base_graph, swarm_labels)
+    }
+
+    // add option (graph, nodeid) argument and build on top of this graph if some
+    // if base_graph is some, add nodes and edges to this graph. otherwise create from scratch.
+    fn random_graph(base_graph: Option<(Graph, NodeId)>, mut swarm_labels: Vec<SwarmLabel>) -> (Graph, NodeId) {
+        let (mut graph, initial, mut nodes) = if base_graph.is_some() {
+            let (base, base_initial) = base_graph.unwrap();
+            let nodes: Vec<NodeId> = base.node_indices().into_iter().collect();
+            (base, base_initial, nodes)
+        } else {
+            let mut graph = Graph::new();
+            let initial =  graph.add_node(State::new(&fresh_i().to_string()));
+            let nodes = vec![initial];
+            (graph, initial, nodes)
+        };
+        let mut rng = rand::thread_rng();
+        let b_dist = Bernoulli::new(0.1).unwrap(); // bernoulli distribution with propability 0.1 of success
+        let gen_state_name = || -> State { State::new(&fresh_i().to_string()) };
 
         while let Some(label) = swarm_labels.pop() {
             // consider bernoulli thing. and distrbutions etc. bc documentations says that these once are optimised for cases where only a single sample is needed... if just faster does not matter
             // generate new or select old source? Generate new or select old, generate new target or select old?
             // same because you would have to connect to graph at some point anyway...?
             // exclusive range upper limit
-            let source_node = if rng.gen_bool(1.0/10.0) {
+            let source_node = if b_dist.sample(&mut rng) {
                 nodes[rng.gen_range(0..nodes.len())]
             } else {
                 // this whole thing was to have fewer branches... idk. loop will terminate because we always can reach 0?
-                let mut source =  nodes[rng.gen_range(0..nodes.len())];
+                let mut source = nodes[rng.gen_range(0..nodes.len())];
                 while graph.edges_directed(source, Outgoing).count() > 0 {
                     source = nodes[rng.gen_range(0..nodes.len())];
                 }
@@ -1283,7 +1363,7 @@ mod tests {
 
             // if generated bool then select an existing node as target
             // otherwise generate a new node as target
-            if rng.gen_bool(1.0/10.0) && !swarm_labels.is_empty() {
+            if b_dist.sample(&mut rng) && swarm_labels.len() > 0 {
                 let index = rng.gen_range(0..nodes.len());
                 let target_node = nodes[index];
                 //nodes.push(graph.add_node(State::new(&graph.node_count().to_string())));
@@ -1293,14 +1373,14 @@ mod tests {
                 // so we should be able to generate new node and add and edge from
                 // target node to this new node
                 if !node_can_reach_zero(&graph, target_node).is_empty() {
-                    let new_target_node = graph.add_node(gen_state_name(&graph));
+                    let new_target_node = graph.add_node(gen_state_name());
                     // consider not pushing?
                     nodes.push(new_target_node);
                     let new_weight = swarm_labels.pop().unwrap();
                     graph.add_edge(target_node, new_target_node, new_weight);
                 }
             } else {
-                let target_node = graph.add_node(gen_state_name(&graph));
+                let target_node = graph.add_node(gen_state_name());
                 nodes.push(target_node);
                 graph.add_edge(source_node, target_node, label);
             }
@@ -1309,20 +1389,305 @@ mod tests {
         (graph, initial)
     }
 
+    // generate a number of protocols that interface. interfacing events may appear in different orderes in the protocols
+    // and may be scattered across different branches: we may 'lose' a lot of behavior.
     prop_compose! {
-        fn generate_composition_input_vec(max_roles: usize, max_events: usize, max_protos: usize)
-                          (vec in all_labels_composition(max_roles, max_events, max_protos))
+        fn generate_composition_input_vec(max_roles: usize, max_events: usize, max_protos: usize, exactly_max: bool)
+                          (vec in all_labels_composition(max_roles, max_events, max_protos, exactly_max))
                           -> CompositionInputVec {
             vec.into_iter()
-                .map(|(interface, swarm_labels)| (random_graph(swarm_labels), interface))
+                .map(|(interface, swarm_labels)| (random_graph_shuffle_labels(None, swarm_labels), interface))
                 .map(|((graph, initial), interface)| {
                     let protocol = to_swarm_json(graph, initial);
-                    let (subscription, _) = weak_well_formed_sub(protocol.clone());
-                    CompositionInput { protocol, subscription, interface }
+                    CompositionInput { protocol, subscription: BTreeMap::new(), interface }
                     }
                 ).collect()
 
         }
+    }
+
+    // generate a number of protocols that interface and where protocol i 'refines' protocol i+1
+    prop_compose! {
+        fn generate_composition_input_vec_refinement(max_roles: usize, max_events: usize, num_protos: usize)
+                          (vec in prop::collection::vec(all_labels(max_roles, max_events), cmp::max(0, num_protos-1)))
+                          -> CompositionInputVec {
+            let level_0_proto = refinement_initial_proto();
+            let mut graphs = vec![CompositionInput {protocol: to_swarm_json(level_0_proto.0, level_0_proto.1), subscription: BTreeMap::new(), interface: None}];
+            let mut vec = vec
+                .into_iter()
+                .map(|swarm_labels| random_graph_shuffle_labels(None, swarm_labels))
+                .enumerate()
+                .map(|(level, (proto, initial))| (level, refinement_shape(level, proto, initial)))
+                .map(|(level, (proto, initial))|
+                        CompositionInput { protocol: to_swarm_json(proto, initial), subscription: BTreeMap::new(), interface: Some(Role::new(&format!("{IR_BASE}_{level}")))}
+                    )
+                .collect();
+            graphs.append(&mut vec);
+
+            graphs
+        }
+    }
+
+    prop_compose! {
+        fn protos_refinement_2(max_events: usize, num_protos: usize)
+                    (labels in all_labels_1((0..num_protos).into_iter().map(|i| Role::new(&format!("{IR_BASE}_{i}"))).collect(), max_events))
+                    -> Vec<(Graph, NodeId)> {
+            labels.into_iter().map(|labels| random_graph(None, labels)).collect()
+        }
+    }
+
+    prop_compose! {
+        fn protos_refinement_22(max_roles: usize, max_events: usize, num_protos: usize)
+                    (labels in all_labels_2((0..num_protos).into_iter().map(|i| Role::new(&format!("{IR_BASE}_{i}"))).collect(), cmp::max(0, max_roles-1), max_events))
+                    -> Vec<((Graph, NodeId), Vec<SwarmLabel>)> {
+            labels.into_iter().map(|(ir_labels, labels)| (random_graph(None, ir_labels.into_iter().rev().collect()), labels)).collect()
+        }
+    }
+
+    prop_compose! {
+        fn generate_composition_input_vec_refinement_2(max_roles: usize, max_events: usize, num_protos: usize)
+                    (protos in protos_refinement_22(max_roles, max_events, num_protos))
+                    -> CompositionInputVec {
+            let mut rng = rand::thread_rng();
+            let protos_altered: Vec<_> = protos.clone()
+                .into_iter()
+                .enumerate()
+                .map(|(i, ((graph, initial), mut labels))| {
+                    let (graph, initial) = if i == 0 {
+                        (graph, initial)
+                    } else {
+                        // create a graph by inserting protos[i] into protos[i-1]
+                        insert_into(protos[i-1].0.clone(), (graph, initial))
+                    };
+                    //(graph, initial)
+                    labels.shuffle(&mut rng);
+                    expand_graph(graph, initial, labels)
+                }).collect();
+
+            protos_altered.into_iter()
+                .enumerate()
+                .map(|(i, (graph, initial))|
+                    CompositionInput { protocol: to_swarm_json(graph, initial), subscription: BTreeMap::new(), interface: if i == 0 { None } else { Some(Role::new(&format!("{IR_BASE}_{level}", level=i-1))) } })
+                .collect()
+        }
+
+    }
+
+    fn refinement_initial_proto() -> (Graph, NodeId) {
+        let mut graph = Graph::new();
+        let initial = graph.add_node(State::new(&fresh_i().to_string()));
+        let middle = graph.add_node(State::new(&fresh_i().to_string()));
+        let last = graph.add_node(State::new(&fresh_i().to_string()));
+
+        let start_label = SwarmLabel {
+            cmd: Command::new(&format!("{IR_BASE}_0_{CMD_BASE}_0")),
+            log_type: vec![EventType::new(&format!("{IR_BASE}_0_{E_BASE}_0"))],
+            role: Role::new(&format!("{IR_BASE}_0")),
+        };
+        let end_label = SwarmLabel {
+            cmd: Command::new(&format!("{IR_BASE}_0_{CMD_BASE}_1")),
+            log_type: vec![EventType::new(&format!("{IR_BASE}_0_{E_BASE}_1"))],
+            role: Role::new(&format!("{IR_BASE}_0")),
+        };
+
+        graph.add_edge(initial, middle, start_label);
+        graph.add_edge(middle, last, end_label);
+
+        (graph, initial)
+    }
+
+    // consider a version where we change existing labels instead of adding new edges. still adding new edges for if, but not next if.
+    fn refinement_shape(level: usize, mut proto: Graph, initial: NodeId) -> (Graph, NodeId) {
+        let terminal_nodes: Vec<_> = proto
+            .node_indices()
+            .filter(|node| proto.edges_directed(*node, Outgoing).count() == 0)
+            .collect();
+        let mut rng = rand::thread_rng();
+        let index = terminal_nodes[rng.gen_range(0..terminal_nodes.len())];
+        let reversed_graph = Reversed(&proto);
+        let mut dfs = Dfs::new(&reversed_graph, index);
+        let mut nodes_on_path = Vec::new();
+        while let Some(node) = dfs.next(&reversed_graph) {
+            nodes_on_path.push(node);
+            if node == initial {
+                break;
+            }
+        }
+        // reverse so that index 0 is the initial node and index len-1 is the terminal node on the path
+        nodes_on_path.reverse();
+
+        let next_ir = format!("{IR_BASE}_{next_level}", next_level = level + 1);
+        let next_if_label_0 = SwarmLabel {
+            cmd: Command::new(&format!("{next_ir}_{CMD_BASE}_0")),
+            log_type: vec![EventType::new(&format!("{next_ir}_{E_BASE}_0"))],
+            role: Role::new(&next_ir),
+        };
+        let next_if_label_1 = SwarmLabel {
+            cmd: Command::new(&format!("{next_ir}_{CMD_BASE}_1")),
+            log_type: vec![EventType::new(&format!("{next_ir}_{E_BASE}_1"))],
+            role: Role::new(&next_ir),
+        };
+
+        let index = rng.gen_range(0..nodes_on_path.len());
+        let source_node = nodes_on_path[index];
+
+        if index == nodes_on_path.len()-1 {
+            let next_if_middle = proto.add_node(State::new(&fresh_i().to_string()));
+            let next_if_end = proto.add_node(State::new(&fresh_i().to_string()));
+            proto.add_edge(source_node, next_if_middle, next_if_label_0);
+            proto.add_edge(next_if_middle, next_if_end, next_if_label_1);
+            nodes_on_path.push(next_if_middle);
+            nodes_on_path.push(next_if_end);
+        } else {
+            let target_node = nodes_on_path[index + 1];
+            let edge_to_remove = proto.find_edge(source_node, target_node).unwrap();
+            let weight = proto[edge_to_remove].clone();
+            proto.remove_edge(edge_to_remove);
+            let next_if_start = proto.add_node(State::new(&fresh_i().to_string()));
+            proto.add_edge(source_node, next_if_start, weight);
+            let next_if_middle = proto.add_node(State::new(&fresh_i().to_string()));
+            proto.add_edge(next_if_start, next_if_middle, next_if_label_0);
+            proto.add_edge(next_if_middle, target_node, next_if_label_1);
+            nodes_on_path = vec![nodes_on_path[..index+1].to_vec(), vec![next_if_start, next_if_middle], nodes_on_path[index+1..].to_vec()].concat();
+        };
+
+        let ir = format!("{IR_BASE}_{level}");
+        let if_label_0 = SwarmLabel {
+            cmd: Command::new(&format!("{ir}_{CMD_BASE}_0")),
+            log_type: vec![EventType::new(&format!("{ir}_{E_BASE}_0"))],
+            role: Role::new(&ir),
+        };
+        let if_label_1 = SwarmLabel {
+            cmd: Command::new(&format!("{ir}_{CMD_BASE}_1")),
+            log_type: vec![EventType::new(&format!("{ir}_{E_BASE}_1"))],
+            role: Role::new(&ir),
+        };
+
+        let new_initial = proto.add_node(State::new(&fresh_i().to_string()));
+        let new_end = proto.add_node(State::new(&fresh_i().to_string()));
+        proto.add_edge(new_initial, initial, if_label_0);
+        proto.add_edge(nodes_on_path[nodes_on_path.len()-1], new_end, if_label_1);
+
+        (proto, new_initial)
+    }
+
+    // insert graph2 into graph1. that is, find some edge e in graph1.
+    // make e terminate at the initial node of graph2.
+    // insert all the edges outgoing from the node where e was incoming in the old graph
+    // as outgoing edges of some node in graph2.
+    // assume graph1 and graph2 have terminal nodes. Assume they both have at least one edge.
+    fn insert_into(graph1: (Graph, NodeId), graph2: (Graph, NodeId)) -> (Graph, NodeId) {
+        let mut rng = rand::thread_rng();
+        let (mut graph1, initial1) = graph1;
+        let (graph2, initial2) = graph2;
+        // map nodes in graph2 to nodes in graph1
+        let mut node_map: BTreeMap<NodeId, NodeId> = BTreeMap::new();
+        let mut graph2_terminals: Vec<NodeId> = vec![];
+
+        // edge that we attach to initial of graph2 instead of its old target
+        let connecting_edge = graph1.edge_references().choose(&mut rng).unwrap();
+        let connecting_source = connecting_edge.source();
+        let connecting_old_target = connecting_edge.target();
+        let connecting_weight = connecting_edge.weight().clone();
+        graph1.remove_edge(connecting_edge.id());
+
+        // create a node in graph1 corresponding to initial of graph2. use insert_with to avoid https://stackoverflow.com/questions/60109843/entryor-insert-executes-despite-a-value-already-existing
+        let inserted_initial = node_map.entry(initial2).or_insert_with(|| graph1.add_node(State::new(&fresh_i().to_string())));
+        graph1.add_edge(connecting_source, *inserted_initial, connecting_weight);
+
+        let mut dfs = Dfs::new(&graph2, initial2);
+        while let Some(node) = dfs.next(&graph2) {
+            let node_in_graph1 = *node_map.entry(node).or_insert_with(|| graph1.add_node(State::new(&fresh_i().to_string())));
+            for e in graph2.edges_directed(node, Outgoing) {
+                let target_in_graph1 = *node_map.entry(e.target()).or_insert_with(|| graph1.add_node(State::new(&fresh_i().to_string())));
+                graph1.add_edge(node_in_graph1, target_in_graph1, e.weight().clone());
+            }
+
+            if graph2.edges_directed(node, Outgoing).count() == 0 {
+                graph2_terminals.push(node);
+            }
+        }
+
+        // select a terminal node in graph2. make all incoming point to connecting old target instead. remove this terminal node.
+        let graph2_terminal = *graph2_terminals.choose(&mut rng).unwrap();
+        let mut edges_to_remove: Vec<EdgeId> = vec![];
+        let mut edges_to_add: Vec<(NodeId, NodeId, SwarmLabel)> = vec![];
+        for e in graph1.edges_directed(node_map[&graph2_terminal], Incoming) {
+            let source = e.source();
+            let weight = e.weight();
+            edges_to_remove.push(e.id());
+            edges_to_add.push((source, connecting_old_target, weight.clone()));
+        }
+        for e_id in edges_to_remove {
+            graph1.remove_edge(e_id);
+        }
+        for (source, target, weight) in edges_to_add {
+            graph1.add_edge(source, target, weight);
+        }
+        graph1.remove_node(node_map[&graph2_terminal]);
+
+        (graph1, initial1)
+    }
+
+    fn expand_graph(mut graph: Graph, initial: NodeId, mut swarm_labels: Vec<SwarmLabel>) -> (Graph, NodeId) {
+        let mut nodes: Vec<NodeId> = graph.node_indices().into_iter().collect();
+        let mut rng = rand::thread_rng();
+        let b_dist = Bernoulli::new(0.1).unwrap(); // bernoulli distribution with propability 0.1 of success
+        let b_dist_2 = Bernoulli::new(0.5).unwrap(); // bernoulli distribution with propability 0.5 of success
+        let gen_state_name = || -> State { State::new(&fresh_i().to_string()) };
+
+        while let Some(label) = swarm_labels.pop() {
+
+            if b_dist_2.sample(&mut rng) {
+                let source_node = if b_dist.sample(&mut rng) {
+                    nodes[rng.gen_range(0..nodes.len())]
+                } else {
+                    // this whole thing was to have fewer branches... idk. loop will terminate because we always can reach 0?
+                    let mut source = nodes[rng.gen_range(0..nodes.len())];
+                    while graph.edges_directed(source, Outgoing).count() > 0 {
+                        source = nodes[rng.gen_range(0..nodes.len())];
+                    }
+
+                    source
+                };
+
+                // if generated bool then select an existing node as target
+                // otherwise generate a new node as target
+                if b_dist.sample(&mut rng) && swarm_labels.len() > 0 {
+                    let index = rng.gen_range(0..nodes.len());
+                    let target_node = nodes[index];
+                    //nodes.push(graph.add_node(State::new(&graph.node_count().to_string())));
+                    graph.add_edge(source_node, target_node, label);
+                    // we should be able to reach a terminating node from all nodes.
+                    // we check that swarm_labels is not empty before entering this branch
+                    // so we should be able to generate new node and add and edge from
+                    // target node to this new node
+                    if !node_can_reach_zero(&graph, target_node).is_empty() {
+                        let new_target_node = graph.add_node(gen_state_name());
+                        // consider not pushing?
+                        nodes.push(new_target_node);
+                        let new_weight = swarm_labels.pop().unwrap();
+                        graph.add_edge(target_node, new_target_node, new_weight);
+                    }
+                } else {
+                    let target_node = graph.add_node(gen_state_name());
+                    nodes.push(target_node);
+                    graph.add_edge(source_node, target_node, label);
+                }
+            } else {
+                let connecting_edge = graph.edge_references().choose(&mut rng).unwrap();
+                let connecting_source = connecting_edge.source();
+                let connecting_old_target = connecting_edge.target();
+                let connecting_weight = connecting_edge.weight().clone();
+                graph.remove_edge(connecting_edge.id());
+
+                let new_node = graph.add_node(gen_state_name());
+                graph.add_edge(connecting_source, new_node, connecting_weight);
+                graph.add_edge(new_node, connecting_old_target, label);
+            }
+        }
+
+        (graph, initial)
     }
 
     #[test]
@@ -1713,10 +2078,11 @@ mod tests {
         #![proptest_config(ProptestConfig::with_cases(50))]
         #[test]
         fn test_generate_graph(labels in all_labels(50, 50)) {
-            let (graph, initial) = random_graph(labels);
+            let (graph, initial) = random_graph_shuffle_labels(None, labels);
             let swarm = to_swarm_json(graph.clone(), initial);
             let (g, i, e) = crate::swarm::from_json(to_swarm_json(graph.clone(), initial), &BTreeMap::new());
             assert!(e.is_empty());
+            //println!("swarm: {}", serde_json::to_string_pretty(&swarm).unwrap());
             let swarm1 = to_swarm_json(g, i.unwrap());
             assert_eq!(swarm, swarm1);
             assert!(confusion_free(&prepare_graph::<Role>(swarm, &BTreeMap::new(), None), 0).is_empty());
@@ -1736,7 +2102,12 @@ mod tests {
 
     // true if subs1 is a subset of subs2
     fn is_sub_subscription(subs1: Subscriptions, subs2: Subscriptions) -> bool {
-        if !subs1.keys().cloned().collect::<BTreeSet<Role>>().is_subset(&subs2.keys().cloned().collect::<BTreeSet<Role>>()) {
+        if !subs1
+            .keys()
+            .cloned()
+            .collect::<BTreeSet<Role>>()
+            .is_subset(&subs2.keys().cloned().collect::<BTreeSet<Role>>())
+        {
             return false;
         }
 
@@ -1755,8 +2126,16 @@ mod tests {
     // i.e. is the approximation safe. max five protocols, max five roles
     // in each, max five commands per role. relatively small.
     proptest! {
+        //#![proptest_config(ProptestConfig::with_cases(1))]
         #[test]
-        fn test_overapprox_1(vec in generate_composition_input_vec(5, 5, 5)) {
+        fn test_overapprox_1(vec in generate_composition_input_vec(5, 5, 5, false)) {
+            let vec: CompositionInputVec = vec
+                .into_iter()
+                .map(|composition_input| {
+                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
+                    CompositionInput {subscription, ..composition_input}
+                })
+                .collect();
             let (subs_implicit, errors) = compose_subscriptions(vec.clone());
             assert!(errors.is_empty());
             let result = compose_protocols(vec.clone());
@@ -1771,11 +2150,17 @@ mod tests {
         }
     }
 
-    // same test as above but for larger compositions. test fewer cases.
-    /* proptest! {
-        #![proptest_config(ProptestConfig::with_cases(1))]
+    // same test as above but for refinement pattern
+    proptest! {
         #[test]
-        fn test_overapprox_2(vec in generate_composition_input_vec(10, 10, 7)) {
+        fn test_overapprox_2(vec in generate_composition_input_vec_refinement(5, 5, 5)) {
+            let vec: CompositionInputVec = vec
+                .into_iter()
+                .map(|composition_input| {
+                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
+                    CompositionInput {subscription, ..composition_input}
+                })
+                .collect();
             let (subs_implicit, errors) = compose_subscriptions(vec.clone());
             assert!(errors.is_empty());
             let result = compose_protocols(vec.clone());
@@ -1788,13 +2173,90 @@ mod tests {
             let (subs_explicit, _) = weak_well_formed_sub(swarm);
             assert!(is_sub_subscription(subs_explicit, subs_implicit));
         }
-    } */
+    }
+
+    // same test as above but for refinement pattern 2 smaller composition
+    proptest! {
+        #[test]
+        fn test_overapprox_3(vec in generate_composition_input_vec_refinement_2(5, 5, 3)) {
+            let vec: CompositionInputVec = vec
+                .into_iter()
+                .map(|composition_input| {
+                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
+                    CompositionInput {subscription, ..composition_input}
+                })
+                .collect();
+            let (subs_implicit, errors) = compose_subscriptions(vec.clone());
+            assert!(errors.is_empty());
+            let result = compose_protocols(vec.clone());
+            assert!(result.is_ok());
+            let (composed_graph, composed_initial) = result.unwrap();
+            // we want to turn it to swarm and call weak_well_well_formed_sub
+            // instead of calling wwf_sub with graph because we want to
+            // prepare the graph and obtain concurrent events etc.
+            let swarm = to_swarm_json(composed_graph, composed_initial);
+            let (subs_explicit, _) = weak_well_formed_sub(swarm);
+            assert!(is_sub_subscription(subs_explicit, subs_implicit));
+        }
+    }
+    proptest! {
+        //#![proptest_config(ProptestConfig::with_cases(1))]
+        #[test]
+        fn test_refinement_pattern(vec in generate_composition_input_vec_refinement(7, 7, 7)) {
+            for v in &vec {
+                assert!(confusion_free(&prepare_graph::<Role>(v.protocol.clone(), &BTreeMap::new(), None), 0).is_empty());
+            }
+
+            let vec: CompositionInputVec = vec
+                .into_iter()
+                .map(|composition_input| {
+                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
+                    CompositionInput {subscription, ..composition_input}
+                })
+                .collect();
+            let result = compose_protocols(vec.clone());
+            assert!(result.is_ok());
+            //let (composed_graph, composed_initial) = result.unwrap();
+            //let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
+            //println!("composition: {}", serde_json::to_string_pretty(&swarm).unwrap());
+        }
+    }
+
+    proptest! {
+        //#![proptest_config(ProptestConfig::with_cases(2))]
+        #[test]
+        fn test_refinement_pattern_2(vec in generate_composition_input_vec_refinement_2(5, 5, 5)) {
+            for v in &vec {
+                assert!(confusion_free(&prepare_graph::<Role>(v.protocol.clone(), &BTreeMap::new(), None), 0).is_empty());
+                //println!("{} \n$$$$", serde_json::to_string_pretty(&v.protocol.clone()).unwrap());
+            }
+
+            let vec: CompositionInputVec = vec
+                .into_iter()
+                .map(|composition_input| {
+                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
+                    CompositionInput {subscription, ..composition_input}
+                })
+                .collect();
+            let result = compose_protocols(vec.clone());
+            assert!(result.is_ok());
+            //let (g, i) = result.unwrap();
+            //println!("{}\n$$$$", serde_json::to_string_pretty(&to_swarm_json(g, i)).unwrap());
+    }
+}
 
     // test whether project(compose(G1, G2, ..., Gn)) = compose(project(G1), project(G2), ... project(Gn))
     // have test here instead of in composition_machine.rs because...
     proptest! {
         #[test]
-        fn test_project_combine(vec in generate_composition_input_vec(5, 5, 5)) {
+        fn test_project_combine(vec in generate_composition_input_vec(5, 5, 5, false)) {
+            let vec: CompositionInputVec = vec
+                .into_iter()
+                .map(|composition_input| {
+                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
+                    CompositionInput {subscription, ..composition_input}
+                })
+                .collect();
             let (protos, subs_implicit) = implicit_composition_swarms(vec.clone());
             let protos = protos.into_iter().map(|((g, i, _), set)| (g, i.unwrap(), set)).collect();
             let result = compose_protocols(vec.clone());
@@ -1814,4 +2276,40 @@ mod tests {
             }
         }
     }
+
+    // Confusion free thing come back to this!
+    /*     proptest! {
+        #![proptest_config(ProptestConfig::with_cases(1))]
+        #[test]
+        fn test_confusion_free_comp(vec in generate_composition_input_vec(5, 5, 2)) {
+            let vec: CompositionInputVec = vec
+                .into_iter()
+                .map(|composition_input| {
+                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
+                    CompositionInput {subscription, ..composition_input}
+                })
+                .collect();
+            let result = compose_protocols(vec.clone());
+            //println!("{:?}", result);
+            assert!(result.is_ok());
+            /* match result {
+                Ok(_) => (),
+                Err(e) => println!("{:?}", error_report_to_strings(e)),
+            } */
+            let (composed_graph, composed_initial) = result.unwrap();
+            let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
+            let (subs_explicit, e) = weak_well_formed_sub(swarm.clone());
+            //
+            if !e.is_empty() {
+                //println!("e: {:?}", e);
+                println!("e strings: {:?}", error_report_to_strings(e));
+                /* println!("g: {}", serde_json::to_string_pretty(&swarm).unwrap());
+                for v in vec {
+                    println!("g component: {}", serde_json::to_string_pretty(&v.protocol).unwrap());
+                    println!("g inteface: {:?}", v.interface);
+                } */
+            }
+            //assert!(is_sub_subscription(subs_explicit.clone(), subs_implicit));
+        }
+    } */
 }
