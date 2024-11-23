@@ -2181,6 +2181,7 @@ mod tests {
         fn test_refinement_pattern_2(vec in generate_composition_input_vec_refinement_2(5, 5, 5)) {
             for v in &vec {
                 assert!(confusion_free(&prepare_graph::<Role>(v.protocol.clone(), &BTreeMap::new(), None), 0).is_empty());
+                //println!("{} \n$$$$", serde_json::to_string_pretty(&v.protocol.clone()).unwrap());
             }
 
             let vec: CompositionInputVec = vec
@@ -2192,6 +2193,8 @@ mod tests {
                 .collect();
             let result = compose_protocols(vec.clone());
             assert!(result.is_ok());
+            //let (g, i) = result.unwrap();
+            //println!("{}\n$$$$", serde_json::to_string_pretty(&to_swarm_json(g, i)).unwrap());
     }
 }
 
