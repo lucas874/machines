@@ -1051,7 +1051,8 @@ mod tests {
     };
 
     use super::*;
-    use petgraph::visit::Reversed;
+    use itertools::enumerate;
+    use petgraph::visit::{IntoNodeReferences, Reversed};
     use proptest::prelude::*;
     use rand::{distributions::Bernoulli, prelude::*};
 
@@ -1281,6 +1282,13 @@ mod tests {
     }
 
     prop_compose! {
+        fn all_labels_1(roles: Vec<Role>, max_events: usize)
+                    (labels in roles.into_iter().map(|role| vec_swarm_label(role, max_events)).collect::<Vec<_>>()) -> Vec<Vec<SwarmLabel>> {
+            labels
+        }
+    }
+
+    prop_compose! {
         fn all_labels_and_if(max_roles: usize, max_events: usize)
                 (roles in vec_role(max_roles))
                 (index in 0..roles.len(), labels in roles.into_iter().map(|role| vec_swarm_label(role, max_events)).collect::<Vec<_>>())
@@ -1308,6 +1316,7 @@ mod tests {
         random_graph(swarm_labels)
     }
 
+    // add option (graph, nodeid) argument and build on top of this graph if some
     fn random_graph(mut swarm_labels: Vec<SwarmLabel>) -> (Graph, NodeId) {
         let mut graph = Graph::new();
         let mut nodes = Vec::new();
@@ -1401,6 +1410,39 @@ mod tests {
 
             graphs
         }
+    }
+
+    prop_compose! {
+        fn protos_refinement_2(max_events: usize, num_protos: usize)
+                    (labels in all_labels_1((0..num_protos).into_iter().map(|i| Role::new(&format!("{IR_BASE}_{i}"))).collect(), max_events))
+                    -> Vec<(Graph, NodeId)> {
+            labels.into_iter().map(|labels| random_graph(labels)).collect()
+        }
+    }
+
+    prop_compose! {
+        fn generate_composition_input_vec_refinement_2(max_roles: usize, max_events: usize, num_protos: usize)
+                    (protos in protos_refinement_2(max_events, num_protos))
+                    -> CompositionInputVec {
+            let protos_altered: Vec<_> = protos.clone()
+                .into_iter()
+                .enumerate()
+                .map(|(i, (graph, initial))| {
+                    let (graph, initial) = if i == 0 {
+                        (graph, initial)
+                    } else {
+                        insert_into(protos[i-1].clone(), (graph, initial))
+                    };
+                    randomly_expand(graph, initial, max_roles, max_events)
+                }).collect();
+
+            protos_altered.into_iter()
+                .enumerate()
+                .map(|(i, (graph, initial))|
+                    CompositionInput { protocol: to_swarm_json(graph, initial), subscription: BTreeMap::new(), interface: if i == 0 { None } else { Some(Role::new(&format!("{IR_BASE}_{i}"))) } })
+                .collect()
+        }
+
     }
 
     fn refinement_initial_proto() -> (Graph, NodeId) {
@@ -1500,6 +1542,69 @@ mod tests {
         proto.add_edge(nodes_on_path[nodes_on_path.len()-1], new_end, if_label_1);
 
         (proto, new_initial)
+    }
+
+    // insert graph2 into graph1. that is, find some edge e in graph1.
+    // make e terminate at the initial node of graph2.
+    // insert all the edges outgoing from the node where e was incoming in the old graph
+    // as outgoing edges of some node in graph2.
+    // assume graph1 and graph2 have terminal nodes. Assume they both have at least one edge.
+    fn insert_into(graph1: (Graph, NodeId), graph2: (Graph, NodeId)) -> (Graph, NodeId) {
+        let mut rng = rand::thread_rng();
+        let (mut graph1, initial1) = graph1;
+        let (mut graph2, initial2) = graph2;
+        // map nodes in graph2 to nodes in graph1
+        let mut node_map: BTreeMap<NodeId, NodeId> = BTreeMap::new();
+        let mut graph2_terminals: Vec<NodeId> = vec![];
+
+        // edge that we attach to initial of graph2 instead of its old target
+        let connecting_edge = graph1.edge_references().choose(&mut rng).unwrap();
+        let connecting_source = connecting_edge.source();
+        let connecting_old_target = connecting_edge.target();
+        let connecting_weight = connecting_edge.weight().clone();
+        graph1.remove_edge(connecting_edge.id());
+
+        // create a node in graph1 corresponding to initial of graph2
+        let inserted_initial = node_map.entry(initial2).or_insert(graph1.add_node(State::new(&graph1.node_count().to_string())));
+        graph1.add_edge(connecting_source, *inserted_initial, connecting_weight);
+
+        let mut dfs = Dfs::new(&graph2, initial2);
+        while let Some(node) = dfs.next(&graph2) {
+            let node_in_graph1 = *node_map.entry(node).or_insert(graph1.add_node(State::new(&graph1.node_count().to_string())));
+            for e in graph2.edges_directed(node, Outgoing) {
+                let target_in_graph1 = *node_map.entry(e.target()).or_insert(graph1.add_node(State::new(&graph1.node_count().to_string())));
+                graph1.add_edge(node_in_graph1, target_in_graph1, e.weight().clone());
+            }
+
+            if graph2.edges_directed(node, Outgoing).count() == 0 {
+                graph2_terminals.push(node);
+            }
+        }
+        // make all edges starting at connecting_old_target start at this node and remove connecting_old_target
+        let connecting_node = *graph2_terminals.choose(&mut rng).unwrap();
+        // fill the vectors below, then remove, then add.
+        let mut edges_to_remove: Vec<EdgeId> = vec![];
+        let mut edges_to_add: Vec<(NodeId, NodeId, SwarmLabel)> = vec![];
+        for e in graph1.edges_directed(connecting_old_target, Outgoing) {
+            let target = e.target();
+            let weight = e.weight();
+            edges_to_remove.push(e.id());
+            edges_to_add.push((connecting_node, target, weight.clone()));
+        }
+        for e_id in edges_to_remove {
+            graph1.remove_edge(e_id);
+        }
+        for (source, target, weight) in edges_to_add {
+            graph1.add_edge(source, target, weight);
+        }
+
+
+        (graph1, initial1)
+    }
+
+    // randomly add edges and nodes to a graph
+    fn randomly_expand(graph: Graph, initial: NodeId, max_roles: usize, max_events: usize) -> (Graph, NodeId) {
+        unimplemented!()
     }
 
     #[test]
