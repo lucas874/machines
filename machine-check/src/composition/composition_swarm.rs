@@ -1051,8 +1051,7 @@ mod tests {
     };
 
     use super::*;
-    use itertools::enumerate;
-    use petgraph::visit::{IntoNodeReferences, Reversed};
+    use petgraph::visit::Reversed;
     use proptest::prelude::*;
     use rand::{distributions::Bernoulli, prelude::*};
 
@@ -1244,6 +1243,12 @@ mod tests {
 
     // for uniquely named roles. not strictly necessary? but nice. little ugly idk
     static ROLE_COUNTER_MUTEX: Mutex<u32> = Mutex::new(0);
+    fn fresh_i() -> u32 {
+        let mut mut_guard = ROLE_COUNTER_MUTEX.lock().unwrap();
+        let i: u32 = *mut_guard;
+        *mut_guard += 1;
+        i
+    }
 
     static R_BASE: &str = "R";
     static IR_BASE: &str = "IR";
@@ -1265,9 +1270,7 @@ mod tests {
             vec
             .into_iter()
             .map(|role| {
-                let mut mut_guard = ROLE_COUNTER_MUTEX.lock().unwrap();
-                let i: u32 = *mut_guard;
-                *mut_guard += 1;
+                let i = fresh_i();
                 Role::new(&format!("{role}{i}"))
             }).collect()
         }
@@ -1285,6 +1288,14 @@ mod tests {
         fn all_labels_1(roles: Vec<Role>, max_events: usize)
                     (labels in roles.into_iter().map(|role| vec_swarm_label(role, max_events)).collect::<Vec<_>>()) -> Vec<Vec<SwarmLabel>> {
             labels
+        }
+    }
+
+    prop_compose! {
+        fn all_labels_2(roles: Vec<Role>, max_roles: usize, max_events: usize)
+                    ((labels, ir_labels) in (prop::collection::vec(all_labels(max_roles, max_events), roles.len()), roles.into_iter().map(|role| vec_swarm_label(role, max_events)).collect::<Vec<_>>()))
+                    -> Vec<(Vec<SwarmLabel>, Vec<SwarmLabel>)> {
+            zip(ir_labels, labels).collect()
         }
     }
 
@@ -1310,23 +1321,30 @@ mod tests {
     }
 
     // shuffle labels before calling, then call random graph
-    fn random_graph_shuffle_labels(mut swarm_labels: Vec<SwarmLabel>) -> (Graph, NodeId) {
+    fn random_graph_shuffle_labels(base_graph: Option<(Graph, NodeId)>, mut swarm_labels: Vec<SwarmLabel>) -> (Graph, NodeId) {
         let mut rng = rand::thread_rng();
         swarm_labels.shuffle(&mut rng);
-        random_graph(swarm_labels)
+        random_graph(base_graph, swarm_labels)
     }
 
     // add option (graph, nodeid) argument and build on top of this graph if some
-    fn random_graph(mut swarm_labels: Vec<SwarmLabel>) -> (Graph, NodeId) {
-        let mut graph = Graph::new();
-        let mut nodes = Vec::new();
+    // if base_graph is some, add nodes and edges to this graph. otherwise create from scratch.
+    fn random_graph(base_graph: Option<(Graph, NodeId)>, mut swarm_labels: Vec<SwarmLabel>) -> (Graph, NodeId) {
+        let (mut graph, initial, mut nodes) = if base_graph.is_some() {
+            let (base, base_initial) = base_graph.unwrap();
+            //println!("--------begin-------\nall nodes reachable: {:?}", all_nodes_reachable(&base.clone(), base_initial).map(Error::convert(&base)));
+            //println!("graph: {}\n\n", serde_json::to_string_pretty(&to_swarm_json(base.clone(), base_initial)).unwrap());
+            let nodes: Vec<NodeId> = base.node_indices().into_iter().collect();
+            (base, base_initial, nodes)
+        } else {
+            let mut graph = Graph::new();
+            let initial =  graph.add_node(State::new(&fresh_i().to_string()));
+            let nodes = vec![initial];
+            (graph, initial, nodes)
+        };
         let mut rng = rand::thread_rng();
         let b_dist = Bernoulli::new(0.1).unwrap(); // bernoulli distribution with propability 0.1 of success
-        let gen_state_name = |g: &Graph| -> State { State::new(&g.node_count().to_string()) };
-
-        //swarm_labels.shuffle(&mut rng); // Back to shuffling here again. Do not know if it is better to shuffle here or shuffle the labels before calling.
-        let initial = graph.add_node(State::new(&graph.node_count().to_string()));
-        nodes.push(initial);
+        let gen_state_name = || -> State { State::new(&fresh_i().to_string()) };
 
         while let Some(label) = swarm_labels.pop() {
             // consider bernoulli thing. and distrbutions etc. bc documentations says that these once are optimised for cases where only a single sample is needed... if just faster does not matter
@@ -1347,7 +1365,7 @@ mod tests {
 
             // if generated bool then select an existing node as target
             // otherwise generate a new node as target
-            if b_dist.sample(&mut rng) && !swarm_labels.is_empty() {
+            if b_dist.sample(&mut rng) && swarm_labels.len() > 0 {
                 let index = rng.gen_range(0..nodes.len());
                 let target_node = nodes[index];
                 //nodes.push(graph.add_node(State::new(&graph.node_count().to_string())));
@@ -1357,18 +1375,30 @@ mod tests {
                 // so we should be able to generate new node and add and edge from
                 // target node to this new node
                 if !node_can_reach_zero(&graph, target_node).is_empty() {
-                    let new_target_node = graph.add_node(gen_state_name(&graph));
+                    //println!("HELLLLOOOOOO: {:?}", target_node);
+                    //println!("graph before: {}", serde_json::to_string_pretty(&to_swarm_json(graph.clone(), initial)).unwrap());
+                    let new_target_node = graph.add_node(gen_state_name());
                     // consider not pushing?
                     nodes.push(new_target_node);
                     let new_weight = swarm_labels.pop().unwrap();
                     graph.add_edge(target_node, new_target_node, new_weight);
+                    //println!("graph after: {}", serde_json::to_string_pretty(&to_swarm_json(graph.clone(), initial)).unwrap());
+                    //println!("after: {}", node_can_reach_zero(&graph, target_node).is_empty());
                 }
             } else {
-                let target_node = graph.add_node(gen_state_name(&graph));
+                let target_node = graph.add_node(gen_state_name());
                 nodes.push(target_node);
                 graph.add_edge(source_node, target_node, label);
             }
         }
+        // remove this
+        //assert!(all_nodes_reachable(&graph, initial).is_empty());
+        let reachable =  all_nodes_reachable(&graph, initial);
+        if !reachable.is_empty() {
+            //println!("all nodes reachable: {:?}\n ----end----", all_nodes_reachable(&graph, initial).map(Error::convert(&graph)));
+            //println!("graph after: {}\n ----end----", serde_json::to_string_pretty(&to_swarm_json(graph.clone(), initial)).unwrap());
+        }
+
 
         (graph, initial)
     }
@@ -1380,7 +1410,7 @@ mod tests {
                           (vec in all_labels_composition(max_roles, max_events, max_protos, exactly_max))
                           -> CompositionInputVec {
             vec.into_iter()
-                .map(|(interface, swarm_labels)| (random_graph_shuffle_labels(swarm_labels), interface))
+                .map(|(interface, swarm_labels)| (random_graph_shuffle_labels(None, swarm_labels), interface))
                 .map(|((graph, initial), interface)| {
                     let protocol = to_swarm_json(graph, initial);
                     CompositionInput { protocol, subscription: BTreeMap::new(), interface }
@@ -1399,7 +1429,7 @@ mod tests {
             let mut graphs = vec![CompositionInput {protocol: to_swarm_json(level_0_proto.0, level_0_proto.1), subscription: BTreeMap::new(), interface: None}];
             let mut vec = vec
                 .into_iter()
-                .map(|swarm_labels| random_graph_shuffle_labels(swarm_labels))
+                .map(|swarm_labels| random_graph_shuffle_labels(None, swarm_labels))
                 .enumerate()
                 .map(|(level, (proto, initial))| (level, refinement_shape(level, proto, initial)))
                 .map(|(level, (proto, initial))|
@@ -1416,30 +1446,40 @@ mod tests {
         fn protos_refinement_2(max_events: usize, num_protos: usize)
                     (labels in all_labels_1((0..num_protos).into_iter().map(|i| Role::new(&format!("{IR_BASE}_{i}"))).collect(), max_events))
                     -> Vec<(Graph, NodeId)> {
-            labels.into_iter().map(|labels| random_graph(labels)).collect()
+            labels.into_iter().map(|labels| random_graph(None, labels)).collect()
+        }
+    }
+
+    prop_compose! {
+        fn protos_refinement_22(max_roles: usize, max_events: usize, num_protos: usize)
+                    (labels in all_labels_2((0..num_protos).into_iter().map(|i| Role::new(&format!("{IR_BASE}_{i}"))).collect(), cmp::max(0, max_roles-1), max_events))
+                    -> Vec<((Graph, NodeId), Vec<SwarmLabel>)> {
+            labels.into_iter().map(|(ir_labels, labels)| (random_graph(None, ir_labels.into_iter().rev().collect()), labels)).collect()
         }
     }
 
     prop_compose! {
         fn generate_composition_input_vec_refinement_2(max_roles: usize, max_events: usize, num_protos: usize)
-                    (protos in protos_refinement_2(max_events, num_protos))
+                    (protos in protos_refinement_22(max_roles, max_events, num_protos))
                     -> CompositionInputVec {
             let protos_altered: Vec<_> = protos.clone()
                 .into_iter()
                 .enumerate()
-                .map(|(i, (graph, initial))| {
+                .map(|(i, ((graph, initial), labels))| {
                     let (graph, initial) = if i == 0 {
                         (graph, initial)
                     } else {
-                        insert_into(protos[i-1].clone(), (graph, initial))
+                        // create a graph by inserting protos[i] into protos[i-1]
+                        insert_into(protos[i-1].0.clone(), (graph, initial))
                     };
-                    randomly_expand(graph, initial, max_roles, max_events)
+                    //(graph, initial)
+                    random_graph_shuffle_labels(Some((graph, initial)), labels)
                 }).collect();
 
             protos_altered.into_iter()
                 .enumerate()
                 .map(|(i, (graph, initial))|
-                    CompositionInput { protocol: to_swarm_json(graph, initial), subscription: BTreeMap::new(), interface: if i == 0 { None } else { Some(Role::new(&format!("{IR_BASE}_{i}"))) } })
+                    CompositionInput { protocol: to_swarm_json(graph, initial), subscription: BTreeMap::new(), interface: if i == 0 { None } else { Some(Role::new(&format!("{IR_BASE}_{level}", level=i-1))) } })
                 .collect()
         }
 
@@ -1447,9 +1487,9 @@ mod tests {
 
     fn refinement_initial_proto() -> (Graph, NodeId) {
         let mut graph = Graph::new();
-        let initial = graph.add_node(State::new("0"));
-        let middle = graph.add_node(State::new("1"));
-        let last = graph.add_node(State::new("2"));
+        let initial = graph.add_node(State::new(&fresh_i().to_string()));
+        let middle = graph.add_node(State::new(&fresh_i().to_string()));
+        let last = graph.add_node(State::new(&fresh_i().to_string()));
 
         let start_label = SwarmLabel {
             cmd: Command::new(&format!("{IR_BASE}_0_{CMD_BASE}_0")),
@@ -1504,8 +1544,8 @@ mod tests {
         let source_node = nodes_on_path[index];
 
         if index == nodes_on_path.len()-1 {
-            let next_if_middle = proto.add_node(State::new(&proto.node_count().to_string()));
-            let next_if_end = proto.add_node(State::new(&proto.node_count().to_string()));
+            let next_if_middle = proto.add_node(State::new(&fresh_i().to_string()));
+            let next_if_end = proto.add_node(State::new(&fresh_i().to_string()));
             proto.add_edge(source_node, next_if_middle, next_if_label_0);
             proto.add_edge(next_if_middle, next_if_end, next_if_label_1);
             nodes_on_path.push(next_if_middle);
@@ -1514,11 +1554,10 @@ mod tests {
             let target_node = nodes_on_path[index + 1];
             let edge_to_remove = proto.find_edge(source_node, target_node).unwrap();
             let weight = proto[edge_to_remove].clone();
-            let old_size = proto.node_count();
             proto.remove_edge(edge_to_remove);
-            let next_if_start = proto.add_node(State::new(&format!("{old_size}")));
+            let next_if_start = proto.add_node(State::new(&fresh_i().to_string()));
             proto.add_edge(source_node, next_if_start, weight);
-            let next_if_middle = proto.add_node(State::new(&proto.node_count().to_string()));
+            let next_if_middle = proto.add_node(State::new(&fresh_i().to_string()));
             proto.add_edge(next_if_start, next_if_middle, next_if_label_0);
             proto.add_edge(next_if_middle, target_node, next_if_label_1);
             nodes_on_path = vec![nodes_on_path[..index+1].to_vec(), vec![next_if_start, next_if_middle], nodes_on_path[index+1..].to_vec()].concat();
@@ -1536,8 +1575,8 @@ mod tests {
             role: Role::new(&ir),
         };
 
-        let new_initial = proto.add_node(State::new(&proto.node_count().to_string()));
-        let new_end = proto.add_node(State::new(&proto.node_count().to_string()));
+        let new_initial = proto.add_node(State::new(&fresh_i().to_string()));
+        let new_end = proto.add_node(State::new(&fresh_i().to_string()));
         proto.add_edge(new_initial, initial, if_label_0);
         proto.add_edge(nodes_on_path[nodes_on_path.len()-1], new_end, if_label_1);
 
@@ -1552,7 +1591,7 @@ mod tests {
     fn insert_into(graph1: (Graph, NodeId), graph2: (Graph, NodeId)) -> (Graph, NodeId) {
         let mut rng = rand::thread_rng();
         let (mut graph1, initial1) = graph1;
-        let (mut graph2, initial2) = graph2;
+        let (graph2, initial2) = graph2;
         // map nodes in graph2 to nodes in graph1
         let mut node_map: BTreeMap<NodeId, NodeId> = BTreeMap::new();
         let mut graph2_terminals: Vec<NodeId> = vec![];
@@ -1564,15 +1603,15 @@ mod tests {
         let connecting_weight = connecting_edge.weight().clone();
         graph1.remove_edge(connecting_edge.id());
 
-        // create a node in graph1 corresponding to initial of graph2
-        let inserted_initial = node_map.entry(initial2).or_insert(graph1.add_node(State::new(&graph1.node_count().to_string())));
+        // create a node in graph1 corresponding to initial of graph2. use insert_with to avoid https://stackoverflow.com/questions/60109843/entryor-insert-executes-despite-a-value-already-existing
+        let inserted_initial = node_map.entry(initial2).or_insert_with(|| graph1.add_node(State::new(&fresh_i().to_string())));
         graph1.add_edge(connecting_source, *inserted_initial, connecting_weight);
 
         let mut dfs = Dfs::new(&graph2, initial2);
         while let Some(node) = dfs.next(&graph2) {
-            let node_in_graph1 = *node_map.entry(node).or_insert(graph1.add_node(State::new(&graph1.node_count().to_string())));
+            let node_in_graph1 = *node_map.entry(node).or_insert_with(|| graph1.add_node(State::new(&fresh_i().to_string())));
             for e in graph2.edges_directed(node, Outgoing) {
-                let target_in_graph1 = *node_map.entry(e.target()).or_insert(graph1.add_node(State::new(&graph1.node_count().to_string())));
+                let target_in_graph1 = *node_map.entry(e.target()).or_insert_with(|| graph1.add_node(State::new(&fresh_i().to_string())));
                 graph1.add_edge(node_in_graph1, target_in_graph1, e.weight().clone());
             }
 
@@ -1580,7 +1619,7 @@ mod tests {
                 graph2_terminals.push(node);
             }
         }
-        // make all edges starting at connecting_old_target start at this node and remove connecting_old_target
+        /* // make all edges starting at connecting_old_target start at this node and remove connecting_old_target
         let connecting_node = *graph2_terminals.choose(&mut rng).unwrap();
         // fill the vectors below, then remove, then add.
         let mut edges_to_remove: Vec<EdgeId> = vec![];
@@ -1589,7 +1628,23 @@ mod tests {
             let target = e.target();
             let weight = e.weight();
             edges_to_remove.push(e.id());
-            edges_to_add.push((connecting_node, target, weight.clone()));
+            edges_to_add.push((node_map[&connecting_node], target, weight.clone()));
+        }
+        for e_id in edges_to_remove {
+            graph1.remove_edge(e_id);
+        }
+        for (source, target, weight) in edges_to_add {
+            graph1.add_edge(source, target, weight);
+        } */
+        // select a terminal node in graph2. make all incoming point to connecting old target instead. remove this terminal node.
+        let graph2_terminal = *graph2_terminals.choose(&mut rng).unwrap();
+        let mut edges_to_remove: Vec<EdgeId> = vec![];
+        let mut edges_to_add: Vec<(NodeId, NodeId, SwarmLabel)> = vec![];
+        for e in graph1.edges_directed(node_map[&graph2_terminal], Incoming) {
+            let source = e.source();
+            let weight = e.weight();
+            edges_to_remove.push(e.id());
+            edges_to_add.push((source, connecting_old_target, weight.clone()));
         }
         for e_id in edges_to_remove {
             graph1.remove_edge(e_id);
@@ -1597,14 +1652,9 @@ mod tests {
         for (source, target, weight) in edges_to_add {
             graph1.add_edge(source, target, weight);
         }
-
+        graph1.remove_node(node_map[&graph2_terminal]);
 
         (graph1, initial1)
-    }
-
-    // randomly add edges and nodes to a graph
-    fn randomly_expand(graph: Graph, initial: NodeId, max_roles: usize, max_events: usize) -> (Graph, NodeId) {
-        unimplemented!()
     }
 
     #[test]
@@ -1995,7 +2045,7 @@ mod tests {
         #![proptest_config(ProptestConfig::with_cases(50))]
         #[test]
         fn test_generate_graph(labels in all_labels(50, 50)) {
-            let (graph, initial) = random_graph_shuffle_labels(labels);
+            let (graph, initial) = random_graph_shuffle_labels(None, labels);
             let swarm = to_swarm_json(graph.clone(), initial);
             let (g, i, e) = crate::swarm::from_json(to_swarm_json(graph.clone(), initial), &BTreeMap::new());
             assert!(e.is_empty());
@@ -2108,6 +2158,43 @@ mod tests {
             println!("composition: {}", serde_json::to_string_pretty(&swarm).unwrap());
         }
     }
+
+    proptest! {
+        //#![proptest_config(ProptestConfig::with_cases(20))]
+        #[test]
+        fn test_refinement_pattern_2(vec in generate_composition_input_vec_refinement_2(5, 5, 3)) {
+            for v in &vec {
+                //println!("protocol: {}", serde_json::to_string_pretty(&v.protocol).unwrap());
+                //println!("protocol: {:?}", v.interface);
+                let thing = confusion_free(&prepare_graph::<Role>(v.protocol.clone(), &BTreeMap::new(), v.interface.clone()), 0);
+                if !thing.is_empty() {
+                    println!("ERRORRRRR: {:?}", thing);
+                    println!("error proto: {}", serde_json::to_string_pretty(&v.protocol.clone()).unwrap());
+                }
+                assert!(thing.is_empty());
+
+            }
+            //println!("--------");
+            let vec: CompositionInputVec = vec
+                .into_iter()
+                .map(|composition_input| {
+                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
+                    CompositionInput {subscription, ..composition_input}
+                })
+                .collect();
+            let result = compose_protocols(vec.clone());
+            let is_ok = match result {
+                Ok((composed_graph, composed_initial)) =>
+                    { //let (composed_graph, composed_initial) = result.unwrap();
+                     let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
+                     //println!("composition: {}", serde_json::to_string_pretty(&swarm).unwrap());
+                     true
+                    },
+                Err(e) => { println!("errors: {:?}", error_report_to_strings(e)); false},
+            };
+            assert!(is_ok);
+    }
+}
 
     // test whether project(compose(G1, G2, ..., Gn)) = compose(project(G1), project(G2), ... project(Gn))
     // have test here instead of in composition_machine.rs because...
