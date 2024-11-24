@@ -1407,6 +1407,221 @@ mod tests {
         ]
     }
 
+    fn get_failing_thing() -> CompositionInputVec {
+        serde_json::from_str::<CompositionInputVec>(
+            r#"
+                [
+            {
+                "protocol": {
+                    "initial": "State(Interned(6632))",
+                    "transitions": [
+                        {
+                            "label": {
+                                "cmd": "Command(Interned(R6584_cmd_3))",
+                                "logType": [
+                                    "EventType(Interned(R6584_e_3))"
+                                ],
+                                "role": "Role(Interned(R6584))"
+                            },
+                            "source": "State(Interned(6632))",
+                            "target": "State(Interned(6633))"
+                        },
+                        {
+                            "label": {
+                                "cmd": "Command(Interned(R6584_cmd_2))",
+                                "logType": [
+                                    "EventType(Interned(R6584_e_2))"
+                                ],
+                                "role": "Role(Interned(R6584))"
+                            },
+                            "source": "State(Interned(6632))",
+                            "target": "State(Interned(6634))"
+                        },
+                        {
+                            "label": {
+                                "cmd": "Command(Interned(R6584_cmd_0))",
+                                "logType": [
+                                    "EventType(Interned(R6584_e_0))"
+                                ],
+                                "role": "Role(Interned(R6584))"
+                            },
+                            "source": "State(Interned(6634))",
+                            "target": "State(Interned(6635))"
+                        },
+                        {
+                            "label": {
+                                "cmd": "Command(Interned(R6584_cmd_1))",
+                                "logType": [
+                                    "EventType(Interned(R6584_e_1))"
+                                ],
+                                "role": "Role(Interned(R6584))"
+                            },
+                            "source": "State(Interned(6633))",
+                            "target": "State(Interned(6636))"
+                        }
+                    ]
+                },
+                "subscription": {},
+                "interface": null
+            },
+            {
+                "protocol": {
+                    "initial": "State(Interned(6637))",
+                    "transitions": [
+                        {
+                            "label": {
+                                "cmd": "Command(Interned(R6584_cmd_3))",
+                                "logType": [
+                                    "EventType(Interned(R6584_e_3))"
+                                ],
+                                "role": "Role(Interned(R6584))"
+                            },
+                            "source": "State(Interned(6637))",
+                            "target": "State(Interned(6638))"
+                        },
+                        {
+                            "label": {
+                                "cmd": "Command(Interned(R6585_cmd_0))",
+                                "logType": [
+                                    "EventType(Interned(R6585_e_0))"
+                                ],
+                                "role": "Role(Interned(R6585))"
+                            },
+                            "source": "State(Interned(6638))",
+                            "target": "State(Interned(6639))"
+                        },
+                        {
+                            "label": {
+                                "cmd": "Command(Interned(R6584_cmd_2))",
+                                "logType": [
+                                    "EventType(Interned(R6584_e_2))"
+                                ],
+                                "role": "Role(Interned(R6584))"
+                            },
+                            "source": "State(Interned(6639))",
+                            "target": "State(Interned(6640))"
+                        },
+                        {
+                            "label": {
+                                "cmd": "Command(Interned(R6584_cmd_1))",
+                                "logType": [
+                                    "EventType(Interned(R6584_e_1))"
+                                ],
+                                "role": "Role(Interned(R6584))"
+                            },
+                            "source": "State(Interned(6640))",
+                            "target": "State(Interned(6641))"
+                        },
+                        {
+                            "label": {
+                                "cmd": "Command(Interned(R6584_cmd_0))",
+                                "logType": [
+                                    "EventType(Interned(R6584_e_0))"
+                                ],
+                                "role": "Role(Interned(R6584))"
+                            },
+                            "source": "State(Interned(6641))",
+                            "target": "State(Interned(6642))"
+                        }
+                    ]
+                },
+                "subscription": {},
+                "interface": "Role(Interned(R6584))"
+
+            },
+            {
+                "protocol": {
+                    "initial": "State(Interned(6643))",
+                    "transitions": [
+                        {
+                            "label": {
+                                "cmd": "Command(Interned(R6585_cmd_0))",
+                                "logType": [
+                                    "EventType(Interned(R6585_e_0))"
+                                ],
+                                "role": "Role(Interned(R6585))"
+                            },
+                            "source": "State(Interned(6643))",
+                            "target": "State(Interned(6644))"
+                        },
+                        {
+                            "label": {
+                                "cmd": "Command(Interned(R6587_cmd_1))",
+                                "logType": [
+                                    "EventType(Interned(R6587_e_1))"
+                                ],
+                                "role": "Role(Interned(R6587))"
+                            },
+                            "source": "State(Interned(6644))",
+                            "target": "State(Interned(6645))"
+                        },
+                        {
+                            "label": {
+                                "cmd": "Command(Interned(R6586_cmd_0))",
+                                "logType": [
+                                    "EventType(Interned(R6586_e_0))"
+                                ],
+                                "role": "Role(Interned(R6586))"
+                            },
+                            "source": "State(Interned(6645))",
+                            "target": "State(Interned(6646))"
+                        },
+                        {
+                            "label": {
+                                "cmd": "Command(Interned(R6586_cmd_1))",
+                                "logType": [
+                                    "EventType(Interned(R6586_e_1))"
+                                ],
+                                "role": "Role(Interned(R6586))"
+                            },
+                            "source": "State(Interned(6646))",
+                            "target": "State(Interned(6647))"
+                        },
+                        {
+                            "label": {
+                                "cmd": "Command(Interned(R6587_cmd_2))",
+                                "logType": [
+                                    "EventType(Interned(R6587_e_2))"
+                                ],
+                                "role": "Role(Interned(R6587))"
+                            },
+                            "source": "State(Interned(6647))",
+                            "target": "State(Interned(6648))"
+                        },
+                        {
+                            "label": {
+                                "cmd": "Command(Interned(R6587_cmd_0))",
+                                "logType": [
+                                    "EventType(Interned(R6587_e_0))"
+                                ],
+                                "role": "Role(Interned(R6587))"
+                            },
+                            "source": "State(Interned(6648))",
+                            "target": "State(Interned(6649))"
+                        },
+                        {
+                            "label": {
+                                "cmd": "Command(Interned(R6586_cmd_2))",
+                                "logType": [
+                                    "EventType(Interned(R6586_e_2))"
+                                ],
+                                "role": "Role(Interned(R6586))"
+                            },
+                            "source": "State(Interned(6649))",
+                            "target": "State(Interned(6650))"
+                        }
+                    ]
+                },
+                "subscription": {},
+                "interface": "Role(Interned(R6585))"
+
+            }
+        ]
+            "#,
+        )
+        .unwrap()
+    }
+
     // for uniquely named roles. not strictly necessary? but nice. little ugly idk
     static ROLE_COUNTER_MUTEX: Mutex<u32> = Mutex::new(0);
     fn fresh_i() -> u32 {
@@ -2335,7 +2550,37 @@ mod tests {
 
         true
     }
+    #[test]
+    fn test_overapprox_fail() {
+        let vec: CompositionInputVec = get_failing_thing()
+                .into_iter()
+                .map(|composition_input| {
+                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
+                    CompositionInput {subscription, ..composition_input}
+                })
+                .collect();
+        let (subs_implicit, errors) = compose_subscriptions(vec.clone());
+        println!("ERRORS: {:?}", error_report_to_strings(errors));
+        //assert!(errors.is_empty());
+        let result = compose_protocols(vec.clone());
+        //assert!(result.is_ok());
+        match result {
+            Ok((composed_graph, composed_initial)) => {
+                // we want to turn it to swarm and call weak_well_well_formed_sub
+                // instead of calling wwf_sub with graph because we want to
+                // prepare the graph and obtain concurrent events etc.
+                let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
+                println!("swarm: {}", serde_json::to_string_pretty(&swarm).unwrap());
+                let (subs_explicit, _) = weak_well_formed_sub(swarm.clone());
+                assert!(is_sub_subscription(subs_explicit.clone(), subs_implicit));
+            },
+            Err(e) => {
+                println!("errors: {:?}", error_report_to_strings(e));
+            }
+        }
+        //let (composed_graph, composed_initial) = result.unwrap();
 
+    }
     // test whether the approximated subscription for compositions
     // is contained within the 'exact' subscription.
     // i.e. is the approximation safe. max five protocols, max five roles
