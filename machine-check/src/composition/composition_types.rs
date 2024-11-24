@@ -34,6 +34,7 @@ pub struct ProtoInfo {
     pub branching_events: BTreeSet<EventType>,
     pub joining_events: BTreeSet<EventType>,
     pub immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
+    pub happens_after: BTreeMap<EventType, BTreeSet<EventType>>,
 }
 
 impl ProtoInfo {
@@ -45,6 +46,7 @@ impl ProtoInfo {
         branching_events: BTreeSet<EventType>,
         joining_events: BTreeSet<EventType>,
         immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
+        happens_after: BTreeMap<EventType, BTreeSet<EventType>>,
     ) -> Self {
         Self {
             protocols,
@@ -54,6 +56,7 @@ impl ProtoInfo {
             branching_events,
             joining_events,
             immediately_pre,
+            happens_after,
         }
     }
 
@@ -68,6 +71,7 @@ impl ProtoInfo {
             branching_events: BTreeSet::new(),
             joining_events: BTreeSet::new(),
             immediately_pre: BTreeMap::new(),
+            happens_after: BTreeMap::new(),
         }
     }
 
