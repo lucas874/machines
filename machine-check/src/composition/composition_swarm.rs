@@ -3,7 +3,7 @@ use crate::{
     types::{EventType, Role, State, StateName, SwarmLabel, Transition},
     EdgeId, NodeId, Subscriptions, SwarmProtocol,
 };
-use itertools::{cloned, Itertools};
+use itertools::Itertools;
 use petgraph::visit::DfsPostOrder;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -137,17 +137,12 @@ pub fn check(proto: SwarmProtocol, subs: &Subscriptions) -> (Graph, Option<NodeI
 
 pub fn weak_well_formed_sub(proto: SwarmProtocol) -> (Subscriptions, ErrorReport) {
     let proto_info = prepare_graph::<Role>(proto, &BTreeMap::new(), None);
-    let (graph, i, mut errors) = match proto_info.get_ith_proto(0) {
+    let (graph, _, mut errors) = match proto_info.get_ith_proto(0) {
         Some((g, Some(i), e)) => (g, i, e),
         Some((g, None, e)) => return (BTreeMap::new(), ErrorReport(vec![(g, e)])),
         _ => return (BTreeMap::new(), ErrorReport(vec![(Graph::new(), vec![])])),
     };
-    let map = after_not_concurrent(&graph, i, &proto_info.concurrent_events);
-    /* println!("map: {}", serde_json::to_string_pretty(&map).unwrap());
-    //println!("concurrent: {:?}", proto_info.concurrent_events);
-    for pair in &proto_info.concurrent_events {
-        println!("Concurrent pair: {:?}", pair);
-    } */
+
     // Check confusion freeness now that it is not done in prepare
     errors.append(&mut confusion_free(&proto_info, 0));
     (wwf_sub(proto_info, 0), ErrorReport(vec![(graph, errors)]))
@@ -417,8 +412,6 @@ fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
         Some((g, Some(i), e)) => (g, i, e),
         _ => return BTreeMap::new(),
     };
-    //println!("CONCURRENT EVENTS: {:?}", proto_info.concurrent_events);
-    //println!("BRANCHING EVENTS: {:?}", proto_info.branching_events);
 
     for node in Dfs::new(&graph, initial).iter(&graph) {
         // for each edge going out of node:
@@ -454,7 +447,7 @@ fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
             // weak determinacy 1: roles subscribe to branching events. be more precise with what roles. overapproximation now.
             //let involved_roles = involved1(node, &graph, &proto_info);
             let involved_roles = roles_on_path(event_type.clone(), &proto_info);
-            //println!("Event type: {:?}, Involved from this node: {:?}", event_type, involved_roles);
+
             if proto_info.branching_events.contains(&event_type) {
                 let branching_events_this_node: BTreeSet<EventType> = graph.edges_directed(node, Outgoing)
                             .map(|e| e.weight().get_event_type())
@@ -491,7 +484,7 @@ fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
             }
         }
     }
-    //println!("subs: {}", serde_json::to_string_pretty(&subscriptions).unwrap());
+
     subscriptions
 }
 
@@ -694,7 +687,7 @@ fn after_not_concurrent(
         happens_after = new_happens_after;
         new_happens_after = after_not_concurrent_step(graph, initial, concurrent_events, happens_after.clone());
     }
-    //println!("HELLO: {}", serde_json::to_string_pretty(&happens_after).unwrap());
+
     happens_after
 }
 
@@ -707,7 +700,11 @@ fn after_not_concurrent_step(
 ) -> BTreeMap<EventType, BTreeSet<EventType>> {
     let mut walk = DfsPostOrder::new(&graph, initial);
     let mut new_happens_after: BTreeMap<EventType, BTreeSet<EventType>> = happens_after;
-    //println!("NEW: {}", serde_json::to_string_pretty(&new_happens_after).unwrap());
+
+
+    // we should not need the outcommented filter
+    // for each edge e we get a set of 'active_in_successor' edges
+    // that only contains events immediately after e and not concurrent with e
     while let Some(node) = walk.next(&graph) {
         for edge in graph.edges_directed(node, Outgoing) {
             let active_in_successor = active_transitions_not_conc(
@@ -727,10 +724,10 @@ fn after_not_concurrent_step(
                     events.clone()
                 })
                 .chain(active_in_successor.into_iter())
-                .filter(|e| {
-                    !concurrent_events
-                        .contains(&unord_event_pair(edge.weight().get_event_type(), e.clone()))
-                })
+                //.filter(|e| {
+                //    !concurrent_events
+                //        .contains(&unord_event_pair(edge.weight().get_event_type(), e.clone()))
+                //})
                 .collect();
 
             new_happens_after
@@ -741,7 +738,7 @@ fn after_not_concurrent_step(
                 .or_insert(succ_events);
         }
     }
-    //println!("HELLO: {}", serde_json::to_string_pretty(&new_happens_after).unwrap());
+
     new_happens_after
 }
 
@@ -790,15 +787,25 @@ fn prepare_graph<T: SwarmInterface>(
         let incoming_pairs = event_pairs_from_node(node_id, &graph, Incoming);
 
         // add joining events. if there are concurrent incoming edges, add the event types of all outgoing edges not concurrent with identified incoming to set of joining events.
-        let incoming_concurrent = incoming_pairs
+        let incoming_concurrent: BTreeSet<_> = incoming_pairs
             .into_iter()
             .filter(|pair| concurrent_events.contains(pair))
-            .map(|set| set.into_iter().collect::<Vec<_>>());
-        let outgoing = graph
+            .map(|set| set.into_iter().collect::<Vec<_>>())
+            .collect();
+
+        let mut joining = BTreeSet::new();
+        for edge in graph.edges_directed(node_id, Outgoing) {
+            if incoming_concurrent.iter().any(|pair|
+                !concurrent_events.contains(&unord_event_pair(pair[0].clone(), edge.weight().get_event_type()))
+                && !concurrent_events.contains(&unord_event_pair(pair[1].clone(), edge.weight().get_event_type()))) {
+                    joining.insert(edge.weight().get_event_type());
+            }
+        }
+        /* let outgoing = graph
             .edges_directed(node_id, Outgoing)
             .map(|e| e.weight().get_event_type())
             .collect::<BTreeSet<_>>();
-        let product: Vec<_> = incoming_concurrent.cartesian_product(&outgoing).collect();
+        let product: Vec<_> = incoming_concurrent.into_iter().cartesian_product(&outgoing).collect();
         // if we have Ga-ea->Gb-eb->Gc, Gd-ec->Gb, with ea, ec concurrent, but not concurrent with eb then eb is joining
         // consider looping may be simpler
         let mut joining: BTreeSet<_> = product
@@ -809,7 +816,7 @@ fn prepare_graph<T: SwarmInterface>(
                         .contains(&unord_event_pair(pair[1].clone(), (*event).clone()))
             })
             .map(|(_, event)| event.clone())
-            .collect();
+            .collect(); */
 
         joining_events.append(&mut joining);
 
@@ -973,17 +980,16 @@ fn diamond_shape(graph: &Graph, node: NodeId) -> BTreeSet<BTreeSet<EventType>> {
         for edge2 in graph.edges_directed(edge1.target(), Outgoing) {
             // this conditional is to avoid categorizing non-concurrent self-loops as concurrent.
             // case of self loops in two protocols between same interfacing events will be wrongly
-            // deemed not concurrent... this case come back
-            if edge1.target() != edge2.target() || edge1.source() != edge2.source() {
-                let tup = (
-                    edge1.weight().get_event_type(),
-                    edge2.weight().get_event_type(),
-                    edge2.target(),
-                );
-                paths.insert(tup.clone());
-                if paths.contains(&(tup.1.clone(), tup.0.clone(), tup.2.clone())) && tup.0 != tup.1 {
-                    concurrent_events.insert(unord_event_pair(tup.0, tup.1)); //BTreeSet::from([tup.0, tup.1]));
-                }
+            // deemed not concurrent... this case come back. outcommented for now.
+            // if edge1.target() != edge2.target() || edge1.source() != edge2.source() { let tup ... } concurrent_events }
+            let tup = (
+                edge1.weight().get_event_type(),
+                edge2.weight().get_event_type(),
+                edge2.target(),
+            );
+            paths.insert(tup.clone());
+            if paths.contains(&(tup.1.clone(), tup.0.clone(), tup.2.clone())) && tup.0 != tup.1 {
+                concurrent_events.insert(unord_event_pair(tup.0, tup.1)); //BTreeSet::from([tup.0, tup.1]));
             }
         }
     }
@@ -2849,7 +2855,303 @@ mod tests {
             ).unwrap()
     }
 
+    fn get_failing_example_500_1() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "960",
+                "transitions": [
+                    {
+                    "label": {
+                        "cmd": "IR_0_cmd_0",
+                        "logType": [
+                        "IR_0_e_0"
+                        ],
+                        "role": "IR_0"
+                    },
+                    "source": "960",
+                    "target": "961"
+                    },
+                    {
+                    "label": {
+                        "cmd": "R958_cmd_1",
+                        "logType": [
+                        "R958_e_1"
+                        ],
+                        "role": "R958"
+                    },
+                    "source": "961",
+                    "target": "961"
+                    },
+                    {
+                    "label": {
+                        "cmd": "R958_cmd_0",
+                        "logType": [
+                        "R958_e_0"
+                        ],
+                        "role": "R958"
+                    },
+                    "source": "961",
+                    "target": "964"
+                    }
+                ]
+            }
+            "#,
+        )
+        .unwrap()
+    }
 
+    fn get_failing_example_500_2() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "960",
+                "transitions": [
+                    {
+                    "label": {
+                        "cmd": "IR_1_cmd_1",
+                        "logType": [
+                        "IR_1_e_1"
+                        ],
+                        "role": "IR_1"
+                    },
+                    "source": "965",
+                    "target": "961"
+                    },
+                    {
+                    "label": {
+                        "cmd": "IR_1_cmd_0",
+                        "logType": [
+                        "IR_1_e_0"
+                        ],
+                        "role": "IR_1"
+                    },
+                    "source": "965",
+                    "target": "965"
+                    },
+                    {
+                    "label": {
+                        "cmd": "IR_0_cmd_0",
+                        "logType": [
+                        "IR_0_e_0"
+                        ],
+                        "role": "IR_0"
+                    },
+                    "source": "960",
+                    "target": "967"
+                    },
+                    {
+                    "label": {
+                        "cmd": "R959_cmd_0",
+                        "logType": [
+                        "R959_e_0"
+                        ],
+                        "role": "R959"
+                    },
+                    "source": "967",
+                    "target": "965"
+                    }
+                ]
+            }
+            "#,
+        )
+        .unwrap()
+    }
+
+
+    fn get_failing_example_500_composition() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "960 || 960",
+                "transitions": [
+                    {
+                    "label": {
+                        "cmd": "IR_0_cmd_0",
+                        "logType": [
+                        "IR_0_e_0"
+                        ],
+                        "role": "IR_0"
+                    },
+                    "source": "960 || 960",
+                    "target": "961 || 967"
+                    },
+                    {
+                    "label": {
+                        "cmd": "R958_cmd_0",
+                        "logType": [
+                        "R958_e_0"
+                        ],
+                        "role": "R958"
+                    },
+                    "source": "961 || 967",
+                    "target": "964 || 967"
+                    },
+                    {
+                    "label": {
+                        "cmd": "R958_cmd_1",
+                        "logType": [
+                        "R958_e_1"
+                        ],
+                        "role": "R958"
+                    },
+                    "source": "961 || 967",
+                    "target": "961 || 967"
+                    },
+                    {
+                    "label": {
+                        "cmd": "R959_cmd_0",
+                        "logType": [
+                        "R959_e_0"
+                        ],
+                        "role": "R959"
+                    },
+                    "source": "961 || 967",
+                    "target": "961 || 965"
+                    },
+                    {
+                    "label": {
+                        "cmd": "R958_cmd_0",
+                        "logType": [
+                        "R958_e_0"
+                        ],
+                        "role": "R958"
+                    },
+                    "source": "961 || 965",
+                    "target": "964 || 965"
+                    },
+                    {
+                    "label": {
+                        "cmd": "R958_cmd_1",
+                        "logType": [
+                        "R958_e_1"
+                        ],
+                        "role": "R958"
+                    },
+                    "source": "961 || 965",
+                    "target": "961 || 965"
+                    },
+                    {
+                    "label": {
+                        "cmd": "IR_1_cmd_0",
+                        "logType": [
+                        "IR_1_e_0"
+                        ],
+                        "role": "IR_1"
+                    },
+                    "source": "961 || 965",
+                    "target": "961 || 965"
+                    },
+                    {
+                    "label": {
+                        "cmd": "IR_1_cmd_1",
+                        "logType": [
+                        "IR_1_e_1"
+                        ],
+                        "role": "IR_1"
+                    },
+                    "source": "961 || 965",
+                    "target": "961 || 961"
+                    },
+                    {
+                    "label": {
+                        "cmd": "R958_cmd_0",
+                        "logType": [
+                        "R958_e_0"
+                        ],
+                        "role": "R958"
+                    },
+                    "source": "961 || 961",
+                    "target": "964 || 961"
+                    },
+                    {
+                    "label": {
+                        "cmd": "R958_cmd_1",
+                        "logType": [
+                        "R958_e_1"
+                        ],
+                        "role": "R958"
+                    },
+                    "source": "961 || 961",
+                    "target": "961 || 961"
+                    },
+                    {
+                    "label": {
+                        "cmd": "IR_1_cmd_0",
+                        "logType": [
+                        "IR_1_e_0"
+                        ],
+                        "role": "IR_1"
+                    },
+                    "source": "964 || 965",
+                    "target": "964 || 965"
+                    },
+                    {
+                    "label": {
+                        "cmd": "IR_1_cmd_1",
+                        "logType": [
+                        "IR_1_e_1"
+                        ],
+                        "role": "IR_1"
+                    },
+                    "source": "964 || 965",
+                    "target": "964 || 961"
+                    },
+                    {
+                    "label": {
+                        "cmd": "R959_cmd_0",
+                        "logType": [
+                        "R959_e_0"
+                        ],
+                        "role": "R959"
+                    },
+                    "source": "964 || 967",
+                    "target": "964 || 965"
+                    }
+                ]
+                }
+            "#,
+        )
+        .unwrap()
+    }
+
+    fn get_composition_input_fail_500() -> CompositionInputVec {
+        vec![
+            CompositionInput {
+                protocol: get_failing_example_500_1(),
+                subscription: weak_well_formed_sub(get_failing_example_500_1()).0,
+                interface: None,
+            },
+            CompositionInput {
+                protocol: get_failing_example_500_2(),
+                subscription: weak_well_formed_sub(get_failing_example_500_2()).0,
+                interface: Some(Role::new("IR_0")),
+            },
+        ]
+    }
+
+
+
+
+    #[test]
+    fn test_fail_500() {
+        let input = get_composition_input_fail_500();
+        let (subs_implicit, errors) = compose_subscriptions(input.clone());
+        assert!(errors.is_empty());
+        let result = compose_protocols(input.clone());
+        assert!(result.is_ok());
+        let (composed_graph, composed_initial) = result.unwrap();
+        // we want to turn it to swarm and call weak_well_well_formed_sub
+        // instead of calling wwf_sub with graph because we want to
+        // prepare the graph and obtain concurrent events etc.
+        let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
+        let (subs_explicit, _) = weak_well_formed_sub(swarm.clone());
+        assert!(is_sub_subscription(subs_explicit.clone(), subs_implicit.clone()));
+        println!("subs explicit: {}", serde_json::to_string_pretty(&subs_explicit).unwrap());
+        println!("subs implicit: {}", serde_json::to_string_pretty(&subs_implicit).unwrap());
+        let (g, i, e) = check(swarm.clone(), &subs_implicit);
+        println!("errors: {:?}", e.map(Error::convert(&g)));
+        let proto_info = prepare_graph::<Role>(swarm, &subs_implicit, None);
+        println!("concurrent events: {:?}", proto_info.concurrent_events);
+        println!("Joining events: {:?}", proto_info.joining_events);
+    }
 
     // for uniquely named roles. not strictly necessary? but nice. little ugly idk
     static ROLE_COUNTER_MUTEX: Mutex<u32> = Mutex::new(0);
