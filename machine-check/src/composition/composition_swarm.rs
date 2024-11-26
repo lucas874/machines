@@ -29,7 +29,7 @@ pub enum Error {
     SwarmErrorString(String), // bit ugly but instead of making prepare graph public or making another from_json returning Error type in swarm.rs
     InvalidInterfaceRole(Role),
     InterfaceEventNotInBothProtocols(EventType),
-    RoleNotSubscribedToBranch(EdgeId, Role),
+    RoleNotSubscribedToBranch(Vec<EventType>, EdgeId, NodeId, Role),
     RoleNotSubscribedToJoin(Vec<EventType>, EdgeId, Role),
     MoreThanOneEventTypeInCommand(EdgeId),
     EventEmittedByDifferentCommands(EventType, EdgeId, EdgeId),
@@ -48,9 +48,11 @@ impl Error {
             Error::InterfaceEventNotInBothProtocols(event_type) => {
                 format!("event type {event_type} does not appear in both protocols")
             }
-            Error::RoleNotSubscribedToBranch(edge, role) => {
+            Error::RoleNotSubscribedToBranch(event_types, edge, node, role) => {
+                let events = event_types.join(", ");
                 format!(
-                    "role {role} does not subscribe to events in branching transition {}",
+                    "role {role} does not subscribe to event types {events} in branching transitions at state {}, but is involved in or after transition {}",
+                    &graph[*node].state_name(),
                     Edge(graph, *edge)
                 )
             }
@@ -294,9 +296,11 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> 
                             .collect();
                 let involved_not_subbed = involved_roles
                     .iter()
-                    .filter(|r| !branching_events_this_node.is_subset(&sub(&r))); // !sub(&r).contains(&event_type));
+                    .filter(|r| !branching_events_this_node.is_subset(&sub(&r)));
+                    //.map(|r| (r, sub(r).difference(&branching_events_this_node)));
                 let mut branching_errors: Vec<_> = involved_not_subbed
-                    .map(|r| Error::RoleNotSubscribedToBranch(edge.id(), r.clone()))
+                    .map(|r| (r, branching_events_this_node.difference(&sub(&r)).cloned().collect::<Vec<EventType>>()))
+                    .map(|(r, event_types)| Error::RoleNotSubscribedToBranch(event_types, edge.id(), node, r.clone()))
                     .collect();
                 errors.append(&mut branching_errors);
             }
@@ -3844,11 +3848,10 @@ mod tests {
         let mut expected_errors = vec![
             "active role does not subscribe to any of its emitted event types in transition (0)--[close@D<time>]-->(3)",
             "active role does not subscribe to any of its emitted event types in transition (1)--[get@FL<pos>]-->(2)",
-            "role D does not subscribe to events in branching transition (0)--[close@D<time>]-->(3)",
-            "role D does not subscribe to events in branching transition (0)--[request@T<partID>]-->(1)",
-            "role FL does not subscribe to events in branching transition (0)--[close@D<time>]-->(3)",
-            "role FL does not subscribe to events in branching transition (0)--[request@T<partID>]-->(1)",
-            "role T does not subscribe to events in branching transition (0)--[close@D<time>]-->(3)",
+            "role T does not subscribe to event types time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
+            "role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[close@D<time>]-->(3)",
+            "role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
+            "role FL does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
             "subsequently active role D does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
             "subsequently active role FL does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
             "subsequently active role T does not subscribe to events in transition (1)--[get@FL<pos>]-->(2)"
@@ -3878,8 +3881,8 @@ mod tests {
             "active role does not subscribe to any of its emitted event types in transition (1)--[test@TR<report>]-->(2)",
             "active role does not subscribe to any of its emitted event types in transition (2)--[accept@QCR<ok>]-->(3)",
             "active role does not subscribe to any of its emitted event types in transition (2)--[reject@QCR<notOk>]-->(3)",
-            "role QCR does not subscribe to events in branching transition (2)--[accept@QCR<ok>]-->(3)",
-            "role QCR does not subscribe to events in branching transition (2)--[reject@QCR<notOk>]-->(3)",
+            "role QCR does not subscribe to event types notOk, ok in branching transitions at state 2, but is involved in or after transition (2)--[accept@QCR<ok>]-->(3)",
+            "role QCR does not subscribe to event types notOk, ok in branching transitions at state 2, but is involved in or after transition (2)--[reject@QCR<notOk>]-->(3)",
             "subsequently active role QCR does not subscribe to events in transition (1)--[test@TR<report>]-->(2)",
             "subsequently active role QCR does not subscribe to events in transition (1)--[test@TR<report>]-->(2)",
             "subsequently active role TR does not subscribe to events in transition (0)--[build@F<car>]-->(1)"
@@ -4054,35 +4057,36 @@ mod tests {
             },
         ]);
         let (swarms, subscriptions) = implicit_composition_swarms(composition_input);
-        let errors1 = vec![
+        let mut errors1 = vec![
             "active role does not subscribe to any of its emitted event types in transition (0)--[close@D<time>]-->(3)",
-            "role D does not subscribe to events in branching transition (0)--[close@D<time>]-->(3)",
-            "role FL does not subscribe to events in branching transition (0)--[close@D<time>]-->(3)",
-            "role T does not subscribe to events in branching transition (0)--[close@D<time>]-->(3)",
+            "role FL does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
             "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
             "subsequently active role FL does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
-            "role D does not subscribe to events in branching transition (0)--[request@T<partID>]-->(1)",
-            "role FL does not subscribe to events in branching transition (0)--[request@T<partID>]-->(1)",
-            "role T does not subscribe to events in branching transition (0)--[request@T<partID>]-->(1)",
+            "role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
+            "role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[close@D<time>]-->(3)",
+            "role T does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
             "active role does not subscribe to any of its emitted event types in transition (1)--[get@FL<pos>]-->(2)",
             "subsequently active role T does not subscribe to events in transition (1)--[get@FL<pos>]-->(2)",
-            "active role does not subscribe to any of its emitted event types in transition (2)--[deliver@T<part>]-->(0)",
             "subsequently active role D does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
-            "subsequently active role T does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)"
+            "subsequently active role T does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
+            "active role does not subscribe to any of its emitted event types in transition (2)--[deliver@T<part>]-->(0)"
         ];
 
-        let errors2 = vec![
+        let mut errors2 = vec![
             "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
-            "subsequently active role T does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
             "active role does not subscribe to any of its emitted event types in transition (1)--[deliver@T<part>]-->(2)",
             "subsequently active role F does not subscribe to events in transition (1)--[deliver@T<part>]-->(2)",
+            "subsequently active role T does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
             "active role does not subscribe to any of its emitted event types in transition (2)--[build@F<car>]-->(3)"
         ];
-
+        errors1.sort();
+        errors2.sort();
         let errors = vec![errors1, errors2];
 
         for (((g, _, e), _), expected) in zip(swarms, errors) {
-            assert_eq!(e.map(Error::convert(&g)), expected);
+            let mut e = e.map(Error::convert(&g));
+            e.sort();
+            assert_eq!(e, expected);
         }
 
         assert!(subscriptions.is_empty());
