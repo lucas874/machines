@@ -36,7 +36,7 @@ pub struct ProtoInfo {
     pub immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
     pub happens_after: BTreeMap<EventType, BTreeSet<EventType>>,
 }
-
+// TODO: remove subscriptions field
 impl ProtoInfo {
     pub fn new(
         protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>,
@@ -83,6 +83,12 @@ impl ProtoInfo {
         }
     }
 
+    pub fn add_errors_ith(&mut self, i: usize, mut errors: Vec<Error>) -> () {
+        if i >= self.protocols.len() {
+            self.protocols[0].0.2.append(&mut errors);
+        }
+    }
+
     pub fn no_errors(&self) -> bool {
         self.protocols.iter().all(|((_, _, e), _)| e.is_empty())
     }
@@ -96,6 +102,17 @@ pub struct CompositionInput {
 }
 
 pub type CompositionInputVec = Vec<CompositionInput>;
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CompositionComponent<T: SwarmInterface> {
+    pub protocol: SwarmProtocol,
+    pub interface: Option<T>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct InterfacingSwarms<T: SwarmInterface>(pub Vec<CompositionComponent<T>>);
+
+
 
 /* Used when combining machines and protocols */
 pub trait EventLabel: Clone + Ord {

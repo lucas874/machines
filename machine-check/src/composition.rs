@@ -1,5 +1,5 @@
 use composition_swarm::{swarms_to_error_report, ErrorReport};
-use composition_types::{CompositionInputVec, DataResult};
+use composition_types::{CompositionInputVec, DataResult, InterfacingSwarms};
 
 use super::*;
 
@@ -8,8 +8,8 @@ mod composition_swarm;
 pub mod composition_types;
 
 #[wasm_bindgen]
-pub fn check_wwf_swarm(proto: String, subs: String) -> String {
-    let proto = match serde_json::from_str::<SwarmProtocol>(&proto) {
+pub fn check_wwf_swarm(protos: String, subs: String) -> String {
+    let protos = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
         Ok(p) => p,
         Err(e) => return err(vec![format!("parsing swarm protocol: {}", e)]),
     };
@@ -17,15 +17,31 @@ pub fn check_wwf_swarm(proto: String, subs: String) -> String {
         Ok(p) => p,
         Err(e) => return err(vec![format!("parsing subscriptions: {}", e)]),
     };
-    let (graph, _, errors) = composition::composition_swarm::check(proto, &subs);
-    if errors.is_empty() {
+
+    let error_report = composition::composition_swarm::check(protos, &subs);
+    if error_report.is_empty() {
         serde_json::to_string(&CheckResult::OK).unwrap()
     } else {
-        err(errors.map(composition::composition_swarm::Error::convert(&graph)))
+        err(error_report_to_strings(error_report))
     }
 }
 
 #[wasm_bindgen]
+pub fn exact_weak_well_formed_sub(protos: String) -> String {
+    let protos = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
+        Ok(p) => p,
+        Err(e) => return derr(vec![format!("parsing swarm protocol: {}", e)]),
+    };
+    /* let (subscriptions, error_report) = composition::composition_swarm::weak_well_formed_sub(proto);
+    if error_report.is_empty() {
+        dok(serde_json::to_string(&subscriptions).unwrap())
+    } else {
+        derr(error_report_to_strings(error_report))
+    } */
+    unimplemented!()
+}
+
+/* #[wasm_bindgen]
 pub fn get_wwf_sub(proto: String) -> String {
     let proto = match serde_json::from_str::<SwarmProtocol>(&proto) {
         Ok(p) => p,
@@ -239,7 +255,7 @@ pub fn compose_protocols(protos: String) -> String {
         }
         Err(errors) => derr(error_report_to_strings(errors)),
     }
-}
+} */
 
 fn derr(errors: Vec<String>) -> String {
     serde_json::to_string(&DataResult::ERROR { errors }).unwrap()

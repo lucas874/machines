@@ -21,12 +21,13 @@ export type Subscriptions = Record<string, string[]>
 
 export type Result = { type: 'OK' } | { type: 'ERROR'; errors: string[] }
 
-export type ResultData = { type: 'OK'; data: string } | { type: 'ERROR'; errors: string[] }
+//export type ResultData = { type: 'OK'; data: string } | { type: 'ERROR'; errors: string[] }
+//export type CompositionInput = { protocol: SwarmProtocolType, subscription: Subscriptions, interface: string | null }
+//export type CompositionInputVec = CompositionInput[]
 
-export type CompositionInput = { protocol: SwarmProtocolType, subscription: Subscriptions, interface: string | null }
-
-export type CompositionInputVec = CompositionInput[]
-
+export type ResultData<Data> = { type: 'OK'; data: Data } | { type: 'ERROR'; errors: string[] }
+export type CompositionComponent = {protocol: SwarmProtocolType, interface: string | null }
+export type InterFacingSwarms = CompositionComponent[]
 
 export function checkSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): Result {
   const p = JSON.stringify(proto)
@@ -48,7 +49,14 @@ export function checkProjection(
   return JSON.parse(result)
 }
 
-export function checkWWFSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): Result {
+export function checkWWFSwarmProtocol(protos: InterFacingSwarms, subscriptions: Subscriptions): Result {
+  const p = JSON.stringify(protos)
+  const s = JSON.stringify(subscriptions)
+  const result = check_wwf_swarm(p, s)
+  return JSON.parse(result)
+}
+
+/* export function checkWWFSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): Result {
   const p = JSON.stringify(proto)
   const s = JSON.stringify(subscriptions)
   const result = check_wwf_swarm(p, s)
@@ -134,4 +142,4 @@ export function projectAll(protos: CompositionInputVec): ResultData {
   const ps = JSON.stringify(protos)
   const result = project_combine_all(ps)
   return JSON.parse(result)
-}
+} */

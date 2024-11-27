@@ -10,6 +10,7 @@ use std::{
     fmt,
 };
 
+use super::composition_types::InterfacingSwarms;
 use super::MapVec;
 use super::{
     composition_types::{
@@ -125,7 +126,57 @@ impl ErrorReport {
     }
 }
 
-pub fn check(proto: SwarmProtocol, subs: &Subscriptions) -> (Graph, Option<NodeId>, Vec<Error>) {
+// a little awkard everything
+pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions) -> ErrorReport {
+    let combined_proto_info = combine_proto_infos_fold(prepare_graphs1::<T>(protos, subs));
+    let combined_proto_info = confusion_free_proto_info(combined_proto_info);
+    if !combined_proto_info.no_errors() {
+        return proto_info_to_error_report(combined_proto_info);
+    }
+
+    // if we reach this point the protocols can interface and are all confusion free
+    // we construct a ProtoInfo with the composition as the only protocol and all the
+    // information about branches etc. from combined_proto_info
+    let (composed, composed_initial) = explicit_composition(&combined_proto_info);
+
+    //let happens_after = after_not_concurrent(&graph, initial.unwrap(), &concurrent_events);
+    let happens_after = after_not_concurrent(&composed, composed_initial, &combined_proto_info.concurrent_events);
+    let composition = ProtoInfo {
+        protocols: vec![((composed, Some(composed_initial), vec![]), BTreeSet::new())],
+        subscription: subs.clone(),
+        happens_after,
+        ..combined_proto_info
+    };
+
+    let composition_checked = weak_well_formed_proto_info(composition);
+
+    proto_info_to_error_report(composition_checked)
+
+}
+
+pub fn exact_wwf_sub<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Result<Subscriptions, ErrorReport> {
+    let combined_proto_info = combine_proto_infos_fold(prepare_graphs1::<T>(protos, &BTreeMap::new()));
+    let combined_proto_info = confusion_free_proto_info(combined_proto_info);
+    if !combined_proto_info.no_errors() {
+        return Err(proto_info_to_error_report(combined_proto_info));
+    }
+
+    // if we reach this point the protocols can interface and are all confusion free
+    // we construct a ProtoInfo with the composition as the only protocol and all the
+    // information about branches etc. from combined_proto_info
+    let (composed, composed_initial) = explicit_composition(&combined_proto_info);
+    let happens_after = after_not_concurrent(&composed, composed_initial, &combined_proto_info.concurrent_events);
+    let composition = ProtoInfo {
+        protocols: vec![((composed, Some(composed_initial), vec![]), BTreeSet::new())],
+        happens_after,
+        ..combined_proto_info
+    };
+
+    let sub = wwf_sub(composition, 0);
+
+    Ok(sub)
+}
+/* pub fn check(proto: SwarmProtocol, subs: &Subscriptions) -> (Graph, Option<NodeId>, Vec<Error>) {
     let proto_info = prepare_graph::<Role>(proto, subs, None);
     let (graph, initial, mut errors) = match proto_info.get_ith_proto(0) {
         Some((g, Some(i), e)) => (g, i, e),
@@ -135,7 +186,7 @@ pub fn check(proto: SwarmProtocol, subs: &Subscriptions) -> (Graph, Option<NodeI
 
     errors.extend(weak_well_formed(&proto_info, 0));
     (graph, Some(initial), errors)
-}
+} */
 
 pub fn weak_well_formed_sub(proto: SwarmProtocol) -> (Subscriptions, ErrorReport) {
     let proto_info = prepare_graph::<Role>(proto, &BTreeMap::new(), None);
@@ -192,20 +243,8 @@ pub fn compose_protocols(protos: CompositionInputVec) -> Result<(Graph, NodeId),
         return Err(proto_info_to_error_report(implicit_composition));
     }
 
-    let (explicit_composition, i) = explicit_composition(implicit_composition);
+    let (explicit_composition, i) = explicit_composition(&implicit_composition);
     Ok((explicit_composition, i))
-}
-
-fn prepare_graphs(protos: CompositionInputVec) -> Vec<(ProtoInfo, Option<Role>)> {
-    protos
-        .iter()
-        .map(|p| {
-            (
-                prepare_graph::<Role>(p.protocol.clone(), &p.subscription, p.interface.clone()),
-                p.interface.clone(),
-            )
-        })
-        .collect()
 }
 
 // perform wwf check on every protocol in a ProtoInfo
@@ -217,6 +256,25 @@ fn weak_well_formed_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
         .enumerate()
         .map(|(i, ((graph, initial, errors), interface))| {
             let errors = vec![errors, weak_well_formed(&proto_info, i)].concat();
+            ((graph, initial, errors), interface)
+        })
+        .collect();
+
+    ProtoInfo {
+        protocols,
+        ..proto_info
+    }
+}
+
+// perform confusion freeness check on every protocol in a ProtoInfo
+fn confusion_free_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
+    let protocols: Vec<_> = proto_info
+        .protocols
+        .clone()
+        .into_iter()
+        .enumerate()
+        .map(|(i, ((graph, initial, errors), interface))| {
+            let errors = vec![errors, confusion_free(&proto_info, i)].concat();
             ((graph, initial, errors), interface)
         })
         .collect();
@@ -307,12 +365,21 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> 
 
             // corresponds to joining rule of weak determinacy.
             if proto_info.joining_events.contains(&event_type) {
+                let incoming_pairs_concurrent: Vec<UnordEventPair> = event_pairs_from_node(node, &graph, Incoming)
+                    .into_iter()
+                    .filter(|pair| proto_info.concurrent_events.contains(pair))
+                    .filter(|pair| pair.iter().all(|e| !proto_info.concurrent_events.contains(&unord_event_pair(e.clone(), event_type.clone()))))
+                    .collect();
+                let join_set: BTreeSet<EventType> = incoming_pairs_concurrent
+                    .into_iter()
+                    .flat_map(|pair| pair.into_iter().chain([event_type.clone()])).collect();
+
                 // not sure if this is to coarse?
-                let join_set: BTreeSet<EventType> = proto_info.immediately_pre[&event_type]
+                /* let join_set: BTreeSet<EventType> = proto_info.immediately_pre[&event_type]
                     .clone()
                     .into_iter()
                     .chain([event_type.clone()])
-                    .collect();
+                    .collect(); */
                 let involved_not_subbed = involved_roles
                     .iter()
                     .filter(|r| !join_set.is_subset(sub(r)));
@@ -468,15 +535,23 @@ fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
                 }
             }
 
-            // weak determinacy 2. joining events. Add test for this...
-            // go over this again. But right now if joining add joining and all
-            // events immediately preceding the joining event
+            // weak determinacy 2. joining events.
+            // With new strategy: the joining events are an overapproximation.
+            // so check if there are two or more incoming concurrent not concurrent with event type
             if proto_info.joining_events.contains(&event_type) {
-                let events_to_add: BTreeSet<EventType> = proto_info.immediately_pre[&event_type]
+                let incoming_pairs_concurrent: Vec<UnordEventPair> = event_pairs_from_node(node, &graph, Incoming)
+                    .into_iter()
+                    .filter(|pair| proto_info.concurrent_events.contains(pair))
+                    .filter(|pair| pair.iter().all(|e| !proto_info.concurrent_events.contains(&unord_event_pair(e.clone(), event_type.clone()))))
+                    .collect();
+                let events_to_add: BTreeSet<EventType> = incoming_pairs_concurrent
+                    .into_iter()
+                    .flat_map(|pair| pair.into_iter().chain([event_type.clone()])).collect();
+                /* let events_to_add: BTreeSet<EventType> = proto_info.immediately_pre[&event_type]
                     .clone()
                     .into_iter()
                     .chain([event_type.clone()])
-                    .collect();
+                    .collect(); */
                 for r in involved_roles.iter() {
                     subscriptions
                         .entry(r.clone())
@@ -490,6 +565,86 @@ fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
     }
 
     subscriptions
+}
+
+fn combine_proto_infos<T: SwarmInterface>(
+    proto_info1: ProtoInfo,
+    proto_info2: ProtoInfo,
+    interface: T,
+) -> ProtoInfo {
+    let errors = interface.check_interface(&proto_info1, &proto_info2);
+    if !errors.is_empty() {
+        let protocols = vec![
+            proto_info1.protocols.clone(),
+            proto_info2.protocols.clone(),
+            vec![((Graph::new(), None, errors), BTreeSet::new())],
+        ]
+        .concat();
+        // Would work to construct it just like normally. but..
+        return ProtoInfo::new_only_proto(protocols);
+    }
+    let interfacing_event_types = interface.interfacing_event_types(&proto_info1, &proto_info2);
+    let protocols = vec![proto_info1.protocols.clone(), proto_info2.protocols.clone()].concat();
+    let role_event_map = combine_maps(
+        proto_info1.role_event_map.clone(),
+        proto_info2.role_event_map.clone(),
+        None,
+    );
+    let concurrent_events = get_concurrent_events(&proto_info1, &proto_info2, &interface);
+    let branching_events: BTreeSet<EventType> = proto_info1
+        .branching_events
+        .union(&proto_info2.branching_events)
+        .cloned()
+        .collect();
+    // add the interfacing events to the set of joining events
+    let joining_events: BTreeSet<EventType> = proto_info1
+        .joining_events
+        .into_iter()
+        .chain(proto_info2.joining_events.into_iter())
+        .chain(interfacing_event_types.into_iter())
+        .collect();
+    let immediately_pre = combine_maps(
+        proto_info1.immediately_pre.clone(),
+        proto_info2.immediately_pre.clone(),
+        None,
+    );
+    let happens_after = combine_maps(
+        proto_info1.happens_after,
+        proto_info2.happens_after,
+        None
+    );
+
+    ProtoInfo::new(
+        protocols,
+        role_event_map,
+        BTreeMap::new(),
+        concurrent_events,
+        branching_events,
+        joining_events,
+        immediately_pre,
+        happens_after,
+    )
+}
+
+fn combine_proto_infos_fold<T: SwarmInterface>(protos: Vec<(ProtoInfo, Option<T>)>) -> ProtoInfo {
+    if protos.is_empty()
+        || protos[0].1.is_some()
+        || protos[1..].iter().any(|(_, interface)| interface.is_none())
+    {
+        return ProtoInfo::new_only_proto(vec![(
+            (Graph::new(), None, vec![Error::InvalidArg]),
+            BTreeSet::new(),
+        )]);
+    }
+
+    let (proto, _) = protos[0].clone();
+
+    protos[1..]
+        .to_vec()
+        .into_iter()
+        .fold(proto, |acc, (p, interface)| {
+            combine_proto_infos(acc, p, interface.unwrap())
+        })
 }
 
 fn implicit_composition<T: SwarmInterface>(
@@ -744,6 +899,98 @@ fn after_not_concurrent_step(
     }
 
     new_happens_after
+}
+
+fn prepare_graphs(protos: CompositionInputVec) -> Vec<(ProtoInfo, Option<Role>)> {
+    protos
+        .iter()
+        .map(|p| {
+            (
+                prepare_graph::<Role>(p.protocol.clone(), &p.subscription, p.interface.clone()),
+                p.interface.clone(),
+            )
+        })
+        .collect()
+}
+
+fn prepare_graphs1<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions) -> Vec<(ProtoInfo, Option<T>)> {
+    protos.0
+        .iter()
+        .map(|p| {
+            (
+                prepare_graph1::<T>(p.protocol.clone(), &subs, p.interface.clone()),
+                p.interface.clone(),
+            )
+        })
+        .collect()
+}
+
+// precondition: proto is a simple protocol, i.e. it does not contain concurrency.
+fn prepare_graph1<T: SwarmInterface>(
+    proto: SwarmProtocol,
+    subs: &Subscriptions,
+    interface: Option<T>,
+) -> ProtoInfo {
+    let mut role_event_map: RoleEventMap = BTreeMap::new();
+    let mut branching_events = BTreeSet::new();
+    let mut immediately_pre_map: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
+    let (graph, initial, errors) = swarm_to_graph(&proto);
+    if initial.is_none() || !errors.is_empty() {
+        return ProtoInfo::new_only_proto(vec![((graph, initial, errors), BTreeSet::new())]);
+    }
+    // If interface is some, then we want to interface this protocol
+    // with some other protocol on this set of events.
+    // We do not know if we can do that yet though, but we prepare as if we can.
+    let interface = if interface.is_some() {
+        interface.unwrap().interfacing_event_types_single(&graph)
+    } else {
+        BTreeSet::new()
+    };
+
+    let mut walk = Dfs::new(&graph, initial.unwrap());
+
+    // add to set of branching and joining
+    while let Some(node_id) = walk.next(&graph) {
+        // should work even if two branches with same outgoing event type right?
+        let outgoing_event_types = graph
+            .edges_directed(node_id, Outgoing)
+            .map(|edge| edge.weight().get_event_type())
+            .collect::<BTreeSet<EventType>>();
+        branching_events.append(&mut if outgoing_event_types.len() > 1 { outgoing_event_types } else { BTreeSet::new() });
+
+
+        for edge in graph.edges_directed(node_id, Outgoing) {
+            role_event_map
+                .entry(edge.weight().role.clone())
+                .and_modify(|role_info| {
+                    role_info.insert(edge.weight().clone());
+                })
+                .or_insert(BTreeSet::from([edge.weight().clone()]));
+
+            // consider changing get_immediately_pre to not take concurrent events as argument. now that we do not consider swarms with concurrency here.
+            let mut pre = get_immediately_pre(&graph, edge, &BTreeSet::new());
+            immediately_pre_map
+                .entry(edge.weight().get_event_type())
+                .and_modify(|events| {
+                    events.append(&mut pre);
+                })
+                .or_insert(pre);
+        }
+    }
+
+    // consider changing after_not_concurrent to not take concurrent events as argument. now that we do not consider swarms with concurrency here.
+    let happens_after = after_not_concurrent(&graph, initial.unwrap(), &BTreeSet::new());
+
+    ProtoInfo::new(
+        vec![((graph, initial, errors), interface)],
+        role_event_map,
+        subs.clone(),
+        BTreeSet::new(),
+        branching_events,
+        BTreeSet::new(),
+        immediately_pre_map,
+        happens_after,
+    )
 }
 
 // turn a SwarmProtocol into a ProtoInfo. Check for errors such as initial not reachable and empty logs.
@@ -1139,7 +1386,7 @@ fn get_concurrent_events<T: SwarmInterface>(
 }
 
 // precondition: the protocols can interface on the given interfaces
-fn explicit_composition(proto_info: ProtoInfo) -> (Graph, NodeId) {
+fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
     if proto_info.protocols.is_empty() {
         return (Graph::new(), NodeId::end());
     }
@@ -1187,7 +1434,7 @@ mod tests {
     use crate::{
         composition::{
             composition_machine::{project, project_combine, to_option_machine},
-            composition_types::CompositionInput,
+            composition_types::{CompositionComponent, CompositionInput},
             error_report_to_strings,
         },
         types::Command,
@@ -1251,10 +1498,11 @@ mod tests {
             r#"{
                 "initial": "0",
                 "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "test", "logType": ["report"], "role": "TR" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "accept", "logType": ["ok"], "role": "QCR" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "reject", "logType": ["notOk"], "role": "QCR" } }
+                    { "source": "0", "target": "1", "label": { "cmd": "observe", "logType": ["report1"], "role": "TR" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "test", "logType": ["report2"], "role": "TR" } },
+                    { "source": "3", "target": "4", "label": { "cmd": "accept", "logType": ["ok"], "role": "QCR" } },
+                    { "source": "3", "target": "4", "label": { "cmd": "reject", "logType": ["notOk"], "role": "QCR" } }
                 ]
             }"#,
         )
@@ -1263,9 +1511,9 @@ mod tests {
     fn get_subs3() -> Subscriptions {
         serde_json::from_str::<Subscriptions>(
             r#"{
-                "F": ["car"],
-                "TR": ["car", "report"],
-                "QCR": ["report", "ok", "notOk"]
+                "F": ["car", "report1"],
+                "TR": ["car", "report1", "report2"],
+                "QCR": ["report2", "ok", "notOk"]
             }"#,
         )
         .unwrap()
@@ -1289,7 +1537,7 @@ mod tests {
         .unwrap()
     }
 
-    fn get_proto1_proto2_composed_subs() -> Subscriptions {
+    fn get_subs_composition_1() -> Subscriptions {
         serde_json::from_str::<Subscriptions>(
             r#"{
                 "T": ["partID", "part", "pos", "time"],
@@ -1301,14 +1549,15 @@ mod tests {
         .unwrap()
     }
 
-    fn get_confusionful_proto1() -> SwarmProtocol {
+    // two event types in close, request appears multiple times, get emits no events
+    fn get_malformed_proto1() -> SwarmProtocol {
         serde_json::from_str::<SwarmProtocol>(
             r#"{
                 "initial": "0",
                 "transitions": [
                     { "source": "0", "target": "1", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "get", "logType": ["pos"], "role": "FL" } },
-                    { "source": "2", "target": "0", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "get", "logType": [], "role": "FL" } },
+                    { "source": "2", "target": "0", "label": { "cmd": "request", "logType": ["part"], "role": "T" } },
                     { "source": "0", "target": "0", "label": { "cmd": "close", "logType": ["time", "time2"], "role": "D" } }
                 ]
             }"#,
@@ -1316,20 +1565,17 @@ mod tests {
         .unwrap()
     }
 
-    // pos event type associated with multiple commands and nondeterminism at 0 || 0
-    fn get_confusionful_proto2() -> SwarmProtocol {
+    // pos event type associated with multiple commands and nondeterminism at 0, no terminal state can be reached from any state
+    fn get_confusionful_proto1() -> SwarmProtocol {
         serde_json::from_str::<SwarmProtocol>(
             r#"{
-                "initial": "0 || 0",
+                "initial": "0",
                 "transitions": [
-                    { "source": "0 || 0", "target": "1 || 1", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
-                    { "source": "0 || 0", "target": "3 || 0", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
-                    { "source": "1 || 1", "target": "2 || 1", "label": { "cmd": "get", "logType": ["pos"], "role": "FL" } },
-                    { "source": "2 || 1", "target": "0 || 2", "label": { "cmd": "deliver", "logType": ["pos"], "role": "T" } },
-                    { "source": "0 || 2", "target": "0 || 3", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
-                    { "source": "0 || 2", "target": "3 || 2", "label": { "cmd": "close", "logType": ["time"], "role": "D" } },
-                    { "source": "0 || 3", "target": "3 || 3", "label": { "cmd": "close", "logType": ["time"], "role": "D" } },
-                    { "source": "3 || 2", "target": "3 || 3", "label": { "cmd": "build", "logType": ["car"], "role": "F" } }
+                    { "source": "0", "target": "1", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
+                    { "source": "0", "target": "0", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "get", "logType": ["pos"], "role": "FL" } },
+                    { "source": "2", "target": "0", "label": { "cmd": "request", "logType": ["pos"], "role": "T" } },
+                    { "source": "0", "target": "0", "label": { "cmd": "close", "logType": ["time"], "role": "D" } }
                 ]
             }"#,
         )
@@ -1337,7 +1583,7 @@ mod tests {
     }
 
     // initial state state unreachable
-    fn get_confusionful_proto3() -> SwarmProtocol {
+    fn get_confusionful_proto2() -> SwarmProtocol {
         serde_json::from_str::<SwarmProtocol>(
             r#"{
                 "initial": "0",
@@ -1351,7 +1597,7 @@ mod tests {
     }
 
     // all states not reachable
-    fn get_confusionful_proto4() -> SwarmProtocol {
+    fn get_confusionful_proto3() -> SwarmProtocol {
         serde_json::from_str::<SwarmProtocol>(
             r#"{
                 "initial": "0",
@@ -1385,2248 +1631,56 @@ mod tests {
         ]
     }
 
-    fn get_weird_conc_1() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"
-            {
-            "initial": "1346",
-            "transitions": [
-                {
-                "label": {
-                    "cmd": "IR_0_cmd_0",
-                    "logType": [
-                    "IR_0_e_0"
-                    ],
-                    "role": "IR_0"
+    fn get_interfacing_swarms_1() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_proto1(),
+                    interface: None,
                 },
-                "source": "1346",
-                "target": "1347"
+                CompositionComponent {
+                    protocol: get_proto2(),
+                    interface: Some(Role::new("T")),
                 },
-                {
-                "label": {
-                    "cmd": "IR_0_cmd_1",
-                    "logType": [
-                    "IR_0_e_1"
-                    ],
-                    "role": "IR_0"
-                },
-                "source": "1347",
-                "target": "1348"
-                }
             ]
-            }
-            "#,
-        ).unwrap()
+        )
     }
 
-    fn get_weird_conc_2() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"
-            {
-            "initial": "1359",
-            "transitions": [
-                {
-                "label": {
-                    "cmd": "R1341_cmd_0",
-                    "logType": [
-                    "R1341_e_0"
-                    ],
-                    "role": "R1341"
+    fn get_interfacing_swarms_2() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_proto1(),
+                    interface: None,
                 },
-                "source": "1349",
-                "target": "1349"
+                CompositionComponent {
+                    protocol: get_proto2(),
+                    interface: Some(Role::new("T")),
                 },
-                {
-                "label": {
-                    "cmd": "R1342_cmd_2",
-                    "logType": [
-                    "R1342_e_2"
-                    ],
-                    "role": "R1342"
+                CompositionComponent {
+                    protocol: get_proto3(),
+                    interface: Some(Role::new("F")),
                 },
-                "source": "1349",
-                "target": "1350"
-                },
-                {
-                "label": {
-                    "cmd": "R1343_cmd_3",
-                    "logType": [
-                    "R1343_e_3"
-                    ],
-                    "role": "R1343"
-                },
-                "source": "1349",
-                "target": "1349"
-                },
-                {
-                "label": {
-                    "cmd": "R1343_cmd_0",
-                    "logType": [
-                    "R1343_e_0"
-                    ],
-                    "role": "R1343"
-                },
-                "source": "1350",
-                "target": "1351"
-                },
-                {
-                "label": {
-                    "cmd": "R1342_cmd_3",
-                    "logType": [
-                    "R1342_e_3"
-                    ],
-                    "role": "R1342"
-                },
-                "source": "1351",
-                "target": "1352"
-                },
-                {
-                "label": {
-                    "cmd": "R1342_cmd_0",
-                    "logType": [
-                    "R1342_e_0"
-                    ],
-                    "role": "R1342"
-                },
-                "source": "1352",
-                "target": "1353"
-                },
-                {
-                "label": {
-                    "cmd": "R1342_cmd_1",
-                    "logType": [
-                    "R1342_e_1"
-                    ],
-                    "role": "R1342"
-                },
-                "source": "1353",
-                "target": "1354"
-                },
-                {
-                "label": {
-                    "cmd": "R1343_cmd_2",
-                    "logType": [
-                    "R1343_e_2"
-                    ],
-                    "role": "R1343"
-                },
-                "source": "1355",
-                "target": "1356"
-                },
-                {
-                "label": {
-                    "cmd": "R1343_cmd_1",
-                    "logType": [
-                    "R1343_e_1"
-                    ],
-                    "role": "R1343"
-                },
-                "source": "1354",
-                "target": "1357"
-                },
-                {
-                "label": {
-                    "cmd": "IR_1_cmd_0",
-                    "logType": [
-                    "IR_1_e_0"
-                    ],
-                    "role": "IR_1"
-                },
-                "source": "1357",
-                "target": "1358"
-                },
-                {
-                "label": {
-                    "cmd": "IR_1_cmd_1",
-                    "logType": [
-                    "IR_1_e_1"
-                    ],
-                    "role": "IR_1"
-                },
-                "source": "1358",
-                "target": "1355"
-                },
-                {
-                "label": {
-                    "cmd": "IR_0_cmd_0",
-                    "logType": [
-                    "IR_0_e_0"
-                    ],
-                    "role": "IR_0"
-                },
-                "source": "1359",
-                "target": "1349"
-                },
-                {
-                "label": {
-                    "cmd": "IR_0_cmd_1",
-                    "logType": [
-                    "IR_0_e_1"
-                    ],
-                    "role": "IR_0"
-                },
-                "source": "1356",
-                "target": "1360"
-                }
             ]
-            }
-            "#,
-        ).unwrap()
+        )
     }
 
-    fn get_weird_conc_3() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"
-            {
-                "initial": "1366",
-                "transitions": [
-                    {
-                    "label": {
-                        "cmd": "R1344_cmd_0",
-                        "logType": [
-                        "R1344_e_0"
-                        ],
-                        "role": "R1344"
-                    },
-                    "source": "1362",
-                    "target": "1363"
-                    },
-                    {
-                    "label": {
-                        "cmd": "R1345_cmd_0",
-                        "logType": [
-                        "R1345_e_0"
-                        ],
-                        "role": "R1345"
-                    },
-                    "source": "1361",
-                    "target": "1364"
-                    },
-                    {
-                    "label": {
-                        "cmd": "IR_2_cmd_0",
-                        "logType": [
-                        "IR_2_e_0"
-                        ],
-                        "role": "IR_2"
-                    },
-                    "source": "1364",
-                    "target": "1365"
-                    },
-                    {
-                    "label": {
-                        "cmd": "IR_2_cmd_1",
-                        "logType": [
-                        "IR_2_e_1"
-                        ],
-                        "role": "IR_2"
-                    },
-                    "source": "1365",
-                    "target": "1362"
-                    },
-                    {
-                    "label": {
-                        "cmd": "IR_1_cmd_0",
-                        "logType": [
-                        "IR_1_e_0"
-                        ],
-                        "role": "IR_1"
-                    },
-                    "source": "1366",
-                    "target": "1361"
-                    },
-                    {
-                    "label": {
-                        "cmd": "IR_1_cmd_1",
-                        "logType": [
-                        "IR_1_e_1"
-                        ],
-                        "role": "IR_1"
-                    },
-                    "source": "1363",
-                    "target": "1367"
-                    }
-                ]
-                }
-            "#,
-        ).unwrap()
-    }
-
-    fn get_proto1_delete() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    // QCR subscribes to car and part because report1 is concurrent with part and they lead to a joining event car/event is joining bc of this.
+    fn get_subs_composition_2() -> Subscriptions {
+        serde_json::from_str::<Subscriptions>(
             r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "cmd_x", "logType": ["x"], "role": "T" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R1" } },
-                    { "source": "3", "target": "4", "label": { "cmd": "cmd_y", "logType": ["y"], "role": "T" } }
-                ]
+                "T": ["partID", "part", "pos", "time"],
+                "FL": ["partID", "pos", "time"],
+                "D": ["partID", "part", "time"],
+                "F": ["partID", "part", "car", "time", "report1"],
+                "TR": ["partID", "report1", "report2", "car", "time", "part"],
+                "QCR": ["partID", "part", "report1", "report2", "car", "time", "ok", "notOk"]
             }"#,
         )
         .unwrap()
     }
 
-    fn get_proto2_delete() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "cmd_x", "logType": ["x"], "role": "T" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R2" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R2" } },
-                    { "source": "3", "target": "1", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R2" } },
-                    { "source": "1", "target": "4", "label": { "cmd": "cmd_y", "logType": ["y"], "role": "T" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
-    fn get_composition_input_vec_delete() -> CompositionInputVec {
-        vec![
-            CompositionInput {
-                protocol: get_proto1_delete(),
-                subscription: weak_well_formed_sub(get_proto1_delete()).0,
-                interface: None,
-            },
-            CompositionInput {
-                protocol: get_proto2_delete(),
-                subscription: weak_well_formed_sub(get_proto2_delete()).0,
-                interface: Some(Role::new("T")),
-            },
-        ]
-    }
-
-    fn get_failing_thing() -> CompositionInputVec {
-        serde_json::from_str::<CompositionInputVec>(
-            r#"
-                [
-            {
-                "protocol": {
-                    "initial": "State(Interned(6632))",
-                    "transitions": [
-                        {
-                            "label": {
-                                "cmd": "Command(Interned(R6584_cmd_3))",
-                                "logType": [
-                                    "EventType(Interned(R6584_e_3))"
-                                ],
-                                "role": "Role(Interned(R6584))"
-                            },
-                            "source": "State(Interned(6632))",
-                            "target": "State(Interned(6633))"
-                        },
-                        {
-                            "label": {
-                                "cmd": "Command(Interned(R6584_cmd_2))",
-                                "logType": [
-                                    "EventType(Interned(R6584_e_2))"
-                                ],
-                                "role": "Role(Interned(R6584))"
-                            },
-                            "source": "State(Interned(6632))",
-                            "target": "State(Interned(6634))"
-                        },
-                        {
-                            "label": {
-                                "cmd": "Command(Interned(R6584_cmd_0))",
-                                "logType": [
-                                    "EventType(Interned(R6584_e_0))"
-                                ],
-                                "role": "Role(Interned(R6584))"
-                            },
-                            "source": "State(Interned(6634))",
-                            "target": "State(Interned(6635))"
-                        },
-                        {
-                            "label": {
-                                "cmd": "Command(Interned(R6584_cmd_1))",
-                                "logType": [
-                                    "EventType(Interned(R6584_e_1))"
-                                ],
-                                "role": "Role(Interned(R6584))"
-                            },
-                            "source": "State(Interned(6633))",
-                            "target": "State(Interned(6636))"
-                        }
-                    ]
-                },
-                "subscription": {},
-                "interface": null
-            },
-            {
-                "protocol": {
-                    "initial": "State(Interned(6637))",
-                    "transitions": [
-                        {
-                            "label": {
-                                "cmd": "Command(Interned(R6584_cmd_3))",
-                                "logType": [
-                                    "EventType(Interned(R6584_e_3))"
-                                ],
-                                "role": "Role(Interned(R6584))"
-                            },
-                            "source": "State(Interned(6637))",
-                            "target": "State(Interned(6638))"
-                        },
-                        {
-                            "label": {
-                                "cmd": "Command(Interned(R6585_cmd_0))",
-                                "logType": [
-                                    "EventType(Interned(R6585_e_0))"
-                                ],
-                                "role": "Role(Interned(R6585))"
-                            },
-                            "source": "State(Interned(6638))",
-                            "target": "State(Interned(6639))"
-                        },
-                        {
-                            "label": {
-                                "cmd": "Command(Interned(R6584_cmd_2))",
-                                "logType": [
-                                    "EventType(Interned(R6584_e_2))"
-                                ],
-                                "role": "Role(Interned(R6584))"
-                            },
-                            "source": "State(Interned(6639))",
-                            "target": "State(Interned(6640))"
-                        },
-                        {
-                            "label": {
-                                "cmd": "Command(Interned(R6584_cmd_1))",
-                                "logType": [
-                                    "EventType(Interned(R6584_e_1))"
-                                ],
-                                "role": "Role(Interned(R6584))"
-                            },
-                            "source": "State(Interned(6640))",
-                            "target": "State(Interned(6641))"
-                        },
-                        {
-                            "label": {
-                                "cmd": "Command(Interned(R6584_cmd_0))",
-                                "logType": [
-                                    "EventType(Interned(R6584_e_0))"
-                                ],
-                                "role": "Role(Interned(R6584))"
-                            },
-                            "source": "State(Interned(6641))",
-                            "target": "State(Interned(6642))"
-                        }
-                    ]
-                },
-                "subscription": {},
-                "interface": "Role(Interned(R6584))"
-
-            },
-            {
-                "protocol": {
-                    "initial": "State(Interned(6643))",
-                    "transitions": [
-                        {
-                            "label": {
-                                "cmd": "Command(Interned(R6585_cmd_0))",
-                                "logType": [
-                                    "EventType(Interned(R6585_e_0))"
-                                ],
-                                "role": "Role(Interned(R6585))"
-                            },
-                            "source": "State(Interned(6643))",
-                            "target": "State(Interned(6644))"
-                        },
-                        {
-                            "label": {
-                                "cmd": "Command(Interned(R6587_cmd_1))",
-                                "logType": [
-                                    "EventType(Interned(R6587_e_1))"
-                                ],
-                                "role": "Role(Interned(R6587))"
-                            },
-                            "source": "State(Interned(6644))",
-                            "target": "State(Interned(6645))"
-                        },
-                        {
-                            "label": {
-                                "cmd": "Command(Interned(R6586_cmd_0))",
-                                "logType": [
-                                    "EventType(Interned(R6586_e_0))"
-                                ],
-                                "role": "Role(Interned(R6586))"
-                            },
-                            "source": "State(Interned(6645))",
-                            "target": "State(Interned(6646))"
-                        },
-                        {
-                            "label": {
-                                "cmd": "Command(Interned(R6586_cmd_1))",
-                                "logType": [
-                                    "EventType(Interned(R6586_e_1))"
-                                ],
-                                "role": "Role(Interned(R6586))"
-                            },
-                            "source": "State(Interned(6646))",
-                            "target": "State(Interned(6647))"
-                        },
-                        {
-                            "label": {
-                                "cmd": "Command(Interned(R6587_cmd_2))",
-                                "logType": [
-                                    "EventType(Interned(R6587_e_2))"
-                                ],
-                                "role": "Role(Interned(R6587))"
-                            },
-                            "source": "State(Interned(6647))",
-                            "target": "State(Interned(6648))"
-                        },
-                        {
-                            "label": {
-                                "cmd": "Command(Interned(R6587_cmd_0))",
-                                "logType": [
-                                    "EventType(Interned(R6587_e_0))"
-                                ],
-                                "role": "Role(Interned(R6587))"
-                            },
-                            "source": "State(Interned(6648))",
-                            "target": "State(Interned(6649))"
-                        },
-                        {
-                            "label": {
-                                "cmd": "Command(Interned(R6586_cmd_2))",
-                                "logType": [
-                                    "EventType(Interned(R6586_e_2))"
-                                ],
-                                "role": "Role(Interned(R6586))"
-                            },
-                            "source": "State(Interned(6649))",
-                            "target": "State(Interned(6650))"
-                        }
-                    ]
-                },
-                "subscription": {},
-                "interface": "Role(Interned(R6585))"
-
-            }
-        ]
-            "#,
-        )
-        .unwrap()
-    }
-
-    fn get_long_fail_500() -> SwarmProtocol {
-     serde_json::from_str::<SwarmProtocol>(
-        r#"
-        {
-            "initial": "77 || 77 || 80",
-            "transitions": [
-                {
-                "label": {
-                    "cmd": "IR_0_cmd_0",
-                    "logType": [
-                    "IR_0_e_0"
-                    ],
-                    "role": "IR_0"
-                },
-                "source": "77 || 77 || 80",
-                "target": "78 || 90 || 80"
-                },
-                {
-                "label": {
-                    "cmd": "IR_1_cmd_0",
-                    "logType": [
-                    "IR_1_e_0"
-                    ],
-                    "role": "IR_1"
-                },
-                "source": "78 || 90 || 80",
-                "target": "78 || 98 || 103"
-                },
-                {
-                "label": {
-                    "cmd": "R3_cmd_0",
-                    "logType": [
-                    "R3_e_0"
-                    ],
-                    "role": "R3"
-                },
-                "source": "78 || 98 || 103",
-                "target": "78 || 102 || 103"
-                },
-                {
-                "label": {
-                    "cmd": "IR_2_cmd_0",
-                    "logType": [
-                    "IR_2_e_0"
-                    ],
-                    "role": "IR_2"
-                },
-                "source": "78 || 98 || 103",
-                "target": "78 || 98 || 107"
-                },
-                {
-                "label": {
-                    "cmd": "R3_cmd_0",
-                    "logType": [
-                    "R3_e_0"
-                    ],
-                    "role": "R3"
-                },
-                "source": "78 || 98 || 107",
-                "target": "78 || 102 || 107"
-                },
-                {
-                "label": {
-                    "cmd": "R5_cmd_1",
-                    "logType": [
-                    "R5_e_1"
-                    ],
-                    "role": "R5"
-                },
-                "source": "78 || 98 || 107",
-                "target": "78 || 98 || 104"
-                },
-                {
-                "label": {
-                    "cmd": "R3_cmd_0",
-                    "logType": [
-                    "R3_e_0"
-                    ],
-                    "role": "R3"
-                },
-                "source": "78 || 98 || 104",
-                "target": "78 || 102 || 104"
-                },
-                {
-                "label": {
-                    "cmd": "IR_2_cmd_1",
-                    "logType": [
-                    "IR_2_e_1"
-                    ],
-                    "role": "IR_2"
-                },
-                "source": "78 || 98 || 104",
-                "target": "78 || 98 || 111"
-                },
-                {
-                "label": {
-                    "cmd": "R3_cmd_0",
-                    "logType": [
-                    "R3_e_0"
-                    ],
-                    "role": "R3"
-                },
-                "source": "78 || 98 || 111",
-                "target": "78 || 102 || 111"
-                },
-                {
-                "label": {
-                    "cmd": "R5_cmd_0",
-                    "logType": [
-                    "R5_e_0"
-                    ],
-                    "role": "R5"
-                },
-                "source": "78 || 98 || 111",
-                "target": "78 || 98 || 108"
-                },
-                {
-                "label": {
-                    "cmd": "R3_cmd_0",
-                    "logType": [
-                    "R3_e_0"
-                    ],
-                    "role": "R3"
-                },
-                "source": "78 || 98 || 108",
-                "target": "78 || 102 || 108"
-                },
-                {
-                "label": {
-                    "cmd": "R5_cmd_2",
-                    "logType": [
-                    "R5_e_2"
-                    ],
-                    "role": "R5"
-                },
-                "source": "78 || 98 || 108",
-                "target": "78 || 98 || 81"
-                },
-                {
-                "label": {
-                    "cmd": "R3_cmd_0",
-                    "logType": [
-                    "R3_e_0"
-                    ],
-                    "role": "R3"
-                },
-                "source": "78 || 98 || 81",
-                "target": "78 || 102 || 81"
-                },
-                {
-                "label": {
-                    "cmd": "R2_cmd_0",
-                    "logType": [
-                    "R2_e_0"
-                    ],
-                    "role": "R2"
-                },
-                "source": "78 || 102 || 81",
-                "target": "78 || 91 || 81"
-                },
-                {
-                "label": {
-                    "cmd": "IR_1_cmd_1",
-                    "logType": [
-                    "IR_1_e_1"
-                    ],
-                    "role": "IR_1"
-                },
-                "source": "78 || 91 || 81",
-                "target": "78 || 99 || 82"
-                },
-                {
-                "label": {
-                    "cmd": "IR_1_cmd_2",
-                    "logType": [
-                    "IR_1_e_2"
-                    ],
-                    "role": "IR_1"
-                },
-                "source": "78 || 91 || 81",
-                "target": "78 || 78 || 83"
-                },
-                {
-                "label": {
-                    "cmd": "IR_0_cmd_1",
-                    "logType": [
-                    "IR_0_e_1"
-                    ],
-                    "role": "IR_0"
-                },
-                "source": "78 || 78 || 83",
-                "target": "79 || 95 || 83"
-                },
-                {
-                "label": {
-                    "cmd": "R4_cmd_1",
-                    "logType": [
-                    "R4_e_1"
-                    ],
-                    "role": "R4"
-                },
-                "source": "78 || 78 || 83",
-                "target": "78 || 78 || 106"
-                },
-                {
-                "label": {
-                    "cmd": "IR_0_cmd_1",
-                    "logType": [
-                    "IR_0_e_1"
-                    ],
-                    "role": "IR_0"
-                },
-                "source": "78 || 78 || 106",
-                "target": "79 || 95 || 106"
-                },
-                {
-                "label": {
-                    "cmd": "R1_cmd_1",
-                    "logType": [
-                    "R1_e_1"
-                    ],
-                    "role": "R1"
-                },
-                "source": "79 || 95 || 106",
-                "target": "79 || 79 || 106"
-                },
-                {
-                "label": {
-                    "cmd": "R0_cmd_0",
-                    "logType": [
-                    "R0_e_0"
-                    ],
-                    "role": "R0"
-                },
-                "source": "79 || 95 || 106",
-                "target": "79 || 95 || 106"
-                },
-                {
-                "label": {
-                    "cmd": "R0_cmd_1",
-                    "logType": [
-                    "R0_e_1"
-                    ],
-                    "role": "R0"
-                },
-                "source": "79 || 95 || 106",
-                "target": "88 || 95 || 106"
-                },
-                {
-                "label": {
-                    "cmd": "R1_cmd_1",
-                    "logType": [
-                    "R1_e_1"
-                    ],
-                    "role": "R1"
-                },
-                "source": "88 || 95 || 106",
-                "target": "88 || 79 || 106"
-                },
-                {
-                "label": {
-                    "cmd": "R0_cmd_2",
-                    "logType": [
-                    "R0_e_2"
-                    ],
-                    "role": "R0"
-                },
-                "source": "88 || 95 || 106",
-                "target": "89 || 95 || 106"
-                },
-                {
-                "label": {
-                    "cmd": "R1_cmd_1",
-                    "logType": [
-                    "R1_e_1"
-                    ],
-                    "role": "R1"
-                },
-                "source": "89 || 95 || 106",
-                "target": "89 || 79 || 106"
-                },
-                {
-                "label": {
-                    "cmd": "R0_cmd_2",
-                    "logType": [
-                    "R0_e_2"
-                    ],
-                    "role": "R0"
-                },
-                "source": "88 || 79 || 106",
-                "target": "89 || 79 || 106"
-                },
-                {
-                "label": {
-                    "cmd": "R0_cmd_0",
-                    "logType": [
-                    "R0_e_0"
-                    ],
-                    "role": "R0"
-                },
-                "source": "79 || 79 || 106",
-                "target": "79 || 79 || 106"
-                },
-                {
-                "label": {
-                    "cmd": "R0_cmd_1",
-                    "logType": [
-                    "R0_e_1"
-                    ],
-                    "role": "R0"
-                },
-                "source": "79 || 79 || 106",
-                "target": "88 || 79 || 106"
-                },
-                {
-                "label": {
-                    "cmd": "R1_cmd_1",
-                    "logType": [
-                    "R1_e_1"
-                    ],
-                    "role": "R1"
-                },
-                "source": "79 || 95 || 83",
-                "target": "79 || 79 || 83"
-                },
-                {
-                "label": {
-                    "cmd": "R0_cmd_0",
-                    "logType": [
-                    "R0_e_0"
-                    ],
-                    "role": "R0"
-                },
-                "source": "79 || 95 || 83",
-                "target": "79 || 95 || 83"
-                },
-                {
-                "label": {
-                    "cmd": "R0_cmd_1",
-                    "logType": [
-                    "R0_e_1"
-                    ],
-                    "role": "R0"
-                },
-                "source": "79 || 95 || 83",
-                "target": "88 || 95 || 83"
-                },
-                {
-                "label": {
-                    "cmd": "R4_cmd_1",
-                    "logType": [
-                    "R4_e_1"
-                    ],
-                    "role": "R4"
-                },
-                "source": "79 || 95 || 83",
-                "target": "79 || 95 || 106"
-                },
-                {
-                "label": {
-                    "cmd": "R1_cmd_1",
-                    "logType": [
-                    "R1_e_1"
-                    ],
-                    "role": "R1"
-                },
-                "source": "88 || 95 || 83",
-                "target": "88 || 79 || 83"
-                },
-                {
-                "label": {
-                    "cmd": "R0_cmd_2",
-                    "logType": [
-                    "R0_e_2"
-                    ],
-                    "role": "R0"
-                },
-                "source": "88 || 95 || 83",
-                "target": "89 || 95 || 83"
-                },
-                {
-                "label": {
-                    "cmd": "R4_cmd_1",
-                    "logType": [
-                    "R4_e_1"
-                    ],
-                    "role": "R4"
-                },
-                "source": "88 || 95 || 83",
-                "target": "88 || 95 || 106"
-                },
-                {
-                "label": {
-                    "cmd": "R1_cmd_1",
-                    "logType": [
-                    "R1_e_1"
-                    ],
-                    "role": "R1"
-                },
-                "source": "89 || 95 || 83",
-                "target": "89 || 79 || 83"
-                },
-                {
-                "label": {
-                    "cmd": "R4_cmd_1",
-                    "logType": [
-                    "R4_e_1"
-                    ],
-                    "role": "R4"
-                },
-                "source": "89 || 95 || 83",
-                "target": "89 || 95 || 106"
-                },
-                {
-                "label": {
-                    "cmd": "R4_cmd_1",
-                    "logType": [
-                    "R4_e_1"
-                    ],
-                    "role": "R4"
-                },
-                "source": "89 || 79 || 83",
-                "target": "89 || 79 || 106"
-                },
-                {
-                "label": {
-                    "cmd": "R0_cmd_2",
-                    "logType": [
-                    "R0_e_2"
-                    ],
-                    "role": "R0"
-                },
-                "source": "88 || 79 || 83",
-                "target": "89 || 79 || 83"
-                },
-                {
-                "label": {
-                    "cmd": "R4_cmd_1",
-                    "logType": [
-                    "R4_e_1"
-                    ],
-                    "role": "R4"
-                },
-                "source": "88 || 79 || 83",
-                "target": "88 || 79 || 106"
-                },
-                {
-                "label": {
-                    "cmd": "R0_cmd_0",
-                    "logType": [
-                    "R0_e_0"
-                    ],
-                    "role": "R0"
-                },
-                "source": "79 || 79 || 83",
-                "target": "79 || 79 || 83"
-                },
-                {
-                "label": {
-                    "cmd": "R0_cmd_1",
-                    "logType": [
-                    "R0_e_1"
-                    ],
-                    "role": "R0"
-                },
-                "source": "79 || 79 || 83",
-                "target": "88 || 79 || 83"
-                },
-                {
-                "label": {
-                    "cmd": "R4_cmd_1",
-                    "logType": [
-                    "R4_e_1"
-                    ],
-                    "role": "R4"
-                },
-                "source": "79 || 79 || 83",
-                "target": "79 || 79 || 106"
-                },
-                {
-                "label": {
-                    "cmd": "R2_cmd_2",
-                    "logType": [
-                    "R2_e_2"
-                    ],
-                    "role": "R2"
-                },
-                "source": "78 || 99 || 82",
-                "target": "78 || 93 || 82"
-                },
-                {
-                "label": {
-                    "cmd": "IR_1_cmd_3",
-                    "logType": [
-                    "IR_1_e_3"
-                    ],
-                    "role": "IR_1"
-                },
-                "source": "78 || 93 || 82",
-                "target": "78 || 94 || 84"
-                },
-                {
-                "label": {
-                    "cmd": "R3_cmd_3",
-                    "logType": [
-                    "R3_e_3"
-                    ],
-                    "role": "R3"
-                },
-                "source": "78 || 94 || 84",
-                "target": "78 || 100 || 84"
-                },
-                {
-                "label": {
-                    "cmd": "R3_cmd_1",
-                    "logType": [
-                    "R3_e_1"
-                    ],
-                    "role": "R3"
-                },
-                "source": "78 || 94 || 84",
-                "target": "78 || 101 || 84"
-                },
-                {
-                "label": {
-                    "cmd": "R4_cmd_2",
-                    "logType": [
-                    "R4_e_2"
-                    ],
-                    "role": "R4"
-                },
-                "source": "78 || 94 || 84",
-                "target": "78 || 94 || 109"
-                },
-                {
-                "label": {
-                    "cmd": "R3_cmd_3",
-                    "logType": [
-                    "R3_e_3"
-                    ],
-                    "role": "R3"
-                },
-                "source": "78 || 94 || 109",
-                "target": "78 || 100 || 109"
-                },
-                {
-                "label": {
-                    "cmd": "R3_cmd_1",
-                    "logType": [
-                    "R3_e_1"
-                    ],
-                    "role": "R3"
-                },
-                "source": "78 || 94 || 109",
-                "target": "78 || 101 || 109"
-                },
-                {
-                "label": {
-                    "cmd": "R4_cmd_0",
-                    "logType": [
-                    "R4_e_0"
-                    ],
-                    "role": "R4"
-                },
-                "source": "78 || 94 || 109",
-                "target": "78 || 94 || 110"
-                },
-                {
-                "label": {
-                    "cmd": "R3_cmd_3",
-                    "logType": [
-                    "R3_e_3"
-                    ],
-                    "role": "R3"
-                },
-                "source": "78 || 94 || 110",
-                "target": "78 || 100 || 110"
-                },
-                {
-                "label": {
-                    "cmd": "R3_cmd_1",
-                    "logType": [
-                    "R3_e_1"
-                    ],
-                    "role": "R3"
-                },
-                "source": "78 || 94 || 110",
-                "target": "78 || 101 || 110"
-                },
-                {
-                "label": {
-                    "cmd": "R3_cmd_2",
-                    "logType": [
-                    "R3_e_2"
-                    ],
-                    "role": "R3"
-                },
-                "source": "78 || 101 || 110",
-                "target": "78 || 97 || 110"
-                },
-                {
-                "label": {
-                    "cmd": "R1_cmd_0",
-                    "logType": [
-                    "R1_e_0"
-                    ],
-                    "role": "R1"
-                },
-                "source": "78 || 100 || 110",
-                "target": "78 || 96 || 110"
-                },
-                {
-                "label": {
-                    "cmd": "R2_cmd_1",
-                    "logType": [
-                    "R2_e_1"
-                    ],
-                    "role": "R2"
-                },
-                "source": "78 || 96 || 110",
-                "target": "78 || 94 || 110"
-                },
-                {
-                "label": {
-                    "cmd": "R3_cmd_2",
-                    "logType": [
-                    "R3_e_2"
-                    ],
-                    "role": "R3"
-                },
-                "source": "78 || 101 || 109",
-                "target": "78 || 97 || 109"
-                },
-                {
-                "label": {
-                    "cmd": "R4_cmd_0",
-                    "logType": [
-                    "R4_e_0"
-                    ],
-                    "role": "R4"
-                },
-                "source": "78 || 101 || 109",
-                "target": "78 || 101 || 110"
-                },
-                {
-                "label": {
-                    "cmd": "R4_cmd_0",
-                    "logType": [
-                    "R4_e_0"
-                    ],
-                    "role": "R4"
-                },
-                "source": "78 || 97 || 109",
-                "target": "78 || 97 || 110"
-                },
-                {
-                "label": {
-                    "cmd": "R1_cmd_0",
-                    "logType": [
-                    "R1_e_0"
-                    ],
-                    "role": "R1"
-                },
-                "source": "78 || 100 || 109",
-                "target": "78 || 96 || 109"
-                },
-                {
-                "label": {
-                    "cmd": "R4_cmd_0",
-                    "logType": [
-                    "R4_e_0"
-                    ],
-                    "role": "R4"
-                },
-                "source": "78 || 100 || 109",
-                "target": "78 || 100 || 110"
-                },
-                {
-                "label": {
-                    "cmd": "R2_cmd_1",
-                    "logType": [
-                    "R2_e_1"
-                    ],
-                    "role": "R2"
-                },
-                "source": "78 || 96 || 109",
-                "target": "78 || 94 || 109"
-                },
-                {
-                "label": {
-                    "cmd": "R4_cmd_0",
-                    "logType": [
-                    "R4_e_0"
-                    ],
-                    "role": "R4"
-                },
-                "source": "78 || 96 || 109",
-                "target": "78 || 96 || 110"
-                },
-                {
-                "label": {
-                    "cmd": "R3_cmd_2",
-                    "logType": [
-                    "R3_e_2"
-                    ],
-                    "role": "R3"
-                },
-                "source": "78 || 101 || 84",
-                "target": "78 || 97 || 84"
-                },
-                {
-                "label": {
-                    "cmd": "R4_cmd_2",
-                    "logType": [
-                    "R4_e_2"
-                    ],
-                    "role": "R4"
-                },
-                "source": "78 || 101 || 84",
-                "target": "78 || 101 || 109"
-                },
-                {
-                "label": {
-                    "cmd": "R4_cmd_2",
-                    "logType": [
-                    "R4_e_2"
-                    ],
-                    "role": "R4"
-                },
-                "source": "78 || 97 || 84",
-                "target": "78 || 97 || 109"
-                },
-                {
-                "label": {
-                    "cmd": "R1_cmd_0",
-                    "logType": [
-                    "R1_e_0"
-                    ],
-                    "role": "R1"
-                },
-                "source": "78 || 100 || 84",
-                "target": "78 || 96 || 84"
-                },
-                {
-                "label": {
-                    "cmd": "R4_cmd_2",
-                    "logType": [
-                    "R4_e_2"
-                    ],
-                    "role": "R4"
-                },
-                "source": "78 || 100 || 84",
-                "target": "78 || 100 || 109"
-                },
-                {
-                "label": {
-                    "cmd": "R2_cmd_1",
-                    "logType": [
-                    "R2_e_1"
-                    ],
-                    "role": "R2"
-                },
-                "source": "78 || 96 || 84",
-                "target": "78 || 94 || 84"
-                },
-                {
-                "label": {
-                    "cmd": "R4_cmd_2",
-                    "logType": [
-                    "R4_e_2"
-                    ],
-                    "role": "R4"
-                },
-                "source": "78 || 96 || 84",
-                "target": "78 || 96 || 109"
-                },
-                {
-                "label": {
-                    "cmd": "R2_cmd_0",
-                    "logType": [
-                    "R2_e_0"
-                    ],
-                    "role": "R2"
-                },
-                "source": "78 || 102 || 108",
-                "target": "78 || 91 || 108"
-                },
-                {
-                "label": {
-                    "cmd": "R5_cmd_2",
-                    "logType": [
-                    "R5_e_2"
-                    ],
-                    "role": "R5"
-                },
-                "source": "78 || 102 || 108",
-                "target": "78 || 102 || 81"
-                },
-                {
-                "label": {
-                    "cmd": "R5_cmd_2",
-                    "logType": [
-                    "R5_e_2"
-                    ],
-                    "role": "R5"
-                },
-                "source": "78 || 91 || 108",
-                "target": "78 || 91 || 81"
-                },
-                {
-                "label": {
-                    "cmd": "R2_cmd_0",
-                    "logType": [
-                    "R2_e_0"
-                    ],
-                    "role": "R2"
-                },
-                "source": "78 || 102 || 111",
-                "target": "78 || 91 || 111"
-                },
-                {
-                "label": {
-                    "cmd": "R5_cmd_0",
-                    "logType": [
-                    "R5_e_0"
-                    ],
-                    "role": "R5"
-                },
-                "source": "78 || 102 || 111",
-                "target": "78 || 102 || 108"
-                },
-                {
-                "label": {
-                    "cmd": "R5_cmd_0",
-                    "logType": [
-                    "R5_e_0"
-                    ],
-                    "role": "R5"
-                },
-                "source": "78 || 91 || 111",
-                "target": "78 || 91 || 108"
-                },
-                {
-                "label": {
-                    "cmd": "R2_cmd_0",
-                    "logType": [
-                    "R2_e_0"
-                    ],
-                    "role": "R2"
-                },
-                "source": "78 || 102 || 104",
-                "target": "78 || 91 || 104"
-                },
-                {
-                "label": {
-                    "cmd": "IR_2_cmd_1",
-                    "logType": [
-                    "IR_2_e_1"
-                    ],
-                    "role": "IR_2"
-                },
-                "source": "78 || 102 || 104",
-                "target": "78 || 102 || 111"
-                },
-                {
-                "label": {
-                    "cmd": "IR_2_cmd_1",
-                    "logType": [
-                    "IR_2_e_1"
-                    ],
-                    "role": "IR_2"
-                },
-                "source": "78 || 91 || 104",
-                "target": "78 || 91 || 111"
-                },
-                {
-                "label": {
-                    "cmd": "R2_cmd_0",
-                    "logType": [
-                    "R2_e_0"
-                    ],
-                    "role": "R2"
-                },
-                "source": "78 || 102 || 107",
-                "target": "78 || 91 || 107"
-                },
-                {
-                "label": {
-                    "cmd": "R5_cmd_1",
-                    "logType": [
-                    "R5_e_1"
-                    ],
-                    "role": "R5"
-                },
-                "source": "78 || 102 || 107",
-                "target": "78 || 102 || 104"
-                },
-                {
-                "label": {
-                    "cmd": "R5_cmd_1",
-                    "logType": [
-                    "R5_e_1"
-                    ],
-                    "role": "R5"
-                },
-                "source": "78 || 91 || 107",
-                "target": "78 || 91 || 104"
-                },
-                {
-                "label": {
-                    "cmd": "R2_cmd_0",
-                    "logType": [
-                    "R2_e_0"
-                    ],
-                    "role": "R2"
-                },
-                "source": "78 || 102 || 103",
-                "target": "78 || 91 || 103"
-                },
-                {
-                "label": {
-                    "cmd": "IR_2_cmd_0",
-                    "logType": [
-                    "IR_2_e_0"
-                    ],
-                    "role": "IR_2"
-                },
-                "source": "78 || 102 || 103",
-                "target": "78 || 102 || 107"
-                },
-                {
-                "label": {
-                    "cmd": "IR_2_cmd_0",
-                    "logType": [
-                    "IR_2_e_0"
-                    ],
-                    "role": "IR_2"
-                },
-                "source": "78 || 91 || 103",
-                "target": "78 || 91 || 107"
-                }
-            ]
-            }"#,
-            ).unwrap()
-    }
-
-    fn get_failing_example_500_1() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "960",
-                "transitions": [
-                    {
-                    "label": {
-                        "cmd": "IR_0_cmd_0",
-                        "logType": [
-                        "IR_0_e_0"
-                        ],
-                        "role": "IR_0"
-                    },
-                    "source": "960",
-                    "target": "961"
-                    },
-                    {
-                    "label": {
-                        "cmd": "R958_cmd_1",
-                        "logType": [
-                        "R958_e_1"
-                        ],
-                        "role": "R958"
-                    },
-                    "source": "961",
-                    "target": "961"
-                    },
-                    {
-                    "label": {
-                        "cmd": "R958_cmd_0",
-                        "logType": [
-                        "R958_e_0"
-                        ],
-                        "role": "R958"
-                    },
-                    "source": "961",
-                    "target": "964"
-                    }
-                ]
-            }
-            "#,
-        )
-        .unwrap()
-    }
-
-    fn get_failing_example_500_2() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "960",
-                "transitions": [
-                    {
-                    "label": {
-                        "cmd": "IR_1_cmd_1",
-                        "logType": [
-                        "IR_1_e_1"
-                        ],
-                        "role": "IR_1"
-                    },
-                    "source": "965",
-                    "target": "961"
-                    },
-                    {
-                    "label": {
-                        "cmd": "IR_1_cmd_0",
-                        "logType": [
-                        "IR_1_e_0"
-                        ],
-                        "role": "IR_1"
-                    },
-                    "source": "965",
-                    "target": "965"
-                    },
-                    {
-                    "label": {
-                        "cmd": "IR_0_cmd_0",
-                        "logType": [
-                        "IR_0_e_0"
-                        ],
-                        "role": "IR_0"
-                    },
-                    "source": "960",
-                    "target": "967"
-                    },
-                    {
-                    "label": {
-                        "cmd": "R959_cmd_0",
-                        "logType": [
-                        "R959_e_0"
-                        ],
-                        "role": "R959"
-                    },
-                    "source": "967",
-                    "target": "965"
-                    }
-                ]
-            }
-            "#,
-        )
-        .unwrap()
-    }
-
-
-    fn get_failing_example_500_composition() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "960 || 960",
-                "transitions": [
-                    {
-                    "label": {
-                        "cmd": "IR_0_cmd_0",
-                        "logType": [
-                        "IR_0_e_0"
-                        ],
-                        "role": "IR_0"
-                    },
-                    "source": "960 || 960",
-                    "target": "961 || 967"
-                    },
-                    {
-                    "label": {
-                        "cmd": "R958_cmd_0",
-                        "logType": [
-                        "R958_e_0"
-                        ],
-                        "role": "R958"
-                    },
-                    "source": "961 || 967",
-                    "target": "964 || 967"
-                    },
-                    {
-                    "label": {
-                        "cmd": "R958_cmd_1",
-                        "logType": [
-                        "R958_e_1"
-                        ],
-                        "role": "R958"
-                    },
-                    "source": "961 || 967",
-                    "target": "961 || 967"
-                    },
-                    {
-                    "label": {
-                        "cmd": "R959_cmd_0",
-                        "logType": [
-                        "R959_e_0"
-                        ],
-                        "role": "R959"
-                    },
-                    "source": "961 || 967",
-                    "target": "961 || 965"
-                    },
-                    {
-                    "label": {
-                        "cmd": "R958_cmd_0",
-                        "logType": [
-                        "R958_e_0"
-                        ],
-                        "role": "R958"
-                    },
-                    "source": "961 || 965",
-                    "target": "964 || 965"
-                    },
-                    {
-                    "label": {
-                        "cmd": "R958_cmd_1",
-                        "logType": [
-                        "R958_e_1"
-                        ],
-                        "role": "R958"
-                    },
-                    "source": "961 || 965",
-                    "target": "961 || 965"
-                    },
-                    {
-                    "label": {
-                        "cmd": "IR_1_cmd_0",
-                        "logType": [
-                        "IR_1_e_0"
-                        ],
-                        "role": "IR_1"
-                    },
-                    "source": "961 || 965",
-                    "target": "961 || 965"
-                    },
-                    {
-                    "label": {
-                        "cmd": "IR_1_cmd_1",
-                        "logType": [
-                        "IR_1_e_1"
-                        ],
-                        "role": "IR_1"
-                    },
-                    "source": "961 || 965",
-                    "target": "961 || 961"
-                    },
-                    {
-                    "label": {
-                        "cmd": "R958_cmd_0",
-                        "logType": [
-                        "R958_e_0"
-                        ],
-                        "role": "R958"
-                    },
-                    "source": "961 || 961",
-                    "target": "964 || 961"
-                    },
-                    {
-                    "label": {
-                        "cmd": "R958_cmd_1",
-                        "logType": [
-                        "R958_e_1"
-                        ],
-                        "role": "R958"
-                    },
-                    "source": "961 || 961",
-                    "target": "961 || 961"
-                    },
-                    {
-                    "label": {
-                        "cmd": "IR_1_cmd_0",
-                        "logType": [
-                        "IR_1_e_0"
-                        ],
-                        "role": "IR_1"
-                    },
-                    "source": "964 || 965",
-                    "target": "964 || 965"
-                    },
-                    {
-                    "label": {
-                        "cmd": "IR_1_cmd_1",
-                        "logType": [
-                        "IR_1_e_1"
-                        ],
-                        "role": "IR_1"
-                    },
-                    "source": "964 || 965",
-                    "target": "964 || 961"
-                    },
-                    {
-                    "label": {
-                        "cmd": "R959_cmd_0",
-                        "logType": [
-                        "R959_e_0"
-                        ],
-                        "role": "R959"
-                    },
-                    "source": "964 || 967",
-                    "target": "964 || 965"
-                    }
-                ]
-                }
-            "#,
-        )
-        .unwrap()
-    }
-
-    fn get_composition_input_fail_500() -> CompositionInputVec {
-        vec![
-            CompositionInput {
-                protocol: get_failing_example_500_1(),
-                subscription: weak_well_formed_sub(get_failing_example_500_1()).0,
-                interface: None,
-            },
-            CompositionInput {
-                protocol: get_failing_example_500_2(),
-                subscription: weak_well_formed_sub(get_failing_example_500_2()).0,
-                interface: Some(Role::new("IR_0")),
-            },
-        ]
-    }
-
-
-
-
-    #[test]
-    fn test_fail_500() {
-        let input = get_composition_input_fail_500();
-        let (subs_implicit, errors) = compose_subscriptions(input.clone());
-        assert!(errors.is_empty());
-        let result = compose_protocols(input.clone());
-        assert!(result.is_ok());
-        let (composed_graph, composed_initial) = result.unwrap();
-        // we want to turn it to swarm and call weak_well_well_formed_sub
-        // instead of calling wwf_sub with graph because we want to
-        // prepare the graph and obtain concurrent events etc.
-        let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
-        let (subs_explicit, _) = weak_well_formed_sub(swarm.clone());
-        assert!(is_sub_subscription(subs_explicit.clone(), subs_implicit.clone()));
-        println!("subs explicit: {}", serde_json::to_string_pretty(&subs_explicit).unwrap());
-        println!("subs implicit: {}", serde_json::to_string_pretty(&subs_implicit).unwrap());
-        let (g, i, e) = check(swarm.clone(), &subs_implicit);
-        println!("errors: {:?}", e.map(Error::convert(&g)));
-        let proto_info = prepare_graph::<Role>(swarm, &subs_implicit, None);
-        println!("concurrent events: {:?}", proto_info.concurrent_events);
-        println!("Joining events: {:?}", proto_info.joining_events);
-    }
-
-    // for uniquely named roles. not strictly necessary? but nice. little ugly idk
-    static ROLE_COUNTER_MUTEX: Mutex<u32> = Mutex::new(0);
-    fn fresh_i() -> u32 {
-        let mut mut_guard = ROLE_COUNTER_MUTEX.lock().unwrap();
-        let i: u32 = *mut_guard;
-        *mut_guard += 1;
-        i
-    }
-
-    static R_BASE: &str = "R";
-    static IR_BASE: &str = "IR";
-    static CMD_BASE: &str = "cmd";
-    static E_BASE: &str = "e";
-
-    prop_compose! {
-        fn vec_swarm_label(role: Role, max_events: usize)(vec in prop::collection::vec((CMD_BASE, E_BASE), 1..max_events)) -> Vec<SwarmLabel> {
-            vec.into_iter()
-            .enumerate()
-            .map(|(i, (cmd, event))|
-                SwarmLabel { cmd: Command::new(&format!("{role}_{cmd}_{i}")), log_type: vec![EventType::new(&format!("{role}_{event}_{i}"))], role: role.clone()})
-            .collect()
-        }
-    }
-
-    prop_compose! {
-        fn vec_role(max_roles: usize)(vec in prop::collection::vec(R_BASE, 1..max_roles)) -> Vec<Role> {
-            vec
-            .into_iter()
-            .map(|role| {
-                let i = fresh_i();
-                Role::new(&format!("{role}{i}"))
-            }).collect()
-        }
-    }
-
-    prop_compose! {
-        fn all_labels(max_roles: usize, max_events: usize)
-                    (roles in vec_role(max_roles))
-                    (labels in roles.into_iter().map(|role| vec_swarm_label(role, max_events)).collect::<Vec<_>>()) -> Vec<SwarmLabel> {
-            labels.concat()
-        }
-    }
-
-    prop_compose! {
-        fn all_labels_1(roles: Vec<Role>, max_events: usize)
-                    (labels in roles.into_iter().map(|role| vec_swarm_label(role, max_events)).collect::<Vec<_>>()) -> Vec<Vec<SwarmLabel>> {
-            labels
-        }
-    }
-
-    prop_compose! {
-        fn all_labels_2(roles: Vec<Role>, max_roles: usize, max_events: usize)
-                    ((labels, ir_labels) in (prop::collection::vec(all_labels(max_roles, max_events), roles.len()), roles.into_iter().map(|role| vec_swarm_label(role, max_events)).collect::<Vec<_>>()))
-                    -> Vec<(Vec<SwarmLabel>, Vec<SwarmLabel>)> {
-            zip(ir_labels, labels).collect()
-        }
-    }
-
-    prop_compose! {
-        fn all_labels_and_if(max_roles: usize, max_events: usize)
-                (roles in vec_role(max_roles))
-                (index in 0..roles.len(), labels in roles.into_iter().map(|role| vec_swarm_label(role, max_events)).collect::<Vec<_>>())
-                -> (Vec<SwarmLabel>, Vec<SwarmLabel>) {
-            let interfacing = labels[index].clone();
-            (labels.concat(), interfacing)
-        }
-    }
-
-    prop_compose! {
-        fn all_labels_composition(max_roles: usize, max_events: usize, max_protos: usize, exactly_max: bool)
-                (tuples in prop::collection::vec(all_labels_and_if(max_roles, max_events), if exactly_max {max_protos..=max_protos} else {1..=max_protos}))
-                -> Vec<(Option<Role>, Vec<SwarmLabel>)> {
-            let (labels, interfaces): (Vec<_>, Vec<_>) = tuples.into_iter().unzip();
-            let tmp: Vec<(Option<Role>, Vec<SwarmLabel>)>  = interfaces[..interfaces.len()].to_vec().into_iter().map(|interface| (Some(interface[0].role.clone()), interface)).collect();
-            let interfaces: Vec<(Option<Role>, Vec<SwarmLabel>)> = vec![vec![(None, vec![])], tmp].concat();
-            labels.into_iter().zip(interfaces.into_iter()).map(|(labels, (interface, interfacing_cmds))| (interface, vec![labels, interfacing_cmds].concat())).collect()
-        }
-    }
-
-    // shuffle labels before calling, then call random graph
-    fn random_graph_shuffle_labels(
-        base_graph: Option<(Graph, NodeId)>,
-        mut swarm_labels: Vec<SwarmLabel>,
-    ) -> (Graph, NodeId) {
-        let mut rng = rand::thread_rng();
-        swarm_labels.shuffle(&mut rng);
-        random_graph(base_graph, swarm_labels)
-    }
-
-    // add option (graph, nodeid) argument and build on top of this graph if some
-    // if base_graph is some, add nodes and edges to this graph. otherwise create from scratch.
-    fn random_graph(
-        base_graph: Option<(Graph, NodeId)>,
-        mut swarm_labels: Vec<SwarmLabel>,
-    ) -> (Graph, NodeId) {
-        let (mut graph, initial, mut nodes) = if base_graph.is_some() {
-            let (base, base_initial) = base_graph.unwrap();
-            let nodes: Vec<NodeId> = base.node_indices().into_iter().collect();
-            (base, base_initial, nodes)
-        } else {
-            let mut graph = Graph::new();
-            let initial = graph.add_node(State::new(&fresh_i().to_string()));
-            let nodes = vec![initial];
-            (graph, initial, nodes)
-        };
-        let mut rng = rand::thread_rng();
-        let b_dist = Bernoulli::new(0.1).unwrap(); // bernoulli distribution with propability 0.1 of success
-        let gen_state_name = || -> State { State::new(&fresh_i().to_string()) };
-
-        while let Some(label) = swarm_labels.pop() {
-            // consider bernoulli thing. and distrbutions etc. bc documentations says that these once are optimised for cases where only a single sample is needed... if just faster does not matter
-            // generate new or select old source? Generate new or select old, generate new target or select old?
-            // same because you would have to connect to graph at some point anyway...?
-            // exclusive range upper limit
-            let source_node = if b_dist.sample(&mut rng) {
-                nodes[rng.gen_range(0..nodes.len())]
-            } else {
-                // this whole thing was to have fewer branches... idk. loop will terminate because we always can reach 0?
-                let mut source = nodes[rng.gen_range(0..nodes.len())];
-                while graph.edges_directed(source, Outgoing).count() > 0 {
-                    source = nodes[rng.gen_range(0..nodes.len())];
-                }
-
-                source
-            };
-
-            // if generated bool then select an existing node as target
-            // otherwise generate a new node as target
-            if b_dist.sample(&mut rng) && swarm_labels.len() > 0 {
-                let index = rng.gen_range(0..nodes.len());
-                let target_node = nodes[index];
-                //nodes.push(graph.add_node(State::new(&graph.node_count().to_string())));
-                graph.add_edge(source_node, target_node, label);
-                // we should be able to reach a terminating node from all nodes.
-                // we check that swarm_labels is not empty before entering this branch
-                // so we should be able to generate new node and add and edge from
-                // target node to this new node
-                if !node_can_reach_zero(&graph, target_node).is_empty() {
-                    let new_target_node = graph.add_node(gen_state_name());
-                    // consider not pushing?
-                    nodes.push(new_target_node);
-                    let new_weight = swarm_labels.pop().unwrap();
-                    graph.add_edge(target_node, new_target_node, new_weight);
-                }
-            } else {
-                let target_node = graph.add_node(gen_state_name());
-                nodes.push(target_node);
-                graph.add_edge(source_node, target_node, label);
-            }
-        }
-
-        (graph, initial)
-    }
-
-    // generate a number of protocols that interface. interfacing events may appear in different orderes in the protocols
-    // and may be scattered across different branches: we may 'lose' a lot of behavior.
-    prop_compose! {
-        fn generate_composition_input_vec(max_roles: usize, max_events: usize, max_protos: usize, exactly_max: bool)
-                          (vec in all_labels_composition(max_roles, max_events, max_protos, exactly_max))
-                          -> CompositionInputVec {
-            vec.into_iter()
-                .map(|(interface, swarm_labels)| (random_graph_shuffle_labels(None, swarm_labels), interface))
-                .map(|((graph, initial), interface)| {
-                    let protocol = to_swarm_json(graph, initial);
-                    CompositionInput { protocol, subscription: BTreeMap::new(), interface }
-                    }
-                ).collect()
-
-        }
-    }
-
-    // generate a number of protocols that interface and where protocol i 'refines' protocol i+1
-    prop_compose! {
-        fn generate_composition_input_vec_refinement(max_roles: usize, max_events: usize, num_protos: usize)
-                          (vec in prop::collection::vec(all_labels(max_roles, max_events), cmp::max(0, num_protos-1)))
-                          -> CompositionInputVec {
-            let level_0_proto = refinement_initial_proto();
-            let mut graphs = vec![CompositionInput {protocol: to_swarm_json(level_0_proto.0, level_0_proto.1), subscription: BTreeMap::new(), interface: None}];
-            let mut vec = vec
-                .into_iter()
-                .map(|swarm_labels| random_graph_shuffle_labels(None, swarm_labels))
-                .enumerate()
-                .map(|(level, (proto, initial))| (level, refinement_shape(level, proto, initial)))
-                .map(|(level, (proto, initial))|
-                        CompositionInput { protocol: to_swarm_json(proto, initial), subscription: BTreeMap::new(), interface: Some(Role::new(&format!("{IR_BASE}_{level}")))}
-                    )
-                .collect();
-            graphs.append(&mut vec);
-
-            graphs
-        }
-    }
-
-    prop_compose! {
-        fn protos_refinement_2(max_events: usize, num_protos: usize)
-                    (labels in all_labels_1((0..num_protos).into_iter().map(|i| Role::new(&format!("{IR_BASE}_{i}"))).collect(), max_events))
-                    -> Vec<(Graph, NodeId)> {
-            labels.into_iter().map(|labels| random_graph(None, labels)).collect()
-        }
-    }
-
-    prop_compose! {
-        fn protos_refinement_22(max_roles: usize, max_events: usize, num_protos: usize)
-                    (labels in all_labels_2((0..num_protos).into_iter().map(|i| Role::new(&format!("{IR_BASE}_{i}"))).collect(), cmp::max(0, max_roles-1), max_events))
-                    -> Vec<((Graph, NodeId), Vec<SwarmLabel>)> {
-            labels.into_iter().map(|(ir_labels, labels)| (random_graph(None, ir_labels.into_iter().rev().collect()), labels)).collect()
-        }
-    }
-
-    prop_compose! {
-        fn generate_composition_input_vec_refinement_2(max_roles: usize, max_events: usize, num_protos: usize)
-                    (protos in protos_refinement_22(max_roles, max_events, num_protos))
-                    -> CompositionInputVec {
-            let mut rng = rand::thread_rng();
-            let protos_altered: Vec<_> = protos.clone()
-                .into_iter()
-                .enumerate()
-                .map(|(i, ((graph, initial), mut labels))| {
-                    let (graph, initial) = if i == 0 {
-                        (graph, initial)
-                    } else {
-                        // create a graph by inserting protos[i] into protos[i-1]
-                        insert_into(protos[i-1].0.clone(), (graph, initial))
-                    };
-                    //(graph, initial)
-                    labels.shuffle(&mut rng);
-                    expand_graph(graph, initial, labels)
-                }).collect();
-
-            protos_altered.into_iter()
-                .enumerate()
-                .map(|(i, (graph, initial))|
-                    CompositionInput { protocol: to_swarm_json(graph, initial), subscription: BTreeMap::new(), interface: if i == 0 { None } else { Some(Role::new(&format!("{IR_BASE}_{level}", level=i-1))) } })
-                .collect()
-        }
-
-    }
-
-    fn refinement_initial_proto() -> (Graph, NodeId) {
-        let mut graph = Graph::new();
-        let initial = graph.add_node(State::new(&fresh_i().to_string()));
-        let middle = graph.add_node(State::new(&fresh_i().to_string()));
-        let last = graph.add_node(State::new(&fresh_i().to_string()));
-
-        let start_label = SwarmLabel {
-            cmd: Command::new(&format!("{IR_BASE}_0_{CMD_BASE}_0")),
-            log_type: vec![EventType::new(&format!("{IR_BASE}_0_{E_BASE}_0"))],
-            role: Role::new(&format!("{IR_BASE}_0")),
-        };
-        let end_label = SwarmLabel {
-            cmd: Command::new(&format!("{IR_BASE}_0_{CMD_BASE}_1")),
-            log_type: vec![EventType::new(&format!("{IR_BASE}_0_{E_BASE}_1"))],
-            role: Role::new(&format!("{IR_BASE}_0")),
-        };
-
-        graph.add_edge(initial, middle, start_label);
-        graph.add_edge(middle, last, end_label);
-
-        (graph, initial)
-    }
-
-    // consider a version where we change existing labels instead of adding new edges. still adding new edges for if, but not next if.
-    fn refinement_shape(level: usize, mut proto: Graph, initial: NodeId) -> (Graph, NodeId) {
-        let terminal_nodes: Vec<_> = proto
-            .node_indices()
-            .filter(|node| proto.edges_directed(*node, Outgoing).count() == 0)
-            .collect();
-        let mut rng = rand::thread_rng();
-        let index = terminal_nodes[rng.gen_range(0..terminal_nodes.len())];
-        let reversed_graph = Reversed(&proto);
-        let mut dfs = Dfs::new(&reversed_graph, index);
-        let mut nodes_on_path = Vec::new();
-        while let Some(node) = dfs.next(&reversed_graph) {
-            nodes_on_path.push(node);
-            if node == initial {
-                break;
-            }
-        }
-        // reverse so that index 0 is the initial node and index len-1 is the terminal node on the path
-        nodes_on_path.reverse();
-
-        let next_ir = format!("{IR_BASE}_{next_level}", next_level = level + 1);
-        let next_if_label_0 = SwarmLabel {
-            cmd: Command::new(&format!("{next_ir}_{CMD_BASE}_0")),
-            log_type: vec![EventType::new(&format!("{next_ir}_{E_BASE}_0"))],
-            role: Role::new(&next_ir),
-        };
-        let next_if_label_1 = SwarmLabel {
-            cmd: Command::new(&format!("{next_ir}_{CMD_BASE}_1")),
-            log_type: vec![EventType::new(&format!("{next_ir}_{E_BASE}_1"))],
-            role: Role::new(&next_ir),
-        };
-
-        let index = rng.gen_range(0..nodes_on_path.len());
-        let source_node = nodes_on_path[index];
-
-        if index == nodes_on_path.len() - 1 {
-            let next_if_middle = proto.add_node(State::new(&fresh_i().to_string()));
-            let next_if_end = proto.add_node(State::new(&fresh_i().to_string()));
-            proto.add_edge(source_node, next_if_middle, next_if_label_0);
-            proto.add_edge(next_if_middle, next_if_end, next_if_label_1);
-            nodes_on_path.push(next_if_middle);
-            nodes_on_path.push(next_if_end);
-        } else {
-            let target_node = nodes_on_path[index + 1];
-            let edge_to_remove = proto.find_edge(source_node, target_node).unwrap();
-            let weight = proto[edge_to_remove].clone();
-            proto.remove_edge(edge_to_remove);
-            let next_if_start = proto.add_node(State::new(&fresh_i().to_string()));
-            proto.add_edge(source_node, next_if_start, weight);
-            let next_if_middle = proto.add_node(State::new(&fresh_i().to_string()));
-            proto.add_edge(next_if_start, next_if_middle, next_if_label_0);
-            proto.add_edge(next_if_middle, target_node, next_if_label_1);
-            nodes_on_path = vec![
-                nodes_on_path[..index + 1].to_vec(),
-                vec![next_if_start, next_if_middle],
-                nodes_on_path[index + 1..].to_vec(),
-            ]
-            .concat();
-        };
-
-        let ir = format!("{IR_BASE}_{level}");
-        let if_label_0 = SwarmLabel {
-            cmd: Command::new(&format!("{ir}_{CMD_BASE}_0")),
-            log_type: vec![EventType::new(&format!("{ir}_{E_BASE}_0"))],
-            role: Role::new(&ir),
-        };
-        let if_label_1 = SwarmLabel {
-            cmd: Command::new(&format!("{ir}_{CMD_BASE}_1")),
-            log_type: vec![EventType::new(&format!("{ir}_{E_BASE}_1"))],
-            role: Role::new(&ir),
-        };
-
-        let new_initial = proto.add_node(State::new(&fresh_i().to_string()));
-        let new_end = proto.add_node(State::new(&fresh_i().to_string()));
-        proto.add_edge(new_initial, initial, if_label_0);
-        proto.add_edge(nodes_on_path[nodes_on_path.len() - 1], new_end, if_label_1);
-
-        (proto, new_initial)
-    }
-
-    // insert graph2 into graph1. that is, find some edge e in graph1.
-    // make e terminate at the initial node of graph2.
-    // insert all the edges outgoing from the node where e was incoming in the old graph
-    // as outgoing edges of some node in graph2.
-    // assume graph1 and graph2 have terminal nodes. Assume they both have at least one edge.
-    fn insert_into(graph1: (Graph, NodeId), graph2: (Graph, NodeId)) -> (Graph, NodeId) {
-        let mut rng = rand::thread_rng();
-        let (mut graph1, initial1) = graph1;
-        let (graph2, initial2) = graph2;
-        // map nodes in graph2 to nodes in graph1
-        let mut node_map: BTreeMap<NodeId, NodeId> = BTreeMap::new();
-        let mut graph2_terminals: Vec<NodeId> = vec![];
-
-        // edge that we attach to initial of graph2 instead of its old target
-        let connecting_edge = graph1.edge_references().choose(&mut rng).unwrap();
-        let connecting_source = connecting_edge.source();
-        let connecting_old_target = connecting_edge.target();
-        let connecting_weight = connecting_edge.weight().clone();
-        graph1.remove_edge(connecting_edge.id());
-
-        // create a node in graph1 corresponding to initial of graph2. use insert_with to avoid https://stackoverflow.com/questions/60109843/entryor-insert-executes-despite-a-value-already-existing
-        let inserted_initial = node_map
-            .entry(initial2)
-            .or_insert_with(|| graph1.add_node(State::new(&fresh_i().to_string())));
-        graph1.add_edge(connecting_source, *inserted_initial, connecting_weight);
-
-        let mut dfs = Dfs::new(&graph2, initial2);
-        while let Some(node) = dfs.next(&graph2) {
-            let node_in_graph1 = *node_map
-                .entry(node)
-                .or_insert_with(|| graph1.add_node(State::new(&fresh_i().to_string())));
-            for e in graph2.edges_directed(node, Outgoing) {
-                let target_in_graph1 = *node_map
-                    .entry(e.target())
-                    .or_insert_with(|| graph1.add_node(State::new(&fresh_i().to_string())));
-                graph1.add_edge(node_in_graph1, target_in_graph1, e.weight().clone());
-            }
-
-            if graph2.edges_directed(node, Outgoing).count() == 0 {
-                graph2_terminals.push(node);
-            }
-        }
-
-        // select a terminal node in graph2. make all incoming point to connecting old target instead. remove this terminal node.
-        let graph2_terminal = *graph2_terminals.choose(&mut rng).unwrap();
-        let mut edges_to_remove: Vec<EdgeId> = vec![];
-        let mut edges_to_add: Vec<(NodeId, NodeId, SwarmLabel)> = vec![];
-        for e in graph1.edges_directed(node_map[&graph2_terminal], Incoming) {
-            let source = e.source();
-            let weight = e.weight();
-            edges_to_remove.push(e.id());
-            edges_to_add.push((source, connecting_old_target, weight.clone()));
-        }
-        for e_id in edges_to_remove {
-            graph1.remove_edge(e_id);
-        }
-        for (source, target, weight) in edges_to_add {
-            graph1.add_edge(source, target, weight);
-        }
-        graph1.remove_node(node_map[&graph2_terminal]);
-
-        (graph1, initial1)
-    }
-
-    fn expand_graph(
-        mut graph: Graph,
-        initial: NodeId,
-        mut swarm_labels: Vec<SwarmLabel>,
-    ) -> (Graph, NodeId) {
-        let mut nodes: Vec<NodeId> = graph.node_indices().into_iter().collect();
-        let mut rng = rand::thread_rng();
-        let b_dist = Bernoulli::new(0.1).unwrap(); // bernoulli distribution with propability 0.1 of success
-        let b_dist_2 = Bernoulli::new(0.5).unwrap(); // bernoulli distribution with propability 0.5 of success
-        let gen_state_name = || -> State { State::new(&fresh_i().to_string()) };
-
-        while let Some(label) = swarm_labels.pop() {
-            if b_dist_2.sample(&mut rng) {
-                let source_node = if b_dist.sample(&mut rng) {
-                    nodes[rng.gen_range(0..nodes.len())]
-                } else {
-                    // this whole thing was to have fewer branches... idk. loop will terminate because we always can reach 0?
-                    let mut source = nodes[rng.gen_range(0..nodes.len())];
-                    while graph.edges_directed(source, Outgoing).count() > 0 {
-                        source = nodes[rng.gen_range(0..nodes.len())];
-                    }
-
-                    source
-                };
-
-                // if generated bool then select an existing node as target
-                // otherwise generate a new node as target
-                if b_dist.sample(&mut rng) && swarm_labels.len() > 0 {
-                    let index = rng.gen_range(0..nodes.len());
-                    let target_node = nodes[index];
-                    //nodes.push(graph.add_node(State::new(&graph.node_count().to_string())));
-                    graph.add_edge(source_node, target_node, label);
-                    // we should be able to reach a terminating node from all nodes.
-                    // we check that swarm_labels is not empty before entering this branch
-                    // so we should be able to generate new node and add and edge from
-                    // target node to this new node
-                    if !node_can_reach_zero(&graph, target_node).is_empty() {
-                        let new_target_node = graph.add_node(gen_state_name());
-                        // consider not pushing?
-                        nodes.push(new_target_node);
-                        let new_weight = swarm_labels.pop().unwrap();
-                        graph.add_edge(target_node, new_target_node, new_weight);
-                    }
-                } else {
-                    let target_node = graph.add_node(gen_state_name());
-                    nodes.push(target_node);
-                    graph.add_edge(source_node, target_node, label);
-                }
-            } else {
-                let connecting_edge = graph.edge_references().choose(&mut rng).unwrap();
-                let connecting_source = connecting_edge.source();
-                let connecting_old_target = connecting_edge.target();
-                let connecting_weight = connecting_edge.weight().clone();
-                graph.remove_edge(connecting_edge.id());
-
-                let new_node = graph.add_node(gen_state_name());
-                graph.add_edge(connecting_source, new_node, connecting_weight);
-                graph.add_edge(new_node, connecting_old_target, label);
-            }
-        }
-
-        (graph, initial)
-    }
-
-    #[test]
+    /* #[test]
     fn test_prepare_graph_confusionfree() {
         let composition = get_proto1_proto2_composed();
         let sub = get_proto1_proto2_composed_subs();
@@ -3714,15 +1768,13 @@ mod tests {
             BTreeSet::from([EventType::new("notOk"), EventType::new("ok")])
         );
         assert_eq!(proto_info.joining_events, BTreeSet::new());
-    }
+    } */
 
     #[test]
-    fn test_prepare_graph_confusionful() {
-        let proto1 = get_confusionful_proto1();
-        let sub = get_subs1();
-        let proto_info = prepare_graph::<Role>(proto1.clone(), &sub, None);
+    fn test_prepare_graph_malformed() {
+        let proto1 = get_malformed_proto1();
+        let proto_info = prepare_graph1::<Role>(proto1.clone(), &BTreeMap::new(), None);
         let mut errors = vec![
-            confusion_free(&proto_info, 0),
             proto_info.get_ith_proto(0).unwrap().2,
         ]
         .concat()
@@ -3730,17 +1782,57 @@ mod tests {
 
         let mut expected_erros = vec![
             "transition (0)--[close@D<time,time2>]-->(0) emits more than one event type",
-            "guard event type partID appears in transitions from multiple states",
-            "state 0 can not reach terminal node",
-            "state 1 can not reach terminal node",
-            "state 2 can not reach terminal node",
+            "log type must not be empty (1)--[get@FL<>]-->(2)",
         ];
         errors.sort();
         expected_erros.sort();
         assert_eq!(errors, expected_erros);
+    }
 
+    // pos event type associated with multiple commands and nondeterminism at 0, no terminal state can be reached from any state
+    #[test]
+    fn test_prepare_graph_confusionful() {
+        let proto = get_confusionful_proto1();
+
+        let proto_info = prepare_graph1::<Role>(proto, &BTreeMap::new(), None);
+        let mut errors = vec![
+            confusion_free(&proto_info, 0),
+            proto_info.get_ith_proto(0).unwrap().2,
+        ]
+        .concat()
+        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
+
+        // TODO CHECK THAT COMMANDS are only associated with a single event? is it allowed two have c@R<e1> c@R<e2>??
+        let mut expected_errors = vec![
+                "non-deterministic event guard type partID in state 0",
+                "non-deterministic command request for role T in state 0",
+                "event type pos emitted by command in transition (1)--[get@FL<pos>]-->(2) and command in transition (2)--[request@T<pos>]-->(0)",
+                "state 0 can not reach terminal node",
+                "state 1 can not reach terminal node",
+                "state 2 can not reach terminal node",
+            ];
+
+        errors.sort();
+        expected_errors.sort();
+        assert_eq!(errors, expected_errors);
+        /*
+        let proto_info = prepare_graph::<Role>(get_confusionful_proto3(), &sub, None);
+        let errors = vec![
+            confusion_free(&proto_info, 0),
+            proto_info.get_ith_proto(0).unwrap().2,
+        ]
+        .concat()
+        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
+        // recorded twice fix this!
+        let expected_errors = vec![
+            "initial swarm protocol state has no transitions",
+            "initial swarm protocol state has no transitions",
+        ];
+        assert_eq!(errors, expected_errors); */
+
+/*
         let proto2 = get_confusionful_proto2();
-        let sub = get_proto1_proto2_composed_subs();
+        let sub = get_subs_composition_1();
         let proto_info = prepare_graph::<Role>(proto2, &sub, None);
         let errors = vec![
             confusion_free(&proto_info, 0),
@@ -3783,27 +1875,52 @@ mod tests {
             "state 4 is unreachable from initial state",
             "state 5 is unreachable from initial state",
         ];
-        assert_eq!(errors, expected_errors);
+        assert_eq!(errors, expected_errors); */
     }
 
     #[test]
     fn test_wwf_ok() {
-        let (_, _, e) = check(get_proto1(), &get_subs1());
-        assert!(e.is_empty());
+        let proto1: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{protocol: get_proto1(), interface: None}]);
+        let result1 = exact_wwf_sub(proto1.clone());
+        assert!(result1.is_ok());
+        let subs1 = result1.unwrap();
+        let error_report = check(proto1, &subs1);
+        assert!(error_report.is_empty());
+        assert_eq!(get_subs1(), subs1);
 
-        let (_, _, e) = check(get_proto2(), &get_subs2());
-        assert!(e.is_empty());
+        let proto2: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{protocol: get_proto2(), interface: None}]);
+        let result2 = exact_wwf_sub(proto2.clone());
+        assert!(result2.is_ok());
+        let subs2 = result2.unwrap();
+        let error_report = check(proto2, &subs2);
+        assert!(error_report.is_empty());
+        assert_eq!(get_subs2(), subs2);
 
-        let (_, _, e) = check(get_proto3(), &get_subs3());
-        assert!(e.is_empty());
+        let proto3: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{protocol: get_proto3(), interface: None}]);
+        let result3 = exact_wwf_sub(proto3.clone());
+        assert!(result3.is_ok());
+        let subs3 = result3.unwrap();
+        let error_report = check(proto3, &subs3);
+        assert!(error_report.is_empty());
+        assert_eq!(get_subs3(), subs3);
 
-        let (_, _, e) = check(
-            get_proto1_proto2_composed(),
-            &get_proto1_proto2_composed_subs(),
-        );
-        assert!(e.is_empty());
+        let composition1: InterfacingSwarms<Role> = get_interfacing_swarms_1();
+        let result_composition1 = exact_wwf_sub(composition1.clone());
+        assert!(result_composition1.is_ok());
+        let subs_composition = result_composition1.unwrap();
+        let error_report = check(composition1, &subs_composition);
+        assert!(error_report.is_empty());
+        assert_eq!(get_subs_composition_1(), subs_composition);
+
+        let composition2: InterfacingSwarms<Role> = get_interfacing_swarms_2();
+        let result_composition2 = exact_wwf_sub(composition2.clone());
+        assert!(result_composition2.is_ok());
+        let subs_composition = result_composition2.unwrap();
+        let error_report = check(composition2, &subs_composition);
+        assert!(error_report.is_empty());
+        assert_eq!(get_subs_composition_2(), subs_composition);
     }
-
+/*
     #[test]
     fn test_weird_conc() {
         let swarm_1 = get_weird_conc_1();
@@ -3980,63 +2097,6 @@ mod tests {
         assert!(errors.is_empty());
     }
 
-   #[test]
-    fn test_explicit_composition_500() {
-
-
-
-
-        let swarm = get_long_fail_500();
-        let (s, e) = weak_well_formed_sub(swarm);
-        println!("sub: {}", serde_json::to_string_pretty(&s).unwrap());
-        println!("e: {:?}", error_report_to_strings(e));
-        /* let (wwf_sub, _) = compose_subscriptions(get_composition_input_vec1());
-        let (_, _, errors) = check(swarm.clone(), &wwf_sub);
-        println!("HERRRRREEEE");
-
-        println!("STOP");
-        // check if subscription generated using implicit composition is actually wwf for the explicit composition.
-        assert!(errors.is_empty());
-
-        let composition = compose_protocols(get_composition_input_vec1()[..2].to_vec());
-        assert!(composition.is_ok());
-
-        let (g, i) = composition.unwrap();
-        let swarm = to_swarm_json(g, i);
-        let (wwf_sub, _) = compose_subscriptions(get_composition_input_vec1()[..2].to_vec());
-        let (_, _, errors) = check(swarm.clone(), &wwf_sub);
-
-        // check if subscription generated using implicit composition is actually wwf for the explicit composition.
-        assert!(errors.is_empty()); */
-    }
-
-    #[test]
-    fn test_explicit_composition_delete() {
-        let composition_input = get_composition_input_vec_delete();
-        for v in &composition_input {
-            println!(
-                "component: {}",
-                serde_json::to_string_pretty(&v.protocol).unwrap()
-            );
-        }
-        let composition = compose_protocols(composition_input);
-        match composition {
-            Ok((g, i)) => {
-                let swarm = to_swarm_json(g, i);
-                println!(
-                    "composition: {}",
-                    serde_json::to_string_pretty(&swarm).unwrap()
-                );
-                let (sub, e) = weak_well_formed_sub(swarm);
-                println!("sub: {}", serde_json::to_string_pretty(&sub).unwrap());
-                println!("errors: {:?}", error_report_to_strings(e));
-            }
-            Err(e) => {
-                println!("{:?}", error_report_to_strings(e))
-            }
-        }
-    }
-
     #[test]
     fn test_compose_non_wwf_swarms() {
         let proto1 = get_proto1();
@@ -4090,317 +2150,5 @@ mod tests {
         }
 
         assert!(subscriptions.is_empty());
-    }
-
-    // test that we do not generate duplicate labels
-    proptest! {
-        #[test]
-        fn test_all_labels(mut labels in all_labels(10, 10)) {
-            labels.sort();
-            let mut labels2 = labels.clone().into_iter().collect::<BTreeSet<SwarmLabel>>().into_iter().collect::<Vec<_>>();
-            labels2.sort();
-            assert_eq!(labels, labels2);
-        }
-    }
-
-    // test that we only generate confusion free protocols and that going back and forth between swarm and graph does not change the meaning of the protocol
-    // lower with_cases arg or max roles and events to make test run faster
-    proptest! {
-        //#![proptest_config(ProptestConfig::with_cases(50))]
-        #[test]
-        fn test_generate_graph(labels in all_labels(20, 20)) {
-            let (graph, initial) = random_graph_shuffle_labels(None, labels);
-            let swarm = to_swarm_json(graph.clone(), initial);
-            let (g, i, e) = crate::swarm::from_json(to_swarm_json(graph.clone(), initial), &BTreeMap::new());
-            assert!(e.is_empty());
-            //println!("swarm: {}", serde_json::to_string_pretty(&swarm).unwrap());
-            let swarm1 = to_swarm_json(g, i.unwrap());
-            assert_eq!(swarm, swarm1);
-            assert!(confusion_free(&prepare_graph::<Role>(swarm, &BTreeMap::new(), None), 0).is_empty());
-        }
-    }
-
-    proptest! {
-        #[test]
-        fn test_labels_and_interface((labels, interfacing) in all_labels_and_if(10, 10)) {
-            let interfacing_set = interfacing.clone().into_iter().collect::<BTreeSet<_>>();
-            let labels_set = labels.into_iter().collect::<BTreeSet<_>>();
-            assert!(interfacing_set.is_subset(&labels_set));
-            let first = interfacing[0].clone();
-            assert!(interfacing[1..].into_iter().all(|label| first.role == label.role));
-        }
-    }
-
-    // true if subs1 is a subset of subs2
-    fn is_sub_subscription(subs1: Subscriptions, subs2: Subscriptions) -> bool {
-        if !subs1
-            .keys()
-            .cloned()
-            .collect::<BTreeSet<Role>>()
-            .is_subset(&subs2.keys().cloned().collect::<BTreeSet<Role>>())
-        {
-            return false;
-        }
-
-        for role in subs1.keys() {
-            //println!("explicit size: {} implicit size: {}", subs1[role].len(), subs2[role].len());
-            if !subs1[role].is_subset(&subs2[role]) {
-                return false;
-            }
-        }
-
-        true
-    }
-    #[test]
-    fn test_overapprox_fail() {
-        let vec: CompositionInputVec = get_failing_thing()
-                .into_iter()
-                .map(|composition_input| {
-                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
-                    CompositionInput {subscription, ..composition_input}
-                })
-                .collect();
-        let (subs_implicit, errors) = compose_subscriptions(vec.clone());
-        println!("ERRORS: {:?}", error_report_to_strings(errors));
-        //assert!(errors.is_empty());
-        let result = compose_protocols(vec.clone());
-        //assert!(result.is_ok());
-        match result {
-            Ok((composed_graph, composed_initial)) => {
-                // we want to turn it to swarm and call weak_well_well_formed_sub
-                // instead of calling wwf_sub with graph because we want to
-                // prepare the graph and obtain concurrent events etc.
-                let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
-                println!("swarm: {}", serde_json::to_string_pretty(&swarm).unwrap());
-                let (subs_explicit, _) = weak_well_formed_sub(swarm.clone());
-                assert!(is_sub_subscription(subs_explicit.clone(), subs_implicit));
-            },
-            Err(e) => {
-                println!("errors: {:?}", error_report_to_strings(e));
-            }
-        }
-        //let (composed_graph, composed_initial) = result.unwrap();
-
-    }
-    // test whether the approximated subscription for compositions
-    // is contained within the 'exact' subscription.
-    // i.e. is the approximation safe. max five protocols, max five roles
-    // in each, max five commands per role. relatively small.
-    proptest! {
-        //#![proptest_config(ProptestConfig::with_cases(1))]
-        #[test]
-        fn test_overapprox_1(vec in generate_composition_input_vec(5, 5, 5, false)) {
-            let vec: CompositionInputVec = vec
-                .into_iter()
-                .map(|composition_input| {
-                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
-                    CompositionInput {subscription, ..composition_input}
-                })
-                .collect();
-            let (subs_implicit, errors) = compose_subscriptions(vec.clone());
-            assert!(errors.is_empty());
-            let result = compose_protocols(vec.clone());
-            assert!(result.is_ok());
-            let (composed_graph, composed_initial) = result.unwrap();
-            // we want to turn it to swarm and call weak_well_well_formed_sub
-            // instead of calling wwf_sub with graph because we want to
-            // prepare the graph and obtain concurrent events etc.
-            let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
-            let (subs_explicit, _) = weak_well_formed_sub(swarm.clone());
-            assert!(is_sub_subscription(subs_explicit.clone(), subs_implicit));
-        }
-    }
-
-    // same test as above but for refinement pattern
-    proptest! {
-        #[test]
-        fn test_overapprox_2(vec in generate_composition_input_vec_refinement(5, 5, 5)) {
-            let vec: CompositionInputVec = vec
-                .into_iter()
-                .map(|composition_input| {
-                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
-                    CompositionInput {subscription, ..composition_input}
-                })
-                .collect();
-            let (subs_implicit, errors) = compose_subscriptions(vec.clone());
-            assert!(errors.is_empty());
-            let result = compose_protocols(vec.clone());
-            assert!(result.is_ok());
-            let (composed_graph, composed_initial) = result.unwrap();
-            // we want to turn it to swarm and call weak_well_well_formed_sub
-            // instead of calling wwf_sub with graph because we want to
-            // prepare the graph and obtain concurrent events etc.
-            let swarm = to_swarm_json(composed_graph, composed_initial);
-            let (subs_explicit, _) = weak_well_formed_sub(swarm);
-            assert!(is_sub_subscription(subs_explicit, subs_implicit));
-        }
-    }
-
-    // same test as above but for refinement pattern 2 smaller composition
-    proptest! {
-        #[test]
-        fn test_overapprox_3(vec in generate_composition_input_vec_refinement_2(3, 3, 2)) {
-            let vec: CompositionInputVec = vec
-                .into_iter()
-                .map(|composition_input| {
-                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
-                    CompositionInput {subscription, ..composition_input}
-                })
-                .collect();
-            let (subs_implicit, errors) = compose_subscriptions(vec.clone());
-            assert!(errors.is_empty());
-            let result = compose_protocols(vec.clone());
-            assert!(result.is_ok());
-            let (composed_graph, composed_initial) = result.unwrap();
-            // we want to turn it to swarm and call weak_well_well_formed_sub
-            // instead of calling wwf_sub with graph because we want to
-            // prepare the graph and obtain concurrent events etc.
-            let swarm = to_swarm_json(composed_graph, composed_initial);
-            let (subs_explicit, e) = weak_well_formed_sub(swarm.clone());
-            let (g, i, e) = check(swarm.clone(), &subs_implicit);
-            if !e.is_empty(){ //is_sub_subscription(subs_explicit.clone(), subs_implicit.clone()) {
-                println!("errors: {:?}", e.map(Error::convert(&g)));
-                let proto_info = prepare_graph::<Role>(swarm.clone(), &BTreeMap::new(), None);
-                for pair in &proto_info.concurrent_events {
-                    println!("pair: {:?}", pair.clone())
-                }
-
-                println!("subs exact: {}", serde_json::to_string_pretty(&subs_explicit).unwrap());
-                println!("subs overapproximation: {}", serde_json::to_string_pretty(&subs_implicit).unwrap());
-                for v in &vec {
-                    println!("component: {}", serde_json::to_string_pretty(&v.protocol).unwrap());
-                }
-                println!("composition: {}", serde_json::to_string_pretty(&swarm).unwrap());
-                assert!(false);
-            }
-            //assert!(is_sub_subscription(subs_explicit, subs_implicit));
-        }
-    }
-    proptest! {
-        //#![proptest_config(ProptestConfig::with_cases(1))]
-        #[test]
-        fn test_refinement_pattern_1(vec in generate_composition_input_vec_refinement(5, 5, 3)) {
-            for v in &vec {
-                assert!(confusion_free(&prepare_graph::<Role>(v.protocol.clone(), &BTreeMap::new(), None), 0).is_empty());
-            }
-
-            let vec: CompositionInputVec = vec
-                .into_iter()
-                .map(|composition_input| {
-                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
-                    CompositionInput {subscription, ..composition_input}
-                })
-                .collect();
-            let result = compose_protocols(vec.clone());
-            match result {
-                    Err(e) => {
-                        println!("errors: {:?}", error_report_to_strings(e));
-                        for v in &vec {
-                            println!("component: {}", serde_json::to_string_pretty(&v.protocol).unwrap());
-                        }
-
-                    },
-                    _ => (),
-                }
-            //assert!(result.is_ok());
-            //let (composed_graph, composed_initial) = result.unwrap();
-            //let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
-            //println!("composition: {}", serde_json::to_string_pretty(&swarm).unwrap());
-        }
-    }
-
-    proptest! {
-            //#![proptest_config(ProptestConfig::with_cases(2))]
-            #[test]
-            fn test_refinement_pattern_2(vec in generate_composition_input_vec_refinement_2(5, 5, 5)) {
-                for v in &vec {
-                    assert!(confusion_free(&prepare_graph::<Role>(v.protocol.clone(), &BTreeMap::new(), None), 0).is_empty());
-                    //println!("{} \n$$$$", serde_json::to_string_pretty(&v.protocol.clone()).unwrap());
-                }
-
-                let vec: CompositionInputVec = vec
-                    .into_iter()
-                    .map(|composition_input| {
-                        let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
-                        CompositionInput {subscription, ..composition_input}
-                    })
-                    .collect();
-                let result = compose_protocols(vec.clone());
-                match result {
-                    Err(e) => println!("errors: {:?}", error_report_to_strings(e)),
-                    _ => (),
-                }
-                //assert!(result.is_ok());
-                //let (g, i) = result.unwrap();
-                //println!("{}\n$$$$", serde_json::to_string_pretty(&to_swarm_json(g, i)).unwrap());
-        }
-    }
-
-    // test whether project(compose(G1, G2, ..., Gn)) = compose(project(G1), project(G2), ... project(Gn))
-    // have test here instead of in composition_machine.rs because...
-    proptest! {
-        #[test]
-        fn test_project_combine(vec in generate_composition_input_vec(5, 5, 5, false)) {
-            let vec: CompositionInputVec = vec
-                .into_iter()
-                .map(|composition_input| {
-                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
-                    CompositionInput {subscription, ..composition_input}
-                })
-                .collect();
-            let (protos, subs_implicit) = implicit_composition_swarms(vec.clone());
-            let protos = protos.into_iter().map(|((g, i, _), set)| (g, i.unwrap(), set)).collect();
-            let result = compose_protocols(vec.clone());
-            assert!(result.is_ok());
-            let (composed_graph, composed_initial) = result.unwrap();
-            for role in subs_implicit.keys() {
-                let (proj_combined, proj_combined_initial) =
-                    project_combine(&protos, &subs_implicit, role.clone());
-                let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs_implicit, role.clone());
-                assert!(crate::machine::equivalent(
-                    &to_option_machine(&proj),
-                    proj_initial,
-                    &proj_combined,
-                    proj_combined_initial.unwrap()
-                )
-                .is_empty());
-            }
-        }
-    }
-
-    // Confusion free thing come back to this!
-    /*     proptest! {
-        #![proptest_config(ProptestConfig::with_cases(1))]
-        #[test]
-        fn test_confusion_free_comp(vec in generate_composition_input_vec(5, 5, 2)) {
-            let vec: CompositionInputVec = vec
-                .into_iter()
-                .map(|composition_input| {
-                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
-                    CompositionInput {subscription, ..composition_input}
-                })
-                .collect();
-            let result = compose_protocols(vec.clone());
-            //println!("{:?}", result);
-            assert!(result.is_ok());
-            /* match result {
-                Ok(_) => (),
-                Err(e) => println!("{:?}", error_report_to_strings(e)),
-            } */
-            let (composed_graph, composed_initial) = result.unwrap();
-            let swarm = to_swarm_json(composed_graph.clone(), composed_initial);
-            let (subs_explicit, e) = weak_well_formed_sub(swarm.clone());
-            //
-            if !e.is_empty() {
-                //println!("e: {:?}", e);
-                println!("e strings: {:?}", error_report_to_strings(e));
-                /* println!("g: {}", serde_json::to_string_pretty(&swarm).unwrap());
-                for v in vec {
-                    println!("g component: {}", serde_json::to_string_pretty(&v.protocol).unwrap());
-                    println!("g inteface: {:?}", v.interface);
-                } */
-            }
-            //assert!(is_sub_subscription(subs_explicit.clone(), subs_implicit));
-        }
     } */
 }
