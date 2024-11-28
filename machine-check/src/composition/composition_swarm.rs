@@ -410,11 +410,18 @@ fn confusion_free(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> {
         Some((_, None, e)) => return e, // this error would be returned twice in this case?
         None => return vec![Error::InvalidArg],
     };
+    let (graph, initial, mut errors) = match crate::swarm::from_json(to_swarm_json(graph, initial), &proto_info.subscription) {
+        (g, Some(i), e) => (g, i, e.into_iter().map(|s| Error::SwarmErrorString(s)).collect::<Vec<Error>>()),
+        (_, None, e) => {
+                return e.into_iter().map(|s| Error::SwarmErrorString(s)).collect();
+            }
+    };
+
     // compute concurrent events for this graph instead of using the field in proto_info bc. we want to now concurrency in this graph
-    let concurrent_events = all_concurrent_pairs(&graph);
+    //let concurrent_events = all_concurrent_pairs(&graph);
     // if graph contains no concurrency, make old confusion freeness check. requires us to call swarm::prepare_graph through swarm::from_json
     // corresponds to rule 3 of concurrency freeness in Composing Swarm Protocols
-    let (graph, initial, mut errors) = if concurrent_events.is_empty() {
+    /* let (graph, initial, mut errors) = if concurrent_events.is_empty() {
         let (graph, initial, e) = match crate::swarm::from_json(
             to_swarm_json(graph, initial),
             &proto_info.subscription,
@@ -431,7 +438,7 @@ fn confusion_free(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> {
         )
     } else {
         (graph, initial, Vec::new())
-    };
+    }; */
 
     let mut walk = Dfs::new(&graph, initial);
 
@@ -1905,9 +1912,11 @@ mod tests {
         .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
 
         // TODO CHECK THAT COMMANDS are only associated with a single event? is it allowed two have c@R<e1> c@R<e2>??
+        // are "guard event..." and "event type pos..." same thing?
         let mut expected_errors = vec![
                 "non-deterministic event guard type partID in state 0",
                 "non-deterministic command request for role T in state 0",
+                "guard event type pos appears in transitions from multiple states",
                 "event type pos emitted by command in transition (1)--[get@FL<pos>]-->(2) and command in transition (2)--[request@T<pos>]-->(0)",
                 "state 0 can not reach terminal node",
                 "state 1 can not reach terminal node",
