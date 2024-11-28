@@ -522,6 +522,16 @@ fn exact_wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
                             .map(|e| e.weight().get_event_type())
                             .filter(|e| proto_info.branching_events.contains(e) && !proto_info.concurrent_events.contains(&unord_event_pair(event_type.clone(), e.clone())))
                             .collect();
+
+                // if only one event labeled as branching at this node, do not count it as an error if not subbed.
+                // could happen due to concurrency and loss of behavior. In such case we will encounter the 'original'
+                // branch and it will be checked there.
+                let branching_events_this_node = if branching_events_this_node.len() > 1 {
+                    branching_events_this_node
+                } else {
+                    BTreeSet::new()
+                };
+
                 for r in involved_roles.iter() {
                     subscriptions
                         .entry(r.clone())
