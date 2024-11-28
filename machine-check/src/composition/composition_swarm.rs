@@ -128,25 +128,17 @@ impl ErrorReport {
 
 // a little awkard everything
 pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions) -> ErrorReport {
-    /* let combined_proto_info = combine_proto_infos_fold(prepare_graphs1::<T>(protos, subs));
-    let combined_proto_info = confusion_free_proto_info(combined_proto_info); */
-    let combined_proto_info = combine_proto_infos_confusion_free(protos, &subs);
+    let combined_proto_info = swarms_to_proto_info(protos, &subs);
     if !combined_proto_info.no_errors() {
         return proto_info_to_error_report(combined_proto_info);
     }
 
+    // TODO: remove subscription field from proto info
     // if we reach this point the protocols can interface and are all confusion free
     // we construct a ProtoInfo with the composition as the only protocol and all the
     // information about branches etc. from combined_proto_info
     let mut composition = explicit_composition_proto_info(combined_proto_info);
     composition.subscription = subs.clone();
-    /* let happens_after = after_not_concurrent(&composed, composed_initial, &combined_proto_info.concurrent_events);
-    let composition = ProtoInfo {
-        protocols: vec![((composed, Some(composed_initial), vec![]), BTreeSet::new())],
-        subscription: subs.clone(),
-        happens_after,
-        ..combined_proto_info
-    }; */
 
     let composition_checked = weak_well_formed_proto_info(composition);
 
@@ -156,9 +148,7 @@ pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptio
 
 // construct wwf subscription by constructing the composition of all protocols in protos and inspecting the result
 pub fn exact_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Result<Subscriptions, ErrorReport> {
-    /* let combined_proto_info = combine_proto_infos_fold(prepare_graphs1::<T>(protos, &BTreeMap::new()));
-    let combined_proto_info = confusion_free_proto_info(combined_proto_info); */
-    let combined_proto_info = combine_proto_infos_confusion_free(protos, &BTreeMap::new());
+    let combined_proto_info = swarms_to_proto_info(protos, &BTreeMap::new());
     if !combined_proto_info.no_errors() {
         return Err(proto_info_to_error_report(combined_proto_info));
     }
@@ -176,9 +166,7 @@ pub fn exact_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwarms<T
 // the subsription of each role. For each role also add the events emitted by the role to its sub and any
 // events immediately preceding these.
 pub fn overapprox_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Result<Subscriptions, ErrorReport> {
-    /* let combined_proto_info = combine_proto_infos_fold(prepare_graphs1::<T>(protos, &BTreeMap::new()));
-    let combined_proto_info = confusion_free_proto_info(combined_proto_info); */
-    let combined_proto_info = combine_proto_infos_confusion_free(protos, &BTreeMap::new());
+    let combined_proto_info = swarms_to_proto_info(protos, &BTreeMap::new());
     if !combined_proto_info.no_errors() {
         return Err(proto_info_to_error_report(combined_proto_info));
     }
@@ -192,7 +180,7 @@ pub fn overapprox_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwa
 
 // set up combined proto info, one containing all protocols, all branching events, joining events etc.
 // then add any errors arising from confusion freeness to the proto info and return it
-pub fn combine_proto_infos_confusion_free<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions) -> ProtoInfo {
+pub fn swarms_to_proto_info<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions) -> ProtoInfo {
     let combined_proto_info = combine_proto_infos_fold(prepare_graphs1::<T>(protos, &subs));
     confusion_free_proto_info(combined_proto_info)
 }
@@ -232,8 +220,16 @@ pub fn implicit_composition_swarms(
 }
 
 // find return type
-pub fn compose_protocols(protos: CompositionInputVec) -> Result<(Graph, NodeId), ErrorReport> {
-    let protos_ifs = prepare_graphs(protos);
+pub fn compose_protocols<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Result<(Graph, NodeId), ErrorReport> {
+    let combined_proto_info = swarms_to_proto_info(protos, &BTreeMap::new());
+    if !combined_proto_info.no_errors() {
+        return Err(proto_info_to_error_report(combined_proto_info));
+    }
+
+    let composition = explicit_composition_proto_info(combined_proto_info);
+    let (graph, initial, _) = composition.get_ith_proto(0).unwrap();
+    Ok((graph, initial.unwrap()))
+    /* let protos_ifs = prepare_graphs(protos);
     if protos_ifs
         .iter()
         .any(|(proto_info, _)| !proto_info.no_errors())
@@ -253,7 +249,7 @@ pub fn compose_protocols(protos: CompositionInputVec) -> Result<(Graph, NodeId),
     }
 
     let (explicit_composition, i) = explicit_composition(&implicit_composition);
-    Ok((explicit_composition, i))
+    Ok((explicit_composition, i)) */
 }
 
 // perform wwf check on every protocol in a ProtoInfo
@@ -299,6 +295,7 @@ fn confusion_free_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
  * Similarly, such a graph will be weakly confusion free, which means we do not have to check for
  * command and log determinism like we do in swarm::well_formed.
  *
+ * Does not check confusion freeness
  */
 fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> {
     // copied from swarm::well_formed
@@ -310,8 +307,6 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> 
         Some((_, None, e)) => return e,
         None => return vec![Error::InvalidArg],
     };
-
-    errors.append(&mut confusion_free(proto_info, proto_pointer));
 
     // inital statements of loop copied from swarm::well_formed
     // comment from there:

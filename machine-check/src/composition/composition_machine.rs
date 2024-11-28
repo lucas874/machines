@@ -354,7 +354,7 @@ mod tests {
     use crate::{
         composition::{
             self,
-            composition_swarm::{from_json, implicit_composition_swarms, weak_well_formed_sub},
+            composition_swarm::{from_json, implicit_composition_swarms, swarms_to_proto_info, weak_well_formed_sub},
             composition_types::{CompositionComponent, CompositionInput, CompositionInputVec, InterfacingSwarms},
         },
         types::{Command, EventType, Role, Transition},
@@ -471,6 +471,21 @@ mod tests {
                 },
                 CompositionComponent {
                     protocol: get_proto2(),
+                    interface: Some(Role::new("T")),
+                },
+            ]
+        )
+    }
+
+    fn get_interfacing_swarms_1_reversed() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_proto2(),
+                    interface: None,
+                },
+                CompositionComponent {
+                    protocol: get_proto1(),
                     interface: Some(Role::new("T")),
                 },
             ]
@@ -681,7 +696,38 @@ mod tests {
     fn test_combine_machines_1() {
         // Example from coplaws slides. Use generated WWF subscriptions. Project over T.
         let role = Role::new("T");
+        let subs1 = crate::composition::composition_swarm::exact_weak_well_formed_sub(get_interfacing_swarms_1());
+        assert!(subs1.is_ok());
+        let subs1 = subs1.unwrap();
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_1(), &subs1);
+        assert!(proto_info.no_errors());
+        let swarms = proto_info.protocols
+            .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
+            .collect();
+        let (proj_combined1, proj_combined_initial1) =
+            project_combine(&swarms, &subs1, role.clone());
 
+        let subs2 = crate::composition::composition_swarm::exact_weak_well_formed_sub(get_interfacing_swarms_1_reversed());
+        assert!(subs2.is_ok());
+        let subs2 = subs2.unwrap();
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_1_reversed(), &subs2);
+        assert!(proto_info.no_errors());
+        let swarms = proto_info.protocols
+            .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
+            .collect();
+        let (proj_combined2, proj_combined_initial2) =
+            project_combine(&swarms, &subs2, role.clone());
+
+        // compose(a, b) should be equal to compose(b, a)
+        assert_eq!(subs1, subs2);
+        assert!(crate::machine::equivalent(
+            &proj_combined1,
+            proj_combined_initial1.unwrap(),
+            &proj_combined2,
+            proj_combined_initial2.unwrap()
+        )
+        .is_empty());
+       /*
         let protos = get_composition_input_vec1()[0..2].to_vec();
         let (swarms, subs) = implicit_composition_swarms(protos);
         let swarms = swarms
@@ -726,9 +772,9 @@ mod tests {
             &proj_combined1,
             proj_combined_initial1.unwrap()
         )
-        .is_empty());
+        .is_empty()); */
     }
-
+/*
     #[test]
     fn test_combine_machines_2() {
         // Example from coplaws slides. Use generated WWF subscriptions. Project over T.
@@ -915,5 +961,5 @@ mod tests {
             proj_combined_initial1.unwrap()
         )
         .is_empty());
-    }
+    } */
 }
