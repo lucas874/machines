@@ -32,13 +32,24 @@ pub fn exact_weak_well_formed_sub(protos: String) -> String {
         Ok(p) => p,
         Err(e) => return derr(vec![format!("parsing swarm protocol: {}", e)]),
     };
-    /* let (subscriptions, error_report) = composition::composition_swarm::weak_well_formed_sub(proto);
-    if error_report.is_empty() {
-        dok(serde_json::to_string(&subscriptions).unwrap())
-    } else {
-        derr(error_report_to_strings(error_report))
-    } */
-    unimplemented!()
+    let result = composition_swarm::exact_weak_well_formed_sub(protos);
+    match result {
+        Ok(subscriptions) => dok(serde_json::to_string(&subscriptions).unwrap()),
+        Err(error_report) => derr(error_report_to_strings(error_report)),
+    }
+}
+
+#[wasm_bindgen]
+pub fn overapproximated_weak_well_formed_sub(protos: String) -> String {
+    let protos = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
+        Ok(p) => p,
+        Err(e) => return derr(vec![format!("parsing swarm protocol: {}", e)]),
+    };
+    let result = composition_swarm::overapprox_weak_well_formed_sub(protos);
+    match result {
+        Ok(subscriptions) => dok(serde_json::to_string(&subscriptions).unwrap()),
+        Err(error_report) => derr(error_report_to_strings(error_report)),
+    }
 }
 
 /* #[wasm_bindgen]
