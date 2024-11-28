@@ -28,7 +28,7 @@ export type Result = { type: 'OK' } | { type: 'ERROR'; errors: string[] }
 
 export type ResultData<Data> = { type: 'OK'; data: Data } | { type: 'ERROR'; errors: string[] }
 export type CompositionComponent = {protocol: SwarmProtocolType, interface: string | null }
-export type InterFacingSwarms = CompositionComponent[]
+export type InterfacingSwarms = CompositionComponent[]
 
 export function checkSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): Result {
   const p = JSON.stringify(proto)
@@ -50,20 +50,20 @@ export function checkProjection(
   return JSON.parse(result)
 }
 
-export function checkWWFSwarmProtocol(protos: InterFacingSwarms, subscriptions: Subscriptions): Result {
+export function checkWWFSwarmProtocol(protos: InterfacingSwarms, subscriptions: Subscriptions): Result {
   const p = JSON.stringify(protos)
   const s = JSON.stringify(subscriptions)
   const result = check_wwf_swarm(p, s)
   return JSON.parse(result)
 }
 
-export function exactWWFSubscriptions(protos: InterFacingSwarms): ResultData<Subscriptions> {
+export function exactWWFSubscriptions(protos: InterfacingSwarms): ResultData<Subscriptions> {
   const p = JSON.stringify(protos)
   const result = exact_weak_well_formed_sub(p);
   return JSON.parse(result)
 }
 
-export function overapproxWWFSubscriptions(protos: InterFacingSwarms): ResultData<Subscriptions> {
+export function overapproxWWFSubscriptions(protos: InterfacingSwarms): ResultData<Subscriptions> {
   const p = JSON.stringify(protos)
   const result = overapproximated_weak_well_formed_sub(p);
   return JSON.parse(result)
