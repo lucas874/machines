@@ -342,10 +342,9 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> 
                 }
             }
 
+            let involved_roles = roles_on_path(event_type.clone(), &proto_info);
             // weak determinacy. branching events and joining subscribed to by all roles in roles(graph[node]). too strict though. does not use new notion of roles()
             // corresponds to branching rule of weak determinacy.
-            //let involved_roles = involved(node, &graph);
-            let involved_roles = roles_on_path(event_type.clone(), &proto_info);
             if proto_info.branching_events.contains(&event_type) {
                 let branching_events_this_node: BTreeSet<EventType> = graph.edges_directed(node, Outgoing)
                             .map(|e| e.weight().get_event_type())
@@ -513,11 +512,8 @@ fn exact_wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
                     })
                     .or_insert(BTreeSet::from([event_type.clone()]));
             }
-
-            // weak determinacy 1: roles subscribe to branching events. be more precise with what roles. overapproximation now.
-            //let involved_roles = involved1(node, &graph, &proto_info);
             let involved_roles = roles_on_path(event_type.clone(), &proto_info);
-
+            // weak determinacy 1: roles subscribe to branching events.
             if proto_info.branching_events.contains(&event_type) {
                 let branching_events_this_node: BTreeSet<EventType> = graph.edges_directed(node, Outgoing)
                             .map(|e| e.weight().get_event_type())
@@ -529,7 +525,6 @@ fn exact_wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
                         .and_modify(|curr| {
                             curr.append(&mut branching_events_this_node.clone());
                         })
-                        //.or_insert(BTreeSet::from([event_type.clone()]));
                         .or_insert(branching_events_this_node.clone());
                 }
             }
@@ -546,11 +541,6 @@ fn exact_wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
                 let events_to_add: BTreeSet<EventType> = incoming_pairs_concurrent
                     .into_iter()
                     .flat_map(|pair| pair.into_iter().chain([event_type.clone()])).collect();
-                /* let events_to_add: BTreeSet<EventType> = proto_info.immediately_pre[&event_type]
-                    .clone()
-                    .into_iter()
-                    .chain([event_type.clone()])
-                    .collect(); */
                 for r in involved_roles.iter() {
                     subscriptions
                         .entry(r.clone())
