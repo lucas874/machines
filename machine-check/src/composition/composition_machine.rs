@@ -354,7 +354,7 @@ mod tests {
     use crate::{
         composition::{
             self,
-            composition_swarm::{from_json, implicit_composition_swarms, swarms_to_proto_info, weak_well_formed_sub},
+            composition_swarm::{compose_protocols, from_json, implicit_composition_swarms, swarms_to_proto_info, weak_well_formed_sub},
             composition_types::{CompositionComponent, CompositionInput, CompositionInputVec, InterfacingSwarms},
         },
         types::{Command, EventType, Role, Transition},
@@ -725,6 +725,18 @@ mod tests {
             proj_combined_initial1.unwrap(),
             &proj_combined2,
             proj_combined_initial2.unwrap()
+        )
+        .is_empty());
+
+        let composition = compose_protocols(get_interfacing_swarms_1());
+        assert!(composition.is_ok());
+        let (composed_graph, composed_initial) = composition.unwrap();
+        let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs1, role.clone());
+        assert!(crate::machine::equivalent(
+            &proj_combined2,
+            proj_combined_initial2.unwrap(),
+            &to_option_machine(&proj),
+            proj_initial
         )
         .is_empty());
        /*
