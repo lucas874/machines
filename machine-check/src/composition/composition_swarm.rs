@@ -1154,7 +1154,7 @@ pub fn from_json(
     (g, i, e)
 }
 
-fn proto_info_to_error_report(proto_info: ProtoInfo) -> ErrorReport {
+pub fn proto_info_to_error_report(proto_info: ProtoInfo) -> ErrorReport {
     ErrorReport(
         proto_info
             .protocols

@@ -353,9 +353,8 @@ mod tests {
     use super::*;
     use crate::{
         composition::{
-            self,
-            composition_swarm::{compose_protocols, from_json, implicit_composition_swarms, swarms_to_proto_info, to_swarm_json, weak_well_formed_sub},
-            composition_types::{CompositionComponent, CompositionInput, CompositionInputVec, InterfacingSwarms},
+            composition_swarm::{compose_protocols, from_json, swarms_to_proto_info, weak_well_formed_sub},
+            composition_types::{CompositionComponent, InterfacingSwarms},
         },
         types::{Command, EventType, Role, Transition},
         Machine, Subscriptions, SwarmProtocol,
@@ -402,64 +401,6 @@ mod tests {
             }"#,
         )
         .unwrap()
-    }
-    fn get_proto1_proto2_composed() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0 || 0",
-                "transitions": [
-                    { "source": "0 || 0", "target": "1 || 1", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
-                    { "source": "0 || 0", "target": "3 || 0", "label": { "cmd": "close", "logType": ["time"], "role": "D" } },
-                    { "source": "1 || 1", "target": "2 || 1", "label": { "cmd": "get", "logType": ["pos"], "role": "FL" } },
-                    { "source": "2 || 1", "target": "0 || 2", "label": { "cmd": "deliver", "logType": ["part"], "role": "T" } },
-                    { "source": "0 || 2", "target": "0 || 3", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
-                    { "source": "0 || 2", "target": "3 || 2", "label": { "cmd": "close", "logType": ["time"], "role": "D" } },
-                    { "source": "0 || 3", "target": "3 || 3", "label": { "cmd": "close", "logType": ["time"], "role": "D" } },
-                    { "source": "3 || 2", "target": "3 || 3", "label": { "cmd": "build", "logType": ["car"], "role": "F" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
-    fn get_composition_input_vec1() -> CompositionInputVec {
-        vec![
-            CompositionInput {
-                protocol: get_proto1(),
-                subscription: weak_well_formed_sub(get_proto1()).0,
-                interface: None,
-            },
-            CompositionInput {
-                protocol: get_proto2(),
-                subscription: weak_well_formed_sub(get_proto2()).0,
-                interface: Some(Role::new("T")),
-            },
-            CompositionInput {
-                protocol: get_proto3(),
-                subscription: weak_well_formed_sub(get_proto3()).0,
-                interface: Some(Role::new("F")),
-            },
-        ]
-    }
-
-    fn get_composition_input_vec2() -> CompositionInputVec {
-        vec![
-            CompositionInput {
-                protocol: get_proto2(),
-                subscription: weak_well_formed_sub(get_proto2()).0,
-                interface: None,
-            },
-            CompositionInput {
-                protocol: get_proto1(),
-                subscription: weak_well_formed_sub(get_proto1()).0,
-                interface: Some(Role::new("T")),
-            },
-            CompositionInput {
-                protocol: get_proto3(),
-                subscription: weak_well_formed_sub(get_proto3()).0,
-                interface: Some(Role::new("F")),
-            },
-        ]
     }
 
     fn get_interfacing_swarms_1() -> InterfacingSwarms<Role> {
