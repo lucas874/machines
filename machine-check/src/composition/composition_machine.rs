@@ -355,7 +355,7 @@ mod tests {
         composition::{
             self,
             composition_swarm::{from_json, implicit_composition_swarms, weak_well_formed_sub},
-            composition_types::{CompositionInput, CompositionInputVec},
+            composition_types::{CompositionComponent, CompositionInput, CompositionInputVec, InterfacingSwarms},
         },
         types::{Command, EventType, Role, Transition},
         Machine, Subscriptions, SwarmProtocol,
@@ -460,6 +460,40 @@ mod tests {
                 interface: Some(Role::new("F")),
             },
         ]
+    }
+
+    fn get_interfacing_swarms_1() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_proto1(),
+                    interface: None,
+                },
+                CompositionComponent {
+                    protocol: get_proto2(),
+                    interface: Some(Role::new("T")),
+                },
+            ]
+        )
+    }
+
+    fn get_interfacing_swarms_2() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_proto1(),
+                    interface: None,
+                },
+                CompositionComponent {
+                    protocol: get_proto2(),
+                    interface: Some(Role::new("T")),
+                },
+                CompositionComponent {
+                    protocol: get_proto3(),
+                    interface: Some(Role::new("F")),
+                },
+            ]
+        )
     }
 
     #[test]
