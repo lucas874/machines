@@ -229,27 +229,6 @@ pub fn compose_protocols<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Res
     let composition = explicit_composition_proto_info(combined_proto_info);
     let (graph, initial, _) = composition.get_ith_proto(0).unwrap();
     Ok((graph, initial.unwrap()))
-    /* let protos_ifs = prepare_graphs(protos);
-    if protos_ifs
-        .iter()
-        .any(|(proto_info, _)| !proto_info.no_errors())
-    {
-        let result = swarms_to_error_report(
-            protos_ifs
-                .into_iter()
-                .flat_map(|(proto_info, _)| proto_info.protocols)
-                .collect(),
-        );
-        return Err(result);
-    }
-    // construct this to check whether the protocols interface. also checks wwf for each proto. not sure if good idea to check wwf.
-    let implicit_composition = implicit_composition_fold(protos_ifs);
-    if !implicit_composition.no_errors() {
-        return Err(proto_info_to_error_report(implicit_composition));
-    }
-
-    let (explicit_composition, i) = explicit_composition(&implicit_composition);
-    Ok((explicit_composition, i)) */
 }
 
 // perform wwf check on every protocol in a ProtoInfo
@@ -410,35 +389,14 @@ fn confusion_free(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> {
         Some((_, None, e)) => return e, // this error would be returned twice in this case?
         None => return vec![Error::InvalidArg],
     };
+    // make old confusion freeness check. requires us to call swarm::prepare_graph through swarm::from_json
+    // corresponds to rule 3 of concurrency freeness in Composing Swarm Protocols
     let (graph, initial, mut errors) = match crate::swarm::from_json(to_swarm_json(graph, initial), &proto_info.subscription) {
         (g, Some(i), e) => (g, i, e.into_iter().map(|s| Error::SwarmErrorString(s)).collect::<Vec<Error>>()),
         (_, None, e) => {
                 return e.into_iter().map(|s| Error::SwarmErrorString(s)).collect();
             }
     };
-
-    // compute concurrent events for this graph instead of using the field in proto_info bc. we want to now concurrency in this graph
-    //let concurrent_events = all_concurrent_pairs(&graph);
-    // if graph contains no concurrency, make old confusion freeness check. requires us to call swarm::prepare_graph through swarm::from_json
-    // corresponds to rule 3 of concurrency freeness in Composing Swarm Protocols
-    /* let (graph, initial, mut errors) = if concurrent_events.is_empty() {
-        let (graph, initial, e) = match crate::swarm::from_json(
-            to_swarm_json(graph, initial),
-            &proto_info.subscription,
-        ) {
-            (g, Some(i), e) => (g, i, e),
-            (_, None, e) => {
-                return e.into_iter().map(|s| Error::SwarmErrorString(s)).collect();
-            }
-        };
-        (
-            graph,
-            initial,
-            e.into_iter().map(|s| Error::SwarmErrorString(s)).collect(),
-        )
-    } else {
-        (graph, initial, Vec::new())
-    }; */
 
     let mut walk = Dfs::new(&graph, initial);
 
