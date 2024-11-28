@@ -140,13 +140,15 @@ pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptio
     let (composed, composed_initial) = explicit_composition(&combined_proto_info);
 
     //let happens_after = after_not_concurrent(&graph, initial.unwrap(), &concurrent_events);
-    let happens_after = after_not_concurrent(&composed, composed_initial, &combined_proto_info.concurrent_events);
+    let mut composition = explicit_composition_proto_info(combined_proto_info);
+    composition.subscription = subs.clone();
+    /* let happens_after = after_not_concurrent(&composed, composed_initial, &combined_proto_info.concurrent_events);
     let composition = ProtoInfo {
         protocols: vec![((composed, Some(composed_initial), vec![]), BTreeSet::new())],
         subscription: subs.clone(),
         happens_after,
         ..combined_proto_info
-    };
+    }; */
 
     let composition_checked = weak_well_formed_proto_info(composition);
 
@@ -164,14 +166,7 @@ pub fn exact_wwf_sub<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Result<
     // if we reach this point the protocols can interface and are all confusion free
     // we construct a ProtoInfo with the composition as the only protocol and all the
     // information about branches etc. from combined_proto_info
-    let (composed, composed_initial) = explicit_composition(&combined_proto_info);
-    let happens_after = after_not_concurrent(&composed, composed_initial, &combined_proto_info.concurrent_events);
-    let composition = ProtoInfo {
-        protocols: vec![((composed, Some(composed_initial), vec![]), BTreeSet::new())],
-        happens_after,
-        ..combined_proto_info
-    };
-
+    let composition = explicit_composition_proto_info(combined_proto_info);
     let sub = wwf_sub(composition, 0);
 
     Ok(sub)
@@ -1385,6 +1380,16 @@ fn get_concurrent_events<T: SwarmInterface>(
         .collect()
 }
 
+fn explicit_composition_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
+    let (composed, composed_initial) = explicit_composition(&proto_info);
+    let happens_after = after_not_concurrent(&composed, composed_initial, &proto_info.concurrent_events);
+    ProtoInfo {
+        protocols: vec![((composed, Some(composed_initial), vec![]), BTreeSet::new())],
+        happens_after,
+        ..proto_info
+    }
+}
+
 // precondition: the protocols can interface on the given interfaces
 fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
     if proto_info.protocols.is_empty() {
@@ -1565,25 +1570,8 @@ mod tests {
         .unwrap()
     }
 
-    // pos event type associated with multiple commands and nondeterminism at 0, no terminal state can be reached from any state
-    fn get_confusionful_proto1() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
-                    { "source": "0", "target": "0", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "get", "logType": ["pos"], "role": "FL" } },
-                    { "source": "2", "target": "0", "label": { "cmd": "request", "logType": ["pos"], "role": "T" } },
-                    { "source": "0", "target": "0", "label": { "cmd": "close", "logType": ["time"], "role": "D" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
     // initial state state unreachable
-    fn get_confusionful_proto2() -> SwarmProtocol {
+    fn get_malformed_proto2() -> SwarmProtocol {
         serde_json::from_str::<SwarmProtocol>(
             r#"{
                 "initial": "0",
@@ -1597,7 +1585,7 @@ mod tests {
     }
 
     // all states not reachable
-    fn get_confusionful_proto3() -> SwarmProtocol {
+    fn get_malformed_proto3() -> SwarmProtocol {
         serde_json::from_str::<SwarmProtocol>(
             r#"{
                 "initial": "0",
@@ -1605,6 +1593,23 @@ mod tests {
                     { "source": "0", "target": "1", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
                     { "source": "2", "target": "3", "label": { "cmd": "deliver", "logType": ["part"], "role": "T" } },
                     { "source": "4", "target": "5", "label": { "cmd": "build", "logType": ["car"], "role": "F" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+
+    // pos event type associated with multiple commands and nondeterminism at 0, no terminal state can be reached from any state
+    fn get_confusionful_proto1() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
+                    { "source": "0", "target": "0", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "get", "logType": ["pos"], "role": "FL" } },
+                    { "source": "2", "target": "0", "label": { "cmd": "request", "logType": ["pos"], "role": "T" } },
+                    { "source": "0", "target": "0", "label": { "cmd": "close", "logType": ["time"], "role": "D" } }
                 ]
             }"#,
         )
@@ -1680,26 +1685,32 @@ mod tests {
         .unwrap()
     }
 
-    /* #[test]
+    #[test]
     fn test_prepare_graph_confusionfree() {
-        let composition = get_proto1_proto2_composed();
-        let sub = get_proto1_proto2_composed_subs();
+        let composition = get_interfacing_swarms_1();
+        let sub = get_subs_composition_1();
+        let proto_info = combine_proto_infos_fold(prepare_graphs1::<Role>(composition, &sub));
+        let proto_info = explicit_composition_proto_info(proto_info);
 
-        let proto_info = prepare_graph::<Role>(composition, &sub, None);
         assert!(proto_info.get_ith_proto(0).is_some());
         assert!(proto_info.get_ith_proto(0).unwrap().2.is_empty());
         assert_eq!(
             proto_info.concurrent_events,
-            BTreeSet::from([unord_event_pair(
-                EventType::new("time"),
-                EventType::new("car")
-            )])
+            BTreeSet::from(
+                [unord_event_pair(
+                    EventType::new("time"),
+                    EventType::new("car")),
+                unord_event_pair(
+                    EventType::new("pos"),
+                    EventType::new("car"))
+                ]
+            )
         );
         assert_eq!(
             proto_info.branching_events,
             BTreeSet::from([EventType::new("time"), EventType::new("partID")])
         );
-        assert_eq!(proto_info.joining_events, BTreeSet::new());
+        assert_eq!(proto_info.joining_events, BTreeSet::from([EventType::new("part"), EventType::new("partID")]));
         let expected_role_event_map = BTreeMap::from([
             (
                 Role::from("T"),
@@ -1742,7 +1753,7 @@ mod tests {
             ),
         ]);
         assert_eq!(proto_info.role_event_map, expected_role_event_map);
-        let proto_info = prepare_graph::<Role>(get_proto1(), &get_subs1(), None);
+        let proto_info = prepare_graph1::<Role>(get_proto1(), &get_subs1(), None);
         assert!(proto_info.get_ith_proto(0).is_some());
         assert!(proto_info.get_ith_proto(0).unwrap().2.is_empty());
         assert_eq!(proto_info.concurrent_events, BTreeSet::new());
@@ -1752,7 +1763,7 @@ mod tests {
         );
         assert_eq!(proto_info.joining_events, BTreeSet::new());
 
-        let proto_info = prepare_graph::<Role>(get_proto2(), &get_subs2(), None);
+        let proto_info = prepare_graph1::<Role>(get_proto2(), &get_subs2(), None);
         assert!(proto_info.get_ith_proto(0).is_some());
         assert!(proto_info.get_ith_proto(0).unwrap().2.is_empty());
         assert_eq!(proto_info.concurrent_events, BTreeSet::new());
@@ -1768,7 +1779,7 @@ mod tests {
             BTreeSet::from([EventType::new("notOk"), EventType::new("ok")])
         );
         assert_eq!(proto_info.joining_events, BTreeSet::new());
-    } */
+    }
 
     #[test]
     fn test_prepare_graph_malformed() {
@@ -1787,6 +1798,33 @@ mod tests {
         errors.sort();
         expected_erros.sort();
         assert_eq!(errors, expected_erros);
+
+        let proto_info = prepare_graph1::<Role>(get_malformed_proto2(), &BTreeMap::new(), None);
+        let errors = vec![
+            confusion_free(&proto_info, 0),
+            proto_info.get_ith_proto(0).unwrap().2,
+        ]
+        .concat()
+        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
+        // recorded twice fix this!
+        let expected_errors = vec![
+            "initial swarm protocol state has no transitions",
+            "initial swarm protocol state has no transitions",
+        ];
+        assert_eq!(errors, expected_errors);
+
+        let proto_info = prepare_graph1::<Role>(get_malformed_proto3(), &BTreeMap::new(), None);
+        let errors =
+                proto_info.get_ith_proto(0).unwrap().2
+            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
+        // recorded twice fix this!
+        let expected_errors = vec![
+            "state 2 is unreachable from initial state",
+            "state 3 is unreachable from initial state",
+            "state 4 is unreachable from initial state",
+            "state 5 is unreachable from initial state",
+        ];
+        assert_eq!(errors, expected_errors);
     }
 
     // pos event type associated with multiple commands and nondeterminism at 0, no terminal state can be reached from any state
@@ -1815,67 +1853,6 @@ mod tests {
         errors.sort();
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
-        /*
-        let proto_info = prepare_graph::<Role>(get_confusionful_proto3(), &sub, None);
-        let errors = vec![
-            confusion_free(&proto_info, 0),
-            proto_info.get_ith_proto(0).unwrap().2,
-        ]
-        .concat()
-        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
-        // recorded twice fix this!
-        let expected_errors = vec![
-            "initial swarm protocol state has no transitions",
-            "initial swarm protocol state has no transitions",
-        ];
-        assert_eq!(errors, expected_errors); */
-
-/*
-        let proto2 = get_confusionful_proto2();
-        let sub = get_subs_composition_1();
-        let proto_info = prepare_graph::<Role>(proto2, &sub, None);
-        let errors = vec![
-            confusion_free(&proto_info, 0),
-            proto_info.get_ith_proto(0).unwrap().2,
-        ]
-        .concat()
-        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
-        let expected_errors = vec![
-                "non-deterministic event guard type partID in state 0 || 0",
-                "non-deterministic command request for role T in state 0 || 0",
-                "event type pos emitted by command in transition (1 || 1)--[get@FL<pos>]-->(2 || 1) and command in transition (2 || 1)--[deliver@T<pos>]-->(0 || 2)"
-            ];
-
-        assert_eq!(errors, expected_errors);
-
-        let proto_info = prepare_graph::<Role>(get_confusionful_proto3(), &sub, None);
-        let errors = vec![
-            confusion_free(&proto_info, 0),
-            proto_info.get_ith_proto(0).unwrap().2,
-        ]
-        .concat()
-        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
-        // recorded twice fix this!
-        let expected_errors = vec![
-            "initial swarm protocol state has no transitions",
-            "initial swarm protocol state has no transitions",
-        ];
-        assert_eq!(errors, expected_errors);
-
-        let proto_info = prepare_graph::<Role>(get_confusionful_proto4(), &sub, None);
-        let errors = //vec![
-                //confusion_free(&proto_info, 0)
-                proto_info.get_ith_proto(0).unwrap().2
-            //].concat()
-            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
-        // recorded twice fix this!
-        let expected_errors = vec![
-            "state 2 is unreachable from initial state",
-            "state 3 is unreachable from initial state",
-            "state 4 is unreachable from initial state",
-            "state 5 is unreachable from initial state",
-        ];
-        assert_eq!(errors, expected_errors); */
     }
 
     #[test]
