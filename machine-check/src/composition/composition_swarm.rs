@@ -343,17 +343,27 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> 
             }
 
             let involved_roles = roles_on_path(event_type.clone(), &proto_info);
-            // weak determinacy. branching events and joining subscribed to by all roles in roles(graph[node]). too strict though. does not use new notion of roles()
+            // weak determinacy.
             // corresponds to branching rule of weak determinacy.
             if proto_info.branching_events.contains(&event_type) {
+                // if event is branching get all branching event related to 'original' branch
+                // we could have multiple branching events from different protocols at node
+                // these are concurrent, we only worry about the original branches for this event_type
                 let branching_events_this_node: BTreeSet<EventType> = graph.edges_directed(node, Outgoing)
                             .map(|e| e.weight().get_event_type())
                             .filter(|e| proto_info.branching_events.contains(e) && !proto_info.concurrent_events.contains(&unord_event_pair(event_type.clone(), e.clone())))
                             .collect();
+                // if only one event labeled as branching at this node, do not count it as an error if not subbed.
+                // could happen due to concurrency and loss of behavior. In such case we will encounter the 'original'
+                // branch and it will be checked there.
+                let branching_events_this_node = if branching_events_this_node.len() > 1 {
+                    branching_events_this_node
+                } else {
+                    BTreeSet::new()
+                };
                 let involved_not_subbed = involved_roles
                     .iter()
                     .filter(|r| !branching_events_this_node.is_subset(&sub(&r)));
-                    //.map(|r| (r, sub(r).difference(&branching_events_this_node)));
                 let mut branching_errors: Vec<_> = involved_not_subbed
                     .map(|r| (r, branching_events_this_node.difference(&sub(&r)).cloned().collect::<Vec<EventType>>()))
                     .map(|(r, event_types)| Error::RoleNotSubscribedToBranch(event_types, edge.id(), node, r.clone()))
@@ -371,13 +381,6 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> 
                 let join_set: BTreeSet<EventType> = incoming_pairs_concurrent
                     .into_iter()
                     .flat_map(|pair| pair.into_iter().chain([event_type.clone()])).collect();
-
-                // not sure if this is to coarse?
-                /* let join_set: BTreeSet<EventType> = proto_info.immediately_pre[&event_type]
-                    .clone()
-                    .into_iter()
-                    .chain([event_type.clone()])
-                    .collect(); */
                 let involved_not_subbed = involved_roles
                     .iter()
                     .filter(|r| !join_set.is_subset(sub(r)));
@@ -1001,7 +1004,6 @@ fn prepare_graph1<T: SwarmInterface>(
 
     // consider changing after_not_concurrent to not take concurrent events as argument. now that we do not consider swarms with concurrency here.
     let happens_after = after_not_concurrent(&graph, initial.unwrap(), &BTreeSet::new());
-
     ProtoInfo::new(
         vec![((graph, initial, errors), interface)],
         role_event_map,
@@ -2118,7 +2120,7 @@ mod tests {
         assert!(errors.is_empty());
     }
     */
-    /* #[test]
+    #[test]
     fn test_compose_non_wwf_swarms() {
         let proto1 = get_proto1();
         let proto2 = get_proto2();
@@ -2134,18 +2136,20 @@ mod tests {
             "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[close@D<time>]-->(3 || 0)",
             "active role does not subscribe to any of its emitted event types in transition (1 || 1)--[get@FL<pos>]-->(2 || 1)",
-            "active role does not subscribe to any of its emitted event types in transition (2 || 1)--[deliver@D<part>]-->(0 || 2)",
+            "active role does not subscribe to any of its emitted event types in transition (2 || 1)--[deliver@T<part>]-->(0 || 2)",
             "active role does not subscribe to any of its emitted event types in transition (0 || 2)--[build@F<car>]-->(0 || 3)",
             "active role does not subscribe to any of its emitted event types in transition (0 || 3)--[close@D<time>]-->(3 || 3)",
             "active role does not subscribe to any of its emitted event types in transition (0 || 2)--[close@D<time>]-->(3 || 2)",
-            "active role does not subscribe to any of its emitted event types in transition (2 || 2)--[build@F<car>]-->(3 || 0)",
-            "role D does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[close@D<time>]-->(0 || 3)",
+            "active role does not subscribe to any of its emitted event types in transition (3 || 2)--[build@F<car>]-->(3 || 3)",
+            "role D does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[close@D<time>]-->(3 || 0)",
+            "role D does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "role T does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "role FL does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "role F does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "subsequently active role FL does not subscribe to events in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "subsequently active role T does not subscribe to events in transition (1 || 1)--[get@FL<pos>]-->(2 || 1)",
             "subsequently active role F does not subscribe to events in transition (2 || 1)--[deliver@T<part>]-->(0 || 2)",
+            "subsequently active role D does not subscribe to events in transition (2 || 1)--[deliver@T<part>]-->(0 || 2)",
         ];
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
@@ -2183,5 +2187,5 @@ mod tests {
         }
 
         assert!(subscriptions.is_empty()); */
-    } */
+    }
 }
