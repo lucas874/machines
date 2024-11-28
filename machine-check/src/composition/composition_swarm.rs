@@ -3,7 +3,7 @@ use crate::{
     types::{EventType, Role, State, StateName, SwarmLabel, Transition},
     EdgeId, NodeId, Subscriptions, SwarmProtocol,
 };
-use itertools::Itertools;
+use itertools::{chain, Itertools};
 use petgraph::visit::DfsPostOrder;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -137,9 +137,6 @@ pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptio
     // if we reach this point the protocols can interface and are all confusion free
     // we construct a ProtoInfo with the composition as the only protocol and all the
     // information about branches etc. from combined_proto_info
-    let (composed, composed_initial) = explicit_composition(&combined_proto_info);
-
-    //let happens_after = after_not_concurrent(&graph, initial.unwrap(), &concurrent_events);
     let mut composition = explicit_composition_proto_info(combined_proto_info);
     composition.subscription = subs.clone();
     /* let happens_after = after_not_concurrent(&composed, composed_initial, &combined_proto_info.concurrent_events);
@@ -156,7 +153,8 @@ pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptio
 
 }
 
-pub fn exact_wwf_sub<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Result<Subscriptions, ErrorReport> {
+// construct wwf subscription by constructing the composition of all protocols in protos and inspecting the result
+pub fn exact_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Result<Subscriptions, ErrorReport> {
     let combined_proto_info = combine_proto_infos_fold(prepare_graphs1::<T>(protos, &BTreeMap::new()));
     let combined_proto_info = confusion_free_proto_info(combined_proto_info);
     if !combined_proto_info.no_errors() {
@@ -167,21 +165,27 @@ pub fn exact_wwf_sub<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Result<
     // we construct a ProtoInfo with the composition as the only protocol and all the
     // information about branches etc. from combined_proto_info
     let composition = explicit_composition_proto_info(combined_proto_info);
-    let sub = wwf_sub(composition, 0);
+    let sub = exact_wwf_sub(composition, 0);
 
     Ok(sub)
 }
-/* pub fn check(proto: SwarmProtocol, subs: &Subscriptions) -> (Graph, Option<NodeId>, Vec<Error>) {
-    let proto_info = prepare_graph::<Role>(proto, subs, None);
-    let (graph, initial, mut errors) = match proto_info.get_ith_proto(0) {
-        Some((g, Some(i), e)) => (g, i, e),
-        Some((g, None, e)) => return (g, None, e),
-        _ => return (Graph::new(), None, vec![]),
-    };
 
-    errors.extend(weak_well_formed(&proto_info, 0));
-    (graph, Some(initial), errors)
-} */
+// construct wwf sub by adding all branching events, joining events, events immediately preceding joins to
+// the subsription of each role. For each role also add the events emitted by the role to its sub and any
+// events immediately preceding these.
+pub fn overapprox_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Result<Subscriptions, ErrorReport> {
+    let combined_proto_info = combine_proto_infos_fold(prepare_graphs1::<T>(protos, &BTreeMap::new()));
+    let combined_proto_info = confusion_free_proto_info(combined_proto_info);
+    if !combined_proto_info.no_errors() {
+        return Err(proto_info_to_error_report(combined_proto_info));
+    }
+
+    // if we reach this point the protocols can interface and are all confusion free
+    // we construct a ProtoInfo with the composition as the only protocol and all the
+    // information about branches etc. from combined_proto_info
+    let sub = overapprox_wwf_sub(&combined_proto_info);
+    Ok(sub)
+}
 
 pub fn weak_well_formed_sub(proto: SwarmProtocol) -> (Subscriptions, ErrorReport) {
     let proto_info = prepare_graph::<Role>(proto, &BTreeMap::new(), None);
@@ -193,7 +197,7 @@ pub fn weak_well_formed_sub(proto: SwarmProtocol) -> (Subscriptions, ErrorReport
 
     // Check confusion freeness now that it is not done in prepare
     errors.append(&mut confusion_free(&proto_info, 0));
-    (wwf_sub(proto_info, 0), ErrorReport(vec![(graph, errors)]))
+    (exact_wwf_sub(proto_info, 0), ErrorReport(vec![(graph, errors)]))
 }
 
 // why have this function and the one below????
@@ -472,7 +476,7 @@ fn confusion_free(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> {
  * assume graph was constructed from a prepare_graph call with an empty subscription -- empty roles and active fields
  * log and command determinism?
  */
-fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
+fn exact_wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
     let mut subscriptions: BTreeMap<Role, BTreeSet<EventType>> = BTreeMap::new();
     let (graph, initial, _) = match proto_info.get_ith_proto(proto_pointer) {
         Some((g, Some(i), e)) => (g, i, e),
@@ -560,6 +564,38 @@ fn wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
     }
 
     subscriptions
+}
+
+fn overapprox_wwf_sub(proto_info: &ProtoInfo) -> Subscriptions {
+    // for each role add all branching.
+    // for each role add all joining and immediately pre joining
+    // for each role, add own events and the events immediately preceding these
+    let default = BTreeSet::new();
+    let events_to_add_to_all:BTreeSet<EventType> = proto_info
+        .branching_events.clone().into_iter()
+        .chain(proto_info.joining_events.clone().into_iter())
+        .chain(
+            proto_info
+                .joining_events
+                .iter()
+                .flat_map(|e| proto_info.immediately_pre.get(e).unwrap_or(&default).clone()))
+        .collect();
+
+    let sub: BTreeMap<Role, BTreeSet<EventType>> = proto_info.role_event_map
+        .iter()
+        .map(|(role, labels)|
+            (role.clone(), labels
+                .iter()
+                .flat_map(|label|
+                        proto_info.immediately_pre.get(&label.get_event_type()).unwrap_or(&default)
+                        .clone()
+                        .into_iter()
+                        .chain([label.get_event_type()]))
+                .chain(events_to_add_to_all.clone().into_iter())
+                .collect::<BTreeSet<EventType>>()))
+        .collect();
+
+    sub
 }
 
 fn combine_proto_infos<T: SwarmInterface>(
@@ -1685,6 +1721,27 @@ mod tests {
         .unwrap()
     }
 
+
+    // true if subs1 is a subset of subs2
+    fn is_sub_subscription(subs1: Subscriptions, subs2: Subscriptions) -> bool {
+        if !subs1
+            .keys()
+            .cloned()
+            .collect::<BTreeSet<Role>>()
+            .is_subset(&subs2.keys().cloned().collect::<BTreeSet<Role>>())
+        {
+            return false;
+        }
+
+        for role in subs1.keys() {
+            if !subs1[role].is_subset(&subs2[role]) {
+                return false;
+            }
+        }
+
+        true
+    }
+
     #[test]
     fn test_prepare_graph_confusionfree() {
         let composition = get_interfacing_swarms_1();
@@ -1858,7 +1915,7 @@ mod tests {
     #[test]
     fn test_wwf_ok() {
         let proto1: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{protocol: get_proto1(), interface: None}]);
-        let result1 = exact_wwf_sub(proto1.clone());
+        let result1 = exact_weak_well_formed_sub(proto1.clone());
         assert!(result1.is_ok());
         let subs1 = result1.unwrap();
         let error_report = check(proto1, &subs1);
@@ -1866,7 +1923,7 @@ mod tests {
         assert_eq!(get_subs1(), subs1);
 
         let proto2: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{protocol: get_proto2(), interface: None}]);
-        let result2 = exact_wwf_sub(proto2.clone());
+        let result2 = exact_weak_well_formed_sub(proto2.clone());
         assert!(result2.is_ok());
         let subs2 = result2.unwrap();
         let error_report = check(proto2, &subs2);
@@ -1874,7 +1931,7 @@ mod tests {
         assert_eq!(get_subs2(), subs2);
 
         let proto3: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{protocol: get_proto3(), interface: None}]);
-        let result3 = exact_wwf_sub(proto3.clone());
+        let result3 = exact_weak_well_formed_sub(proto3.clone());
         assert!(result3.is_ok());
         let subs3 = result3.unwrap();
         let error_report = check(proto3, &subs3);
@@ -1882,7 +1939,7 @@ mod tests {
         assert_eq!(get_subs3(), subs3);
 
         let composition1: InterfacingSwarms<Role> = get_interfacing_swarms_1();
-        let result_composition1 = exact_wwf_sub(composition1.clone());
+        let result_composition1 = exact_weak_well_formed_sub(composition1.clone());
         assert!(result_composition1.is_ok());
         let subs_composition = result_composition1.unwrap();
         let error_report = check(composition1, &subs_composition);
@@ -1890,54 +1947,19 @@ mod tests {
         assert_eq!(get_subs_composition_1(), subs_composition);
 
         let composition2: InterfacingSwarms<Role> = get_interfacing_swarms_2();
-        let result_composition2 = exact_wwf_sub(composition2.clone());
+        let result_composition2 = exact_weak_well_formed_sub(composition2.clone());
         assert!(result_composition2.is_ok());
         let subs_composition = result_composition2.unwrap();
         let error_report = check(composition2, &subs_composition);
         assert!(error_report.is_empty());
         assert_eq!(get_subs_composition_2(), subs_composition);
     }
-/*
-    #[test]
-    fn test_weird_conc() {
-        let swarm_1 = get_weird_conc_1();
-        let swarm_2 = get_weird_conc_2();
-        let swarm_3 = get_weird_conc_3();
-        let composition_input_vec = vec![
-            CompositionInput{protocol: swarm_1, subscription: BTreeMap::new(), interface: None},
-            CompositionInput{protocol: swarm_2.clone(), subscription: BTreeMap::new(), interface: Some(Role::new("IR_0"))},
-            CompositionInput{protocol: swarm_3, subscription: BTreeMap::new(), interface: Some(Role::new("IR_1"))},
-        ];
-
-        let composition_input_vec: CompositionInputVec = composition_input_vec
-                .into_iter()
-                .map(|composition_input| {
-                    let (subscription, _) = weak_well_formed_sub(composition_input.protocol.clone());
-                    CompositionInput {subscription, ..composition_input}
-                })
-                .collect();
-            let result = compose_protocols(composition_input_vec.clone());
-            match result {
-                    Err(e) => {
-                        println!("errors: {:?}", error_report_to_strings(e));
-                        for v in &composition_input_vec {
-                            println!("component: {}", serde_json::to_string_pretty(&v.protocol).unwrap());
-                        }
-
-                    },
-                    Ok((g, i)) => {
-                        println!("composition: {}", serde_json::to_string_pretty(&to_swarm_json(g, i)).unwrap());
-                    },
-                }
-
-        let thing = prepare_graph::<Role>(swarm_2, &BTreeMap::new(), None);
-        println!("thing concurrent: {:?}", thing.concurrent_events);
-    }
 
     #[test]
     fn test_wwf_fail() {
-        let (g, _, e) = check(get_proto1(), &get_subs2());
-        let mut errors = e.map(Error::convert(&g));
+        let input: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{ protocol: get_proto1(), interface: None }]);
+        let error_report = check(input, &get_subs2());
+        let mut errors = error_report_to_strings(error_report);
         errors.sort();
         let mut expected_errors = vec![
             "active role does not subscribe to any of its emitted event types in transition (0)--[close@D<time>]-->(3)",
@@ -1954,8 +1976,9 @@ mod tests {
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
 
-        let (g, _, e) = check(get_proto2(), &get_subs3());
-        let mut errors = e.map(Error::convert(&g));
+        let input: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{ protocol: get_proto2(), interface: None }]);
+        let error_report = check(input, &get_subs3());
+        let mut errors = error_report_to_strings(error_report);
         errors.sort();
         let mut expected_errors = vec![
             "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
@@ -1967,22 +1990,25 @@ mod tests {
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
 
-        let (g, _, e) = check(get_proto3(), &get_subs1());
-        let mut errors = e.map(Error::convert(&g));
+        let input: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{ protocol: get_proto3(), interface: None }]);
+        let error_report = check(input, &get_subs1());
+        let mut errors = error_report_to_strings(error_report);
         errors.sort();
         let mut expected_errors = vec![
-            "active role does not subscribe to any of its emitted event types in transition (0)--[build@F<car>]-->(1)",
-            "active role does not subscribe to any of its emitted event types in transition (1)--[test@TR<report>]-->(2)",
-            "active role does not subscribe to any of its emitted event types in transition (2)--[accept@QCR<ok>]-->(3)",
-            "active role does not subscribe to any of its emitted event types in transition (2)--[reject@QCR<notOk>]-->(3)",
-            "role QCR does not subscribe to event types notOk, ok in branching transitions at state 2, but is involved in or after transition (2)--[accept@QCR<ok>]-->(3)",
-            "role QCR does not subscribe to event types notOk, ok in branching transitions at state 2, but is involved in or after transition (2)--[reject@QCR<notOk>]-->(3)",
-            "subsequently active role QCR does not subscribe to events in transition (1)--[test@TR<report>]-->(2)",
-            "subsequently active role QCR does not subscribe to events in transition (1)--[test@TR<report>]-->(2)",
-            "subsequently active role TR does not subscribe to events in transition (0)--[build@F<car>]-->(1)"
+            "active role does not subscribe to any of its emitted event types in transition (0)--[observe@TR<report1>]-->(1)",
+            "active role does not subscribe to any of its emitted event types in transition (1)--[build@F<car>]-->(2)",
+            "active role does not subscribe to any of its emitted event types in transition (2)--[test@TR<report2>]-->(3)",
+            "active role does not subscribe to any of its emitted event types in transition (3)--[accept@QCR<ok>]-->(4)",
+            "active role does not subscribe to any of its emitted event types in transition (3)--[reject@QCR<notOk>]-->(4)",
+            "role QCR does not subscribe to event types notOk, ok in branching transitions at state 3, but is involved in or after transition (3)--[accept@QCR<ok>]-->(4)",
+            "role QCR does not subscribe to event types notOk, ok in branching transitions at state 3, but is involved in or after transition (3)--[reject@QCR<notOk>]-->(4)",
+            "subsequently active role F does not subscribe to events in transition (0)--[observe@TR<report1>]-->(1)",
+            "subsequently active role QCR does not subscribe to events in transition (2)--[test@TR<report2>]-->(3)",
+            "subsequently active role QCR does not subscribe to events in transition (2)--[test@TR<report2>]-->(3)",
+            "subsequently active role TR does not subscribe to events in transition (1)--[build@F<car>]-->(2)"
         ];
 
-        // fix the duplicate situation. because of active not conc returning labels not set of roles.
+        // fix the duplicate situation. because of active not conc returning labels not set of roles. Still relevant?
 
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
@@ -1990,7 +2016,35 @@ mod tests {
 
     #[test]
     fn test_weak_well_formed_sub() {
-        let (subs1, errors1) = weak_well_formed_sub(get_proto1());
+        let result = exact_weak_well_formed_sub(get_interfacing_swarms_1());
+        assert!(result.is_ok());
+        let subs1 = result.unwrap();
+        let error_report = check(get_interfacing_swarms_1(), &subs1);
+        assert!(error_report.is_empty());
+        let result = overapprox_weak_well_formed_sub(get_interfacing_swarms_1());
+        assert!(result.is_ok());
+        let subs2 = result.unwrap();
+        let error_report = check(get_interfacing_swarms_1(), &subs2);
+        assert!(error_report.is_empty());
+        //println!("exact: {}", serde_json::to_string_pretty(&subs1).unwrap());
+        //println!("approx: {}", serde_json::to_string_pretty(&subs2).unwrap());
+        assert!(is_sub_subscription(subs1, subs2));
+
+        let result = exact_weak_well_formed_sub(get_interfacing_swarms_2());
+        assert!(result.is_ok());
+        let subs1 = result.unwrap();
+        let error_report = check(get_interfacing_swarms_1(), &subs1);
+        assert!(error_report.is_empty());
+        let result = overapprox_weak_well_formed_sub(get_interfacing_swarms_2());
+        assert!(result.is_ok());
+        let subs2 = result.unwrap();
+        let error_report = check(get_interfacing_swarms_1(), &subs2);
+        assert!(error_report.is_empty());
+        //println!("exact: {}", serde_json::to_string_pretty(&subs1).unwrap());
+        //println!("approx: {}", serde_json::to_string_pretty(&subs2).unwrap());
+        assert!(is_sub_subscription(subs1, subs2));
+
+        /* let (subs1, errors1) = weak_well_formed_sub(get_proto1());
         let (subs2, errors2) = weak_well_formed_sub(get_proto2());
         let (subs3, errors3) = weak_well_formed_sub(get_proto3());
         let (subs4, errors4) = weak_well_formed_sub(get_proto1_proto2_composed());
@@ -2001,9 +2055,9 @@ mod tests {
         assert_eq!(subs3, get_subs3());
         assert!(errors3.is_empty());
         assert_eq!(subs4, get_proto1_proto2_composed_subs());
-        assert!(errors4.is_empty());
+        assert!(errors4.is_empty()); */
     }
-
+    /*
     #[test]
     fn test_compose_subs() {
         let composition_input = vec![
@@ -2073,28 +2127,40 @@ mod tests {
         // check if subscription generated using implicit composition is actually wwf for the explicit composition.
         assert!(errors.is_empty());
     }
-
-    #[test]
+    */
+    /* #[test]
     fn test_compose_non_wwf_swarms() {
         let proto1 = get_proto1();
         let proto2 = get_proto2();
+        let input = get_interfacing_swarms_1();
         let subs1: Subscriptions = BTreeMap::from([(Role::new("T"), BTreeSet::new())]);
         let subs2: Subscriptions = BTreeMap::from([(Role::new("F"), BTreeSet::new())]);
-
-        let composition_input: CompositionInputVec = Vec::from([
-            CompositionInput {
-                protocol: proto1,
-                subscription: subs1,
-                interface: None,
-            },
-            CompositionInput {
-                protocol: proto2,
-                subscription: subs2,
-                interface: Some(Role::new("T")),
-            },
-        ]);
-        let (swarms, subscriptions) = implicit_composition_swarms(composition_input);
-        let mut errors1 = vec![
+        let subs = BTreeMap::from([(Role::new("T"), BTreeSet::new()), (Role::new("F"), BTreeSet::new())]);
+        let error_report = check(input, &subs);
+        let mut errors = error_report_to_strings(error_report);
+        errors.sort();
+        //println!("errors: {:?}", errors);
+        let mut expected_errors = vec![
+            "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+            "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[close@D<time>]-->(3 || 0)",
+            "active role does not subscribe to any of its emitted event types in transition (1 || 1)--[get@FL<pos>]-->(2 || 1)",
+            "active role does not subscribe to any of its emitted event types in transition (2 || 1)--[deliver@D<part>]-->(0 || 2)",
+            "active role does not subscribe to any of its emitted event types in transition (0 || 2)--[build@F<car>]-->(0 || 3)",
+            "active role does not subscribe to any of its emitted event types in transition (0 || 3)--[close@D<time>]-->(3 || 3)",
+            "active role does not subscribe to any of its emitted event types in transition (0 || 2)--[close@D<time>]-->(3 || 2)",
+            "active role does not subscribe to any of its emitted event types in transition (2 || 2)--[build@F<car>]-->(3 || 0)",
+            "role D does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[close@D<time>]-->(0 || 3)",
+            "role T does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+            "role FL does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+            "role F does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+            "subsequently active role FL does not subscribe to events in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+            "subsequently active role T does not subscribe to events in transition (1 || 1)--[get@FL<pos>]-->(2 || 1)",
+            "subsequently active role F does not subscribe to events in transition (2 || 1)--[deliver@T<part>]-->(0 || 2)",
+        ];
+        expected_errors.sort();
+        assert_eq!(errors, expected_errors);
+        //let (swarms, subscriptions) = implicit_composition_swarms(composition_input);
+        /* let mut errors1 = vec![
             "active role does not subscribe to any of its emitted event types in transition (0)--[close@D<time>]-->(3)",
             "role FL does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
             "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
@@ -2126,6 +2192,6 @@ mod tests {
             assert_eq!(e, expected);
         }
 
-        assert!(subscriptions.is_empty());
+        assert!(subscriptions.is_empty()); */
     } */
 }
