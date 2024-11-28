@@ -128,8 +128,9 @@ impl ErrorReport {
 
 // a little awkard everything
 pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions) -> ErrorReport {
-    let combined_proto_info = combine_proto_infos_fold(prepare_graphs1::<T>(protos, subs));
-    let combined_proto_info = confusion_free_proto_info(combined_proto_info);
+    /* let combined_proto_info = combine_proto_infos_fold(prepare_graphs1::<T>(protos, subs));
+    let combined_proto_info = confusion_free_proto_info(combined_proto_info); */
+    let combined_proto_info = combine_proto_infos_confusion_free(protos, &subs);
     if !combined_proto_info.no_errors() {
         return proto_info_to_error_report(combined_proto_info);
     }
@@ -155,8 +156,9 @@ pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptio
 
 // construct wwf subscription by constructing the composition of all protocols in protos and inspecting the result
 pub fn exact_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Result<Subscriptions, ErrorReport> {
-    let combined_proto_info = combine_proto_infos_fold(prepare_graphs1::<T>(protos, &BTreeMap::new()));
-    let combined_proto_info = confusion_free_proto_info(combined_proto_info);
+    /* let combined_proto_info = combine_proto_infos_fold(prepare_graphs1::<T>(protos, &BTreeMap::new()));
+    let combined_proto_info = confusion_free_proto_info(combined_proto_info); */
+    let combined_proto_info = combine_proto_infos_confusion_free(protos, &BTreeMap::new());
     if !combined_proto_info.no_errors() {
         return Err(proto_info_to_error_report(combined_proto_info));
     }
@@ -174,8 +176,9 @@ pub fn exact_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwarms<T
 // the subsription of each role. For each role also add the events emitted by the role to its sub and any
 // events immediately preceding these.
 pub fn overapprox_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Result<Subscriptions, ErrorReport> {
-    let combined_proto_info = combine_proto_infos_fold(prepare_graphs1::<T>(protos, &BTreeMap::new()));
-    let combined_proto_info = confusion_free_proto_info(combined_proto_info);
+    /* let combined_proto_info = combine_proto_infos_fold(prepare_graphs1::<T>(protos, &BTreeMap::new()));
+    let combined_proto_info = confusion_free_proto_info(combined_proto_info); */
+    let combined_proto_info = combine_proto_infos_confusion_free(protos, &BTreeMap::new());
     if !combined_proto_info.no_errors() {
         return Err(proto_info_to_error_report(combined_proto_info));
     }
@@ -185,6 +188,13 @@ pub fn overapprox_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwa
     // information about branches etc. from combined_proto_info
     let sub = overapprox_wwf_sub(&combined_proto_info);
     Ok(sub)
+}
+
+// set up combined proto info, one containing all protocols, all branching events, joining events etc.
+// then add any errors arising from confusion freeness to the proto info and return it
+pub fn combine_proto_infos_confusion_free<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions) -> ProtoInfo {
+    let combined_proto_info = combine_proto_infos_fold(prepare_graphs1::<T>(protos, &subs));
+    confusion_free_proto_info(combined_proto_info)
 }
 
 pub fn weak_well_formed_sub(proto: SwarmProtocol) -> (Subscriptions, ErrorReport) {
