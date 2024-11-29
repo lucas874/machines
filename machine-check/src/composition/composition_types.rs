@@ -12,8 +12,8 @@ use super::{NodeId, Subscriptions, SwarmProtocol};
 
 #[derive(Serialize)]
 #[serde(tag = "type")]
-pub enum DataResult {
-    OK { data: String },
+pub enum DataResult<T: Serialize> {
+    OK { data: T },
     ERROR { errors: Vec<String> },
 }
 
@@ -34,8 +34,9 @@ pub struct ProtoInfo {
     pub branching_events: BTreeSet<EventType>,
     pub joining_events: BTreeSet<EventType>,
     pub immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
+    pub happens_after: BTreeMap<EventType, BTreeSet<EventType>>,
 }
-
+// TODO: remove subscriptions field
 impl ProtoInfo {
     pub fn new(
         protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>,
@@ -45,6 +46,7 @@ impl ProtoInfo {
         branching_events: BTreeSet<EventType>,
         joining_events: BTreeSet<EventType>,
         immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
+        happens_after: BTreeMap<EventType, BTreeSet<EventType>>,
     ) -> Self {
         Self {
             protocols,
@@ -54,6 +56,7 @@ impl ProtoInfo {
             branching_events,
             joining_events,
             immediately_pre,
+            happens_after,
         }
     }
 
@@ -68,6 +71,7 @@ impl ProtoInfo {
             branching_events: BTreeSet::new(),
             joining_events: BTreeSet::new(),
             immediately_pre: BTreeMap::new(),
+            happens_after: BTreeMap::new(),
         }
     }
 
@@ -76,6 +80,12 @@ impl ProtoInfo {
             None
         } else {
             Some(self.protocols[i].0.clone())
+        }
+    }
+
+    pub fn add_errors_ith(&mut self, i: usize, mut errors: Vec<Error>) -> () {
+        if i >= self.protocols.len() {
+            self.protocols[0].0.2.append(&mut errors);
         }
     }
 
@@ -92,6 +102,17 @@ pub struct CompositionInput {
 }
 
 pub type CompositionInputVec = Vec<CompositionInput>;
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CompositionComponent<T: SwarmInterface> {
+    pub protocol: SwarmProtocol,
+    pub interface: Option<T>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct InterfacingSwarms<T: SwarmInterface>(pub Vec<CompositionComponent<T>>);
+
+
 
 /* Used when combining machines and protocols */
 pub trait EventLabel: Clone + Ord {

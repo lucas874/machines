@@ -1,9 +1,9 @@
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType,  getWWFSub, composeSubs, ResultData, Subscriptions, checkComposedProjection } from '../../..'
+import { SwarmProtocolType, Subscriptions, ResultData, InterfacingSwarms, checkComposedProjection, overapproxWWFSubscriptions} from '../../..'
 import { Events, Composition } from './car-factory-protos.js'
-import { CompositionInputVec } from '../../../lib/cjs/index.js'
 
-export namespace WeakWellFormed {
+
+export namespace OkMachine {
     export namespace T {
         export const machine = Composition.makeMachine('T')
         export const S00 = machine
@@ -27,7 +27,7 @@ export namespace WeakWellFormed {
     }
 }
 
-export namespace NotWeakWellFormed {
+export namespace NotOkMachine {
     export namespace T {
         export const machine = Composition.makeMachine('T')
         export const S00 = machine
@@ -94,40 +94,27 @@ const G2: SwarmProtocolType = {
   ],
 }
 
-const result_subscriptions1: ResultData = getWWFSub(G1)
-const result_subscriptions2: ResultData = getWWFSub(G2)
+const interfacing_swarms: InterfacingSwarms = [{protocol: G1, interface: null}, {protocol: G2, interface: 'T'}]
+const overapprox_result_subscriptions: ResultData<Subscriptions> = overapproxWWFSubscriptions(interfacing_swarms)
 
-describe('extended subscriptions', () => {
-  it('subscription1 should be ok', () => {
-    expect(result_subscriptions1.type).toBe('OK')
-  })
-
-  it('subscription1 should be ok', () => {
-    expect(result_subscriptions2.type).toBe('OK')
+describe('subscriptions', () => {
+  it('overapproximation should be ok', () => {
+    expect(overapprox_result_subscriptions.type).toBe('OK')
   })
 })
 
-if (result_subscriptions1.type === 'ERROR') throw new Error('error getting subscription')
-const subscriptions1: Subscriptions = JSON.parse(result_subscriptions1.data)
-
-if (result_subscriptions2.type === 'ERROR') throw new Error('error getting subscription')
-const subscriptions2: Subscriptions = JSON.parse(result_subscriptions2.data)
-
-const composition_input: CompositionInputVec = [{protocol: G1, subscription: subscriptions1, interface: null}, {protocol: G2, subscription: subscriptions2, interface: "T"}]
-
-const result_subscriptions: ResultData = composeSubs(composition_input)
-if (result_subscriptions.type === 'ERROR') throw new Error('error getting subscription')
-const subscriptions: Subscriptions = JSON.parse(result_subscriptions.data)
+if (overapprox_result_subscriptions.type === 'ERROR') throw new Error('error getting subscription')
+const overapprox_subscriptions: Subscriptions = overapprox_result_subscriptions.data
 
 describe('checkComposedProjection', () => {
   describe('weak-wellformed', () => {
     it('should match T', () => {
       expect(
         checkComposedProjection(
-          composition_input,
-          subscriptions,
+          interfacing_swarms,
+          overapprox_subscriptions,
           'T',
-          WeakWellFormed.T.machine.createJSONForAnalysis(WeakWellFormed.T.S00)
+          OkMachine.T.machine.createJSONForAnalysis(OkMachine.T.S00)
         ),
       ).toEqual({
         type: 'OK',
@@ -139,10 +126,10 @@ describe('checkComposedProjection', () => {
     it('should match T', () => {
       expect(
         checkComposedProjection(
-          composition_input,
-          subscriptions,
+          interfacing_swarms,
+          overapprox_subscriptions,
           'T',
-          NotWeakWellFormed.T.machine.createJSONForAnalysis(NotWeakWellFormed.T.S00)
+          NotOkMachine.T.machine.createJSONForAnalysis(NotOkMachine.T.S00)
         ),
       ).toEqual({
         type: 'ERROR',

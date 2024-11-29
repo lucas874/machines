@@ -1,5 +1,5 @@
-use composition_swarm::{swarms_to_error_report, ErrorReport};
-use composition_types::{CompositionInputVec, DataResult};
+use composition_swarm::{proto_info_to_error_report, swarms_to_proto_info, ErrorReport};
+use composition_types::{DataResult, InterfacingSwarms};
 
 use super::*;
 
@@ -8,8 +8,8 @@ mod composition_swarm;
 pub mod composition_types;
 
 #[wasm_bindgen]
-pub fn check_wwf_swarm(proto: String, subs: String) -> String {
-    let proto = match serde_json::from_str::<SwarmProtocol>(&proto) {
+pub fn check_wwf_swarm(protos: String, subs: String) -> String {
+    let protos = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
         Ok(p) => p,
         Err(e) => return err(vec![format!("parsing swarm protocol: {}", e)]),
     };
@@ -17,41 +17,38 @@ pub fn check_wwf_swarm(proto: String, subs: String) -> String {
         Ok(p) => p,
         Err(e) => return err(vec![format!("parsing subscriptions: {}", e)]),
     };
-    let (graph, _, errors) = composition::composition_swarm::check(proto, &subs);
-    if errors.is_empty() {
+
+    let error_report = composition::composition_swarm::check(protos, &subs);
+    if error_report.is_empty() {
         serde_json::to_string(&CheckResult::OK).unwrap()
     } else {
-        err(errors.map(composition::composition_swarm::Error::convert(&graph)))
+        err(error_report_to_strings(error_report))
     }
 }
 
 #[wasm_bindgen]
-pub fn get_wwf_sub(proto: String) -> String {
-    let proto = match serde_json::from_str::<SwarmProtocol>(&proto) {
+pub fn exact_weak_well_formed_sub(protos: String) -> String {
+    let protos = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
         Ok(p) => p,
-        Err(e) => return derr(vec![format!("parsing swarm protocol: {}", e)]),
+        Err(e) => return derr::<Subscriptions>(vec![format!("parsing swarm protocol: {}", e)]),
     };
-    let (subscriptions, error_report) = composition::composition_swarm::weak_well_formed_sub(proto);
-    if error_report.is_empty() {
-        dok(serde_json::to_string(&subscriptions).unwrap())
-    } else {
-        derr(error_report_to_strings(error_report))
+    let result = composition_swarm::exact_weak_well_formed_sub(protos);
+    match result {
+        Ok(subscriptions) => dok(subscriptions),
+        Err(error_report) => derr::<Subscriptions>(error_report_to_strings(error_report)),
     }
-
 }
 
 #[wasm_bindgen]
-pub fn compose_subs(input: String) -> String {
-    let protocols = match serde_json::from_str::<CompositionInputVec>(&input) {
+pub fn overapproximated_weak_well_formed_sub(protos: String) -> String {
+    let protos = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
         Ok(p) => p,
-        Err(e) => return derr(vec![format!("parsing composition input: {}", e)]),
+        Err(e) => return derr::<Subscriptions>(vec![format!("parsing swarm protocol: {}", e)]),
     };
-
-    let (subscriptions, error_report) = composition_swarm::compose_subscriptions(protocols);
-    if error_report.is_empty() {
-        dok(serde_json::to_string(&subscriptions).unwrap())
-    } else {
-        derr(error_report_to_strings(error_report))
+    let result = composition_swarm::overapprox_weak_well_formed_sub(protos);
+    match result {
+        Ok(subscriptions) => dok(subscriptions),
+        Err(error_report) => derr::<Subscriptions>(error_report_to_strings(error_report)),
     }
 }
 
@@ -60,11 +57,11 @@ pub fn revised_projection(proto: String, subs: String, role: String) -> String {
     let proto = match serde_json::from_str::<SwarmProtocol>(&proto) {
         Ok(p) => p,
 
-        Err(e) => return derr(vec![format!("parsing swarm protocol: {}", e)]),
+        Err(e) => return derr::<Machine>(vec![format!("parsing swarm protocol: {}", e)]),
     };
     let subs = match serde_json::from_str::<Subscriptions>(&subs) {
         Ok(s) => s,
-        Err(e) => return derr(vec![format!("parsing subscriptions: {}", e)]),
+        Err(e) => return derr::<Machine>(vec![format!("parsing subscriptions: {}", e)]),
     };
     let (swarm, initial, errors) = composition_swarm::from_json(proto, &subs);
     let Some(initial) = initial else {
@@ -74,94 +71,74 @@ pub fn revised_projection(proto: String, subs: String, role: String) -> String {
     let (proj, initial) = composition::composition_machine::project(&swarm, initial, &subs, role);
 
     dok(
-        serde_json::to_string(&composition::composition_machine::to_json_machine(
-            proj, initial,
-        ))
-        .unwrap(),
+        composition::composition_machine::to_json_machine(proj, initial)
     )
 }
 
 #[wasm_bindgen]
-pub fn project_combine(input: String, role: String) -> String {
-    let protocols = match serde_json::from_str::<CompositionInputVec>(&input) {
+pub fn project_combine(protos: String, subs: String, role: String) -> String {
+    let protocols = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
         Ok(p) => p,
-        Err(e) => return derr(vec![format!("parsing composition input: {}", e)]),
+        Err(e) => return derr::<Machine>(vec![format!("parsing composition input: {}", e)]),
+    };
+    let subs = match serde_json::from_str::<Subscriptions>(&subs) {
+        Ok(s) => s,
+        Err(e) => return derr::<Machine>(vec![format!("parsing subscriptions: {}", e)]),
     };
     let role = Role::new(&role);
 
-    let (composed_protos, subs) = composition_swarm::implicit_composition_swarms(protocols);
-
-    // does not look nice? reconsider
-    let swarms = match composed_protos
-        .iter()
-        .any(|((_, i, e), _)| i.is_none() || !e.is_empty())
-    {
-        false => composed_protos
-            .into_iter()
-            .map(|((g, i, _), s)| (g, i.unwrap(), s))
-            .collect(),
-        true => {
-            return derr(error_report_to_strings(swarms_to_error_report(
-                composed_protos,
-            )))
-        }
-    };
-
+    let proto_info = swarms_to_proto_info(protocols, &subs);
+    if !proto_info.no_errors() {
+        return derr::<Machine>(error_report_to_strings(proto_info_to_error_report(proto_info)));
+    }
+    let swarms = proto_info.protocols
+            .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
+            .collect();
     let (proj, proj_initial) = composition_machine::project_combine(&swarms, &subs, role);
 
     dok(
-        serde_json::to_string(&composition::composition_machine::from_option_to_machine(
-            proj,
-            proj_initial.unwrap(),
-        ))
-        .unwrap(),
+        composition::composition_machine::from_option_to_machine(proj, proj_initial.unwrap())
     )
 }
 
 #[wasm_bindgen]
-pub fn project_combine_all(input: String) -> String {
-    let protocols = match serde_json::from_str::<CompositionInputVec>(&input) {
+pub fn project_combine_all(protos: String, subs: String) -> String {
+    let protocols = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
         Ok(p) => p,
-        Err(e) => return derr(vec![format!("parsing composition input: {}", e)]),
+        Err(e) => return derr::<Vec<Machine>>(vec![format!("parsing composition input: {}", e)]),
+    };
+    let subs = match serde_json::from_str::<Subscriptions>(&subs) {
+        Ok(s) => s,
+        Err(e) => return derr::<Vec<Machine>>(vec![format!("parsing subscriptions: {}", e)]),
     };
 
-    let (composed_protos, subs) = composition_swarm::implicit_composition_swarms(protocols);
-
-    // does not look nice? reconsider
-    let swarms = match composed_protos
-        .iter()
-        .any(|((_, i, e), _)| i.is_none() || !e.is_empty())
-    {
-        false => composed_protos
-            .into_iter()
-            .map(|((g, i, _), s)| (g, i.unwrap(), s))
-            .collect(),
-        true => {
-            return derr(error_report_to_strings(swarms_to_error_report(
-                composed_protos,
-            )))
-        }
-    };
-
+    let proto_info = swarms_to_proto_info(protocols, &subs);
+    if !proto_info.no_errors() {
+        return derr::<Vec<Machine>>(error_report_to_strings(proto_info_to_error_report(proto_info)));
+    }
+    let swarms = proto_info.protocols
+        .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
+        .collect();
     let projections = composition_machine::project_combine_all(&swarms, &subs);
+
     // do not think we need this check here
     if projections.iter().any(|(_, i)| i.is_none()) {
-        return derr(vec![]);
+        return derr::<Vec<Machine>>(vec![]);
     }
     let machines: Vec<_> = projections
         .into_iter()
         .map(|(g, i)| {
-            serde_json::to_string(&composition::composition_machine::from_option_to_machine(
+            composition::composition_machine::from_option_to_machine(
                 g,
                 i.unwrap(),
-            ))
-            .unwrap()
+            )
         })
         .collect();
-    dok(format!("[{}]", machines.join(", ")))
+    dok(machines)
 }
 
-// take a sub instead of inferring one or combining the ones in the input vec...
+// check an implementation against the combined projection of swarms over role.
+// consider also offering one projecting over explicit projection?
 #[wasm_bindgen]
 pub fn check_composed_projection(
     swarms: String,
@@ -169,9 +146,9 @@ pub fn check_composed_projection(
     role: String,
     machine: String,
 ) -> String {
-    let protocols = match serde_json::from_str::<CompositionInputVec>(&swarms) {
+    let protocols = match serde_json::from_str::<InterfacingSwarms<Role>>(&swarms) {
         Ok(p) => p,
-        Err(e) => return derr(vec![format!("parsing composition input: {}", e)]),
+        Err(e) => return err(vec![format!("parsing composition input: {}", e)]),
     };
     let subs = match serde_json::from_str::<Subscriptions>(&subs) {
         Ok(p) => p,
@@ -182,23 +159,13 @@ pub fn check_composed_projection(
         Ok(p) => p,
         Err(e) => return err(vec![format!("parsing machine: {}", e)]),
     };
-    let (composed_protos, _) = composition_swarm::implicit_composition_swarms(protocols);
-
-    let swarms = match composed_protos
-        .iter()
-        .any(|((_, i, e), _)| i.is_none() || !e.is_empty())
-    {
-        false => composed_protos
-            .into_iter()
-            .map(|((g, i, _), s)| (g, i.unwrap(), s))
-            .collect(),
-        true => {
-            return derr(error_report_to_strings(swarms_to_error_report(
-                composed_protos,
-            )))
-        }
-    };
-
+    let proto_info = swarms_to_proto_info(protocols, &subs);
+    if !proto_info.no_errors() {
+        return err(error_report_to_strings(proto_info_to_error_report(proto_info)));
+    }
+    let swarms = proto_info.protocols
+        .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
+        .collect();
     let (proj, proj_initial) = composition_machine::project_combine(&swarms, &subs, role);
     let (machine, json_initial, m_errors) = machine::from_json(machine);
     let machine_problem = !m_errors.is_empty();
@@ -227,25 +194,25 @@ pub fn check_composed_projection(
 
 #[wasm_bindgen]
 pub fn compose_protocols(protos: String) -> String {
-    let protocols = match serde_json::from_str::<CompositionInputVec>(&protos) {
+    let protocols = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
         Ok(p) => p,
-        Err(e) => return derr(vec![format!("parsing composition input: {}", e)]),
+        Err(e) => return derr::<SwarmProtocol>(vec![format!("parsing composition input: {}", e)]),
     };
     let composition = composition_swarm::compose_protocols(protocols);
 
     match composition {
         Ok((graph, initial)) => {
-            dok(serde_json::to_string(&composition_swarm::to_swarm_json(graph, initial)).unwrap())
+            dok(composition_swarm::to_swarm_json(graph, initial))
         }
-        Err(errors) => derr(error_report_to_strings(errors)),
+        Err(errors) => derr::<SwarmProtocol>(error_report_to_strings(errors)),
     }
 }
 
-fn derr(errors: Vec<String>) -> String {
-    serde_json::to_string(&DataResult::ERROR { errors }).unwrap()
+fn derr<T: serde::Serialize>(errors: Vec<String>) -> String {
+    serde_json::to_string(&DataResult::<T>::ERROR { errors }).unwrap()
 }
 
-fn dok(data: String) -> String {
+fn dok<T: serde::Serialize>(data: T) -> String {
     serde_json::to_string(&DataResult::OK { data }).unwrap()
 }
 

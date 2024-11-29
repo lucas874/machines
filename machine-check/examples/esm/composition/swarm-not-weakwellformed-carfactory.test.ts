@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, checkSwarmProtocol, getWWFSub, checkWWFSwarmProtocol, ResultData, Subscriptions } from '../../..'
+import { SwarmProtocolType, Subscriptions, checkWWFSwarmProtocol, ResultData, InterfacingSwarms, exactWWFSubscriptions} from '../../..'
 import { Events } from './car-factory-protos.js'
 
 /*
@@ -97,12 +97,15 @@ const subscriptions1 = {
     ],
 }
 
+const G1_: InterfacingSwarms = [{protocol: G1, interface: null}]
+const G2_: InterfacingSwarms = [{protocol: G2, interface: null}]
+const G3_: InterfacingSwarms = [{protocol: G3, interface: null}]
 
-const result_subscriptions2: ResultData = getWWFSub(G2)
-const result_subscriptions3: ResultData = getWWFSub(G3)
+const result_subscriptions2: ResultData<Subscriptions> = exactWWFSubscriptions(G2_)
+const result_subscriptions3: ResultData<Subscriptions> = exactWWFSubscriptions(G3_)
 
-describe('extended subscriptions', () => {
-  it('subscription1 should be ok', () => {
+describe('check confusion-ful protocols G2 and G3', () => {
+  it('result should not be ok', () => {
     expect(result_subscriptions2).toEqual({
       type: 'ERROR',
       errors: [
@@ -113,7 +116,7 @@ describe('extended subscriptions', () => {
     })
   })
 
-  it('subscription3 should be ok', () => {
+  it('result should not be ok', () => {
     expect(result_subscriptions3).toEqual({
       type: 'ERROR',
       errors: [
@@ -126,10 +129,10 @@ describe('extended subscriptions', () => {
 
 describe('checkWWFSwarmProtocol G1', () => {
   it('should catch not well-formed protocol', () => {
-    expect(checkWWFSwarmProtocol(G1, subscriptions1)).toEqual({
+    expect(checkWWFSwarmProtocol(G1_, subscriptions1)).toEqual({
       type: 'ERROR',
       errors: [
-        "role FL does not subscribe to events in branching transition (0)--[close@D<time>]-->(3)",
+        "role FL does not subscribe to event types time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
         "active role does not subscribe to any of its emitted event types in transition (2)--[deliver@T<part>]-->(0)",
         "subsequently active role D does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
         "subsequently active role T does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
