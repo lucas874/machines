@@ -185,19 +185,6 @@ pub fn swarms_to_proto_info<T: SwarmInterface>(protos: InterfacingSwarms<T>, sub
     confusion_free_proto_info(combined_proto_info)
 }
 
-pub fn weak_well_formed_sub(proto: SwarmProtocol) -> (Subscriptions, ErrorReport) {
-    let proto_info = prepare_graph::<Role>(proto, &BTreeMap::new(), None);
-    let (graph, _, mut errors) = match proto_info.get_ith_proto(0) {
-        Some((g, Some(i), e)) => (g, i, e),
-        Some((g, None, e)) => return (BTreeMap::new(), ErrorReport(vec![(g, e)])),
-        _ => return (BTreeMap::new(), ErrorReport(vec![(Graph::new(), vec![])])),
-    };
-
-    // Check confusion freeness now that it is not done in prepare
-    errors.append(&mut confusion_free(&proto_info, 0));
-    (exact_wwf_sub(proto_info, 0), ErrorReport(vec![(graph, errors)]))
-}
-
 // find return type
 pub fn compose_protocols<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Result<(Graph, NodeId), ErrorReport> {
     let combined_proto_info = swarms_to_proto_info(protos, &BTreeMap::new());
@@ -794,18 +781,6 @@ fn after_not_concurrent_step(
     new_happens_after
 }
 
-fn prepare_graphs(protos: CompositionInputVec) -> Vec<(ProtoInfo, Option<Role>)> {
-    protos
-        .iter()
-        .map(|p| {
-            (
-                prepare_graph::<Role>(p.protocol.clone(), &p.subscription, p.interface.clone()),
-                p.interface.clone(),
-            )
-        })
-        .collect()
-}
-
 fn prepare_graphs1<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions) -> Vec<(ProtoInfo, Option<T>)> {
     protos.0
         .iter()
@@ -880,116 +855,6 @@ fn prepare_graph1<T: SwarmInterface>(
         BTreeSet::new(),
         branching_events,
         BTreeSet::new(),
-        immediately_pre_map,
-        happens_after,
-    )
-}
-
-// turn a SwarmProtocol into a ProtoInfo. Check for errors such as initial not reachable and empty logs.
-fn prepare_graph<T: SwarmInterface>(
-    proto: SwarmProtocol,
-    subs: &Subscriptions,
-    interface: Option<T>,
-) -> ProtoInfo {
-    let mut role_event_map: RoleEventMap = BTreeMap::new();
-    let mut branching_events = BTreeSet::new();
-    let mut joining_events: BTreeSet<EventType> = BTreeSet::new();
-    let mut immediately_pre_map: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
-    let (graph, initial, errors) = swarm_to_graph(&proto);
-    if initial.is_none() || !errors.is_empty() {
-        return ProtoInfo::new_only_proto(vec![((graph, initial, errors), BTreeSet::new())]);
-    }
-
-    // If interface is some, then we want to interface this protocol
-    // with some other protocol on this set of events.
-    // We do not know if we can do that yet though, but we prepare as if we can.
-    let interface = if interface.is_some() {
-        interface.unwrap().interfacing_event_types_single(&graph)
-    } else {
-        BTreeSet::new()
-    };
-
-    let concurrent_events = all_concurrent_pairs(&graph);
-    let mut walk = Dfs::new(&graph, initial.unwrap());
-
-    // add to set of branching and joining
-    // check for weak confusion freeness. confusion freeness does not depend on subscription.
-    // nice to whether graph is weakly confusion freeness before for instance generating wwf-subscription.
-    // for each node we pass three times over its outgoing edges... awkward find better way.
-    while let Some(node_id) = walk.next(&graph) {
-        let outgoing_pairs = event_pairs_from_node(node_id, &graph, Outgoing);
-
-        // should work even if two branches with same outgoing event type right?
-        branching_events.append(
-            &mut outgoing_pairs
-                .into_iter()
-                .filter(|pair| !concurrent_events.contains(pair))
-                .concat(),
-        );
-
-        let incoming_pairs = event_pairs_from_node(node_id, &graph, Incoming);
-
-        // add joining events. if there are concurrent incoming edges, add the event types of all outgoing edges not concurrent with identified incoming to set of joining events.
-        let incoming_concurrent: BTreeSet<_> = incoming_pairs
-            .into_iter()
-            .filter(|pair| concurrent_events.contains(pair))
-            .map(|set| set.into_iter().collect::<Vec<_>>())
-            .collect();
-
-        let mut joining = BTreeSet::new();
-        for edge in graph.edges_directed(node_id, Outgoing) {
-            if incoming_concurrent.iter().any(|pair|
-                !concurrent_events.contains(&unord_event_pair(pair[0].clone(), edge.weight().get_event_type()))
-                && !concurrent_events.contains(&unord_event_pair(pair[1].clone(), edge.weight().get_event_type()))) {
-                    joining.insert(edge.weight().get_event_type());
-            }
-        }
-        /* let outgoing = graph
-            .edges_directed(node_id, Outgoing)
-            .map(|e| e.weight().get_event_type())
-            .collect::<BTreeSet<_>>();
-        let product: Vec<_> = incoming_concurrent.into_iter().cartesian_product(&outgoing).collect();
-        // if we have Ga-ea->Gb-eb->Gc, Gd-ec->Gb, with ea, ec concurrent, but not concurrent with eb then eb is joining
-        // consider looping may be simpler
-        let mut joining: BTreeSet<_> = product
-            .into_iter()
-            .filter(|(pair, event)| {
-                !concurrent_events.contains(&unord_event_pair(pair[0].clone(), (*event).clone()))
-                    && !concurrent_events
-                        .contains(&unord_event_pair(pair[1].clone(), (*event).clone()))
-            })
-            .map(|(_, event)| event.clone())
-            .collect(); */
-
-        joining_events.append(&mut joining);
-
-        for edge in graph.edges_directed(node_id, Outgoing) {
-            role_event_map
-                .entry(edge.weight().role.clone())
-                .and_modify(|role_info| {
-                    role_info.insert(edge.weight().clone());
-                })
-                .or_insert(BTreeSet::from([edge.weight().clone()]));
-
-            let mut pre = get_immediately_pre(&graph, edge, &concurrent_events);
-            immediately_pre_map
-                .entry(edge.weight().get_event_type())
-                .and_modify(|events| {
-                    events.append(&mut pre);
-                })
-                .or_insert(pre);
-        }
-    }
-
-    let happens_after = after_not_concurrent(&graph, initial.unwrap(), &concurrent_events);
-
-    ProtoInfo::new(
-        vec![((graph, initial, errors), interface)],
-        role_event_map,
-        subs.clone(),
-        concurrent_events,
-        branching_events,
-        joining_events,
         immediately_pre_map,
         happens_after,
     )

@@ -353,7 +353,7 @@ mod tests {
     use super::*;
     use crate::{
         composition::{
-            composition_swarm::{compose_protocols, from_json, swarms_to_proto_info, weak_well_formed_sub},
+            composition_swarm::{compose_protocols, exact_weak_well_formed_sub, from_json, swarms_to_proto_info},
             composition_types::{CompositionComponent, InterfacingSwarms},
         },
         types::{Command, EventType, Role, Transition},
@@ -550,7 +550,9 @@ mod tests {
     fn test_projection_2() {
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let subs = weak_well_formed_sub(proto.clone()).0;
+        let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), interface: None}]));
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
         let role = Role::new("FL");
         let (g, i, _) = from_json(proto, &subs);
         let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role);
@@ -607,7 +609,9 @@ mod tests {
     fn test_projection_3() {
         // car factory from coplaws example
         let proto = get_proto2();
-        let subs = weak_well_formed_sub(proto.clone()).0;
+        let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), interface: None}]));
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
         let role = Role::new("F");
         let (g, i, _) = from_json(proto, &subs);
         let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role);
