@@ -1,5 +1,5 @@
 use machine_check::{
-    composition::{check_wwf_swarm, compose_protocols, composition_types::{CompositionComponent, DataResult, InterfacingSwarms}, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub},
+    composition::{check_wwf_swarm, composition_types::{CompositionComponent, DataResult, InterfacingSwarms}, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub},
     types::{Command, EventType, Role, State, StateName, SwarmLabel, Transition},
     EdgeId, Graph, NodeId, Subscriptions, SwarmProtocol,
 };
@@ -573,6 +573,162 @@ proptest! {
 // i.e. is the approximation safe. max five protocols, max five roles
 // in each, max five commands per role. relatively small.
 proptest! {
+    #[test]
+    fn test_exact_1(vec in generate_interfacing_swarms(5, 5, 5, false)) {
+        let string = serde_json::to_string(&vec).unwrap();
+        let subscription = match serde_json::from_str(&exact_weak_well_formed_sub(string.clone())).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+        assert!(subscription.is_some());
+        let subscription = subscription.unwrap();
+        let subscription = serde_json::to_string(&subscription).unwrap();
+        let errors = check_wwf_swarm(string.clone(), subscription.clone());
+        let errors = serde_json::from_str::<CheckResult>(&errors).unwrap();
+        let ok = match errors {
+            CheckResult::OK => true,
+            CheckResult::ERROR { .. } => false
+
+        };
+        assert!(ok);
+    }
+}
+
+// test whether the approximated subscription for compositions
+// is contained within the 'exact' subscription.
+// i.e. is the approximation safe. max five protocols, max five roles
+// in each, max five commands per role. relatively small.
+proptest! {
+    #[test]
+    fn test_overapproximated_1(vec in generate_interfacing_swarms(5, 5, 5, false)) {
+        let string = serde_json::to_string(&vec).unwrap();
+        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(string.clone())).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+        assert!(subscription.is_some());
+        let subscription = subscription.unwrap();
+        let subscription = serde_json::to_string(&subscription).unwrap();
+        let errors = check_wwf_swarm(string.clone(), subscription.clone());
+        let errors = serde_json::from_str::<CheckResult>(&errors).unwrap();
+        let ok = match errors {
+            CheckResult::OK => true,
+            CheckResult::ERROR { .. } => false
+
+        };
+        assert!(ok);
+    }
+}
+
+// same tests as above but with refinement pattern 1
+proptest! {
+    #[test]
+    fn test_exact_2(vec in generate_interfacing_swarms_refinement(5, 5, 5)) {
+        let string = serde_json::to_string(&vec).unwrap();
+        let subscription = match serde_json::from_str(&exact_weak_well_formed_sub(string.clone())).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+        assert!(subscription.is_some());
+        let subscription = subscription.unwrap();
+        let subscription = serde_json::to_string(&subscription).unwrap();
+        let errors = check_wwf_swarm(string.clone(), subscription.clone());
+        let errors = serde_json::from_str::<CheckResult>(&errors).unwrap();
+        let ok = match errors {
+            CheckResult::OK => true,
+            CheckResult::ERROR { .. } => false
+
+        };
+        assert!(ok);
+    }
+}
+
+proptest! {
+    #[test]
+    fn test_overapproximated_2(vec in generate_interfacing_swarms_refinement(5, 5, 5)) {
+        let string = serde_json::to_string(&vec).unwrap();
+        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(string.clone())).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+        assert!(subscription.is_some());
+        let subscription = subscription.unwrap();
+        let subscription = serde_json::to_string(&subscription).unwrap();
+        let errors = check_wwf_swarm(string.clone(), subscription.clone());
+        let errors = serde_json::from_str::<CheckResult>(&errors).unwrap();
+        let ok = match errors {
+            CheckResult::OK => true,
+            CheckResult::ERROR { .. } => false
+
+        };
+        assert!(ok);
+    }
+}
+
+// same tests as above but with refinement pattern 2 fewer protocols to not have to wait so long
+proptest! {
+    #[test]
+    fn test_exact_3(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
+        let string = serde_json::to_string(&vec).unwrap();
+        let subscription = match serde_json::from_str(&exact_weak_well_formed_sub(string.clone())).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+        assert!(subscription.is_some());
+        let subscription = subscription.unwrap();
+        let subscription = serde_json::to_string(&subscription).unwrap();
+        let errors = check_wwf_swarm(string.clone(), subscription.clone());
+        let errors = serde_json::from_str::<CheckResult>(&errors).unwrap();
+        let ok = match errors {
+            CheckResult::OK => true,
+            CheckResult::ERROR { .. } => false
+
+        };
+        assert!(ok);
+    }
+}
+
+proptest! {
+    #[test]
+    fn test_overapproximated_3(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
+        let string = serde_json::to_string(&vec).unwrap();
+        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(string.clone())).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+        assert!(subscription.is_some());
+        let subscription = subscription.unwrap();
+        let subscription = serde_json::to_string(&subscription).unwrap();
+        let errors = check_wwf_swarm(string.clone(), subscription.clone());
+        let errors = serde_json::from_str::<CheckResult>(&errors).unwrap();
+        let ok = match errors {
+            CheckResult::OK => true,
+            CheckResult::ERROR { .. } => false
+
+        };
+        assert!(ok);
+    }
+}
+
+proptest! {
+    #[test]
+    fn test_overapproximated_refinement_2_only_generate(vec in generate_interfacing_swarms_refinement_2(7, 7, 10)) {
+        let string = serde_json::to_string(&vec).unwrap();
+        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(string.clone())).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+        assert!(subscription.is_some());
+    }
+}
+
+/*
+    THIS ONE HAS LOTS OF PRINTS KEEP BC. NICE FOR DEBUGGING
+// test whether the approximated subscription for compositions
+// is contained within the 'exact' subscription.
+// i.e. is the approximation safe. max five protocols, max five roles
+// in each, max five commands per role. relatively small.
+proptest! {
     //#![proptest_config(ProptestConfig::with_cases(5))]
     #[test]
     fn test_exact_1(vec in generate_interfacing_swarms(5, 5, 5, false)) {
@@ -609,43 +765,6 @@ proptest! {
     }
 }
 
-// test whether the approximated subscription for compositions
-// is contained within the 'exact' subscription.
-// i.e. is the approximation safe. max five protocols, max five roles
-// in each, max five commands per role. relatively small.
-proptest! {
-    //#![proptest_config(ProptestConfig::with_cases(5))]
-    #[test]
-    fn test_overapproximated_1(vec in generate_interfacing_swarms(5, 5, 5, false)) {
-        let string = serde_json::to_string(&vec).unwrap();
-        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(string.clone())).unwrap() {
-            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::<Subscriptions>::ERROR{ .. } => None,
-        };
-        assert!(subscription.is_some());
-        let subscription = subscription.unwrap();
-        //println!("subs: {:?}", subscription);
-        let subscription = serde_json::to_string(&subscription).unwrap();
 
-        let errors = check_wwf_swarm(string.clone(), subscription.clone());
-        //println!("errors: {:?}", errors);
-        let errors = serde_json::from_str::<CheckResult>(&errors).unwrap();
-        let ok = match errors {
-            CheckResult::OK => true,
-            CheckResult::ERROR { errors: e } => {
-                println!("{:?}", e);
-                println!("subs: {}", serde_json::to_string_pretty(&subscription).unwrap());
-                for v in &vec.0 {
-                    println!("component: {}", serde_json::to_string_pretty(&v.protocol).unwrap());
-                }
-                let c = compose_protocols(string);
-                match serde_json::from_str(&c).unwrap() {
-                    DataResult::<SwarmProtocol>::OK{data: protocol} => {println!("protocol: {}", serde_json::to_string_pretty(&protocol).unwrap())},
-                    DataResult::<SwarmProtocol>::ERROR{..} => (),
-                }
-                false}
 
-        };
-        assert!(ok);
-    }
-}
+*/

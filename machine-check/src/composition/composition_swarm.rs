@@ -58,9 +58,9 @@ impl Error {
                 )
             }
             Error::RoleNotSubscribedToJoin(preceding_events, edge, role) => {
-                let events = preceding_events.join(",");
+                let events = preceding_events.join(", ");
                 format!(
-                    "role {role} does not subscribe to concurrent event types {events} leading to joining event in transition {}",
+                    "role {role} does not subscribe to event types {events} leading to and in joining event in transition {}",
                     Edge(graph, *edge),
                 )
             }
@@ -1795,18 +1795,32 @@ mod tests {
         assert!(result.is_ok());
         let subs1 = result.unwrap();
         let error_report = check(get_fail_1_swarms(), &subs1);
-        println!("errors: {:?}", error_report_to_strings(error_report));
-        let combined_proto_info = swarms_to_proto_info(get_fail_1_swarms(), &subs1);
-        if !combined_proto_info.no_errors() {
-            println!("whhhha no")
-        } else {
-            let composition = explicit_composition_proto_info(combined_proto_info);
-            println!("subs: {}", serde_json::to_string_pretty(&subs1).unwrap());
-            println!("composition happens after: {}", serde_json::to_string_pretty(&composition.happens_after).unwrap());
-            println!("composition immediately pre: {}", serde_json::to_string_pretty(&composition.immediately_pre).unwrap());
-            println!("composition concurrent: {:?}", composition.concurrent_events);
-            println!("composition branching: {:?}", composition.branching_events);
-            println!("composition joining: {:?}", composition.joining_events);
-        }
+        assert!(error_report.is_empty());
+
+        let error_report = check(get_fail_1_swarms(), &BTreeMap::new());
+        let mut errors = error_report_to_strings(error_report);
+        errors.sort();
+        let mut expected_errors = vec![
+            "active role does not subscribe to any of its emitted event types in transition (456 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(456 || 460)",
+            "subsequently active role R455 does not subscribe to events in transition (456 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(456 || 460)",
+            "active role does not subscribe to any of its emitted event types in transition (456 || 459)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 459)",
+            "subsequently active role R454 does not subscribe to events in transition (456 || 459)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 459)",
+            "active role does not subscribe to any of its emitted event types in transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
+            "role R454 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved in or after transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
+            "role R454 does not subscribe to event types R453_e_0, R454_e_0, R455_e_1 leading to and in joining event in transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
+            "active role does not subscribe to any of its emitted event types in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
+            "subsequently active role R455 does not subscribe to events in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
+            "role R454 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved in or after transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
+            "role R455 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved in or after transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
+            "active role does not subscribe to any of its emitted event types in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
+            "subsequently active role R454 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
+            "subsequently active role R455 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
+            "active role does not subscribe to any of its emitted event types in transition (456 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(456 || 459)",
+            "subsequently active role R455 does not subscribe to events in transition (456 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(456 || 459)",
+            "active role does not subscribe to any of its emitted event types in transition (456 || 460)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 460)"
+        ];
+        expected_errors.sort();
+        assert_eq!(errors, expected_errors);
+
     }
 }
