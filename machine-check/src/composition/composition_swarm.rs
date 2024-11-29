@@ -198,27 +198,6 @@ pub fn weak_well_formed_sub(proto: SwarmProtocol) -> (Subscriptions, ErrorReport
     (exact_wwf_sub(proto_info, 0), ErrorReport(vec![(graph, errors)]))
 }
 
-// why have this function and the one below????
-pub fn compose_subscriptions(protos: CompositionInputVec) -> (Subscriptions, ErrorReport) {
-    let protos_ifs = prepare_graphs(protos);
-    let result = implicit_composition_fold(protos_ifs);
-    (
-        result.subscription.clone(),
-        proto_info_to_error_report(result),
-    )
-}
-
-pub fn implicit_composition_swarms(
-    protos: CompositionInputVec,
-) -> (
-    Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>,
-    Subscriptions,
-) {
-    let protos_ifs = prepare_graphs(protos);
-    let result = implicit_composition_fold(protos_ifs);
-    (result.protocols, result.subscription)
-}
-
 // find return type
 pub fn compose_protocols<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Result<(Graph, NodeId), ErrorReport> {
     let combined_proto_info = swarms_to_proto_info(protos, &BTreeMap::new());
@@ -648,96 +627,6 @@ fn combine_proto_infos_fold<T: SwarmInterface>(protos: Vec<(ProtoInfo, Option<T>
         .into_iter()
         .fold(proto, |acc, (p, interface)| {
             combine_proto_infos(acc, p, interface.unwrap())
-        })
-}
-
-fn implicit_composition<T: SwarmInterface>(
-    proto_info1: ProtoInfo,
-    proto_info2: ProtoInfo,
-    interface: T,
-) -> ProtoInfo {
-    let errors = interface.check_interface(&proto_info1, &proto_info2);
-    if !errors.is_empty() {
-        let protocols = vec![
-            proto_info1.protocols.clone(),
-            proto_info2.protocols.clone(),
-            vec![((Graph::new(), None, errors), BTreeSet::new())],
-        ]
-        .concat();
-        // Would work to construct it just like normally. but..
-        return ProtoInfo::new_only_proto(protocols);
-    }
-    let interfacing_event_types = interface.interfacing_event_types(&proto_info1, &proto_info2);
-    let protocols = vec![proto_info1.protocols.clone(), proto_info2.protocols.clone()].concat();
-    let role_event_map = combine_maps(
-        proto_info1.role_event_map.clone(),
-        proto_info2.role_event_map.clone(),
-        None,
-    );
-    let subscription = combine_subscriptions(&proto_info1, &proto_info2, &interface);
-    let concurrent_events = get_concurrent_events(&proto_info1, &proto_info2, &interface);
-    let branching_events: BTreeSet<EventType> = proto_info1
-        .branching_events
-        .union(&proto_info2.branching_events)
-        .cloned()
-        .collect();
-    // add the interfacing events to the set of joining events
-    let joining_events: BTreeSet<EventType> = proto_info1
-        .joining_events
-        .into_iter()
-        .chain(proto_info2.joining_events.into_iter())
-        .chain(interfacing_event_types.into_iter())
-        .collect();
-    let immediately_pre = combine_maps(
-        proto_info1.immediately_pre.clone(),
-        proto_info2.immediately_pre.clone(),
-        None,
-    );
-    ProtoInfo::new(
-        protocols,
-        role_event_map,
-        subscription,
-        concurrent_events,
-        branching_events,
-        joining_events,
-        immediately_pre,
-        BTreeMap::new(),
-    )
-}
-
-// The result<error, proto> thing here...
-fn implicit_composition_fold<T: SwarmInterface>(protos: Vec<(ProtoInfo, Option<T>)>) -> ProtoInfo {
-    if protos.is_empty()
-        || protos[0].1.is_some()
-        || protos[1..].iter().any(|(_, interface)| interface.is_none())
-    {
-        return ProtoInfo::new_only_proto(vec![(
-            (Graph::new(), None, vec![Error::InvalidArg]),
-            BTreeSet::new(),
-        )]);
-    }
-
-    let protos: Vec<_> = protos
-        .into_iter()
-        .map(|(proto_info, interface)| (weak_well_formed_proto_info(proto_info), interface))
-        .collect();
-
-    // check that every proto is wwf before composing. Consider doing this elsewhere?
-    if protos.iter().any(|(proto_info, _)| !proto_info.no_errors()) {
-        let protocols: Vec<_> = protos
-            .into_iter()
-            .flat_map(|(proto_info, _)| proto_info.protocols)
-            .collect();
-        return ProtoInfo::new_only_proto(protocols);
-    }
-
-    let (proto, _) = protos[0].clone();
-
-    protos[1..]
-        .to_vec()
-        .into_iter()
-        .fold(proto, |acc, (p, interface)| {
-            implicit_composition(acc, p, interface.unwrap())
         })
 }
 
