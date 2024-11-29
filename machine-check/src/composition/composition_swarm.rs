@@ -14,7 +14,7 @@ use super::composition_types::InterfacingSwarms;
 use super::MapVec;
 use super::{
     composition_types::{
-        unord_event_pair, CompositionInputVec, EventLabel, ProtoInfo, RoleEventMap, SwarmInterface,
+        unord_event_pair, EventLabel, ProtoInfo, RoleEventMap, SwarmInterface,
         UnordEventPair,
     },
     Graph,
@@ -633,53 +633,9 @@ fn active_transitions_not_conc(
         .collect()
 }
 
-fn involved(node: NodeId, graph: &super::Graph) -> BTreeSet<Role> {
-    let mut roles: BTreeSet<Role> = BTreeSet::new();
-    for n in Dfs::new(graph, node).iter(graph) {
-        roles.append(
-            &mut graph
-                .edges_directed(n, Outgoing)
-                .map(|e| e.weight().role.clone())
-                .collect(),
-        )
-    }
-
-    roles
-}
-
-// the involved roles of a node are those roles that subscribe (or perform) to one or
-// more of the events taking place in a transition reachable from the node
-fn involved1(node: NodeId, graph: &super::Graph, proto_info: &ProtoInfo) -> BTreeSet<Role> {
-    let default = BTreeSet::new();
-    let outgoing_events: BTreeSet<EventType> = graph
-        .edges_directed(node, Outgoing)
-        .map(|edge| edge.weight().get_event_type())
-        .collect();
-    let events_and_succeeding_events: BTreeSet<EventType> = outgoing_events
-        .iter()
-        .chain(outgoing_events.iter().flat_map(|e| proto_info.happens_after.get(e).unwrap_or(&default)))
-        .cloned()
-        .collect();
-    proto_info.role_event_map
-        .iter()
-        .filter(|(role, labels)| {
-            !labels
-                .iter()
-                .map(|label| label.get_event_type())
-                .chain(proto_info.subscription.get(*role).unwrap_or(&default).clone())
-                .collect::<BTreeSet<EventType>>()
-                .intersection(&events_and_succeeding_events)
-                .cloned()
-                .collect::<BTreeSet<EventType>>()
-                .is_empty()
-        })
-        .map(|(role, _)| role.clone())
-        .collect()
-}
-
-// the involved roles of a node are those roles that subscribe (or perform) to one or
-// more of the events taking place in a transition reachable from a transition
-// represented by its emitted event
+// the involved roles on a path are those roles that subscribe (or perform) to one or
+// more of the events taking place in a transition reachable from the transition
+// represented by its emitted event 'event_type'
 fn roles_on_path(event_type: EventType, proto_info: &ProtoInfo) -> BTreeSet<Role> {
     let default = BTreeSet::new();
     let event_and_succeeding_events: BTreeSet<EventType> = [event_type.clone()]
@@ -702,15 +658,6 @@ fn roles_on_path(event_type: EventType, proto_info: &ProtoInfo) -> BTreeSet<Role
         })
         .map(|(role, _)| role.clone())
         .collect()
-}
-
-fn events_for_roles(proto_info: &ProtoInfo) -> BTreeMap<Role, BTreeSet<EventType>> {
-    proto_info.role_event_map.iter().map(|(role, labels)| (role.clone(), labels.clone().into_iter().map(|label| label.get_event_type()).collect())).collect()
-}
-
-fn events_for_role(proto_info: &ProtoInfo, role: &Role) -> BTreeSet<EventType> {
-    let default = BTreeSet::new();
-    proto_info.role_event_map.get(role).unwrap_or_else(|| &default).iter().map(|label| label.get_event_type()).collect()
 }
 
 fn after_not_concurrent(
@@ -918,17 +865,6 @@ pub fn proto_info_to_error_report(proto_info: ProtoInfo) -> ErrorReport {
     )
 }
 
-pub fn swarms_to_error_report(
-    swarms: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>,
-) -> ErrorReport {
-    ErrorReport(
-        swarms
-            .into_iter()
-            .map(|((graph, _, errors), _)| (graph, errors))
-            .collect(),
-    )
-}
-
 // copied from swarm::swarm.rs
 fn all_nodes_reachable(graph: &Graph, initial: NodeId) -> Vec<Error> {
     // Traversal order choice (Bfs vs Dfs vs DfsPostOrder) does not matter
@@ -969,40 +905,6 @@ fn event_pairs_from_node(
             )
         }) //BTreeSet::from([graph[pair[0]].get_event_type(), graph[pair[1]].get_event_type()]))
         .collect()
-}
-
-fn all_concurrent_pairs(graph: &Graph) -> BTreeSet<UnordEventPair> {
-    graph
-        .node_indices()
-        .flat_map(|node| diamond_shape(graph, node))
-        .collect()
-}
-
-// check for 'diamond shape' starting at a node.
-// we have a pair of concurrent events if there is a path G-a->Ga-b->G', G-b->Gb-a->G', diamond shape.
-fn diamond_shape(graph: &Graph, node: NodeId) -> BTreeSet<BTreeSet<EventType>> {
-    let mut paths: BTreeSet<(EventType, EventType, NodeId)> = BTreeSet::new();
-    let mut concurrent_events: BTreeSet<BTreeSet<EventType>> = BTreeSet::new();
-
-    for edge1 in graph.edges_directed(node, Outgoing) {
-        for edge2 in graph.edges_directed(edge1.target(), Outgoing) {
-            // this conditional is to avoid categorizing non-concurrent self-loops as concurrent.
-            // case of self loops in two protocols between same interfacing events will be wrongly
-            // deemed not concurrent... this case come back. outcommented for now.
-            // if edge1.target() != edge2.target() || edge1.source() != edge2.source() { let tup ... } concurrent_events }
-            let tup = (
-                edge1.weight().get_event_type(),
-                edge2.weight().get_event_type(),
-                edge2.target(),
-            );
-            paths.insert(tup.clone());
-            if paths.contains(&(tup.1.clone(), tup.0.clone(), tup.2.clone())) && tup.0 != tup.1 {
-                concurrent_events.insert(unord_event_pair(tup.0, tup.1)); //BTreeSet::from([tup.0, tup.1]));
-            }
-        }
-    }
-
-    concurrent_events
 }
 
 // get events that are immediately before some event and not concurrent.
@@ -1060,52 +962,6 @@ fn combine_maps<K: Ord + Clone, V: Ord + Clone>(
     };
 
     all_keys.iter().map(extend_for_key).collect()
-}
-
-// add all branching and all interfacing events to the subscription of each role
-fn combine_subscriptions<T: SwarmInterface>(
-    proto_info1: &ProtoInfo,
-    proto_info2: &ProtoInfo,
-    interface: &T,
-) -> Subscriptions {
-    let interfacing_events = interface.interfacing_event_types(proto_info1, &proto_info2);
-
-    let extra = interfacing_events
-        .clone()
-        .into_iter()
-        .chain(proto_info1.branching_events.clone())
-        .chain(proto_info2.branching_events.clone())
-        .chain(proto_info1.joining_events.clone()) // think joins could be handled in a better way...
-        .chain(
-            proto_info1
-                .joining_events
-                .iter()
-                .flat_map(|e| proto_info1.immediately_pre[e].clone()),
-        )
-        .chain(proto_info2.joining_events.clone())
-        .chain(
-            proto_info2
-                .joining_events
-                .iter()
-                .flat_map(|e| proto_info2.immediately_pre[e].clone()),
-        )
-        .chain(
-            interfacing_events
-                .iter()
-                .flat_map(|e| proto_info1.immediately_pre[e].clone()),
-        )
-        .chain(
-            interfacing_events
-                .iter()
-                .flat_map(|e| proto_info2.immediately_pre[e].clone()),
-        )
-        .collect::<BTreeSet<_>>();
-
-    combine_maps(
-        proto_info1.subscription.clone(),
-        proto_info2.subscription.clone(),
-        Some(extra),
-    )
 }
 
 // overapproximate concurrent events. anything from different protocols that are not interfacing events is considered concurrent.
