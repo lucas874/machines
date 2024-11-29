@@ -3,7 +3,7 @@ use crate::{
     types::{EventType, Role, State, StateName, SwarmLabel, Transition},
     EdgeId, NodeId, Subscriptions, SwarmProtocol,
 };
-use itertools::{chain, Itertools};
+use itertools::Itertools;
 use petgraph::visit::DfsPostOrder;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -1145,7 +1145,7 @@ pub fn from_json(
     proto: SwarmProtocol,
     subs: &Subscriptions,
 ) -> (Graph, Option<NodeId>, Vec<String>) {
-    let proto_info = prepare_graph::<Role>(proto, subs, None);
+    let proto_info = prepare_graph1::<Role>(proto, subs, None);
     let (g, i, e) = match proto_info.get_ith_proto(0) {
         Some((g, i, e)) => (g, i, e),
         _ => return (Graph::new(), None, vec![]),
@@ -1442,12 +1442,9 @@ pub fn to_swarm_json(graph: crate::Graph, initial: NodeId) -> SwarmProtocol {
 
 #[cfg(test)]
 mod tests {
-    use std::{cmp, iter::zip, sync::Mutex};
-
     use crate::{
         composition::{
-            composition_machine::{project, project_combine, to_option_machine},
-            composition_types::{CompositionComponent, CompositionInput},
+            composition_types::CompositionComponent,
             error_report_to_strings,
         },
         types::Command,
@@ -1455,9 +1452,6 @@ mod tests {
     };
 
     use super::*;
-    use petgraph::visit::Reversed;
-    use proptest::prelude::*;
-    use rand::{distributions::Bernoulli, prelude::*};
 
     // Example from coplaws slides
     fn get_proto1() -> SwarmProtocol {
@@ -1527,24 +1521,6 @@ mod tests {
                 "F": ["car", "report1"],
                 "TR": ["car", "report1", "report2"],
                 "QCR": ["report2", "ok", "notOk"]
-            }"#,
-        )
-        .unwrap()
-    }
-    fn get_proto1_proto2_composed() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0 || 0",
-                "transitions": [
-                    { "source": "0 || 0", "target": "1 || 1", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
-                    { "source": "0 || 0", "target": "3 || 0", "label": { "cmd": "close", "logType": ["time"], "role": "D" } },
-                    { "source": "1 || 1", "target": "2 || 1", "label": { "cmd": "get", "logType": ["pos"], "role": "FL" } },
-                    { "source": "2 || 1", "target": "0 || 2", "label": { "cmd": "deliver", "logType": ["part"], "role": "T" } },
-                    { "source": "0 || 2", "target": "0 || 3", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
-                    { "source": "0 || 2", "target": "3 || 2", "label": { "cmd": "close", "logType": ["time"], "role": "D" } },
-                    { "source": "0 || 3", "target": "3 || 3", "label": { "cmd": "close", "logType": ["time"], "role": "D" } },
-                    { "source": "3 || 2", "target": "3 || 3", "label": { "cmd": "build", "logType": ["car"], "role": "F" } }
-                ]
             }"#,
         )
         .unwrap()
@@ -1622,26 +1598,6 @@ mod tests {
             }"#,
         )
         .unwrap()
-    }
-
-    fn get_composition_input_vec1() -> CompositionInputVec {
-        vec![
-            CompositionInput {
-                protocol: get_proto1(),
-                subscription: weak_well_formed_sub(get_proto1()).0,
-                interface: None,
-            },
-            CompositionInput {
-                protocol: get_proto2(),
-                subscription: weak_well_formed_sub(get_proto2()).0,
-                interface: Some(Role::new("T")),
-            },
-            CompositionInput {
-                protocol: get_proto3(),
-                subscription: weak_well_formed_sub(get_proto3()).0,
-                interface: Some(Role::new("F")),
-            },
-        ]
     }
 
     fn get_interfacing_swarms_1() -> InterfacingSwarms<Role> {
@@ -1799,7 +1755,7 @@ mod tests {
         assert_eq!(proto_info.branching_events, BTreeSet::new());
         assert_eq!(proto_info.joining_events, BTreeSet::new());
 
-        let proto_info = prepare_graph::<Role>(get_proto3(), &get_subs3(), None);
+        let proto_info = prepare_graph1::<Role>(get_proto3(), &get_subs3(), None);
         assert!(proto_info.get_ith_proto(0).is_some());
         assert!(proto_info.get_ith_proto(0).unwrap().2.is_empty());
         assert_eq!(proto_info.concurrent_events, BTreeSet::new());
@@ -2014,22 +1970,7 @@ mod tests {
         let subs2 = result.unwrap();
         let error_report = check(get_interfacing_swarms_1(), &subs2);
         assert!(error_report.is_empty());
-        //println!("exact: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        //println!("approx: {}", serde_json::to_string_pretty(&subs2).unwrap());
         assert!(is_sub_subscription(subs1, subs2));
-
-        /* let (subs1, errors1) = weak_well_formed_sub(get_proto1());
-        let (subs2, errors2) = weak_well_formed_sub(get_proto2());
-        let (subs3, errors3) = weak_well_formed_sub(get_proto3());
-        let (subs4, errors4) = weak_well_formed_sub(get_proto1_proto2_composed());
-        assert_eq!(subs1, get_subs1());
-        assert!(errors1.is_empty());
-        assert_eq!(subs2, get_subs2());
-        assert!(errors2.is_empty());
-        assert_eq!(subs3, get_subs3());
-        assert!(errors3.is_empty());
-        assert_eq!(subs4, get_proto1_proto2_composed_subs());
-        assert!(errors4.is_empty()); */
     }
     /*
     #[test]
@@ -2104,16 +2045,11 @@ mod tests {
     */
     #[test]
     fn test_compose_non_wwf_swarms() {
-        let proto1 = get_proto1();
-        let proto2 = get_proto2();
         let input = get_interfacing_swarms_1();
-        let subs1: Subscriptions = BTreeMap::from([(Role::new("T"), BTreeSet::new())]);
-        let subs2: Subscriptions = BTreeMap::from([(Role::new("F"), BTreeSet::new())]);
         let subs = BTreeMap::from([(Role::new("T"), BTreeSet::new()), (Role::new("F"), BTreeSet::new())]);
         let error_report = check(input, &subs);
         let mut errors = error_report_to_strings(error_report);
         errors.sort();
-        //println!("errors: {:?}", errors);
         let mut expected_errors = vec![
             "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[close@D<time>]-->(3 || 0)",
@@ -2135,39 +2071,5 @@ mod tests {
         ];
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
-        //let (swarms, subscriptions) = implicit_composition_swarms(composition_input);
-        /* let mut errors1 = vec![
-            "active role does not subscribe to any of its emitted event types in transition (0)--[close@D<time>]-->(3)",
-            "role FL does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
-            "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
-            "subsequently active role FL does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
-            "role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
-            "role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[close@D<time>]-->(3)",
-            "role T does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
-            "active role does not subscribe to any of its emitted event types in transition (1)--[get@FL<pos>]-->(2)",
-            "subsequently active role T does not subscribe to events in transition (1)--[get@FL<pos>]-->(2)",
-            "subsequently active role D does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
-            "subsequently active role T does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
-            "active role does not subscribe to any of its emitted event types in transition (2)--[deliver@T<part>]-->(0)"
-        ];
-
-        let mut errors2 = vec![
-            "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
-            "active role does not subscribe to any of its emitted event types in transition (1)--[deliver@T<part>]-->(2)",
-            "subsequently active role F does not subscribe to events in transition (1)--[deliver@T<part>]-->(2)",
-            "subsequently active role T does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
-            "active role does not subscribe to any of its emitted event types in transition (2)--[build@F<car>]-->(3)"
-        ];
-        errors1.sort();
-        errors2.sort();
-        let errors = vec![errors1, errors2];
-
-        for (((g, _, e), _), expected) in zip(swarms, errors) {
-            let mut e = e.map(Error::convert(&g));
-            e.sort();
-            assert_eq!(e, expected);
-        }
-
-        assert!(subscriptions.is_empty()); */
     }
 }
