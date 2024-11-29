@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, checkSwarmProtocol, Subscriptions, checkWWFSwarmProtocol, ResultData, InterfacingSwarms, exactWWFSubscriptions, overapproxWWFSubscriptions, composeProtocols} from '../../..'
+import { SwarmProtocolType, Subscriptions, MachineType, checkWWFSwarmProtocol, ResultData, InterfacingSwarms, exactWWFSubscriptions, overapproxWWFSubscriptions, composeProtocols, projectAll} from '../../..'
 import { Events } from './car-factory-protos.js'
 
 /*
@@ -136,8 +136,9 @@ const interfacing_swarms_error_2: InterfacingSwarms = [{protocol: G1, interface:
 const result_composition_ok = composeProtocols(interfacing_swarms)
 const result_composition_error_1 = composeProtocols(interfacing_swarms_error_1)
 const result_composition_error_2 = composeProtocols(interfacing_swarms_error_2)
+const result_project_all = projectAll(interfacing_swarms, overapprox_subscriptions)
 
-describe('check if we can construct explicit composition', () => {
+describe('various tests', () => {
   it('should be ok', () => {
     expect(result_composition_ok.type).toBe('OK')
   })
@@ -189,5 +190,93 @@ describe('various errors', () => {
         "invalid argument"
       ]
     })
+  })
+})
+
+describe('all projections', () => {
+  it('should be ok and compare with expected', () => {
+    expect(result_project_all.type).toBe('OK')
+
+    if (result_project_all.type === 'ERROR') throw new Error('error getting subscription')
+    const all_projections: MachineType[] = result_project_all.data
+    const expectedFL: MachineType =
+      {
+        initial: '{ 0 } || { 0 } || { 0 }',
+        transitions: [
+          {
+            label: { tag: 'Input', eventType: 'partID' },
+            source: '{ 0 } || { 0 } || { 0 }',
+            target: '{ 1 } || { 1 } || { 0 }'
+          },
+          {
+            label: { tag: 'Input', eventType: 'time' },
+            source: '{ 0 } || { 0 } || { 0 }',
+            target: '{ 3 } || { 0 } || { 0 }'
+          },
+          {
+            label: { tag: 'Execute', cmd: 'get', logType: ['position'] },
+            source: '{ 1 } || { 1 } || { 0 }',
+            target: '{ 1 } || { 1 } || { 0 }'
+          },
+          {
+            label: { tag: 'Input', eventType: 'position' },
+            source: '{ 1 } || { 1 } || { 0 }',
+            target: '{ 2 } || { 1 } || { 0 }'
+          },
+          {
+            label: { tag: 'Input', eventType: 'part' },
+            source: '{ 2 } || { 1 } || { 0 }',
+            target: '{ 0 } || { 2 } || { 0 }'
+          },
+          {
+            label: { tag: 'Input', eventType: 'time' },
+            source: '{ 0 } || { 2 } || { 0 }',
+            target: '{ 3 } || { 2 } || { 0 }'
+          },
+          {
+            label: { tag: 'Input', eventType: 'car' },
+            source: '{ 0 } || { 2 } || { 0 }',
+            target: '{ 0 } || { 3 } || { 1 }'
+          },
+          {
+            label: { tag: 'Input', eventType: 'time' },
+            source: '{ 0 } || { 3 } || { 1 }',
+            target: '{ 3 } || { 3 } || { 1 }'
+          },
+          {
+            label: { tag: 'Input', eventType: 'ok' },
+            source: '{ 0 } || { 3 } || { 1 }',
+            target: '{ 0 } || { 3 } || { 3 }'
+          },
+          {
+            label: { tag: 'Input', eventType: 'notOk' },
+            source: '{ 0 } || { 3 } || { 1 }',
+            target: '{ 0 } || { 3 } || { 3 }'
+          },
+          {
+            label: { tag: 'Input', eventType: 'time' },
+            source: '{ 0 } || { 3 } || { 3 }',
+            target: '{ 3 } || { 3 } || { 3 }'
+          },
+          {
+            label: { tag: 'Input', eventType: 'ok' },
+            source: '{ 3 } || { 3 } || { 1 }',
+            target: '{ 3 } || { 3 } || { 3 }'
+          },
+          {
+            label: { tag: 'Input', eventType: 'notOk' },
+            source: '{ 3 } || { 3 } || { 1 }',
+            target: '{ 3 } || { 3 } || { 3 }'
+          },
+          {
+            label: { tag: 'Input', eventType: 'car' },
+            source: '{ 3 } || { 2 } || { 0 }',
+            target: '{ 3 } || { 3 } || { 1 }'
+          }
+        ]
+      }
+    const expectedFLString = JSON.stringify(expectedFL)
+    const FLstring = JSON.stringify(all_projections[2])
+    expect(FLstring).toBe(expectedFLString)
   })
 })

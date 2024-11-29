@@ -1,4 +1,4 @@
-import { check_swarm, check_projection, check_wwf_swarm, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, check_composed_projection, revised_projection, project_combine, compose_protocols } from '../pkg/machine_check.js'
+import { check_swarm, check_projection, check_wwf_swarm, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, check_composed_projection, revised_projection, project_combine, compose_protocols, project_combine_all } from '../pkg/machine_check.js'
 
 //, check_composed_projection, get_wwf_sub, compose_subs, revised_projection, project_combine, project_combine_all, compose_protocols } from '../pkg/machine_check.js'
 export type Protocol<Label> = {
@@ -106,76 +106,9 @@ export function composeProtocols(protos: InterfacingSwarms): ResultData<SwarmPro
   return JSON.parse(result)
 }
 
-/* export function projectAll(protos: InterfacingSwarms): ResultData<MachineType> {
+export function projectAll(protos: InterfacingSwarms, subscriptions: Subscriptions): ResultData<MachineType[]> {
   const ps = JSON.stringify(protos)
-  const result = project_combine_all(ps)
-  return JSON.parse(result)
-} */
-/*
-export function getWWFSub(proto: SwarmProtocolType): ResultData {
-  const p = JSON.stringify(proto)
-  const result = get_wwf_sub(p)
-  return JSON.parse(result)
-}
-
-export function composeTwoSubs(
-  proto1: SwarmProtocolType,
-  subscriptions1: Subscriptions,
-  proto2: SwarmProtocolType,
-  subscriptions2: Subscriptions,
-  swarm_interface: string
-): ResultData {
-  const ps: CompositionInputVec = [{ protocol: proto1, subscription: subscriptions1, interface: null }, { protocol: proto2, subscription: subscriptions2, interface: swarm_interface }]
-  const ps_str = JSON.stringify(ps)
-  const result = compose_subs(ps_str)
-  return JSON.parse(result)
-}
-
-export function composeSubs(protos: CompositionInputVec): ResultData {
-  const ps = JSON.stringify(protos)
-  const result = compose_subs(ps);
-  return JSON.parse(result)
-}
-
-export function revisedProjection(
-  proto: SwarmProtocolType,
-  subscriptions: Subscriptions,
-  role: string
-): ResultData {
-  const p = JSON.stringify(proto)
   const s = JSON.stringify(subscriptions)
-  const result = revised_projection(p, s, role)
+  const result = project_combine_all(ps, s)
   return JSON.parse(result)
 }
-
-export function projectCombineTwoMachines(
-  proto1: SwarmProtocolType,
-  subscriptions1: Subscriptions,
-  proto2: SwarmProtocolType,
-  subscriptions2: Subscriptions,
-  swarm_interface: string,
-  role: string
-): ResultData {
-  const ps: CompositionInputVec = [{ protocol: proto1, subscription: subscriptions1, interface: null }, { protocol: proto2, subscription: subscriptions2, interface: swarm_interface }]
-  const ps_str = JSON.stringify(ps)
-  const result = project_combine(ps_str, role)
-  return JSON.parse(result)
-}
-
-export function projectCombineMachines(protos: CompositionInputVec, role: string): ResultData {
-  const ps = JSON.stringify(protos)
-  const result = project_combine(ps, role);
-  return JSON.parse(result)
-}
-
-export function composeProtocols(protos: CompositionInputVec): ResultData {
-  const ps = JSON.stringify(protos)
-  const result = compose_protocols(ps)
-  return JSON.parse(result)
-}
-
-export function projectAll(protos: CompositionInputVec): ResultData {
-  const ps = JSON.stringify(protos)
-  const result = project_combine_all(ps)
-  return JSON.parse(result)
-} */

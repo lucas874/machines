@@ -101,8 +101,7 @@ pub fn project_combine(protos: String, subs: String, role: String) -> String {
     )
 }
 
-
-/* #[wasm_bindgen]
+#[wasm_bindgen]
 pub fn project_combine_all(protos: String, subs: String) -> String {
     let protocols = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
         Ok(p) => p,
@@ -129,16 +128,15 @@ pub fn project_combine_all(protos: String, subs: String) -> String {
     let machines: Vec<_> = projections
         .into_iter()
         .map(|(g, i)| {
-            serde_json::to_string(&composition::composition_machine::from_option_to_machine(
+            composition::composition_machine::from_option_to_machine(
                 g,
                 i.unwrap(),
-            ))
-            .unwrap()
+            )
         })
         .collect();
-    dok(format!("[{}]", machines.join(", ")))
+    dok(machines)
 }
- */
+
 // check an implementation against the combined projection of swarms over role.
 // consider also offering one projecting over explicit projection?
 #[wasm_bindgen]
