@@ -1,4 +1,4 @@
-import { check_swarm, check_projection, check_wwf_swarm, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub } from '../pkg/machine_check.js'
+import { check_swarm, check_projection, check_wwf_swarm, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, check_composed_projection, revised_projection, project_combine, compose_protocols } from '../pkg/machine_check.js'
 
 //, check_composed_projection, get_wwf_sub, compose_subs, revised_projection, project_combine, project_combine_all, compose_protocols } from '../pkg/machine_check.js'
 export type Protocol<Label> = {
@@ -69,15 +69,8 @@ export function overapproxWWFSubscriptions(protos: InterfacingSwarms): ResultDat
   return JSON.parse(result)
 }
 
-/* export function checkWWFSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): Result {
-  const p = JSON.stringify(proto)
-  const s = JSON.stringify(subscriptions)
-  const result = check_wwf_swarm(p, s)
-  return JSON.parse(result)
-}
-
 export function checkComposedProjection(
-  protos: CompositionInputVec,
+  protos: InterfacingSwarms,
   subscriptions: Subscriptions,
   role: string,
   machine: MachineType,
@@ -89,6 +82,36 @@ export function checkComposedProjection(
   return JSON.parse(result)
 }
 
+export function revisedProjection(
+  proto: SwarmProtocolType,
+  subscriptions: Subscriptions,
+  role: string
+): ResultData<MachineType> {
+  const p = JSON.stringify(proto)
+  const s = JSON.stringify(subscriptions)
+  const result = revised_projection(p, s, role)
+  return JSON.parse(result)
+}
+
+export function projectCombineMachines(protos: InterfacingSwarms, subscriptions: Subscriptions, role: string): ResultData<MachineType> {
+  const ps = JSON.stringify(protos)
+  const s = JSON.stringify(subscriptions)
+  const result = project_combine(ps, s, role);
+  return JSON.parse(result)
+}
+
+export function composeProtocols(protos: InterfacingSwarms): ResultData<SwarmProtocolType> {
+  const ps = JSON.stringify(protos)
+  const result = compose_protocols(ps)
+  return JSON.parse(result)
+}
+
+/* export function projectAll(protos: InterfacingSwarms): ResultData<MachineType> {
+  const ps = JSON.stringify(protos)
+  const result = project_combine_all(ps)
+  return JSON.parse(result)
+} */
+/*
 export function getWWFSub(proto: SwarmProtocolType): ResultData {
   const p = JSON.stringify(proto)
   const result = get_wwf_sub(p)

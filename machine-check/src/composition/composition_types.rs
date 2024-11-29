@@ -12,8 +12,8 @@ use super::{NodeId, Subscriptions, SwarmProtocol};
 
 #[derive(Serialize)]
 #[serde(tag = "type")]
-pub enum DataResult {
-    OK { data: String },
+pub enum DataResult<T: Serialize> {
+    OK { data: T },
     ERROR { errors: Vec<String> },
 }
 

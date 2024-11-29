@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, checkSwarmProtocol, Subscriptions, checkWWFSwarmProtocol, ResultData, CompositionComponent, InterfacingSwarms, exactWWFSubscriptions, overapproxWWFSubscriptions} from '../../..'
+import { SwarmProtocolType, checkSwarmProtocol, Subscriptions, checkWWFSwarmProtocol, ResultData, InterfacingSwarms, exactWWFSubscriptions, overapproxWWFSubscriptions} from '../../..'
 import { Events } from './car-factory-protos.js'
 
 /*
@@ -83,38 +83,36 @@ const G3: SwarmProtocolType = {
 const G1_: InterfacingSwarms = [{protocol: G1, interface: null}]
 const G2_: InterfacingSwarms = [{protocol: G2, interface: null}]
 const G3_: InterfacingSwarms = [{protocol: G3, interface: null}]
-const result_subscriptions1: ResultData<Subscriptions> = exactWWFSubscriptions(G1_)
-const result_subscriptions2: ResultData<Subscriptions> = exactWWFSubscriptions(G2_)
-const result_subscriptions3: ResultData<Subscriptions> = exactWWFSubscriptions(G3_)
+const exact_result_subscriptions1: ResultData<Subscriptions> = exactWWFSubscriptions(G1_)
+const exact_result_subscriptions2: ResultData<Subscriptions> = exactWWFSubscriptions(G2_)
+const exact_result_subscriptions3: ResultData<Subscriptions> = exactWWFSubscriptions(G3_)
 
 describe('extended subscriptions', () => {
   it('subscription1 should be ok', () => {
-    expect(result_subscriptions1.type).toBe('OK')
+    expect(exact_result_subscriptions1.type).toBe('OK')
   })
 
-  it('subscription1 should be ok', () => {
-    expect(result_subscriptions2.type).toBe('OK')
+   it('subscription1 should be ok', () => {
+    expect(exact_result_subscriptions2.type).toBe('OK')
   })
 
   it('subscription3 should be ok', () => {
-    expect(result_subscriptions3.type).toBe('OK')
+    expect(exact_result_subscriptions3.type).toBe('OK')
   })
 })
 
-if (result_subscriptions1.type === 'ERROR') throw new Error('error getting subscription')
-const subscriptions1: Subscriptions = result_subscriptions1.data
+if (exact_result_subscriptions1.type === 'ERROR') throw new Error('error getting subscription')
+const exact_subscriptions1: Subscriptions = exact_result_subscriptions1.data
 
-if (result_subscriptions2.type === 'ERROR') throw new Error('error getting subscription')
-const subscriptions2: Subscriptions = result_subscriptions2.data
+if (exact_result_subscriptions2.type === 'ERROR') throw new Error('error getting subscription')
+const exact_subscriptions2: Subscriptions = exact_result_subscriptions2.data
 
-if (result_subscriptions3.type === 'ERROR') throw new Error('error getting subscription')
-const subscriptions3: Subscriptions = result_subscriptions3.data
+if (exact_result_subscriptions3.type === 'ERROR') throw new Error('error getting subscription')
+const exact_subscriptions3: Subscriptions = exact_result_subscriptions3.data
 
-console.log(subscriptions1)
-
-describe('checkSwarmProtocol G1', () => {
-  it('should catch not well-formed protocol', () => {
-    expect(checkSwarmProtocol(G1, subscriptions1)).toEqual({
+describe('checkSwarmProtocol for protocols with exact wwf subscription', () => {
+  it('should catch not well-formed protocol G1', () => {
+    expect(checkSwarmProtocol(G1, exact_subscriptions1)).toEqual({
       type: 'ERROR',
       errors: [
         "subsequently involved role D does not subscribe to guard in transition (1)--[get@FL<position>]-->(2)",
@@ -122,50 +120,74 @@ describe('checkSwarmProtocol G1', () => {
       ],
     })
   })
-})
-/*
-describe('checkSwarmProtocol G2', () => {
-  it('should catch not well-formed protocol', () => {
-    expect(checkSwarmProtocol(G2, subscriptions2)).toEqual({
+
+  it('should catch not well-formed protocol G2', () => {
+    expect(checkSwarmProtocol(G2, exact_subscriptions2)).toEqual({
       type: 'ERROR',
       errors: [
         "subsequently involved role F does not subscribe to guard in transition (0)--[request@T<partID>]-->(1)"
       ],
     })
   })
-})
 
-describe('checkSwarmProtocol G3', () => {
-  it('should catch not well-formed protocol', () => {
-    expect(checkSwarmProtocol(G3, subscriptions3)).toEqual({
+  it('should catch not well-formed protocol G3', () => {
+    expect(checkSwarmProtocol(G3, exact_subscriptions3)).toEqual({
       type: 'ERROR',
       errors: [
         "subsequently involved role QCR does not subscribe to guard in transition (0)--[build@F<car>]-->(1)"
       ],
     })
   })
-}) */
+})
 
-/* describe('checkWWFSwarmProtocol G1', () => {
-  it('should be weak-well-formed protocol', () => {
-    expect(checkWWFSwarmProtocol(G1_, subscriptions1)).toEqual({
+describe('checkWWFSwarmProtocol for protocols with exact wwf subscription', () => {
+  it('should be weak-well-formed protocol G1', () => {
+    expect(checkWWFSwarmProtocol(G1_, exact_subscriptions1)).toEqual({
+      type: 'OK',
+    })
+  })
+
+  it('should be weak-well-formed protocol G1', () => {
+    expect(checkWWFSwarmProtocol(G2_, exact_subscriptions2)).toEqual({
+      type: 'OK',
+    })
+  })
+
+  it('should be weak-well-formed protocol G1', () => {
+    expect(checkWWFSwarmProtocol(G3_, exact_subscriptions3)).toEqual({
       type: 'OK',
     })
   })
 })
 
-describe('checkWWFSwarmProtocol G2', () => {
-  it('should be weak-well-formed protocol', () => {
-    expect(checkWWFSwarmProtocol(G2_, subscriptions2)).toEqual({
+const overapprox_result_subscriptions1: ResultData<Subscriptions> = overapproxWWFSubscriptions(G1_)
+const overapprox_result_subscriptions2: ResultData<Subscriptions> = overapproxWWFSubscriptions(G2_)
+const overapprox_result_subscriptions3: ResultData<Subscriptions> = overapproxWWFSubscriptions(G3_)
+if (overapprox_result_subscriptions1.type === 'ERROR') throw new Error('error getting subscription')
+const overapprox_subscriptions1: Subscriptions = overapprox_result_subscriptions1.data
+
+if (overapprox_result_subscriptions2.type === 'ERROR') throw new Error('error getting subscription')
+const overapprox_subscriptions2: Subscriptions = overapprox_result_subscriptions2.data
+
+if (overapprox_result_subscriptions3.type === 'ERROR') throw new Error('error getting subscription')
+const overapprox_subscriptions3: Subscriptions = overapprox_result_subscriptions3.data
+
+describe('checkWWFSwarmProtocol for protocols with overapproximated wwf subscription', () => {
+  it('should be weak-well-formed protocol G1', () => {
+    expect(checkWWFSwarmProtocol(G1_, overapprox_subscriptions1)).toEqual({
+      type: 'OK',
+    })
+  })
+
+  it('should be weak-well-formed protocol G1', () => {
+    expect(checkWWFSwarmProtocol(G2_, overapprox_subscriptions2)).toEqual({
+      type: 'OK',
+    })
+  })
+
+  it('should be weak-well-formed protocol G1', () => {
+    expect(checkWWFSwarmProtocol(G3_, overapprox_subscriptions3)).toEqual({
       type: 'OK',
     })
   })
 })
-
-describe('checkWWFSwarmProtocol G3', () => {
-  it('should be weak-well-formed protocol', () => {
-    expect(checkWWFSwarmProtocol(G3_, subscriptions3)).toEqual({
-      type: 'OK',
-    })
-  })
-}) */
