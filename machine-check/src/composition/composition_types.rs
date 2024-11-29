@@ -10,7 +10,7 @@ use crate::{
 
 use super::{NodeId, Subscriptions, SwarmProtocol};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum DataResult<T: Serialize> {
     OK { data: T },
