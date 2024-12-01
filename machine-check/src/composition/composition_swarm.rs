@@ -589,8 +589,8 @@ fn combine_proto_infos<T: SwarmInterface>(
         None,
     );
     let happens_after = combine_maps(
-        proto_info1.happens_after,
-        proto_info2.happens_after,
+        proto_info1.succeeding_events,
+        proto_info2.succeeding_events,
         None
     );
 
@@ -649,7 +649,7 @@ fn roles_on_path(event_type: EventType, proto_info: &ProtoInfo, subs: &Subscript
     let default = BTreeSet::new();
     let event_and_succeeding_events: BTreeSet<EventType> = [event_type.clone()]
         .iter()
-        .chain([event_type].iter().flat_map(|e| proto_info.happens_after.get(e).unwrap_or(&default)))
+        .chain([event_type].iter().flat_map(|e| proto_info.succeeding_events.get(e).unwrap_or(&default)))
         .cloned()
         .collect();
     proto_info.role_event_map
@@ -674,16 +674,16 @@ fn after_not_concurrent(
     initial: NodeId,
     concurrent_events: &BTreeSet<BTreeSet<EventType>>,
 )-> BTreeMap<EventType, BTreeSet<EventType>> {
-    let mut happens_after: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
+    let mut succ_map: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
 
-    let mut new_happens_after = after_not_concurrent_step(graph, initial, concurrent_events, happens_after.clone());
+    let mut new_succ_map = after_not_concurrent_step(graph, initial, concurrent_events, succ_map.clone());
 
-    while happens_after != new_happens_after {
-        happens_after = new_happens_after;
-        new_happens_after = after_not_concurrent_step(graph, initial, concurrent_events, happens_after.clone());
+    while succ_map != new_succ_map {
+        succ_map = new_succ_map;
+        new_succ_map = after_not_concurrent_step(graph, initial, concurrent_events, succ_map.clone());
     }
 
-    happens_after
+    succ_map
 }
 
 
@@ -691,10 +691,10 @@ fn after_not_concurrent_step(
     graph: &Graph,
     initial: NodeId,
     concurrent_events: &BTreeSet<BTreeSet<EventType>>,
-    happens_after: BTreeMap<EventType, BTreeSet<EventType>>,
+    succ_map: BTreeMap<EventType, BTreeSet<EventType>>,
 ) -> BTreeMap<EventType, BTreeSet<EventType>> {
     let mut walk = DfsPostOrder::new(&graph, initial);
-    let mut new_happens_after: BTreeMap<EventType, BTreeSet<EventType>> = happens_after;
+    let mut new_succ_map: BTreeMap<EventType, BTreeSet<EventType>> = succ_map;
 
 
     // we should not need the outcommented filter
@@ -715,7 +715,7 @@ fn after_not_concurrent_step(
                 .clone()
                 .into_iter()
                 .flat_map(|e| {
-                    let events = new_happens_after.get(&e).unwrap_or(&default);
+                    let events = new_succ_map.get(&e).unwrap_or(&default);
                     events.clone()
                 })
                 .chain(active_in_successor.into_iter())
@@ -725,7 +725,7 @@ fn after_not_concurrent_step(
                 //})
                 .collect();
 
-            new_happens_after
+            new_succ_map
                 .entry(edge.weight().get_event_type())
                 .and_modify(|events| {
                     events.append(&mut succ_events);
@@ -734,7 +734,7 @@ fn after_not_concurrent_step(
         }
     }
 
-    new_happens_after
+    new_succ_map
 }
 
 fn prepare_graphs<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Vec<(ProtoInfo, Option<T>)> {
@@ -1006,10 +1006,10 @@ fn get_concurrent_events<T: SwarmInterface>(
 
 fn explicit_composition_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
     let (composed, composed_initial) = explicit_composition(&proto_info);
-    let happens_after = after_not_concurrent(&composed, composed_initial, &proto_info.concurrent_events);
+    let succeeding_events = after_not_concurrent(&composed, composed_initial, &proto_info.concurrent_events);
     ProtoInfo {
         protocols: vec![((composed, Some(composed_initial), vec![]), BTreeSet::new())],
-        happens_after,
+        succeeding_events,
         ..proto_info
     }
 }
@@ -1039,9 +1039,9 @@ pub fn to_swarm_json(graph: crate::Graph, initial: NodeId) -> SwarmProtocol {
         let source = g[eref.source()].state_name().clone();
         let target = g[eref.target()].state_name().clone();
         Transition {
-            label: label,
-            source: source,
-            target: target,
+            label,
+            source,
+            target,
         }
     };
 
