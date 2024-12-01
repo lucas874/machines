@@ -8,7 +8,7 @@ use crate::{
     Graph,
 };
 
-use super::{NodeId, Subscriptions, SwarmProtocol};
+use super::{NodeId, SwarmProtocol};
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -89,15 +89,6 @@ impl ProtoInfo {
         self.protocols.iter().all(|((_, _, e), _)| e.is_empty())
     }
 }
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct CompositionInput {
-    pub protocol: SwarmProtocol,
-    pub subscription: Subscriptions,
-    pub interface: Option<Role>,
-}
-
-pub type CompositionInputVec = Vec<CompositionInput>;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CompositionComponent<T: SwarmInterface> {

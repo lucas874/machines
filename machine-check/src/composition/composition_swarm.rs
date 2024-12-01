@@ -180,7 +180,7 @@ pub fn overapprox_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwa
 // set up combined proto info, one containing all protocols, all branching events, joining events etc.
 // then add any errors arising from confusion freeness to the proto info and return it
 pub fn swarms_to_proto_info<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions) -> ProtoInfo {
-    let combined_proto_info = combine_proto_infos_fold(prepare_graphs::<T>(protos));
+    let combined_proto_info = combine_proto_infos_fold(prepare_proto_infos::<T>(protos));
     confusion_free_proto_info(combined_proto_info, &subs)
 }
 
@@ -737,12 +737,12 @@ fn after_not_concurrent_step(
     new_succ_map
 }
 
-fn prepare_graphs<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Vec<(ProtoInfo, Option<T>)> {
+fn prepare_proto_infos<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Vec<(ProtoInfo, Option<T>)> {
     protos.0
         .iter()
         .map(|p| {
             (
-                prepare_graph::<T>(p.protocol.clone(), p.interface.clone()),
+                prepare_proto_info::<T>(p.protocol.clone(), p.interface.clone()),
                 p.interface.clone(),
             )
         })
@@ -750,7 +750,7 @@ fn prepare_graphs<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Vec<(Proto
 }
 
 // precondition: proto is a simple protocol, i.e. it does not contain concurrency.
-fn prepare_graph<T: SwarmInterface>(
+fn prepare_proto_info<T: SwarmInterface>(
     proto: SwarmProtocol,
     interface: Option<T>,
 ) -> ProtoInfo {
@@ -852,7 +852,7 @@ fn swarm_to_graph(proto: &SwarmProtocol) -> (Graph, Option<NodeId>, Vec<Error>) 
 pub fn from_json(
     proto: SwarmProtocol,
 ) -> (Graph, Option<NodeId>, Vec<String>) {
-    let proto_info = prepare_graph::<Role>(proto, None);
+    let proto_info = prepare_proto_info::<Role>(proto, None);
     let (g, i, e) = match proto_info.get_ith_proto(0) {
         Some((g, i, e)) => (g, i, e),
         _ => return (Graph::new(), None, vec![]),
@@ -1384,7 +1384,7 @@ mod tests {
     #[test]
     fn test_prepare_graph_confusionfree() {
         let composition = get_interfacing_swarms_1();
-        let proto_info = combine_proto_infos_fold(prepare_graphs::<Role>(composition));
+        let proto_info = combine_proto_infos_fold(prepare_proto_infos::<Role>(composition));
         let proto_info = explicit_composition_proto_info(proto_info);
 
         assert!(proto_info.get_ith_proto(0).is_some());
@@ -1448,7 +1448,7 @@ mod tests {
             ),
         ]);
         assert_eq!(proto_info.role_event_map, expected_role_event_map);
-        let proto_info = prepare_graph::<Role>(get_proto1(), None);
+        let proto_info = prepare_proto_info::<Role>(get_proto1(), None);
         assert!(proto_info.get_ith_proto(0).is_some());
         assert!(proto_info.get_ith_proto(0).unwrap().2.is_empty());
         assert_eq!(proto_info.concurrent_events, BTreeSet::new());
@@ -1458,14 +1458,14 @@ mod tests {
         );
         assert_eq!(proto_info.joining_events, BTreeSet::new());
 
-        let proto_info = prepare_graph::<Role>(get_proto2(), None);
+        let proto_info = prepare_proto_info::<Role>(get_proto2(), None);
         assert!(proto_info.get_ith_proto(0).is_some());
         assert!(proto_info.get_ith_proto(0).unwrap().2.is_empty());
         assert_eq!(proto_info.concurrent_events, BTreeSet::new());
         assert_eq!(proto_info.branching_events, BTreeSet::new());
         assert_eq!(proto_info.joining_events, BTreeSet::new());
 
-        let proto_info = prepare_graph::<Role>(get_proto3(), None);
+        let proto_info = prepare_proto_info::<Role>(get_proto3(), None);
         assert!(proto_info.get_ith_proto(0).is_some());
         assert!(proto_info.get_ith_proto(0).unwrap().2.is_empty());
         assert_eq!(proto_info.concurrent_events, BTreeSet::new());
@@ -1479,7 +1479,7 @@ mod tests {
     #[test]
     fn test_prepare_graph_malformed() {
         let proto1 = get_malformed_proto1();
-        let proto_info = prepare_graph::<Role>(proto1.clone(), None);
+        let proto_info = prepare_proto_info::<Role>(proto1.clone(), None);
         let mut errors = vec![
             proto_info.get_ith_proto(0).unwrap().2,
         ]
@@ -1494,7 +1494,7 @@ mod tests {
         expected_erros.sort();
         assert_eq!(errors, expected_erros);
 
-        let proto_info = prepare_graph::<Role>(get_malformed_proto2(), None);
+        let proto_info = prepare_proto_info::<Role>(get_malformed_proto2(), None);
         let errors = vec![
             confusion_free(&proto_info, 0, &BTreeMap::new()),
             proto_info.get_ith_proto(0).unwrap().2,
@@ -1508,7 +1508,7 @@ mod tests {
         ];
         assert_eq!(errors, expected_errors);
 
-        let proto_info = prepare_graph::<Role>(get_malformed_proto3(), None);
+        let proto_info = prepare_proto_info::<Role>(get_malformed_proto3(), None);
         let errors =
                 proto_info.get_ith_proto(0).unwrap().2
             .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
@@ -1527,7 +1527,7 @@ mod tests {
     fn test_prepare_graph_confusionful() {
         let proto = get_confusionful_proto1();
 
-        let proto_info = prepare_graph::<Role>(proto, None);
+        let proto_info = prepare_proto_info::<Role>(proto, None);
         let mut errors = vec![
             confusion_free(&proto_info, 0, &BTreeMap::new()),
             proto_info.get_ith_proto(0).unwrap().2,
