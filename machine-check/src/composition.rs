@@ -63,7 +63,7 @@ pub fn revised_projection(proto: String, subs: String, role: String) -> String {
         Ok(s) => s,
         Err(e) => return derr::<Machine>(vec![format!("parsing subscriptions: {}", e)]),
     };
-    let (swarm, initial, errors) = composition_swarm::from_json(proto, &subs);
+    let (swarm, initial, errors) = composition_swarm::from_json(proto);
     let Some(initial) = initial else {
         return err(errors);
     };

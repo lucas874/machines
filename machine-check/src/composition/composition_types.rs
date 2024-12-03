@@ -8,9 +8,9 @@ use crate::{
     Graph,
 };
 
-use super::{NodeId, Subscriptions, SwarmProtocol};
+use super::{NodeId, SwarmProtocol};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum DataResult<T: Serialize> {
     OK { data: T },
@@ -29,34 +29,31 @@ pub fn unord_event_pair(a: EventType, b: EventType) -> UnordEventPair {
 pub struct ProtoInfo {
     pub protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>, // maybe weird to have an interface as if it was related to one protocol. but convenient. "a graph interfaces with rest on if"
     pub role_event_map: RoleEventMap,
-    pub subscription: Subscriptions,
     pub concurrent_events: BTreeSet<UnordEventPair>, // consider to make a more specific type. unordered pair.
     pub branching_events: BTreeSet<EventType>,
     pub joining_events: BTreeSet<EventType>,
     pub immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
-    pub happens_after: BTreeMap<EventType, BTreeSet<EventType>>,
+    pub succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
 }
 // TODO: remove subscriptions field
 impl ProtoInfo {
     pub fn new(
         protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>,
         role_event_map: RoleEventMap,
-        subscription: Subscriptions,
         concurrent_events: BTreeSet<UnordEventPair>,
         branching_events: BTreeSet<EventType>,
         joining_events: BTreeSet<EventType>,
         immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
-        happens_after: BTreeMap<EventType, BTreeSet<EventType>>,
+        succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
     ) -> Self {
         Self {
             protocols,
             role_event_map,
-            subscription,
             concurrent_events,
             branching_events,
             joining_events,
             immediately_pre,
-            happens_after,
+            succeeding_events,
         }
     }
 
@@ -66,12 +63,11 @@ impl ProtoInfo {
         Self {
             protocols,
             role_event_map: BTreeMap::new(),
-            subscription: BTreeMap::new(),
             concurrent_events: BTreeSet::new(),
             branching_events: BTreeSet::new(),
             joining_events: BTreeSet::new(),
             immediately_pre: BTreeMap::new(),
-            happens_after: BTreeMap::new(),
+            succeeding_events: BTreeMap::new(),
         }
     }
 
@@ -93,15 +89,6 @@ impl ProtoInfo {
         self.protocols.iter().all(|((_, _, e), _)| e.is_empty())
     }
 }
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct CompositionInput {
-    pub protocol: SwarmProtocol,
-    pub subscription: Subscriptions,
-    pub interface: Option<Role>,
-}
-
-pub type CompositionInputVec = Vec<CompositionInput>;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CompositionComponent<T: SwarmInterface> {

@@ -497,7 +497,7 @@ mod tests {
         .unwrap();
 
         let role = Role::new("F");
-        let (g, i, _) = from_json(proto, &subs);
+        let (g, i, _) = from_json(proto);
         let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role);
         let expected_m = Machine {
             initial: State::new("0"),
@@ -554,7 +554,7 @@ mod tests {
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
-        let (g, i, _) = from_json(proto, &subs);
+        let (g, i, _) = from_json(proto);
         let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role);
         let expected_m = Machine {
             initial: State::new("0"),
@@ -613,7 +613,7 @@ mod tests {
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("F");
-        let (g, i, _) = from_json(proto, &subs);
+        let (g, i, _) = from_json(proto);
         let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role);
         let expected_m = Machine {
             initial: State::new("1"),
