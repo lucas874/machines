@@ -30,7 +30,7 @@ pub struct ProtoInfo {
     pub protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>, // maybe weird to have an interface as if it was related to one protocol. but convenient. "a graph interfaces with rest on if"
     pub role_event_map: RoleEventMap,
     pub concurrent_events: BTreeSet<UnordEventPair>, // consider to make a more specific type. unordered pair.
-    pub branching_events: BTreeSet<EventType>,
+    pub branching_events: Vec<BTreeSet<EventType>>,
     pub joining_events: BTreeSet<EventType>,
     pub immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
     pub succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
@@ -41,7 +41,7 @@ impl ProtoInfo {
         protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>,
         role_event_map: RoleEventMap,
         concurrent_events: BTreeSet<UnordEventPair>,
-        branching_events: BTreeSet<EventType>,
+        branching_events: Vec<BTreeSet<EventType>>,
         joining_events: BTreeSet<EventType>,
         immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
         succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
@@ -64,7 +64,7 @@ impl ProtoInfo {
             protocols,
             role_event_map: BTreeMap::new(),
             concurrent_events: BTreeSet::new(),
-            branching_events: BTreeSet::new(),
+            branching_events: Vec::new(),
             joining_events: BTreeSet::new(),
             immediately_pre: BTreeMap::new(),
             succeeding_events: BTreeMap::new(),

@@ -616,7 +616,7 @@ proptest! {
         let errors = serde_json::from_str::<CheckResult>(&errors).unwrap();
         let ok = match errors {
             CheckResult::OK => true,
-            CheckResult::ERROR { .. } => false
+            CheckResult::ERROR { errors: e } => {println!("{:?}", e); false}
 
         };
         assert!(ok);
@@ -723,6 +723,57 @@ proptest! {
             DataResult::<Subscriptions>::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
+    }
+}
+
+fn avg_sub_size(subscriptions: &Subscriptions) -> f32 {
+    let denominator = subscriptions.keys().len();
+    let mut numerator = 0;
+    for events in subscriptions.values() {
+        numerator += events.len();
+    }
+
+    numerator as f32 / denominator as f32
+}
+
+proptest! {
+    #[test]
+    #[ignore]
+    fn test_sub_sizes(vec in generate_interfacing_swarms_refinement_2(5, 5, 5)) {
+        let protos = serde_json::to_string(&vec).unwrap();
+        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone())).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+        assert!(subscription.is_some());
+        let subscription1 = subscription.unwrap();
+        /* let subscription = serde_json::to_string(&subscription1.clone()).unwrap();
+        let errors = check_wwf_swarm(protos.clone(), subscription.clone());
+        let errors = serde_json::from_str::<CheckResult>(&errors).unwrap();
+        let ok = match errors {
+            CheckResult::OK => true,
+            CheckResult::ERROR { .. } => false
+
+        };
+        assert!(ok); */
+        let subscription = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone())).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+        assert!(subscription.is_some());
+        let subscription2 = subscription.unwrap();
+        /* let subscription = serde_json::to_string(&subscription2.clone()).unwrap();
+        let errors = check_wwf_swarm(protos.clone(), subscription.clone());
+        let errors = serde_json::from_str::<CheckResult>(&errors).unwrap();
+        let ok = match errors {
+            CheckResult::OK => true,
+            CheckResult::ERROR { .. } => false
+
+        };
+        assert!(ok); */
+
+        println!("avg sub size approx: {}", avg_sub_size(&subscription1));
+        println!("avg sub size exact: {}\n", avg_sub_size(&subscription2));
     }
 }
 
