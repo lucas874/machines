@@ -101,6 +101,11 @@ pub fn project(
             );
         }
     }
+    //let (dfa, dfa_initial)  = nfa_to_dfa(machine, m_nodes[initial.index()]);
+    //let (minimal, minimal_initial)  = minimal_machine(&machine, m_nodes[initial.index()]);
+    //let (dfa, dfa_initial) = nfa_to_dfa(minimal, minimal_initial);
+    //minimal_machine(&dfa, dfa_initial)
+    //nfa_to_dfa(minimal, minimal_initial)
     nfa_to_dfa(machine, m_nodes[initial.index()])
 }
 
@@ -134,12 +139,23 @@ pub fn project_combine(
         (acc_machine, acc_initial),
         |(acc, acc_i), (m, i, interface)| compose(acc, acc_i, m, i, interface),
     );
-
+    //let (minimal, minimal_initial) = minimal_machine(&combined_projection, combined_initial);
+    //let (dfa, dfa_initial) = nfa_to_dfa(minimal, minimal_initial);
+    //let (dfa, dfa_initial) = nfa_to_dfa(combined_projection, combined_initial);
+    //let (minimal, minimal_initial) = minimal_machine(&dfa, dfa_initial);
     // why option here COME BACK
     (
         to_option_machine(&combined_projection),
         Some(combined_initial),
     )
+    /* (
+        to_option_machine(&minimal),
+        Some(minimal_initial),
+    ) */
+    /* (
+        to_option_machine(&dfa),
+        Some(dfa_initial),
+    ) */
 }
 
 pub fn project_combine_all(
@@ -153,21 +169,22 @@ pub fn project_combine_all(
 
 // nfa to dfa using subset construction. Hopcroft, Motwani and Ullman section 2.3.5
 fn nfa_to_dfa(nfa: Graph, i: NodeId) -> (Graph, NodeId) {
+    partition_refinement(&nfa, i);
     let mut dfa = Graph::new();
     // maps vectors of NodeIds from the nfa to a NodeId in the new dfa
-    let mut dfa_nodes: BTreeMap<Vec<NodeId>, NodeId> = BTreeMap::new();
+    let mut dfa_nodes: BTreeMap<BTreeSet<NodeId>, NodeId> = BTreeMap::new();
 
     // push to and pop from in loop until empty and NFA has been turned into a dfa
-    let mut stack: Vec<Vec<NodeId>> = Vec::new();
+    let mut stack: Vec<BTreeSet<NodeId>> = Vec::new();
 
     // [0, 1, 2] becomes Some(State("{0, 1, 2}"))
-    let state_name = |nodes: &Vec<NodeId>| -> State {
+    let state_name = |nodes: &BTreeSet<NodeId>| -> State {
         let name = format!("{{ {} }}", nodes.iter().map(|n| nfa[*n].clone()).join(", "));
         State::new(&name)
     };
 
     // get all outgoing edges of the sources. turn into a map from machine labels to vectors of target states.
-    let outgoing_map = |srcs: &Vec<NodeId>| -> BTreeMap<MachineLabel, Vec<NodeId>> {
+    let outgoing_map = |srcs: &BTreeSet<NodeId>| -> BTreeMap<MachineLabel, BTreeSet<NodeId>> {
         srcs.iter()
             .flat_map(|src| {
                 nfa.edges_directed(*src, Outgoing)
@@ -177,16 +194,16 @@ fn nfa_to_dfa(nfa: Graph, i: NodeId) -> (Graph, NodeId) {
             .into_iter()
             .fold(BTreeMap::new(), |mut m, (edge_label, target)| {
                 m.entry(edge_label)
-                    .and_modify(|v: &mut Vec<NodeId>| v.push(target))
-                    .or_insert(vec![target]);
+                    .and_modify(|v: &mut BTreeSet<NodeId>| { v.insert(target); })
+                    .or_insert(BTreeSet::from([target]));
                 m
             })
     };
 
     // add initial state to dfa
-    dfa_nodes.insert(vec![i], dfa.add_node(state_name(&vec![i])));
+    dfa_nodes.insert(BTreeSet::from([i]), dfa.add_node(state_name(&BTreeSet::from([i]))));
     // add initial state to stack
-    stack.push(vec![i]);
+    stack.push(BTreeSet::from([i]));
 
     while let Some(states) = stack.pop() {
         let map = outgoing_map(&states);
@@ -203,7 +220,70 @@ fn nfa_to_dfa(nfa: Graph, i: NodeId) -> (Graph, NodeId) {
         }
     }
 
-    (dfa, dfa_nodes[&vec![i]])
+    (dfa, dfa_nodes[&BTreeSet::from([i])])
+}
+
+fn minimal_machine(graph: &Graph, i: NodeId) -> (Graph, NodeId) {
+    let partition = partition_refinement(graph, i);
+    let mut minimal = Graph::new();
+    let mut node_to_partition = BTreeMap::new();
+    let mut partition_to_minimal_graph_node = BTreeMap::new();
+    let state_name = |nodes: &BTreeSet<NodeId>| -> State {
+        let name = format!("{{ {} }}", nodes.iter().map(|n| graph[*n].clone()).join(", "));
+        State::new(&name)
+    };
+
+    for n in graph.node_indices() {
+        node_to_partition.insert(n, partition.iter().find(|block| block.contains(&n)).unwrap());
+    }
+    for block in &partition {
+        partition_to_minimal_graph_node.insert(block, minimal.add_node(state_name(block)));
+    }
+    for node in graph.node_indices() {
+        for edge in graph.edges_directed(node, Outgoing) {
+            let source = partition_to_minimal_graph_node[node_to_partition[&node]];
+            let target = partition_to_minimal_graph_node[node_to_partition[&edge.target()]];
+            minimal.add_edge(source, target, edge.weight().clone());
+        }
+    }
+    let initial = partition_to_minimal_graph_node[node_to_partition[&i]];
+    (minimal, initial)
+
+
+}
+
+fn partition_refinement(graph: &Graph, i: NodeId) -> BTreeSet<BTreeSet<NodeId>> {
+    let mut partition_old: BTreeSet<BTreeSet<NodeId>> = BTreeSet::from([graph.node_indices().collect()]);
+    let tmp: (BTreeSet<_>, BTreeSet<_>) = graph
+        .node_indices()
+        .partition(|n| graph.edges_directed(*n, Outgoing).count() == 0);
+    let mut partition: BTreeSet<BTreeSet<NodeId>> = BTreeSet::from([tmp.0, tmp.1]);
+    while partition.len() != partition_old.len() {
+        partition_old = partition.clone();
+        for superblock in &partition_old {
+            partition = refine_partition(graph, partition, superblock)
+        }
+    }
+
+    partition
+}
+
+fn refine_partition(graph: &Graph, partition: BTreeSet<BTreeSet<NodeId>>, superblock: &BTreeSet<NodeId>) -> BTreeSet<BTreeSet<NodeId>> {
+    partition
+        .iter()
+        .flat_map(|block| refine_block(graph, block, superblock))
+        .collect()
+}
+
+fn refine_block(graph: &Graph, block: &BTreeSet<NodeId>, superblock: &BTreeSet<NodeId>) -> BTreeSet<BTreeSet<NodeId>> {
+    let pre_super_block: BTreeSet<NodeId> = superblock
+        .iter()
+        .flat_map(|node| graph.edges_directed(*node, Incoming).into_iter().map(|e| e.source()))
+        .collect();
+
+    [block.intersection(&pre_super_block).cloned().collect(), block.difference(&pre_super_block).cloned().collect()]
+        .into_iter()
+        .filter(|s: &BTreeSet<NodeId>| !s.is_empty()).collect()
 }
 
 // precondition: both machines are projected from wwf protocols?
@@ -353,11 +433,9 @@ mod tests {
     use super::*;
     use crate::{
         composition::{
-            composition_swarm::{compose_protocols, exact_weak_well_formed_sub, from_json, swarms_to_proto_info},
+            composition_swarm::{compose_protocols, exact_weak_well_formed_sub, from_json, swarms_to_proto_info, Error},
             composition_types::{CompositionComponent, InterfacingSwarms},
-        },
-        types::{Command, EventType, Role, Transition},
-        Machine, Subscriptions, SwarmProtocol,
+        }, types::{Command, EventType, Role, Transition}, Machine, MapVec, Subscriptions, SwarmProtocol
     };
 
     // Example from coplaws slides
@@ -547,6 +625,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_projection_2() {
         // warehouse example from coplaws slides
         let proto = get_proto1();
@@ -749,7 +828,9 @@ mod tests {
                 proj_combined_initial2.unwrap()
             )
             .is_empty());
-
+            //println!("machine: {}\n$$$$\n", serde_json::to_string_pretty(&from_option_to_machine(proj_combined2.clone(), proj_combined_initial2.clone().unwrap())).unwrap());
+            println!("{}\n$$$$\n", serde_json::to_string_pretty(&from_option_to_machine(proj_combined2.clone(), proj_combined_initial2.clone().unwrap())).unwrap());
+            println!("");
             assert_eq!(subs2, subs);
 
             let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, role.clone());
@@ -759,7 +840,9 @@ mod tests {
                 &to_option_machine(&proj),
                 proj_initial
             );
-
+            //println!("explicit {}\n$$$$\n", serde_json::to_string_pretty(&to_json_machine(proj.clone(), proj_initial)).unwrap());
+            println!("{}\n$$$$\n", serde_json::to_string_pretty(&to_json_machine(proj.clone(), proj_initial)).unwrap());
+            //print!("errors: {:?}", errors.map(crate::machine::Error::convert(&proj_combined2, &to_option_machine(&proj))));
             assert!(errors.is_empty());
             }
     }

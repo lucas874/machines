@@ -1,5 +1,5 @@
 use machine_check::{
-    composition::{check_wwf_swarm, compose_protocols, composition_types::{CompositionComponent, DataResult, InterfacingSwarms}, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, revised_projection, check_composed_projection}, types::{Command, EventType, Role, State, StateName, SwarmLabel, Transition}, EdgeId, Graph, Machine, NodeId, Subscriptions, SwarmProtocol
+    composition::{check_composed_projection, check_wwf_swarm, compose_protocols, composition_types::{CompositionComponent, DataResult, InterfacingSwarms}, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, project_combine, revised_projection}, types::{Command, EventType, Role, State, StateName, SwarmLabel, Transition}, EdgeId, Graph, Machine, NodeId, Subscriptions, SwarmProtocol
 };
 use petgraph::{
     graph::EdgeReference,
@@ -818,11 +818,20 @@ proptest! {
                 CheckResult::ERROR {errors: e} => { println!("errors: {:?}", e); assert!(false) },
             } */
             assert!(projection.is_some());
-            let machine_string = serde_json::to_string(&projection.unwrap()).unwrap();
+            let machine_string = serde_json::to_string(&projection.clone().unwrap()).unwrap();
             // should work like this projecting over the explicit composition initially and comparing that with combined machines?
-            match serde_json::from_str(&check_composed_projection(protos.clone(), sub_string.clone(), role.to_string(), machine_string)).unwrap() {
+            match serde_json::from_str(&check_composed_projection(protos.clone(), sub_string.clone(), role.clone().to_string(), machine_string)).unwrap() {
                 CheckResult::OK => assert!(true),
-                CheckResult::ERROR {errors: e} => { println!("errors: {:?}", e); assert!(false) },
+                CheckResult::ERROR {errors: e} => {
+                    match serde_json::from_str(&project_combine(protos.clone(), sub_string.clone(), role.clone().to_string())).unwrap() {
+                        DataResult::<Machine>::OK{data: projection1} => {
+                            println!("machine combined: {}", serde_json::to_string_pretty(&projection1).unwrap());
+                        },
+                        DataResult::<Machine>::ERROR{ errors: e } => println!("errors combined: {:?}", e),
+                    };
+                    println!("machine: {}", serde_json::to_string_pretty(&projection.unwrap()).unwrap());
+                    println!("errors: {:?}", e); assert!(false)
+                },
             }
         }
     }

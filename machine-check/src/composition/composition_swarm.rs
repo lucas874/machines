@@ -579,21 +579,14 @@ fn finer_overapprox_wwf_sub(proto_info: &mut ProtoInfo) -> Subscriptions {
 
         subscription.insert(role.clone(), event_types.into_iter().chain(preceding_event_types.into_iter()).collect());
     }
-    for (role, _) in &proto_info.role_event_map {
-        subscription
-            .entry(role.clone())
-            .and_modify(|curr| {
-                curr.append(&mut proto_info.joining_events.clone());
-            })
-            .or_insert(proto_info.joining_events.clone());
-    }
+
     // determinacy
-    finer_approx_add_branches_and_joins(proto_info, &mut subscription);
+    finer_approx_add_branches_and_joins(proto_info, &mut subscription, true);
 
     subscription
 }
 
-fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mut Subscriptions) {
+fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mut Subscriptions, with_all_interfacing: bool) {
     let mut is_stable = false;
     let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
         let pre = proto_info.immediately_pre.get(e).cloned().unwrap_or_default();
@@ -620,21 +613,22 @@ fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mu
 
     while !is_stable {
         is_stable = true;
+        // determinacy: joins
+        for joining_event in &proto_info.joining_events {
+            let interested_roles = if with_all_interfacing { proto_info.role_event_map.keys().cloned().collect() } else { roles_on_path(joining_event.clone(), proto_info, &subscription) };
+            let join_and_prejoin: BTreeSet<_> = [joining_event.clone()].into_iter().chain(get_pre_joins(&joining_event).into_iter()).collect();
+            for role in interested_roles {
+                is_stable = add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
+                //subscription.entry(role).and_modify(|events| { events.append(&mut join_and_prejoin.clone()); }).or_default();
+            }
+        }
+
         // determinacy: branches
         for branching_events in &proto_info.branching_events {
             let interested_roles = branching_events.iter().flat_map(|e| roles_on_path(e.clone(), proto_info, &subscription)).collect::<BTreeSet<_>>();//roles_on_path(branching_events.clone(), proto_info, &subscription);
             for role in interested_roles {
                 is_stable = add_to_sub(role, branching_events.clone(), subscription) && is_stable;
                 //subscription.entry(role).and_modify(|events| { events.append(&mut branching_events.clone()); }).or_default();
-            }
-        }
-        // determinacy: joins
-        for joining_event in &proto_info.joining_events {
-            let interested_roles = roles_on_path(joining_event.clone(), proto_info, &subscription);
-            let join_and_prejoin: BTreeSet<_> = [joining_event.clone()].into_iter().chain(get_pre_joins(&joining_event).into_iter()).collect();
-            for role in interested_roles {
-                is_stable = add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
-                //subscription.entry(role).and_modify(|events| { events.append(&mut join_and_prejoin.clone()); }).or_default();
             }
         }
     }
@@ -837,17 +831,6 @@ fn after_not_concurrent_step(
 fn transitive_closure_succeeding(succ_map: BTreeMap<EventType, BTreeSet<EventType>>) -> BTreeMap<EventType, BTreeSet<EventType>> {
     let mut graph: petgraph::Graph::<EventType, (), Directed> = petgraph::Graph::new();
     let mut node_map = BTreeMap::new();
-    /* for e in &all_events {
-        node_map.insert(e.clone(), graph.add_node(e.clone()));
-    }
-    for k in &all_events {
-        if succ_map.contains_key(k) {
-            for v in &succ_map[k] {
-                //println!("k: {}, v: {}", k, v);
-                graph.add_edge(node_map[k], node_map[v], ());
-            }
-        }
-    } */
     for (event, succeeding) in &succ_map {
         if !node_map.contains_key(event) {
             node_map.insert(event.clone(), graph.add_node(event.clone()));
