@@ -421,19 +421,28 @@ fn exact_wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
         Some((g, Some(i), e)) => (g, i, e),
         _ => return BTreeMap::new(),
     };
-
-    let mut next_subscriptions = exact_wwf_sub_step(&proto_info, &graph, initial, subscriptions.clone());
-
-    while subscriptions != next_subscriptions {
-        subscriptions = next_subscriptions;
-        next_subscriptions = exact_wwf_sub_step(&proto_info, &graph, initial, subscriptions.clone());
+    let mut is_stable = exact_wwf_sub_step(&proto_info, &graph, initial, &mut subscriptions);
+    while !is_stable {
+        is_stable = exact_wwf_sub_step(&proto_info, &graph, initial, &mut subscriptions);
     }
 
     subscriptions
 }
+fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, subscriptions: &mut Subscriptions) -> bool {
+    let mut is_stable = true;
+    let add_to_sub = |role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subscriptions| -> bool {
+        if subs.contains_key(&role) && event_types.iter().all(|e| subs[&role].contains(e)) {//event_types.is_subset(&subs[&role]) {
+            return true;
+        }
+        subs
+            .entry(role)
+            .and_modify(|curr| {
+                curr.append(&mut event_types);
+            })
+            .or_insert(event_types);
+        false
 
-fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, subs: Subscriptions) -> Subscriptions {
-    let mut subscriptions = subs;
+    };
     for node in Dfs::new(&graph, initial).iter(&graph) {
         // for each edge going out of node:
         // extend subscriptions to satisfy conditions for weak causal consistency
@@ -443,12 +452,7 @@ fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, su
         for edge in graph.edges_directed(node, Outgoing) {
             let event_type = edge.weight().get_event_type();
             // weak causal consistency 1: a role subscribes to the events it emits
-            subscriptions
-                .entry(edge.weight().role.clone())
-                .and_modify(|curr| {
-                    curr.insert(event_type.clone());
-                })
-                .or_insert(BTreeSet::from([event_type.clone()]));
+            is_stable = add_to_sub(edge.weight().role.clone(), BTreeSet::from([event_type.clone()]), subscriptions) && is_stable;
 
             // weak causal consistency 2: a role subscribes to events that immediately precedes its own commands
             for active in active_transitions_not_conc(
@@ -457,12 +461,7 @@ fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, su
                 &event_type,
                 &proto_info.concurrent_events,
             ) {
-                subscriptions
-                    .entry(active.role)
-                    .and_modify(|curr| {
-                        curr.insert(event_type.clone());
-                    })
-                    .or_insert(BTreeSet::from([event_type.clone()]));
+                is_stable = add_to_sub(active.role, BTreeSet::from([event_type.clone()]), subscriptions) && is_stable;
             }
             let involved_roles = roles_on_path(event_type.clone(), &proto_info, &subscriptions);
             // weak determinacy 1: roles subscribe to branching events.
@@ -482,17 +481,12 @@ fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, su
                 };
 
                 for r in involved_roles.iter() {
-                    subscriptions
-                        .entry(r.clone())
-                        .and_modify(|curr| {
-                            curr.append(&mut branching_events_this_node.clone());
-                        })
-                        .or_insert(branching_events_this_node.clone());
+                    is_stable = add_to_sub(r.clone(), branching_events_this_node.clone(), subscriptions) && is_stable;
                 }
             }
 
             // weak determinacy 2. joining events.
-            // With new strategy: the joining events are an overapproximation.
+           // With new strategy: the joining events are an overapproximation.
             // so check if there are two or more incoming concurrent not concurrent with event type
             if proto_info.joining_events.contains(&event_type) {
                 let incoming_pairs_concurrent: Vec<UnordEventPair> = event_pairs_from_node(node, &graph, Incoming)
@@ -504,20 +498,14 @@ fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, su
                     .into_iter()
                     .flat_map(|pair| pair.into_iter().chain([event_type.clone()])).collect();
                 for r in involved_roles.iter() {
-                    subscriptions
-                        .entry(r.clone())
-                        .and_modify(|curr| {
-                            curr.append(&mut events_to_add.clone());
-                        })
-                        .or_insert(events_to_add.clone());
+                    is_stable = add_to_sub(r.clone(), events_to_add.clone(), subscriptions) && is_stable;
                 }
             }
         }
     }
 
-    subscriptions
+    is_stable
 }
-
 fn overapprox_wwf_sub(proto_info: &ProtoInfo) -> Subscriptions {
     // for each role add all branching.
     // for each role add all joining and immediately pre joining that are concurrent
@@ -638,7 +626,7 @@ fn combine_proto_infos_fold<T: SwarmInterface>(protos: Vec<(ProtoInfo, Option<T>
         });
     //println!("combined before: {}", serde_json::to_string_pretty(&combined.succeeding_events).unwrap());
     let all_events = combined.role_event_map.values().flat_map(|v| v.iter().map(|sl| sl.get_event_type())).collect();
-    combined.succeeding_events = transitive_closure_succeeding_1(combined.succeeding_events, all_events);
+    combined.succeeding_events = transitive_closure_succeeding(combined.succeeding_events, all_events);
     //combined.succeeding_events = transitive_closure_succeeding(combined.succeeding_events);
     //println!("combined after: {}\n\n------\n", serde_json::to_string_pretty(&combined.succeeding_events).unwrap());
     combined
@@ -702,11 +690,10 @@ fn after_not_concurrent(
 )-> BTreeMap<EventType, BTreeSet<EventType>> {
     let mut succ_map: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
 
-    let mut new_succ_map = after_not_concurrent_step(graph, initial, concurrent_events, succ_map.clone());
+    let mut is_stable = after_not_concurrent_step(graph, initial, concurrent_events, &mut succ_map);
 
-    while succ_map != new_succ_map {
-        succ_map = new_succ_map;
-        new_succ_map = after_not_concurrent_step(graph, initial, concurrent_events, succ_map.clone());
+    while !is_stable {
+        is_stable = after_not_concurrent_step(graph, initial, concurrent_events, &mut succ_map);
     }
 
     succ_map
@@ -716,21 +703,20 @@ fn after_not_concurrent_step(
     graph: &Graph,
     initial: NodeId,
     concurrent_events: &BTreeSet<BTreeSet<EventType>>,
-    succ_map: BTreeMap<EventType, BTreeSet<EventType>>,
-) -> BTreeMap<EventType, BTreeSet<EventType>> {
+    succ_map: &mut BTreeMap<EventType, BTreeSet<EventType>>,
+) -> bool {
+    let mut is_stable = true;
     let mut walk = DfsPostOrder::new(&graph, initial);
-    let mut new_succ_map: BTreeMap<EventType, BTreeSet<EventType>> = succ_map;
-
-
     // we should not need the outcommented filter
     // for each edge e we get a set of 'active_in_successor' edges
     // that only contains events immediately after e and not concurrent with e
     while let Some(node) = walk.next(&graph) {
         for edge in graph.edges_directed(node, Outgoing) {
+            let event_type = edge.weight().get_event_type();
             let active_in_successor = active_transitions_not_conc(
                 edge.target(),
                 graph,
-                &edge.weight().get_event_type(),
+                &event_type,
                 concurrent_events,
             )
             .map(|label| label.get_event_type());
@@ -740,65 +726,32 @@ fn after_not_concurrent_step(
                 .clone()
                 .into_iter()
                 .flat_map(|e| {
-                    let events = new_succ_map.get(&e).unwrap_or(&default);
+                    let events = succ_map.get(&e).unwrap_or(&default);
                     events.clone()
                 })
                 .chain(active_in_successor.into_iter())
-                //.filter(|e| {
-                //    !concurrent_events
-                //        .contains(&unord_event_pair(edge.weight().get_event_type(), e.clone()))
-                //})
                 .collect();
 
-            new_succ_map
-                .entry(edge.weight().get_event_type())
-                .and_modify(|events| {
-                    events.append(&mut succ_events);
-                })
-                .or_insert(succ_events);
+            if !succ_map.contains_key(&event_type) || !succ_events.iter().all(|e| succ_map[&event_type].contains(e)) {
+                succ_map
+                    .entry(event_type)
+                    .and_modify(|events| {
+                        events.append(&mut succ_events);
+                    })
+                    .or_insert(succ_events);
+                is_stable = false;
+            }
         }
     }
-
-    new_succ_map
+    is_stable
 }
 
-fn transitive_closure_succeeding(succ_map: BTreeMap<EventType, BTreeSet<EventType>>) -> BTreeMap<EventType, BTreeSet<EventType>> {
-    let mut succ_maps: Vec<BTreeMap<EventType, BTreeSet<EventType>>> = vec![succ_map];
-
-    let after_n = |e: &EventType, map: &BTreeMap::<EventType, BTreeSet<EventType>>,| -> BTreeSet<EventType> {
-        map.get(e).cloned().unwrap_or_default().clone()
-    };
-    let mut i = 0;
-    loop {
-        let mut new_succ_map = BTreeMap::new();
-        let n = succ_maps.len();
-        for e in succ_maps[0].keys() {
-            new_succ_map.insert(e.clone(), succ_maps[0][e].iter().flat_map(|event| after_n(event, &succ_maps[n-1])).collect());
-        }
-        //println!("succ map: {}", serde_json::to_string_pretty(&new_succ_map).unwrap());
-        //println!("i is: {}", i);
-        succ_maps.push(new_succ_map);
-
-
-
-        i = i + 1;
-        if succ_maps[n] == succ_maps[n-1] {
-            break;
-        }
-    }
-
-    succ_maps.pop().unwrap()
-
-}
-
-fn transitive_closure_succeeding_1(succ_map: BTreeMap<EventType, BTreeSet<EventType>>, all_events: BTreeSet<EventType>) -> BTreeMap<EventType, BTreeSet<EventType>> {
+fn transitive_closure_succeeding(succ_map: BTreeMap<EventType, BTreeSet<EventType>>, all_events: BTreeSet<EventType>) -> BTreeMap<EventType, BTreeSet<EventType>> {
     let mut graph: petgraph::Graph::<EventType, (), Directed> = petgraph::Graph::new();
     let mut node_map = BTreeMap::new();
-    //println!("hallo in succ_1 old {}", serde_json::to_string_pretty(&succ_map).unwrap());
     for e in &all_events {
         node_map.insert(e.clone(), graph.add_node(e.clone()));
     }
-    //for (k, v) in &succ_map {
     for k in &all_events {
         if succ_map.contains_key(k) {
             for v in &succ_map[k] {
@@ -809,7 +762,6 @@ fn transitive_closure_succeeding_1(succ_map: BTreeMap<EventType, BTreeSet<EventT
     }
 
     let reflexive_transitive_closure = floyd_warshall(&graph, |_| 1);
-    //println!("reflexive transitive: {:?}", reflexive_transitive_closure);
     let transitive_closure: Vec<_> = reflexive_transitive_closure
         .unwrap_or_else(|_| HashMap::new())
         .into_iter()
@@ -819,11 +771,10 @@ fn transitive_closure_succeeding_1(succ_map: BTreeMap<EventType, BTreeSet<EventT
 
     let mut succ_map_new: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
     for (i1, i2) in transitive_closure {
-        //println!("i1: {:?}, i2: {:?}", graph[i1].clone(), graph[i2].clone());
         succ_map_new.entry(graph[i1].clone()).and_modify(|succeeding_events| { succeeding_events.insert(graph[i2].clone()); }).or_insert_with(|| BTreeSet::from([graph[i2].clone()]));
     }
-    //println!("hallo in succ_1 {}", serde_json::to_string_pretty(&succ_map_new).unwrap());
-    // do this because of loops
+
+    // do this because of loops. everything reachable from itself in result from floyd_warshall(), but we filter these out. add them again if loops.
     combine_maps(succ_map, succ_map_new, None)
 }
 
