@@ -4,7 +4,10 @@ use crate::{
     EdgeId, NodeId, Subscriptions, SwarmProtocol,
 };
 use itertools::Itertools;
+use petgraph::algo::floyd_warshall;
 use petgraph::visit::DfsPostOrder;
+use petgraph::Directed;
+use std::collections::HashMap;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
@@ -52,7 +55,7 @@ impl Error {
             Error::RoleNotSubscribedToBranch(event_types, edge, node, role) => {
                 let events = event_types.join(", ");
                 format!(
-                    "role {role} does not subscribe to event types {events} in branching transitions at state {}, but is involved in or after transition {}",
+                    "role {role} does not subscribe to event types {events} in branching transitions at state {}, but is involved after transition {}",
                     &graph[*node].state_name(),
                     Edge(graph, *edge)
                 )
@@ -517,9 +520,17 @@ fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, su
 
 fn overapprox_wwf_sub(proto_info: &ProtoInfo) -> Subscriptions {
     // for each role add all branching.
-    // for each role add all joining and immediately pre joining
+    // for each role add all joining and immediately pre joining that are concurrent
     // for each role, add own events and the events immediately preceding these
     let default = BTreeSet::new();
+    let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
+        let pre = proto_info.immediately_pre.get(e).unwrap_or(&default);
+        let product = pre.clone().into_iter().cartesian_product(pre);
+        product.filter(|(e1, e2)| *e1 != **e2 && proto_info.concurrent_events.contains(&unord_event_pair(e1.clone(), (*e2).clone())))
+            .map(|(e1, e2)| [e1, e2.clone()])
+            .flatten()
+            .collect()
+    };
     let events_to_add_to_all:BTreeSet<EventType> = proto_info
         .branching_events.clone().into_iter()
         .chain(proto_info.joining_events.clone().into_iter())
@@ -527,7 +538,7 @@ fn overapprox_wwf_sub(proto_info: &ProtoInfo) -> Subscriptions {
             proto_info
                 .joining_events
                 .iter()
-                .flat_map(|e| proto_info.immediately_pre.get(e).unwrap_or(&default).clone()))
+                .flat_map(|e| get_pre_joins(e)))//proto_info.immediately_pre.get(e).unwrap_or(&default).clone()))
         .collect();
 
     let sub: BTreeMap<Role, BTreeSet<EventType>> = proto_info.role_event_map
@@ -593,6 +604,7 @@ fn combine_proto_infos<T: SwarmInterface>(
         proto_info2.succeeding_events,
         None
     );
+    let happens_after = happens_after;
 
     ProtoInfo::new(
         protocols,
@@ -618,12 +630,18 @@ fn combine_proto_infos_fold<T: SwarmInterface>(protos: Vec<(ProtoInfo, Option<T>
 
     let (proto, _) = protos[0].clone();
 
-    protos[1..]
+    let mut combined = protos[1..]
         .to_vec()
         .into_iter()
         .fold(proto, |acc, (p, interface)| {
             combine_proto_infos(acc, p, interface.unwrap())
-        })
+        });
+    //println!("combined before: {}", serde_json::to_string_pretty(&combined.succeeding_events).unwrap());
+    let all_events = combined.role_event_map.values().flat_map(|v| v.iter().map(|sl| sl.get_event_type())).collect();
+    combined.succeeding_events = transitive_closure_succeeding_1(combined.succeeding_events, all_events);
+    //combined.succeeding_events = transitive_closure_succeeding(combined.succeeding_events);
+    //println!("combined after: {}\n\n------\n", serde_json::to_string_pretty(&combined.succeeding_events).unwrap());
+    combined
 }
 
 // given some node, return the swarmlabels going out of that node that are not concurrent with 'event'
@@ -645,11 +663,19 @@ fn active_transitions_not_conc(
 // the involved roles on a path are those roles that subscribe (or perform) to one or
 // more of the events taking place in a transition reachable from the transition
 // represented by its emitted event 'event_type'
+// Remove event_type from succeeding...
 fn roles_on_path(event_type: EventType, proto_info: &ProtoInfo, subs: &Subscriptions) -> BTreeSet<Role> {
     let default = BTreeSet::new();
-    let event_and_succeeding_events: BTreeSet<EventType> = [event_type.clone()]
+    /* let event_and_succeeding_events: BTreeSet<EventType> = [event_type.clone()]
         .iter()
         .chain([event_type].iter().flat_map(|e| proto_info.succeeding_events.get(e).unwrap_or(&default)))
+        .cloned()
+        .collect(); */
+    let succeeding_events: BTreeSet<EventType> =
+        proto_info.succeeding_events
+        .get(&event_type)
+        .unwrap_or(&default)
+        .iter()
         .cloned()
         .collect();
     proto_info.role_event_map
@@ -660,7 +686,7 @@ fn roles_on_path(event_type: EventType, proto_info: &ProtoInfo, subs: &Subscript
                 .map(|label| label.get_event_type())
                 .chain(subs.get(*role).unwrap_or(&default).clone())
                 .collect::<BTreeSet<EventType>>()
-                .intersection(&event_and_succeeding_events)
+                .intersection(&succeeding_events)
                 .cloned()
                 .collect::<BTreeSet<EventType>>()
                 .is_empty()
@@ -685,7 +711,6 @@ fn after_not_concurrent(
 
     succ_map
 }
-
 
 fn after_not_concurrent_step(
     graph: &Graph,
@@ -735,6 +760,71 @@ fn after_not_concurrent_step(
     }
 
     new_succ_map
+}
+
+fn transitive_closure_succeeding(succ_map: BTreeMap<EventType, BTreeSet<EventType>>) -> BTreeMap<EventType, BTreeSet<EventType>> {
+    let mut succ_maps: Vec<BTreeMap<EventType, BTreeSet<EventType>>> = vec![succ_map];
+
+    let after_n = |e: &EventType, map: &BTreeMap::<EventType, BTreeSet<EventType>>,| -> BTreeSet<EventType> {
+        map.get(e).cloned().unwrap_or_default().clone()
+    };
+    let mut i = 0;
+    loop {
+        let mut new_succ_map = BTreeMap::new();
+        let n = succ_maps.len();
+        for e in succ_maps[0].keys() {
+            new_succ_map.insert(e.clone(), succ_maps[0][e].iter().flat_map(|event| after_n(event, &succ_maps[n-1])).collect());
+        }
+        //println!("succ map: {}", serde_json::to_string_pretty(&new_succ_map).unwrap());
+        //println!("i is: {}", i);
+        succ_maps.push(new_succ_map);
+
+
+
+        i = i + 1;
+        if succ_maps[n] == succ_maps[n-1] {
+            break;
+        }
+    }
+
+    succ_maps.pop().unwrap()
+
+}
+
+fn transitive_closure_succeeding_1(succ_map: BTreeMap<EventType, BTreeSet<EventType>>, all_events: BTreeSet<EventType>) -> BTreeMap<EventType, BTreeSet<EventType>> {
+    let mut graph: petgraph::Graph::<EventType, (), Directed> = petgraph::Graph::new();
+    let mut node_map = BTreeMap::new();
+    //println!("hallo in succ_1 old {}", serde_json::to_string_pretty(&succ_map).unwrap());
+    for e in &all_events {
+        node_map.insert(e.clone(), graph.add_node(e.clone()));
+    }
+    //for (k, v) in &succ_map {
+    for k in &all_events {
+        if succ_map.contains_key(k) {
+            for v in &succ_map[k] {
+                //println!("k: {}, v: {}", k, v);
+                graph.add_edge(node_map[k], node_map[v], ());
+            }
+        }
+    }
+
+    let reflexive_transitive_closure = floyd_warshall(&graph, |_| 1);
+    //println!("reflexive transitive: {:?}", reflexive_transitive_closure);
+    let transitive_closure: Vec<_> = reflexive_transitive_closure
+        .unwrap_or_else(|_| HashMap::new())
+        .into_iter()
+        .filter(|(_, v)| *v != i32::MAX && *v != 0)
+        .map(|(related_pair, _)| related_pair)
+        .collect();
+
+    let mut succ_map_new: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
+    for (i1, i2) in transitive_closure {
+        //println!("i1: {:?}, i2: {:?}", graph[i1].clone(), graph[i2].clone());
+        succ_map_new.entry(graph[i1].clone()).and_modify(|succeeding_events| { succeeding_events.insert(graph[i2].clone()); }).or_insert_with(|| BTreeSet::from([graph[i2].clone()]));
+    }
+    //println!("hallo in succ_1 {}", serde_json::to_string_pretty(&succ_map_new).unwrap());
+    // do this because of loops
+    combine_maps(succ_map, succ_map_new, None)
 }
 
 fn prepare_proto_infos<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Vec<(ProtoInfo, Option<T>)> {
@@ -915,6 +1005,7 @@ fn event_pairs_from_node(
 
 // get events that are immediately before some event and not concurrent.
 // backtrack if immediately preceding is concurrent. not sure if this is needed or ok though
+// do not think we should 'backtrack' outcommented now
 fn get_immediately_pre(
     graph: &Graph,
     edge: EdgeReference<'_, SwarmLabel>,
@@ -922,7 +1013,7 @@ fn get_immediately_pre(
 ) -> BTreeSet<EventType> {
     let node = edge.source();
     let event_type = edge.weight().get_event_type();
-    let mut visited = BTreeSet::from([node]);
+    //let mut visited = BTreeSet::from([node]);
     let mut to_visit = Vec::from([node]);
     let mut immediately_pre = BTreeSet::new();
 
@@ -933,14 +1024,14 @@ fn get_immediately_pre(
                 e.weight().get_event_type(),
             )) {
                 immediately_pre.insert(e.weight().get_event_type());
-            } else {
+            } /* else {
                 // not sure this else branch is actually needed. when concurrency, one of the incoming will be noncurrent with event?
                 let source = e.source();
                 if !visited.contains(&source) {
                     visited.insert(source);
                     to_visit.push(source);
                 }
-            }
+            } */
         }
     }
 
@@ -1141,6 +1232,20 @@ mod tests {
         )
         .unwrap()
     }
+    fn get_proto31() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "observe", "logType": ["report1"], "role": "QCR" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "observe", "logType": ["report2"], "role": "QCR" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
+                    { "source": "3", "target": "4", "label": { "cmd": "assess", "logType": ["report3"], "role": "QCR" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
 
     fn get_subs_composition_1() -> Subscriptions {
         serde_json::from_str::<Subscriptions>(
@@ -1324,6 +1429,25 @@ mod tests {
                 },
                 CompositionComponent {
                     protocol: get_proto3(),
+                    interface: Some(Role::new("F")),
+                },
+            ]
+        )
+    }
+
+    fn get_interfacing_swarms_3() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_proto1(),
+                    interface: None,
+                },
+                CompositionComponent {
+                    protocol: get_proto2(),
+                    interface: Some(Role::new("T")),
+                },
+                CompositionComponent {
+                    protocol: get_proto31(),
                     interface: Some(Role::new("F")),
                 },
             ]
@@ -1604,10 +1728,10 @@ mod tests {
         let mut expected_errors = vec![
             "active role does not subscribe to any of its emitted event types in transition (0)--[close@D<time>]-->(3)",
             "active role does not subscribe to any of its emitted event types in transition (1)--[get@FL<pos>]-->(2)",
-            "role T does not subscribe to event types time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
-            "role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[close@D<time>]-->(3)",
-            "role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
-            "role FL does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
+            "role T does not subscribe to event types time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
+            //"role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[close@D<time>]-->(3)",
+            "role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
+            "role FL does not subscribe to event types partID, time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
             "subsequently active role D does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
             "subsequently active role FL does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
             "subsequently active role T does not subscribe to events in transition (1)--[get@FL<pos>]-->(2)"
@@ -1640,8 +1764,8 @@ mod tests {
             "active role does not subscribe to any of its emitted event types in transition (2)--[test@TR<report2>]-->(3)",
             "active role does not subscribe to any of its emitted event types in transition (3)--[accept@QCR<ok>]-->(4)",
             "active role does not subscribe to any of its emitted event types in transition (3)--[reject@QCR<notOk>]-->(4)",
-            "role QCR does not subscribe to event types notOk, ok in branching transitions at state 3, but is involved in or after transition (3)--[accept@QCR<ok>]-->(4)",
-            "role QCR does not subscribe to event types notOk, ok in branching transitions at state 3, but is involved in or after transition (3)--[reject@QCR<notOk>]-->(4)",
+            //"role QCR does not subscribe to event types notOk, ok in branching transitions at state 3, but is involved in or after transition (3)--[accept@QCR<ok>]-->(4)",
+            //"role QCR does not subscribe to event types notOk, ok in branching transitions at state 3, but is involved in or after transition (3)--[reject@QCR<notOk>]-->(4)",
             "subsequently active role F does not subscribe to events in transition (0)--[observe@TR<report1>]-->(1)",
             "subsequently active role QCR does not subscribe to events in transition (2)--[test@TR<report2>]-->(3)",
             "subsequently active role QCR does not subscribe to events in transition (2)--[test@TR<report2>]-->(3)",
@@ -1769,11 +1893,11 @@ mod tests {
             "active role does not subscribe to any of its emitted event types in transition (0 || 3)--[close@D<time>]-->(3 || 3)",
             "active role does not subscribe to any of its emitted event types in transition (0 || 2)--[close@D<time>]-->(3 || 2)",
             "active role does not subscribe to any of its emitted event types in transition (3 || 2)--[build@F<car>]-->(3 || 3)",
-            "role D does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[close@D<time>]-->(3 || 0)",
-            "role D does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "role T does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "role FL does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "role F does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+            //"role D does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[close@D<time>]-->(3 || 0)",
+            "role D does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+            "role T does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+            "role FL does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+            "role F does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "subsequently active role FL does not subscribe to events in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "subsequently active role T does not subscribe to events in transition (1 || 1)--[get@FL<pos>]-->(2 || 1)",
             "subsequently active role F does not subscribe to events in transition (2 || 1)--[deliver@T<part>]-->(0 || 2)",
@@ -1800,12 +1924,12 @@ mod tests {
             "active role does not subscribe to any of its emitted event types in transition (456 || 459)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 459)",
             "subsequently active role R454 does not subscribe to events in transition (456 || 459)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 459)",
             "active role does not subscribe to any of its emitted event types in transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
-            "role R454 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved in or after transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
-            "role R454 does not subscribe to event types R453_e_0, R454_e_0, R455_e_1 leading to or in joining event in transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
+            //"role R454 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved in or after transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
+            //"role R454 does not subscribe to event types R453_e_0, R454_e_0, R455_e_1 leading to or in joining event in transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
             "active role does not subscribe to any of its emitted event types in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
             "subsequently active role R455 does not subscribe to events in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
-            "role R454 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved in or after transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
-            "role R455 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved in or after transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
+            "role R454 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved after transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
+            "role R455 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved after transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
             "active role does not subscribe to any of its emitted event types in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
             "subsequently active role R454 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
             "subsequently active role R455 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
@@ -1832,10 +1956,27 @@ mod tests {
         let mut expected_errors = vec![
             "subsequently active role F does not subscribe to events in transition (0 || 2 || 0)--[observe@TR<report1>]-->(0 || 2 || 1)",
             "subsequently active role F does not subscribe to events in transition (3 || 2 || 0)--[observe@TR<report1>]-->(3 || 2 || 1)",
-            "role F does not subscribe to event types report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)",
+            //"role F does not subscribe to event types report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)",
             "role QCR does not subscribe to event types car, part, report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)"];
         errors.sort();
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
+    }
+    #[test]
+    fn test_example_3() {
+        let composition = compose_protocols(get_interfacing_swarms_3());
+        assert!(composition.is_ok());
+
+        let (g, i) = composition.unwrap();
+        let swarm = to_swarm_json(g, i);
+        println!("proto:\n {}", serde_json::to_string_pretty(&swarm).unwrap());
+        let result_composition = exact_weak_well_formed_sub(get_interfacing_swarms_3());
+        assert!(result_composition.is_ok());
+        let subs_composition = result_composition.unwrap();
+        println!("subs exact: {}", serde_json::to_string_pretty(&subs_composition).unwrap());
+        let result_composition = overapprox_weak_well_formed_sub(get_interfacing_swarms_3());
+        assert!(result_composition.is_ok());
+        let subs_composition = result_composition.unwrap();
+        println!("subs approx: {}", serde_json::to_string_pretty(&subs_composition).unwrap());
     }
 }

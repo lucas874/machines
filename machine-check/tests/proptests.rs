@@ -715,6 +715,7 @@ proptest! {
 
 proptest! {
     #[test]
+    //#[ignore]
     fn test_overapproximated_refinement_2_only_generate(vec in generate_interfacing_swarms_refinement_2(7, 7, 10)) {
         let protos = serde_json::to_string(&vec).unwrap();
         let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone())).unwrap() {
