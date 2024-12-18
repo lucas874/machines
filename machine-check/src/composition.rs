@@ -91,10 +91,10 @@ pub fn project_combine(protos: String, subs: String, role: String) -> String {
     if !proto_info.no_errors() {
         return derr::<Machine>(error_report_to_strings(proto_info_to_error_report(proto_info)));
     }
-    let swarms = proto_info.protocols
+    /* let swarms = proto_info.protocols
             .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
-            .collect();
-    let (proj, proj_initial) = composition_machine::project_combine(&swarms, &subs, role);
+            .collect(); */
+    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role);
 
     dok(
         composition::composition_machine::from_option_to_machine(proj, proj_initial.unwrap())
@@ -116,10 +116,10 @@ pub fn project_combine_all(protos: String, subs: String) -> String {
     if !proto_info.no_errors() {
         return derr::<Vec<Machine>>(error_report_to_strings(proto_info_to_error_report(proto_info)));
     }
-    let swarms = proto_info.protocols
+    /* let swarms = proto_info.protocols
         .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
-        .collect();
-    let projections = composition_machine::project_combine_all(&swarms, &subs);
+        .collect(); */
+    let projections = composition_machine::project_combine_all(&proto_info.protocols, &subs);
 
     // do not think we need this check here
     if projections.iter().any(|(_, i)| i.is_none()) {
@@ -163,10 +163,10 @@ pub fn check_composed_projection(
     if !proto_info.no_errors() {
         return err(error_report_to_strings(proto_info_to_error_report(proto_info)));
     }
-    let swarms = proto_info.protocols
+    /* let swarms = proto_info.protocols
         .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
-        .collect();
-    let (proj, proj_initial) = composition_machine::project_combine(&swarms, &subs, role);
+        .collect(); */
+    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role);
     let (machine, json_initial, m_errors) = machine::from_json(machine);
     let machine_problem = !m_errors.is_empty();
     let mut errors = vec![];

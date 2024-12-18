@@ -223,7 +223,7 @@ prop_compose! {
             .map(|(interface, swarm_labels)| (random_graph_shuffle_labels(None, swarm_labels), interface))
             .map(|((graph, initial), interface)| {
                 let protocol = to_swarm_json(graph, initial);
-                CompositionComponent { protocol, interface }
+                CompositionComponent { protocol, subscriptions: BTreeMap::new(), interface }
                 }
             ).collect())
 
@@ -236,14 +236,14 @@ prop_compose! {
                       (vec in prop::collection::vec(all_labels(max_roles, max_events), cmp::max(0, num_protos-1)))
                       -> InterfacingSwarms<Role> {
         let level_0_proto = refinement_initial_proto();
-        let mut graphs = vec![CompositionComponent {protocol: to_swarm_json(level_0_proto.0, level_0_proto.1), interface: None}];
+        let mut graphs = vec![CompositionComponent {protocol: to_swarm_json(level_0_proto.0, level_0_proto.1), subscriptions: BTreeMap::new(), interface: None}];
         let mut vec = vec
             .into_iter()
             .map(|swarm_labels| random_graph_shuffle_labels(None, swarm_labels))
             .enumerate()
             .map(|(level, (proto, initial))| (level, refinement_shape(level, proto, initial)))
             .map(|(level, (proto, initial))|
-                    CompositionComponent { protocol: to_swarm_json(proto, initial), interface: Some(Role::new(&format!("{IR_BASE}_{level}")))}
+                    CompositionComponent { protocol: to_swarm_json(proto, initial), subscriptions: BTreeMap::new(), interface: Some(Role::new(&format!("{IR_BASE}_{level}")))}
                 )
             .collect();
         graphs.append(&mut vec);
@@ -291,7 +291,7 @@ prop_compose! {
         InterfacingSwarms(protos_altered.into_iter()
             .enumerate()
             .map(|(i, (graph, initial))|
-                CompositionComponent { protocol: to_swarm_json(graph, initial), interface: if i == 0 { None } else { Some(Role::new(&format!("{IR_BASE}_{level}", level=i-1))) } })
+                CompositionComponent { protocol: to_swarm_json(graph, initial), subscriptions: BTreeMap::new(), interface: if i == 0 { None } else { Some(Role::new(&format!("{IR_BASE}_{level}", level=i-1))) } })
             .collect())
     }
 

@@ -8,9 +8,7 @@ use petgraph::{
 };
 
 use super::{
-    composition_types::EventLabel,
-    types::{StateName, Transition},
-    EventType, Machine, MachineLabel, NodeId, Role, State, Subscriptions, SwarmLabel,
+    composition_types::{EventLabel, ProtoStruct}, types::{StateName, Transition}, EventType, Machine, MachineLabel, NodeId, Role, State, Subscriptions, SwarmLabel
 };
 
 // types more or less copied from machine.rs.
@@ -113,23 +111,25 @@ pub fn project(
 // precondition: the composition of the protocols in swarms is wwf w.r.t. subs.
 // the type of the input paremeter not nice? reconsider
 pub fn project_combine(
-    swarms: &Vec<(super::Graph, NodeId, BTreeSet<EventType>)>,
+    swarms: &Vec<ProtoStruct>,//&Vec<(super::Graph, NodeId, BTreeSet<EventType>)>,
     subs: &Subscriptions,
     role: Role,
 ) -> (OptionGraph, Option<NodeId>) {
     // check this anyway
     if swarms.is_empty()
-        || !swarms[0].2.is_empty()
+        || !swarms[0].interface.is_empty()
+        || swarms[0].initial.is_none()
         || swarms[1..]
             .iter()
-            .any(|(_, _, interface)| interface.is_empty())
+            .any(|p| p.interface.is_empty() || p.initial.is_none())
     {
         return (OptionGraph::new(), None);
     }
 
-    let mapper = |(graph, initial, interface): &(super::Graph, NodeId, BTreeSet<EventType>)| -> (Graph, NodeId, BTreeSet<EventType>) {
-        let (projection, projection_initial) = project(&graph, *initial, subs, role.clone());
-        (projection, projection_initial, interface.clone())
+    let mapper = |p: &ProtoStruct| -> (Graph, NodeId, BTreeSet<EventType>) { //|(graph, initial, interface): &(super::Graph, NodeId, BTreeSet<EventType>)| -> (Graph, NodeId, BTreeSet<EventType>) {
+        let (projection, projection_initial) = project(&p.graph, p.initial.unwrap(), subs, role.clone());
+        //let (projection, projection_initial) = project(&graph, *initial, subs, role.clone());
+        (projection, projection_initial, p.interface.clone())
     };
 
     let projections: Vec<_> = swarms.into_iter().map(mapper).collect();
@@ -159,7 +159,7 @@ pub fn project_combine(
 }
 
 pub fn project_combine_all(
-    swarms: &Vec<(super::Graph, NodeId, BTreeSet<EventType>)>,
+    swarms: &Vec<ProtoStruct>,//&Vec<(super::Graph, NodeId, BTreeSet<EventType>)>,
     subs: &Subscriptions,
 ) -> Vec<(OptionGraph, Option<NodeId>)> {
     subs.keys()
@@ -169,7 +169,6 @@ pub fn project_combine_all(
 
 // nfa to dfa using subset construction. Hopcroft, Motwani and Ullman section 2.3.5
 fn nfa_to_dfa(nfa: Graph, i: NodeId) -> (Graph, NodeId) {
-    partition_refinement(&nfa, i);
     let mut dfa = Graph::new();
     // maps vectors of NodeIds from the nfa to a NodeId in the new dfa
     let mut dfa_nodes: BTreeMap<BTreeSet<NodeId>, NodeId> = BTreeMap::new();
@@ -223,7 +222,7 @@ fn nfa_to_dfa(nfa: Graph, i: NodeId) -> (Graph, NodeId) {
     (dfa, dfa_nodes[&BTreeSet::from([i])])
 }
 
-fn minimal_machine(graph: &Graph, i: NodeId) -> (Graph, NodeId) {
+/* fn minimal_machine(graph: &Graph, i: NodeId) -> (Graph, NodeId) {
     let partition = partition_refinement(graph, i);
     let mut minimal = Graph::new();
     let mut node_to_partition = BTreeMap::new();
@@ -284,7 +283,7 @@ fn refine_block(graph: &Graph, block: &BTreeSet<NodeId>, superblock: &BTreeSet<N
     [block.intersection(&pre_super_block).cloned().collect(), block.difference(&pre_super_block).cloned().collect()]
         .into_iter()
         .filter(|s: &BTreeSet<NodeId>| !s.is_empty()).collect()
-}
+} */
 
 // precondition: both machines are projected from wwf protocols?
 // precondition: m1 and m2 subscribe to all events in interface? Sort of works without but not really?
@@ -433,9 +432,9 @@ mod tests {
     use super::*;
     use crate::{
         composition::{
-            composition_swarm::{compose_protocols, exact_weak_well_formed_sub, from_json, swarms_to_proto_info, Error},
+            composition_swarm::{compose_protocols, exact_weak_well_formed_sub, from_json, swarms_to_proto_info},
             composition_types::{CompositionComponent, InterfacingSwarms},
-        }, types::{Command, EventType, Role, Transition}, Machine, MapVec, Subscriptions, SwarmProtocol
+        }, types::{Command, EventType, Role, Transition}, Machine, Subscriptions, SwarmProtocol
     };
 
     // Example from coplaws slides
@@ -486,10 +485,12 @@ mod tests {
             vec![
                 CompositionComponent {
                     protocol: get_proto1(),
+                    subscriptions: BTreeMap::new(),
                     interface: None,
                 },
                 CompositionComponent {
                     protocol: get_proto2(),
+                    subscriptions: BTreeMap::new(),
                     interface: Some(Role::new("T")),
                 },
             ]
@@ -501,10 +502,12 @@ mod tests {
             vec![
                 CompositionComponent {
                     protocol: get_proto2(),
+                    subscriptions: BTreeMap::new(),
                     interface: None,
                 },
                 CompositionComponent {
                     protocol: get_proto1(),
+                    subscriptions: BTreeMap::new(),
                     interface: Some(Role::new("T")),
                 },
             ]
@@ -516,14 +519,17 @@ mod tests {
             vec![
                 CompositionComponent {
                     protocol: get_proto1(),
+                    subscriptions: BTreeMap::new(),
                     interface: None,
                 },
                 CompositionComponent {
                     protocol: get_proto2(),
+                    subscriptions: BTreeMap::new(),
                     interface: Some(Role::new("T")),
                 },
                 CompositionComponent {
                     protocol: get_proto3(),
+                    subscriptions: BTreeMap::new(),
                     interface: Some(Role::new("F")),
                 },
             ]
@@ -535,14 +541,17 @@ mod tests {
             vec![
                 CompositionComponent {
                     protocol: get_proto3(),
+                    subscriptions: BTreeMap::new(),
                     interface: None,
                 },
                 CompositionComponent {
                     protocol: get_proto2(),
+                    subscriptions: BTreeMap::new(),
                     interface: Some(Role::new("F")),
                 },
                 CompositionComponent {
                     protocol: get_proto1(),
+                    subscriptions: BTreeMap::new(),
                     interface: Some(Role::new("T")),
                 },
             ]
@@ -629,7 +638,7 @@ mod tests {
     fn test_projection_2() {
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), interface: None}]));
+        let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), subscriptions: BTreeMap::new(), interface: None}]));
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
@@ -688,7 +697,7 @@ mod tests {
     fn test_projection_3() {
         // car factory from coplaws example
         let proto = get_proto2();
-        let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), interface: None}]));
+        let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), subscriptions: BTreeMap::new(), interface: None}]));
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("F");
@@ -744,22 +753,22 @@ mod tests {
         let subs1 = subs1.unwrap();
         let proto_info = swarms_to_proto_info(get_interfacing_swarms_1(), &subs1);
         assert!(proto_info.no_errors());
-        let swarms = proto_info.protocols
-            .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
-            .collect();
+        //let swarms = proto_info.protocols
+        //    .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
+        //    .collect();
         let (proj_combined1, proj_combined_initial1) =
-            project_combine(&swarms, &subs1, role.clone());
+            project_combine(&proto_info.protocols, &subs1, role.clone());
 
         let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_1_reversed());
         assert!(subs2.is_ok());
         let subs2 = subs2.unwrap();
         let proto_info = swarms_to_proto_info(get_interfacing_swarms_1_reversed(), &subs2);
         assert!(proto_info.no_errors());
-        let swarms = proto_info.protocols
-            .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
-            .collect();
+        //let swarms = proto_info.protocols
+        //    .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
+        //    .collect();
         let (proj_combined2, proj_combined_initial2) =
-            project_combine(&swarms, &subs2, role.clone());
+            project_combine(&proto_info.protocols, &subs2, role.clone());
 
         // compose(a, b) should be equal to compose(b, a)
         assert_eq!(subs1, subs2);
@@ -802,22 +811,22 @@ mod tests {
             let subs1 = subs1.unwrap();
             let proto_info = swarms_to_proto_info(get_interfacing_swarms_2(), &subs1);
             assert!(proto_info.no_errors());
-            let swarms = proto_info.protocols
+            /* let swarms = proto_info.protocols
                 .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
-                .collect();
+                .collect(); */
             let (proj_combined1, proj_combined_initial1) =
-                project_combine(&swarms, &subs1, role.clone());
+                project_combine(&proto_info.protocols, &subs1, role.clone());
 
             let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_2_reversed());
             assert!(subs2.is_ok());
             let subs2 = subs2.unwrap();
             let proto_info = swarms_to_proto_info(get_interfacing_swarms_2_reversed(), &subs2);
             assert!(proto_info.no_errors());
-            let swarms = proto_info.protocols
+            /* let swarms = proto_info.protocols
                 .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
-                .collect();
+                .collect(); */
             let (proj_combined2, proj_combined_initial2) =
-                project_combine(&swarms, &subs2, role.clone());
+                project_combine(&proto_info.protocols, &subs2, role.clone());
 
             // compose(a, b) should be equal to compose(b, a)
             assert_eq!(subs1, subs2);

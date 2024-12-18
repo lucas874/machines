@@ -13,7 +13,7 @@ use std::{
     fmt,
 };
 
-use super::composition_types::InterfacingSwarms;
+use super::composition_types::{CompositionComponent, InterfacingSwarms, ProtoStruct};
 use super::MapVec;
 use super::{
     composition_types::{
@@ -194,8 +194,7 @@ pub fn compose_protocols<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Res
         return Err(proto_info_to_error_report(combined_proto_info));
     }
 
-    let composition = explicit_composition_proto_info(combined_proto_info);
-    let (graph, initial, _) = composition.get_ith_proto(0).unwrap();
+    let (graph, initial, _) = explicit_composition_proto_info(combined_proto_info).get_ith_proto(0).unwrap();
     Ok((graph, initial.unwrap()))
 }
 
@@ -206,9 +205,9 @@ fn weak_well_formed_proto_info(proto_info: ProtoInfo, subs: &Subscriptions) -> P
         .clone()
         .into_iter()
         .enumerate()
-        .map(|(i, ((graph, initial, errors), interface))| {
-            let errors = vec![errors, weak_well_formed(&proto_info, i, subs)].concat();
-            ((graph, initial, errors), interface)
+        .map(|(i, p)| {
+            let errors = vec![p.errors, weak_well_formed(&proto_info, i, subs)].concat();
+            ProtoStruct {errors, .. p}
         })
         .collect();
 
@@ -225,9 +224,9 @@ fn confusion_free_proto_info(proto_info: ProtoInfo, subs: &Subscriptions) -> Pro
         .clone()
         .into_iter()
         .enumerate()
-        .map(|(i, ((graph, initial, errors), interface))| {
-            let errors = vec![errors, confusion_free(&proto_info, i, subs)].concat();
-            ((graph, initial, errors), interface)
+        .map(|(i, p)| {
+            let errors = vec![p.errors, confusion_free(&proto_info, i, subs)].concat();
+            ProtoStruct {errors, .. p}
         })
         .collect();
 
@@ -644,7 +643,8 @@ fn combine_proto_infos<T: SwarmInterface>(
         let protocols = vec![
             proto_info1.protocols.clone(),
             proto_info2.protocols.clone(),
-            vec![((Graph::new(), None, errors), BTreeSet::new())],
+            vec![ProtoStruct::new(Graph::new(), None, errors, BTreeSet::new(), BTreeMap::new())]
+            //vec![((Graph::new(), None, errors), BTreeSet::new())],
         ]
         .concat();
         // Would work to construct it just like normally. but..
@@ -699,10 +699,11 @@ fn combine_proto_infos_fold<T: SwarmInterface>(protos: Vec<(ProtoInfo, Option<T>
         || protos[0].1.is_some()
         || protos[1..].iter().any(|(_, interface)| interface.is_none())
     {
-        return ProtoInfo::new_only_proto(vec![(
+        /* return ProtoInfo::new_only_proto(vec![(
             (Graph::new(), None, vec![Error::InvalidArg]),
             BTreeSet::new(),
-        )]);
+        )]); */
+        return ProtoInfo::new_only_proto(vec![ProtoStruct::new(Graph::new(), None, vec![Error::InvalidArg], BTreeSet::new(), BTreeMap::new())]);
     }
 
     let (proto, _) = protos[0].clone();
@@ -865,7 +866,7 @@ fn prepare_proto_infos<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Vec<(
         .iter()
         .map(|p| {
             (
-                prepare_proto_info::<T>(p.protocol.clone(), p.interface.clone()),
+                prepare_proto_info::<T>(p.clone()),
                 p.interface.clone(),
             )
         })
@@ -874,21 +875,21 @@ fn prepare_proto_infos<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Vec<(
 
 // precondition: proto is a simple protocol, i.e. it does not contain concurrency.
 fn prepare_proto_info<T: SwarmInterface>(
-    proto: SwarmProtocol,
-    interface: Option<T>,
+    proto: CompositionComponent<T>
 ) -> ProtoInfo {
     let mut role_event_map: RoleEventMap = BTreeMap::new();
     let mut branching_events = Vec::new();
     let mut immediately_pre_map: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
-    let (graph, initial, errors) = swarm_to_graph(&proto);
+    let (graph, initial, errors) = swarm_to_graph(&proto.protocol);
     if initial.is_none() || !errors.is_empty() {
-        return ProtoInfo::new_only_proto(vec![((graph, initial, errors), BTreeSet::new())]);
+        //return ProtoInfo::new_only_proto(vec![((graph, initial, errors), BTreeSet::new())]);
+        return ProtoInfo::new_only_proto(vec![ProtoStruct::new(graph, initial, errors, BTreeSet::new(), BTreeMap::new())]);
     }
     // If interface is some, then we want to interface this protocol
     // with some other protocol on this set of events.
     // We do not know if we can do that yet though, but we prepare as if we can.
-    let interface = if interface.is_some() {
-        interface.unwrap().interfacing_event_types_single(&graph)
+    let interface = if proto.interface.is_some() {
+        proto.interface.unwrap().interfacing_event_types_single(&graph)
     } else {
         BTreeSet::new()
     };
@@ -928,7 +929,7 @@ fn prepare_proto_info<T: SwarmInterface>(
     // consider changing after_not_concurrent to not take concurrent events as argument. now that we do not consider swarms with concurrency here.
     let happens_after = after_not_concurrent(&graph, initial.unwrap(), &BTreeSet::new());
     ProtoInfo::new(
-        vec![((graph, initial, errors), interface)],
+        vec![ProtoStruct::new(graph, initial, errors, interface, proto.subscriptions)],
         role_event_map,
         BTreeSet::new(),
         branching_events,
@@ -976,7 +977,7 @@ fn swarm_to_graph(proto: &SwarmProtocol) -> (Graph, Option<NodeId>, Vec<Error>) 
 pub fn from_json(
     proto: SwarmProtocol,
 ) -> (Graph, Option<NodeId>, Vec<String>) {
-    let proto_info = prepare_proto_info::<Role>(proto, None);
+    let proto_info = prepare_proto_info::<Role>(CompositionComponent{protocol: proto, subscriptions: BTreeMap::new(), interface: None});
     let (g, i, e) = match proto_info.get_ith_proto(0) {
         Some((g, i, e)) => (g, i, e),
         _ => return (Graph::new(), None, vec![]),
@@ -990,7 +991,7 @@ pub fn proto_info_to_error_report(proto_info: ProtoInfo) -> ErrorReport {
         proto_info
             .protocols
             .into_iter()
-            .map(|((graph, _, errors), _)| (graph, errors))
+            .map(|p| (p.graph, p.errors))
             .collect(),
     )
 }
@@ -1132,8 +1133,10 @@ fn get_concurrent_events<T: SwarmInterface>(
 fn explicit_composition_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
     let (composed, composed_initial) = explicit_composition(&proto_info);
     let succeeding_events = after_not_concurrent(&composed, composed_initial, &proto_info.concurrent_events);
+    let subscription_union = proto_info.protocols.iter().map(|p| p.subscriptions.clone()).fold(BTreeMap::new(), |acc, sub| combine_maps(acc, sub, None));
     ProtoInfo {
-        protocols: vec![((composed, Some(composed_initial), vec![]), BTreeSet::new())],
+        //protocols: vec![((composed, Some(composed_initial), vec![]), BTreeSet::new())],
+        protocols: vec![ProtoStruct::new(composed, Some(composed_initial), vec![], BTreeSet::new(), subscription_union)],
         succeeding_events,
         ..proto_info
     }
@@ -1145,12 +1148,14 @@ fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
         return (Graph::new(), NodeId::end());
     }
 
-    let ((g, i, _), _) = proto_info.protocols[0].clone();
+    //let ((g, i, _), _) = proto_info.protocols[0].clone();
+    let (g, i, _) = proto_info.protocols[0].get_triple();
     let folder =
         |(acc_g, acc_i): (Graph, NodeId),
-         ((g, i, _), interface): ((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)|
+         //((g, i, _), interface): ((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)|
+         p: ProtoStruct|
          -> (Graph, NodeId) {
-            crate::composition::composition_machine::compose(acc_g, acc_i, g, i.unwrap(), interface)
+            crate::composition::composition_machine::compose(acc_g, acc_i, p.graph, p.initial.unwrap(), p.interface)
         };
     proto_info.protocols[1..]
         .to_vec()
@@ -1440,10 +1445,12 @@ mod tests {
             vec![
                 CompositionComponent {
                     protocol: get_proto1(),
+                    subscriptions: BTreeMap::new(),
                     interface: None,
                 },
                 CompositionComponent {
                     protocol: get_proto2(),
+                    subscriptions: BTreeMap::new(),
                     interface: Some(Role::new("T")),
                 },
             ]
@@ -1455,14 +1462,17 @@ mod tests {
             vec![
                 CompositionComponent {
                     protocol: get_proto1(),
+                    subscriptions: BTreeMap::new(),
                     interface: None,
                 },
                 CompositionComponent {
                     protocol: get_proto2(),
+                    subscriptions: BTreeMap::new(),
                     interface: Some(Role::new("T")),
                 },
                 CompositionComponent {
                     protocol: get_proto3(),
+                    subscriptions: BTreeMap::new(),
                     interface: Some(Role::new("F")),
                 },
             ]
@@ -1474,14 +1484,17 @@ mod tests {
             vec![
                 CompositionComponent {
                     protocol: get_proto1(),
+                    subscriptions: BTreeMap::new(),
                     interface: None,
                 },
                 CompositionComponent {
                     protocol: get_proto2(),
+                    subscriptions: BTreeMap::new(),
                     interface: Some(Role::new("T")),
                 },
                 CompositionComponent {
                     protocol: get_proto31(),
+                    subscriptions: BTreeMap::new(),
                     interface: Some(Role::new("F")),
                 },
             ]
@@ -1493,10 +1506,12 @@ mod tests {
                 vec![
                     CompositionComponent {
                         protocol: get_fail_1_component_1(),
+                        subscriptions: BTreeMap::new(),
                         interface: None,
                     },
                     CompositionComponent {
                         protocol: get_fail_1_component_2(),
+                        subscriptions: BTreeMap::new(),
                         interface: Some(Role::new("R454")),
                     }
                 ]
@@ -1606,7 +1621,7 @@ mod tests {
             ),
         ]);
         assert_eq!(proto_info.role_event_map, expected_role_event_map);
-        let proto_info = prepare_proto_info::<Role>(get_proto1(), None);
+        let proto_info = prepare_proto_info::<Role>(CompositionComponent{ protocol: get_proto1(), subscriptions: BTreeMap::new(), interface: None} );
         assert!(proto_info.get_ith_proto(0).is_some());
         assert!(proto_info.get_ith_proto(0).unwrap().2.is_empty());
         assert_eq!(proto_info.concurrent_events, BTreeSet::new());
@@ -1616,14 +1631,14 @@ mod tests {
         );
         assert_eq!(proto_info.joining_events, BTreeSet::new());
 
-        let proto_info = prepare_proto_info::<Role>(get_proto2(), None);
+        let proto_info = prepare_proto_info::<Role>(CompositionComponent{ protocol: get_proto2(), subscriptions: BTreeMap::new(), interface: None} );//get_proto2(), None);
         assert!(proto_info.get_ith_proto(0).is_some());
         assert!(proto_info.get_ith_proto(0).unwrap().2.is_empty());
         assert_eq!(proto_info.concurrent_events, BTreeSet::new());
         assert_eq!(proto_info.branching_events, Vec::new());
         assert_eq!(proto_info.joining_events, BTreeSet::new());
 
-        let proto_info = prepare_proto_info::<Role>(get_proto3(), None);
+        let proto_info = prepare_proto_info::<Role>(CompositionComponent{ protocol: get_proto3(), subscriptions: BTreeMap::new(), interface: None} );//get_proto2(), None);//get_proto3(), None);
         assert!(proto_info.get_ith_proto(0).is_some());
         assert!(proto_info.get_ith_proto(0).unwrap().2.is_empty());
         assert_eq!(proto_info.concurrent_events, BTreeSet::new());
@@ -1637,7 +1652,7 @@ mod tests {
     #[test]
     fn test_prepare_graph_malformed() {
         let proto1 = get_malformed_proto1();
-        let proto_info = prepare_proto_info::<Role>(proto1.clone(), None);
+        let proto_info = prepare_proto_info::<Role>(CompositionComponent {protocol: proto1.clone(), subscriptions: BTreeMap::new(), interface: None});//proto1.clone(), None);
         let mut errors = vec![
             proto_info.get_ith_proto(0).unwrap().2,
         ]
@@ -1652,7 +1667,7 @@ mod tests {
         expected_erros.sort();
         assert_eq!(errors, expected_erros);
 
-        let proto_info = prepare_proto_info::<Role>(get_malformed_proto2(), None);
+        let proto_info = prepare_proto_info::<Role>(CompositionComponent {protocol: get_malformed_proto2(), subscriptions: BTreeMap::new(), interface: None});//get_malformed_proto2(), None);
         let errors = vec![
             confusion_free(&proto_info, 0, &BTreeMap::new()),
             proto_info.get_ith_proto(0).unwrap().2,
@@ -1666,7 +1681,7 @@ mod tests {
         ];
         assert_eq!(errors, expected_errors);
 
-        let proto_info = prepare_proto_info::<Role>(get_malformed_proto3(), None);
+        let proto_info = prepare_proto_info::<Role>(CompositionComponent{protocol: get_malformed_proto3(), subscriptions: BTreeMap::new(), interface: None});//get_malformed_proto3(), None);
         let errors =
                 proto_info.get_ith_proto(0).unwrap().2
             .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
@@ -1685,7 +1700,7 @@ mod tests {
     fn test_prepare_graph_confusionful() {
         let proto = get_confusionful_proto1();
 
-        let proto_info = prepare_proto_info::<Role>(proto, None);
+        let proto_info = prepare_proto_info::<Role>(CompositionComponent{protocol: proto, subscriptions: BTreeMap::new(), interface: None});  //proto, None);
         let mut errors = vec![
             confusion_free(&proto_info, 0, &BTreeMap::new()),
             proto_info.get_ith_proto(0).unwrap().2,
@@ -1712,7 +1727,7 @@ mod tests {
 
     #[test]
     fn test_wwf_ok() {
-        let proto1: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{protocol: get_proto1(), interface: None}]);
+        let proto1: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{protocol: get_proto1(), subscriptions: BTreeMap::new(), interface: None}]);
         let result1 = exact_weak_well_formed_sub(proto1.clone());
         assert!(result1.is_ok());
         let subs1 = result1.unwrap();
@@ -1720,7 +1735,7 @@ mod tests {
         assert!(error_report.is_empty());
         assert_eq!(get_subs1(), subs1);
 
-        let proto2: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{protocol: get_proto2(), interface: None}]);
+        let proto2: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{protocol: get_proto2(), subscriptions: BTreeMap::new(), interface: None}]);
         let result2 = exact_weak_well_formed_sub(proto2.clone());
         assert!(result2.is_ok());
         let subs2 = result2.unwrap();
@@ -1728,7 +1743,7 @@ mod tests {
         assert!(error_report.is_empty());
         assert_eq!(get_subs2(), subs2);
 
-        let proto3: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{protocol: get_proto3(), interface: None}]);
+        let proto3: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{protocol: get_proto3(), subscriptions: BTreeMap::new(), interface: None}]);
         let result3 = exact_weak_well_formed_sub(proto3.clone());
         assert!(result3.is_ok());
         let subs3 = result3.unwrap();
@@ -1755,7 +1770,7 @@ mod tests {
 
     #[test]
     fn test_wwf_fail() {
-        let input: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{ protocol: get_proto1(), interface: None }]);
+        let input: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{ protocol: get_proto1(), subscriptions: BTreeMap::new(), interface: None }]);
         let error_report = check(input, &get_subs2());
         let mut errors = error_report_to_strings(error_report);
         errors.sort();
@@ -1774,7 +1789,7 @@ mod tests {
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
 
-        let input: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{ protocol: get_proto2(), interface: None }]);
+        let input: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{ protocol: get_proto2(), subscriptions: BTreeMap::new(), interface: None }]);
         let error_report = check(input, &get_subs3());
         let mut errors = error_report_to_strings(error_report);
         errors.sort();
@@ -1788,7 +1803,7 @@ mod tests {
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
 
-        let input: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{ protocol: get_proto3(), interface: None }]);
+        let input: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{ protocol: get_proto3(), subscriptions: BTreeMap::new(), interface: None }]);
         let error_report = check(input, &get_subs1());
         let mut errors = error_report_to_strings(error_report);
         errors.sort();

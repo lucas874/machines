@@ -8,7 +8,7 @@ use crate::{
     Graph,
 };
 
-use super::{NodeId, SwarmProtocol};
+use super::{NodeId, Subscriptions, SwarmProtocol};
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -26,8 +26,43 @@ pub fn unord_event_pair(a: EventType, b: EventType) -> UnordEventPair {
 }
 
 #[derive(Debug, Clone)]
+pub struct ProtoStruct {
+    pub graph: Graph,
+    pub initial: Option<NodeId>,
+    pub errors: Vec<Error>,
+    pub interface: BTreeSet<EventType>,
+    pub subscriptions: Subscriptions,
+}
+
+impl ProtoStruct {
+    pub fn new(
+        graph: Graph,
+        initial: Option<NodeId>,
+        errors: Vec<Error>,
+        interface: BTreeSet<EventType>,
+        subscriptions: Subscriptions
+    ) -> Self {
+        Self {
+            graph,
+            initial,
+            errors,
+            interface,
+            subscriptions
+        }
+    }
+
+    pub fn get_triple(&self) -> (Graph, Option<NodeId>, Vec<Error>) {
+        (self.graph.clone(), self.initial.clone(), self.errors.clone())
+    }
+
+    pub fn no_errors(&self) -> bool {
+        self.errors.is_empty()
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ProtoInfo {
-    pub protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>, // maybe weird to have an interface as if it was related to one protocol. but convenient. "a graph interfaces with rest on if"
+    pub protocols: Vec<ProtoStruct>,//Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>, // maybe weird to have an interface as if it was related to one protocol. but convenient. "a graph interfaces with rest on if"
     pub role_event_map: RoleEventMap,
     pub concurrent_events: BTreeSet<UnordEventPair>, // consider to make a more specific type. unordered pair.
     pub branching_events: Vec<BTreeSet<EventType>>,
@@ -38,7 +73,7 @@ pub struct ProtoInfo {
 // TODO: remove subscriptions field
 impl ProtoInfo {
     pub fn new(
-        protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>,
+        protocols: Vec<ProtoStruct>,//Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>,
         role_event_map: RoleEventMap,
         concurrent_events: BTreeSet<UnordEventPair>,
         branching_events: Vec<BTreeSet<EventType>>,
@@ -58,7 +93,7 @@ impl ProtoInfo {
     }
 
     pub fn new_only_proto(
-        protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>
+        protocols: Vec<ProtoStruct>//Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>
     ) -> Self {
         Self {
             protocols,
@@ -71,28 +106,31 @@ impl ProtoInfo {
         }
     }
 
-    pub fn get_ith_proto(&self, i: usize) -> Option<(Graph, Option<NodeId>, Vec<Error>)> {
+    pub fn get_ith_proto(&self, i: usize) -> Option<(Graph, Option<NodeId>, Vec<Error>)> { // Option<ProtoStruct>{//
         if i >= self.protocols.len() {
             None
         } else {
-            Some(self.protocols[i].0.clone())
+            Some(self.protocols[i].get_triple())
         }
     }
 
-    pub fn add_errors_ith(&mut self, i: usize, mut errors: Vec<Error>) -> () {
+    /* pub fn add_errors_ith(&mut self, i: usize, mut errors: Vec<Error>) -> () {
         if i >= self.protocols.len() {
             self.protocols[0].0.2.append(&mut errors);
         }
-    }
+    } */
 
     pub fn no_errors(&self) -> bool {
-        self.protocols.iter().all(|((_, _, e), _)| e.is_empty())
+        //self.protocols.iter().all(|((_, _, e), _)| e.is_empty())
+        self.protocols.iter().all(|p| p.no_errors())
+
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CompositionComponent<T: SwarmInterface> {
     pub protocol: SwarmProtocol,
+    pub subscriptions: Subscriptions,
     pub interface: Option<T>,
 }
 

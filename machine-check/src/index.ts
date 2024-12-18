@@ -27,8 +27,12 @@ export type Result = { type: 'OK' } | { type: 'ERROR'; errors: string[] }
 //export type CompositionInputVec = CompositionInput[]
 
 export type ResultData<Data> = { type: 'OK'; data: Data } | { type: 'ERROR'; errors: string[] }
-export type CompositionComponent = {protocol: SwarmProtocolType, interface: string | null }
+export type CompositionComponent = {protocol: SwarmProtocolType, subscriptions: Subscriptions, interface: string | null }
 export type InterfacingSwarms = CompositionComponent[]
+export type Granularity =
+  | "Fine"
+  | "Medium"
+  | "Coarse"
 
 export function checkSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): Result {
   const p = JSON.stringify(proto)
