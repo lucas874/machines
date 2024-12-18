@@ -67,9 +67,10 @@ export function exactWWFSubscriptions(protos: InterfacingSwarms): ResultData<Sub
   return JSON.parse(result)
 }
 
-export function overapproxWWFSubscriptions(protos: InterfacingSwarms): ResultData<Subscriptions> {
+export function overapproxWWFSubscriptions(protos: InterfacingSwarms, granularity: Granularity): ResultData<Subscriptions> {
   const p = JSON.stringify(protos)
-  const result = overapproximated_weak_well_formed_sub(p);
+  const g = JSON.stringify(granularity)
+  const result = overapproximated_weak_well_formed_sub(p, g);
   return JSON.parse(result)
 }
 

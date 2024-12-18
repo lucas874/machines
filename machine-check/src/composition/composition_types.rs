@@ -106,22 +106,15 @@ impl ProtoInfo {
         }
     }
 
-    pub fn get_ith_proto(&self, i: usize) -> Option<(Graph, Option<NodeId>, Vec<Error>)> { // Option<ProtoStruct>{//
+    pub fn get_ith_proto(&self, i: usize) -> Option<ProtoStruct>{//Option<(Graph, Option<NodeId>, Vec<Error>)> { // Option<ProtoStruct>{//
         if i >= self.protocols.len() {
             None
         } else {
-            Some(self.protocols[i].get_triple())
+            Some(self.protocols[i].clone())
         }
     }
 
-    /* pub fn add_errors_ith(&mut self, i: usize, mut errors: Vec<Error>) -> () {
-        if i >= self.protocols.len() {
-            self.protocols[0].0.2.append(&mut errors);
-        }
-    } */
-
     pub fn no_errors(&self) -> bool {
-        //self.protocols.iter().all(|((_, _, e), _)| e.is_empty())
         self.protocols.iter().all(|p| p.no_errors())
 
     }
@@ -137,7 +130,12 @@ pub struct CompositionComponent<T: SwarmInterface> {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct InterfacingSwarms<T: SwarmInterface>(pub Vec<CompositionComponent<T>>);
 
-
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum  Granularity {
+    Fine,
+    Medium,
+    Coarse
+}
 
 /* Used when combining machines and protocols */
 pub trait EventLabel: Clone + Ord {
