@@ -603,7 +603,7 @@ fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mu
         is_stable = true;
         // determinacy: joins
         for joining_event in &proto_info.joining_events {
-            let interested_roles = if with_all_interfacing { proto_info.role_event_map.keys().cloned().collect() } else { roles_on_path(joining_event.clone(), proto_info, &subscription) };
+            let interested_roles = if with_all_interfacing { subscription.keys().cloned().collect() } else { roles_on_path(joining_event.clone(), proto_info, &subscription) };
             let join_and_prejoin: BTreeSet<_> = [joining_event.clone()].into_iter().chain(get_pre_joins(&joining_event).into_iter()).collect();
             for role in interested_roles {
                 is_stable = add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
@@ -728,21 +728,6 @@ fn roles_on_path(event_type: EventType, proto_info: &ProtoInfo, subs: &Subscript
         .filter(|(_, events)| events.intersection(&succeeding_events).count() != 0)
         .map(|(r, _)| r.clone())
         .collect()
-    /* proto_info.role_event_map
-        .iter()
-        .filter(|(role, labels)| {
-            !labels
-                .iter()
-                .map(|label| label.get_event_type())
-                .chain(subs.get(*role).cloned().unwrap_or_default())
-                .collect::<BTreeSet<EventType>>()
-                .intersection(&succeeding_events)
-                .cloned()
-                .collect::<BTreeSet<EventType>>()
-                .is_empty()
-        })
-        .map(|(role, _)| role.clone())
-        .collect() */
 }
 
 fn after_not_concurrent(

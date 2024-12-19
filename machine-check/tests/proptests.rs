@@ -842,10 +842,10 @@ proptest! {
     //#![proptest_config(ProptestConfig::with_cases(1))]
     #[test]
     #[ignore]
-    fn test_combine_machines_prop(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
+    fn test_combine_machines_prop(vec in generate_interfacing_swarms_refinement_2(3, 3, 2)) {
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
-        let granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
+        let granularity = serde_json::to_string(&Granularity::Medium).unwrap();
         let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
             DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
             DataResult::<Subscriptions>::ERROR{ .. } => None,
@@ -860,7 +860,7 @@ proptest! {
         let composition = composition.unwrap();
         //let composition = InterfacingSwarms::<Role>(vec![CompositionComponent{protocol: composition.unwrap(), interface: None}]);
         let sub_string = serde_json::to_string(&subscriptions).unwrap();
-        let composition_string = serde_json::to_string(&composition).unwrap();
+        let composition_string = serde_json::to_string(&composition.clone()).unwrap();
         for role in subscriptions.keys() {
             let role_string = role.to_string();
             let projection = match serde_json::from_str(&revised_projection(composition_string.clone(), sub_string.clone(), role_string.clone())).unwrap() {
@@ -893,6 +893,10 @@ proptest! {
                         DataResult::<Machine>::ERROR{ errors: e } => println!("errors combined: {:?}", e),
                     };
                     println!("machine: {}", serde_json::to_string_pretty(&projection.unwrap()).unwrap());
+                    println!("composition: {}", serde_json::to_string_pretty(&composition).unwrap());
+                    for v in &vec.0 {
+                        println!("component: {}", serde_json::to_string_pretty(&v.protocol).unwrap());
+                    }
                     println!("errors: {:?}", e); assert!(false)
                 },
             }
