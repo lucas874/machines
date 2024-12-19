@@ -723,7 +723,11 @@ fn roles_on_path(event_type: EventType, proto_info: &ProtoInfo, subs: &Subscript
         .get(&event_type)
         .cloned()
         .unwrap_or_default();
-    proto_info.role_event_map
+    subs.iter()
+        .filter(|(_, events)| events.intersection(&succeeding_events).count() != 0)
+        .map(|(r, _)| r.clone())
+        .collect()
+    /* proto_info.role_event_map
         .iter()
         .filter(|(role, labels)| {
             !labels
@@ -737,7 +741,7 @@ fn roles_on_path(event_type: EventType, proto_info: &ProtoInfo, subs: &Subscript
                 .is_empty()
         })
         .map(|(role, _)| role.clone())
-        .collect()
+        .collect() */
 }
 
 fn after_not_concurrent(
@@ -1758,19 +1762,30 @@ mod tests {
     #[test]
     fn test_wwf_fail() {
         let input: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{ protocol: get_proto1(), subscriptions: BTreeMap::new(), interface: None }]);
-        let error_report = check(input, &get_subs2());
+        let subs = BTreeMap::from([
+            (Role::new("T"), BTreeSet::from(
+                [EventType::new("pos")]
+            )),
+            (Role::new("D"), BTreeSet::from(
+                [EventType::new("pos")]
+            )),
+            (Role::new("FL"), BTreeSet::from(
+                [EventType::new("partID")]
+            )),
+        ]);
+        let error_report = check(input, &subs);
         let mut errors = error_report_to_strings(error_report);
         errors.sort();
         let mut expected_errors = vec![
             "active role does not subscribe to any of its emitted event types in transition (0)--[close@D<time>]-->(3)",
+            "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
+            "active role does not subscribe to any of its emitted event types in transition (2)--[deliver@T<part>]-->(0)",
             "active role does not subscribe to any of its emitted event types in transition (1)--[get@FL<pos>]-->(2)",
-            "role T does not subscribe to event types time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
-            //"role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[close@D<time>]-->(3)",
+            "role T does not subscribe to event types partID, time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
             "role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
-            "role FL does not subscribe to event types partID, time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
+            "role FL does not subscribe to event types time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
             "subsequently active role D does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
-            "subsequently active role FL does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
-            "subsequently active role T does not subscribe to events in transition (1)--[get@FL<pos>]-->(2)"
+            "subsequently active role T does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
         ];
 
         expected_errors.sort();
@@ -1908,7 +1923,20 @@ mod tests {
     #[test]
     fn test_compose_non_wwf_swarms() {
         let input = get_interfacing_swarms_1();
-        let subs = BTreeMap::from([(Role::new("T"), BTreeSet::new()), (Role::new("F"), BTreeSet::new())]);
+        let subs = BTreeMap::from([
+            (Role::new("T"), BTreeSet::from(
+                [EventType::new("part")]
+            )),
+            (Role::new("D"), BTreeSet::from(
+                [EventType::new("part")]
+            )),
+            (Role::new("FL"), BTreeSet::from(
+                [EventType::new("part")]
+            )),
+            (Role::new("F"), BTreeSet::from(
+                [EventType::new("part")]
+            )),
+        ]);
         let error_report = check(input, &subs);
         let mut errors = error_report_to_strings(error_report);
         errors.sort();
@@ -1916,20 +1944,16 @@ mod tests {
             "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[close@D<time>]-->(3 || 0)",
             "active role does not subscribe to any of its emitted event types in transition (1 || 1)--[get@FL<pos>]-->(2 || 1)",
-            "active role does not subscribe to any of its emitted event types in transition (2 || 1)--[deliver@T<part>]-->(0 || 2)",
             "active role does not subscribe to any of its emitted event types in transition (0 || 2)--[build@F<car>]-->(0 || 3)",
             "active role does not subscribe to any of its emitted event types in transition (0 || 3)--[close@D<time>]-->(3 || 3)",
             "active role does not subscribe to any of its emitted event types in transition (0 || 2)--[close@D<time>]-->(3 || 2)",
             "active role does not subscribe to any of its emitted event types in transition (3 || 2)--[build@F<car>]-->(3 || 3)",
-            //"role D does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[close@D<time>]-->(3 || 0)",
             "role D does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "role T does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "role FL does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "role F does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "subsequently active role FL does not subscribe to events in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "subsequently active role T does not subscribe to events in transition (1 || 1)--[get@FL<pos>]-->(2 || 1)",
-            "subsequently active role F does not subscribe to events in transition (2 || 1)--[deliver@T<part>]-->(0 || 2)",
-            "subsequently active role D does not subscribe to events in transition (2 || 1)--[deliver@T<part>]-->(0 || 2)",
         ];
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
@@ -1956,8 +1980,8 @@ mod tests {
             //"role R454 does not subscribe to event types R453_e_0, R454_e_0, R455_e_1 leading to or in joining event in transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
             "active role does not subscribe to any of its emitted event types in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
             "subsequently active role R455 does not subscribe to events in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
-            "role R454 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved after transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
-            "role R455 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved after transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
+            //"role R454 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved after transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
+            //"role R455 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved after transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
             "active role does not subscribe to any of its emitted event types in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
             "subsequently active role R454 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
             "subsequently active role R455 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
