@@ -873,7 +873,7 @@ proptest! {
             let machine_string = serde_json::to_string(&projection.clone().unwrap()).unwrap();
             // should work like this projecting over the explicit composition initially and comparing that with combined machines?
             match serde_json::from_str(&check_composed_projection(protos.clone(), sub_string.clone(), role.clone().to_string(), machine_string)).unwrap() {
-                CheckResult::OK => assert!(true),
+                CheckResult::OK => (),
                 CheckResult::ERROR {errors: e} => {
                     match serde_json::from_str(&project_combine(protos.clone(), sub_string.clone(), role.clone().to_string())).unwrap() {
                         DataResult::<Machine>::OK{data: projection1} => {

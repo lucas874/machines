@@ -307,8 +307,7 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize, subs: &Subscri
                             .filter(|e| branching_with_this_event.contains(e))
                             .collect();
                 // if only one event labeled as branching at this node, do not count it as an error if not subbed.
-                // could happen due to concurrency and loss of behavior. In such case we will encounter the 'original'
-                // branch and it will be checked there.
+                // could happen due to concurrency and loss of behavior.
                 let branches = if branching_this_node.len() > 1 {
                     branching_this_node
                 } else {
@@ -586,7 +585,7 @@ fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mu
     };
 
     let add_to_sub = |role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subscriptions| -> bool {
-        if subs.contains_key(&role) && event_types.iter().all(|e| subs[&role].contains(e)) {//event_types.is_subset(&subs[&role]) {
+        if subs.contains_key(&role) && event_types.iter().all(|e| subs[&role].contains(e)) {
             return true;
         }
         subs
@@ -607,16 +606,14 @@ fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mu
             let join_and_prejoin: BTreeSet<_> = [joining_event.clone()].into_iter().chain(get_pre_joins(&joining_event).into_iter()).collect();
             for role in interested_roles {
                 is_stable = add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
-                //subscription.entry(role).and_modify(|events| { events.append(&mut join_and_prejoin.clone()); }).or_default();
             }
         }
 
         // determinacy: branches
         for branching_events in &proto_info.branching_events {
-            let interested_roles = branching_events.iter().flat_map(|e| roles_on_path(e.clone(), proto_info, &subscription)).collect::<BTreeSet<_>>();//roles_on_path(branching_events.clone(), proto_info, &subscription);
+            let interested_roles = branching_events.iter().flat_map(|e| roles_on_path(e.clone(), proto_info, &subscription)).collect::<BTreeSet<_>>();
             for role in interested_roles {
                 is_stable = add_to_sub(role, branching_events.clone(), subscription) && is_stable;
-                //subscription.entry(role).and_modify(|events| { events.append(&mut branching_events.clone()); }).or_default();
             }
         }
     }
@@ -725,10 +722,7 @@ fn roles_on_path(event_type: EventType, proto_info: &ProtoInfo, subs: &Subscript
         proto_info.succeeding_events
         .get(&event_type)
         .cloned()
-        .unwrap_or_default()
-        .iter()
-        .cloned()
-        .collect();
+        .unwrap_or_default();
     proto_info.role_event_map
         .iter()
         .filter(|(role, labels)| {
