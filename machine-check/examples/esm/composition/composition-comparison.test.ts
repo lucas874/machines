@@ -80,9 +80,9 @@ const G3: SwarmProtocolType = {
     },
   ],
 }
-const interfacing_swarms: InterfacingSwarms = [{protocol: G1, subscriptions: {}, interface: null}, {protocol: G2, subscriptions: {}, interface: 'T'}, {protocol: G3, subscriptions: {}, interface: 'F'}]
-const exact_result_subscriptions: ResultData<Subscriptions> = exactWWFSubscriptions(interfacing_swarms)
-const overapprox_result_subscriptions: ResultData<Subscriptions> = overapproxWWFSubscriptions(interfacing_swarms, "Coarse")
+const interfacing_swarms: InterfacingSwarms = [{protocol: G1, interface: null}, {protocol: G2, interface: 'T'}, {protocol: G3, interface: 'F'}]
+const exact_result_subscriptions: ResultData<Subscriptions> = exactWWFSubscriptions(interfacing_swarms, {})
+const overapprox_result_subscriptions: ResultData<Subscriptions> = overapproxWWFSubscriptions(interfacing_swarms, {}, "Coarse")
 
 describe('subscriptions', () => {
   it('exact should be ok', () => {
@@ -131,8 +131,8 @@ const G2_: SwarmProtocolType = {
   ],
 }
 
-const interfacing_swarms_error_1: InterfacingSwarms = [{protocol: G1, subscriptions: {}, interface: null}, {protocol: G2, subscriptions: {}, interface: 'FL'}, {protocol: G3, subscriptions: {}, interface: 'F'}]
-const interfacing_swarms_error_2: InterfacingSwarms = [{protocol: G1, subscriptions: {}, interface: null}, {protocol: G2_, subscriptions: {}, interface: 'T'}]
+const interfacing_swarms_error_1: InterfacingSwarms = [{protocol: G1, interface: null}, {protocol: G2, interface: 'FL'}, {protocol: G3, interface: 'F'}]
+const interfacing_swarms_error_2: InterfacingSwarms = [{protocol: G1, interface: null}, {protocol: G2_, interface: 'T'}]
 const result_composition_ok = composeProtocols(interfacing_swarms)
 const result_composition_error_1 = composeProtocols(interfacing_swarms_error_1)
 const result_composition_error_2 = composeProtocols(interfacing_swarms_error_2)
@@ -174,7 +174,7 @@ describe('various tests', () => {
 // fix this error being recorded twice.
 describe('various errors', () => {
   it('subscription for empty list of protocols', () => {
-    expect(overapproxWWFSubscriptions([], "Coarse")).toEqual({
+    expect(overapproxWWFSubscriptions([], {}, "Coarse")).toEqual({
       type: 'ERROR',
       errors: [
         "invalid argument",
@@ -183,7 +183,7 @@ describe('various errors', () => {
     })
   })
   it('subscription for empty list of protocols', () => {
-    expect(exactWWFSubscriptions([])).toEqual({
+    expect(exactWWFSubscriptions([], {})).toEqual({
       type: 'ERROR',
       errors: [
         "invalid argument",

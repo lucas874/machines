@@ -8,7 +8,7 @@ use crate::{
     Graph,
 };
 
-use super::{NodeId, Subscriptions, SwarmProtocol};
+use super::{NodeId, SwarmProtocol};
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -31,7 +31,6 @@ pub struct ProtoStruct {
     pub initial: Option<NodeId>,
     pub errors: Vec<Error>,
     pub interface: BTreeSet<EventType>,
-    pub subscriptions: Subscriptions,
 }
 
 impl ProtoStruct {
@@ -40,14 +39,12 @@ impl ProtoStruct {
         initial: Option<NodeId>,
         errors: Vec<Error>,
         interface: BTreeSet<EventType>,
-        subscriptions: Subscriptions
     ) -> Self {
         Self {
             graph,
             initial,
             errors,
             interface,
-            subscriptions
         }
     }
 
@@ -123,7 +120,6 @@ impl ProtoInfo {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CompositionComponent<T: SwarmInterface> {
     pub protocol: SwarmProtocol,
-    pub subscriptions: Subscriptions,
     pub interface: Option<T>,
 }
 

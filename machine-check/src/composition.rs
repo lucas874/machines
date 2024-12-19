@@ -27,12 +27,16 @@ pub fn check_wwf_swarm(protos: String, subs: String) -> String {
 }
 
 #[wasm_bindgen]
-pub fn exact_weak_well_formed_sub(protos: String) -> String {
+pub fn exact_weak_well_formed_sub(protos: String, subs: String) -> String {
     let protos = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
         Ok(p) => p,
         Err(e) => return derr::<Subscriptions>(vec![format!("parsing swarm protocol: {}", e)]),
     };
-    let result = composition_swarm::exact_weak_well_formed_sub(protos);
+    let subs = match serde_json::from_str::<Subscriptions>(&subs) {
+        Ok(p) => p,
+        Err(e) => return err(vec![format!("parsing subscriptions: {}", e)]),
+    };
+    let result = composition_swarm::exact_weak_well_formed_sub(protos, &subs);
     match result {
         Ok(subscriptions) => dok(subscriptions),
         Err(error_report) => derr::<Subscriptions>(error_report_to_strings(error_report)),
@@ -40,16 +44,20 @@ pub fn exact_weak_well_formed_sub(protos: String) -> String {
 }
 
 #[wasm_bindgen]
-pub fn overapproximated_weak_well_formed_sub(protos: String, granularity: String) -> String {
+pub fn overapproximated_weak_well_formed_sub(protos: String, subs: String, granularity: String) -> String {
     let protos = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
         Ok(p) => p,
         Err(e) => return derr::<Subscriptions>(vec![format!("parsing swarm protocol: {}", e)]),
+    };
+    let subs = match serde_json::from_str::<Subscriptions>(&subs) {
+        Ok(p) => p,
+        Err(e) => return err(vec![format!("parsing subscriptions: {}", e)]),
     };
     let granularity = match serde_json::from_str::<Granularity>(&granularity) {
         Ok(g) => g,
         Err(e) => return derr::<Subscriptions>(vec![format!("parsing granularity parameter: {}", e)]),
     };
-    let result = composition_swarm::overapprox_weak_well_formed_sub(protos, granularity);
+    let result = composition_swarm::overapprox_weak_well_formed_sub(protos, &subs, granularity);
     match result {
         Ok(subscriptions) => dok(subscriptions),
         Err(error_report) => derr::<Subscriptions>(error_report_to_strings(error_report)),

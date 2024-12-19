@@ -97,12 +97,12 @@ const subscriptions1 = {
     ],
 }
 
-const G1_: InterfacingSwarms = [{protocol: G1, subscriptions: {}, interface: null}]
-const G2_: InterfacingSwarms = [{protocol: G2, subscriptions: {}, interface: null}]
-const G3_: InterfacingSwarms = [{protocol: G3, subscriptions: {}, interface: null}]
+const G1_: InterfacingSwarms = [{protocol: G1, interface: null}]
+const G2_: InterfacingSwarms = [{protocol: G2, interface: null}]
+const G3_: InterfacingSwarms = [{protocol: G3, interface: null}]
 
-const result_subscriptions2: ResultData<Subscriptions> = exactWWFSubscriptions(G2_)
-const result_subscriptions3: ResultData<Subscriptions> = exactWWFSubscriptions(G3_)
+const result_subscriptions2: ResultData<Subscriptions> = exactWWFSubscriptions(G2_, {})
+const result_subscriptions3: ResultData<Subscriptions> = exactWWFSubscriptions(G3_, {})
 
 describe('check confusion-ful protocols G2 and G3', () => {
   it('result should not be ok', () => {

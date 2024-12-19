@@ -406,12 +406,10 @@ mod tests {
             vec![
                 CompositionComponent {
                     protocol: get_proto1(),
-                    subscriptions: BTreeMap::new(),
                     interface: None,
                 },
                 CompositionComponent {
                     protocol: get_proto2(),
-                    subscriptions: BTreeMap::new(),
                     interface: Some(Role::new("T")),
                 },
             ]
@@ -423,12 +421,10 @@ mod tests {
             vec![
                 CompositionComponent {
                     protocol: get_proto2(),
-                    subscriptions: BTreeMap::new(),
                     interface: None,
                 },
                 CompositionComponent {
                     protocol: get_proto1(),
-                    subscriptions: BTreeMap::new(),
                     interface: Some(Role::new("T")),
                 },
             ]
@@ -440,17 +436,14 @@ mod tests {
             vec![
                 CompositionComponent {
                     protocol: get_proto1(),
-                    subscriptions: BTreeMap::new(),
                     interface: None,
                 },
                 CompositionComponent {
                     protocol: get_proto2(),
-                    subscriptions: BTreeMap::new(),
                     interface: Some(Role::new("T")),
                 },
                 CompositionComponent {
                     protocol: get_proto3(),
-                    subscriptions: BTreeMap::new(),
                     interface: Some(Role::new("F")),
                 },
             ]
@@ -462,17 +455,14 @@ mod tests {
             vec![
                 CompositionComponent {
                     protocol: get_proto3(),
-                    subscriptions: BTreeMap::new(),
                     interface: None,
                 },
                 CompositionComponent {
                     protocol: get_proto2(),
-                    subscriptions: BTreeMap::new(),
                     interface: Some(Role::new("F")),
                 },
                 CompositionComponent {
                     protocol: get_proto1(),
-                    subscriptions: BTreeMap::new(),
                     interface: Some(Role::new("T")),
                 },
             ]
@@ -559,7 +549,7 @@ mod tests {
     fn test_projection_2() {
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), subscriptions: BTreeMap::new(), interface: None}]));
+        let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), interface: None}]), &BTreeMap::new());
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
@@ -618,7 +608,7 @@ mod tests {
     fn test_projection_3() {
         // car factory from coplaws example
         let proto = get_proto2();
-        let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), subscriptions: BTreeMap::new(), interface: None}]));
+        let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), interface: None}]), &BTreeMap::new());
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("F");
@@ -669,7 +659,7 @@ mod tests {
     fn test_combine_machines_1() {
         // Example from coplaws slides. Use generated WWF subscriptions. Project over T.
         let role = Role::new("T");
-        let subs1 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_1(), Granularity::Coarse);
+        let subs1 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_1(), &BTreeMap::new(), Granularity::Coarse);
         assert!(subs1.is_ok());
         let subs1 = subs1.unwrap();
         let proto_info = swarms_to_proto_info(get_interfacing_swarms_1(), &subs1);
@@ -680,7 +670,7 @@ mod tests {
         let (proj_combined1, proj_combined_initial1) =
             project_combine(&proto_info.protocols, &subs1, role.clone());
 
-        let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_1_reversed(), Granularity::Coarse);
+        let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_1_reversed(), &BTreeMap::new(), Granularity::Coarse);
         assert!(subs2.is_ok());
         let subs2 = subs2.unwrap();
         let proto_info = swarms_to_proto_info(get_interfacing_swarms_1_reversed(), &subs2);
@@ -721,13 +711,13 @@ mod tests {
         let composition = compose_protocols(get_interfacing_swarms_2());
         assert!(composition.is_ok());
         let (composed_graph, composed_initial) = composition.unwrap();
-        let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_2(), Granularity::Coarse);
+        let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_2(), &BTreeMap::new(), Granularity::Coarse);
         assert!(subs.is_ok());
         let subs = subs.unwrap();
         let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D"), Role::new("F"), Role::new("TR"), Role::new("QCR")];
 
         for role in all_roles {
-            let subs1 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_2(), Granularity::Coarse);
+            let subs1 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_2(), &BTreeMap::new(), Granularity::Coarse);
             assert!(subs1.is_ok());
             let subs1 = subs1.unwrap();
             let proto_info = swarms_to_proto_info(get_interfacing_swarms_2(), &subs1);
@@ -738,7 +728,7 @@ mod tests {
             let (proj_combined1, proj_combined_initial1) =
                 project_combine(&proto_info.protocols, &subs1, role.clone());
 
-            let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_2_reversed(), Granularity::Coarse);
+            let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_2_reversed(), &BTreeMap::new(), Granularity::Coarse);
             assert!(subs2.is_ok());
             let subs2 = subs2.unwrap();
             let proto_info = swarms_to_proto_info(get_interfacing_swarms_2_reversed(), &subs2);
