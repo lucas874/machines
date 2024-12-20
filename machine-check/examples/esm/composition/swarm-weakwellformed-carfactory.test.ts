@@ -83,9 +83,9 @@ const G3: SwarmProtocolType = {
 const G1_: InterfacingSwarms = [{protocol: G1, interface: null}]
 const G2_: InterfacingSwarms = [{protocol: G2, interface: null}]
 const G3_: InterfacingSwarms = [{protocol: G3, interface: null}]
-const exact_result_subscriptions1: ResultData<Subscriptions> = exactWWFSubscriptions(G1_)
-const exact_result_subscriptions2: ResultData<Subscriptions> = exactWWFSubscriptions(G2_)
-const exact_result_subscriptions3: ResultData<Subscriptions> = exactWWFSubscriptions(G3_)
+const exact_result_subscriptions1: ResultData<Subscriptions> = exactWWFSubscriptions(G1_, {})
+const exact_result_subscriptions2: ResultData<Subscriptions> = exactWWFSubscriptions(G2_, {})
+const exact_result_subscriptions3: ResultData<Subscriptions> = exactWWFSubscriptions(G3_, {})
 
 describe('extended subscriptions', () => {
   it('subscription1 should be ok', () => {
@@ -160,9 +160,9 @@ describe('checkWWFSwarmProtocol for protocols with exact wwf subscription', () =
   })
 })
 
-const overapprox_result_subscriptions1: ResultData<Subscriptions> = overapproxWWFSubscriptions(G1_)
-const overapprox_result_subscriptions2: ResultData<Subscriptions> = overapproxWWFSubscriptions(G2_)
-const overapprox_result_subscriptions3: ResultData<Subscriptions> = overapproxWWFSubscriptions(G3_)
+const overapprox_result_subscriptions1: ResultData<Subscriptions> = overapproxWWFSubscriptions(G1_, {}, "Coarse")
+const overapprox_result_subscriptions2: ResultData<Subscriptions> = overapproxWWFSubscriptions(G2_, {}, "Coarse")
+const overapprox_result_subscriptions3: ResultData<Subscriptions> = overapproxWWFSubscriptions(G3_, {}, "Coarse")
 if (overapprox_result_subscriptions1.type === 'ERROR') throw new Error('error getting subscription')
 const overapprox_subscriptions1: Subscriptions = overapprox_result_subscriptions1.data
 

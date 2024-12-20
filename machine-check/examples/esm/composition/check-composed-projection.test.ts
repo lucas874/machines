@@ -95,7 +95,7 @@ const G2: SwarmProtocolType = {
 }
 
 const interfacing_swarms: InterfacingSwarms = [{protocol: G1, interface: null}, {protocol: G2, interface: 'T'}]
-const overapprox_result_subscriptions: ResultData<Subscriptions> = overapproxWWFSubscriptions(interfacing_swarms)
+const overapprox_result_subscriptions: ResultData<Subscriptions> = overapproxWWFSubscriptions(interfacing_swarms, {}, "Coarse")
 
 describe('subscriptions', () => {
   it('overapproximation should be ok', () => {

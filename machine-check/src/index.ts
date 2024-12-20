@@ -29,6 +29,10 @@ export type Result = { type: 'OK' } | { type: 'ERROR'; errors: string[] }
 export type ResultData<Data> = { type: 'OK'; data: Data } | { type: 'ERROR'; errors: string[] }
 export type CompositionComponent = {protocol: SwarmProtocolType, interface: string | null }
 export type InterfacingSwarms = CompositionComponent[]
+export type Granularity =
+  | "Fine"
+  | "Medium"
+  | "Coarse"
 
 export function checkSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): Result {
   const p = JSON.stringify(proto)
@@ -57,15 +61,18 @@ export function checkWWFSwarmProtocol(protos: InterfacingSwarms, subscriptions: 
   return JSON.parse(result)
 }
 
-export function exactWWFSubscriptions(protos: InterfacingSwarms): ResultData<Subscriptions> {
+export function exactWWFSubscriptions(protos: InterfacingSwarms, subscriptions: Subscriptions): ResultData<Subscriptions> {
   const p = JSON.stringify(protos)
-  const result = exact_weak_well_formed_sub(p);
+  const s = JSON.stringify(subscriptions)
+  const result = exact_weak_well_formed_sub(p, s);
   return JSON.parse(result)
 }
 
-export function overapproxWWFSubscriptions(protos: InterfacingSwarms): ResultData<Subscriptions> {
+export function overapproxWWFSubscriptions(protos: InterfacingSwarms, subscriptions: Subscriptions, granularity: Granularity): ResultData<Subscriptions> {
   const p = JSON.stringify(protos)
-  const result = overapproximated_weak_well_formed_sub(p);
+  const s = JSON.stringify(subscriptions)
+  const g = JSON.stringify(granularity)
+  const result = overapproximated_weak_well_formed_sub(p, s, g);
   return JSON.parse(result)
 }
 

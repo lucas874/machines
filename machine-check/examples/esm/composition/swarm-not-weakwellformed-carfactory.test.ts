@@ -101,8 +101,8 @@ const G1_: InterfacingSwarms = [{protocol: G1, interface: null}]
 const G2_: InterfacingSwarms = [{protocol: G2, interface: null}]
 const G3_: InterfacingSwarms = [{protocol: G3, interface: null}]
 
-const result_subscriptions2: ResultData<Subscriptions> = exactWWFSubscriptions(G2_)
-const result_subscriptions3: ResultData<Subscriptions> = exactWWFSubscriptions(G3_)
+const result_subscriptions2: ResultData<Subscriptions> = exactWWFSubscriptions(G2_, {})
+const result_subscriptions3: ResultData<Subscriptions> = exactWWFSubscriptions(G3_, {})
 
 describe('check confusion-ful protocols G2 and G3', () => {
   it('result should not be ok', () => {
@@ -132,7 +132,7 @@ describe('checkWWFSwarmProtocol G1', () => {
     expect(checkWWFSwarmProtocol(G1_, subscriptions1)).toEqual({
       type: 'ERROR',
       errors: [
-        "role FL does not subscribe to event types time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
+        "role FL does not subscribe to event types time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
         "active role does not subscribe to any of its emitted event types in transition (2)--[deliver@T<part>]-->(0)",
         "subsequently active role D does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
         "subsequently active role T does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",

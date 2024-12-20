@@ -81,8 +81,8 @@ const G3: SwarmProtocolType = {
   ],
 }
 const interfacing_swarms: InterfacingSwarms = [{protocol: G1, interface: null}, {protocol: G2, interface: 'T'}, {protocol: G3, interface: 'F'}]
-const exact_result_subscriptions: ResultData<Subscriptions> = exactWWFSubscriptions(interfacing_swarms)
-const overapprox_result_subscriptions: ResultData<Subscriptions> = overapproxWWFSubscriptions(interfacing_swarms)
+const exact_result_subscriptions: ResultData<Subscriptions> = exactWWFSubscriptions(interfacing_swarms, {})
+const overapprox_result_subscriptions: ResultData<Subscriptions> = overapproxWWFSubscriptions(interfacing_swarms, {}, "Coarse")
 
 describe('subscriptions', () => {
   it('exact should be ok', () => {
@@ -174,7 +174,7 @@ describe('various tests', () => {
 // fix this error being recorded twice.
 describe('various errors', () => {
   it('subscription for empty list of protocols', () => {
-    expect(overapproxWWFSubscriptions([])).toEqual({
+    expect(overapproxWWFSubscriptions([], {}, "Coarse")).toEqual({
       type: 'ERROR',
       errors: [
         "invalid argument",
@@ -183,7 +183,7 @@ describe('various errors', () => {
     })
   })
   it('subscription for empty list of protocols', () => {
-    expect(exactWWFSubscriptions([])).toEqual({
+    expect(exactWWFSubscriptions([], {})).toEqual({
       type: 'ERROR',
       errors: [
         "invalid argument",

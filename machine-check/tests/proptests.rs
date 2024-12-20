@@ -1,5 +1,5 @@
 use machine_check::{
-    composition::{check_wwf_swarm, compose_protocols, composition_types::{CompositionComponent, DataResult, InterfacingSwarms}, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, revised_projection, check_composed_projection}, types::{Command, EventType, Role, State, StateName, SwarmLabel, Transition}, EdgeId, Graph, Machine, NodeId, Subscriptions, SwarmProtocol
+    composition::{check_composed_projection, check_wwf_swarm, compose_protocols, composition_types::{CompositionComponent, DataResult, Granularity, InterfacingSwarms}, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, project_combine, revised_projection}, types::{Command, EventType, Role, State, StateName, SwarmLabel, Transition}, EdgeId, Graph, Machine, NodeId, Subscriptions, SwarmProtocol
 };
 use petgraph::{
     graph::EdgeReference,
@@ -579,7 +579,8 @@ proptest! {
     #[test]
     fn test_exact_1(vec in generate_interfacing_swarms(5, 5, 5, false)) {
         let protos = serde_json::to_string(&vec).unwrap();
-        let subscription = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone())).unwrap() {
+        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let subscription = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs)).unwrap() {
             DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
             DataResult::<Subscriptions>::ERROR{ .. } => None,
         };
@@ -605,7 +606,9 @@ proptest! {
     #[test]
     fn test_overapproximated_1(vec in generate_interfacing_swarms(5, 5, 5, false)) {
         let protos = serde_json::to_string(&vec).unwrap();
-        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone())).unwrap() {
+        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
+        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
             DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
             DataResult::<Subscriptions>::ERROR{ .. } => None,
         };
@@ -616,7 +619,7 @@ proptest! {
         let errors = serde_json::from_str::<CheckResult>(&errors).unwrap();
         let ok = match errors {
             CheckResult::OK => true,
-            CheckResult::ERROR { .. } => false
+            CheckResult::ERROR { errors: e } => {println!("{:?}", e); false}
 
         };
         assert!(ok);
@@ -628,7 +631,8 @@ proptest! {
     #[test]
     fn test_exact_2(vec in generate_interfacing_swarms_refinement(5, 5, 5)) {
         let protos = serde_json::to_string(&vec).unwrap();
-        let subscription = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone())).unwrap() {
+        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let subscription = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs)).unwrap() {
             DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
             DataResult::<Subscriptions>::ERROR{ .. } => None,
         };
@@ -650,7 +654,9 @@ proptest! {
     #[test]
     fn test_overapproximated_2(vec in generate_interfacing_swarms_refinement(5, 5, 5)) {
         let protos = serde_json::to_string(&vec).unwrap();
-        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone())).unwrap() {
+        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
+        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
             DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
             DataResult::<Subscriptions>::ERROR{ .. } => None,
         };
@@ -673,7 +679,8 @@ proptest! {
     #[test]
     fn test_exact_3(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
         let protos = serde_json::to_string(&vec).unwrap();
-        let subscription = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone())).unwrap() {
+        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let subscription = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs)).unwrap() {
             DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
             DataResult::<Subscriptions>::ERROR{ .. } => None,
         };
@@ -695,7 +702,9 @@ proptest! {
     #[test]
     fn test_overapproximated_3(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
         let protos = serde_json::to_string(&vec).unwrap();
-        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone())).unwrap() {
+        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
+        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
             DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
             DataResult::<Subscriptions>::ERROR{ .. } => None,
         };
@@ -715,9 +724,60 @@ proptest! {
 
 proptest! {
     #[test]
+    fn test_overapproximated_4(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
+        let protos = serde_json::to_string(&vec).unwrap();
+        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let granularity = serde_json::to_string(&Granularity::Medium).unwrap();
+        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+        assert!(subscription.is_some());
+        let subscription = subscription.unwrap();
+        let subscription = serde_json::to_string(&subscription).unwrap();
+        let errors = check_wwf_swarm(protos.clone(), subscription.clone());
+        let errors = serde_json::from_str::<CheckResult>(&errors).unwrap();
+        let ok = match errors {
+            CheckResult::OK => true,
+            CheckResult::ERROR { .. } => false
+
+        };
+        assert!(ok);
+    }
+}
+
+proptest! {
+    #[test]
+    fn test_overapproximated_5(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
+        let protos = serde_json::to_string(&vec).unwrap();
+        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let granularity = serde_json::to_string(&Granularity::Fine).unwrap();
+        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+        assert!(subscription.is_some());
+        let subscription = subscription.unwrap();
+        let subscription = serde_json::to_string(&subscription).unwrap();
+        let errors = check_wwf_swarm(protos.clone(), subscription.clone());
+        let errors = serde_json::from_str::<CheckResult>(&errors).unwrap();
+        let ok = match errors {
+            CheckResult::OK => true,
+            CheckResult::ERROR { .. } => false
+
+        };
+        assert!(ok);
+    }
+}
+
+proptest! {
+    #[test]
+    #[ignore]
     fn test_overapproximated_refinement_2_only_generate(vec in generate_interfacing_swarms_refinement_2(7, 7, 10)) {
         let protos = serde_json::to_string(&vec).unwrap();
-        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone())).unwrap() {
+        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
+        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
             DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
             DataResult::<Subscriptions>::ERROR{ .. } => None,
         };
@@ -725,13 +785,68 @@ proptest! {
     }
 }
 
+fn avg_sub_size(subscriptions: &Subscriptions) -> f32 {
+    let denominator = subscriptions.keys().len();
+    let mut numerator = 0;
+    for events in subscriptions.values() {
+        numerator += events.len();
+    }
+
+    numerator as f32 / denominator as f32
+}
+
+proptest! {
+    #[test]
+    #[ignore]
+    fn test_sub_sizes(vec in generate_interfacing_swarms_refinement_2(5, 5, 5)) {
+        let protos = serde_json::to_string(&vec).unwrap();
+        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
+        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs.clone(), granularity)).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+        assert!(subscription.is_some());
+        let subscription1 = subscription.unwrap();
+        /* let subscription = serde_json::to_string(&subscription1.clone()).unwrap();
+        let errors = check_wwf_swarm(protos.clone(), subscription.clone());
+        let errors = serde_json::from_str::<CheckResult>(&errors).unwrap();
+        let ok = match errors {
+            CheckResult::OK => true,
+            CheckResult::ERROR { .. } => false
+
+        };
+        assert!(ok); */
+        let subscription = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs.clone())).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+        assert!(subscription.is_some());
+        let subscription2 = subscription.unwrap();
+        /* let subscription = serde_json::to_string(&subscription2.clone()).unwrap();
+        let errors = check_wwf_swarm(protos.clone(), subscription.clone());
+        let errors = serde_json::from_str::<CheckResult>(&errors).unwrap();
+        let ok = match errors {
+            CheckResult::OK => true,
+            CheckResult::ERROR { .. } => false
+
+        };
+        assert!(ok); */
+
+        println!("avg sub size approx: {}", avg_sub_size(&subscription1));
+        println!("avg sub size exact: {}\n", avg_sub_size(&subscription2));
+    }
+}
+
 proptest! {
     //#![proptest_config(ProptestConfig::with_cases(1))]
     #[test]
     #[ignore]
-    fn test_combine_machines_prop(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
+    fn test_combine_machines_prop(vec in generate_interfacing_swarms_refinement_2(5, 5, 5)) {
         let protos = serde_json::to_string(&vec).unwrap();
-        let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone())).unwrap() {
+        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let granularity = serde_json::to_string(&Granularity::Medium).unwrap();
+        let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
             DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
             DataResult::<Subscriptions>::ERROR{ .. } => None,
         };
@@ -745,7 +860,7 @@ proptest! {
         let composition = composition.unwrap();
         //let composition = InterfacingSwarms::<Role>(vec![CompositionComponent{protocol: composition.unwrap(), interface: None}]);
         let sub_string = serde_json::to_string(&subscriptions).unwrap();
-        let composition_string = serde_json::to_string(&composition).unwrap();
+        let composition_string = serde_json::to_string(&composition.clone()).unwrap();
         for role in subscriptions.keys() {
             let role_string = role.to_string();
             let projection = match serde_json::from_str(&revised_projection(composition_string.clone(), sub_string.clone(), role_string.clone())).unwrap() {
@@ -766,13 +881,68 @@ proptest! {
                 CheckResult::ERROR {errors: e} => { println!("errors: {:?}", e); assert!(false) },
             } */
             assert!(projection.is_some());
-            let machine_string = serde_json::to_string(&projection.unwrap()).unwrap();
+            let machine_string = serde_json::to_string(&projection.clone().unwrap()).unwrap();
             // should work like this projecting over the explicit composition initially and comparing that with combined machines?
-            match serde_json::from_str(&check_composed_projection(protos.clone(), sub_string.clone(), role.to_string(), machine_string)).unwrap() {
-                CheckResult::OK => assert!(true),
-                CheckResult::ERROR {errors: e} => { println!("errors: {:?}", e); assert!(false) },
+            match serde_json::from_str(&check_composed_projection(protos.clone(), sub_string.clone(), role.clone().to_string(), machine_string)).unwrap() {
+                CheckResult::OK => (),
+                CheckResult::ERROR {errors: e} => {
+                    match serde_json::from_str(&project_combine(protos.clone(), sub_string.clone(), role.clone().to_string())).unwrap() {
+                        DataResult::<Machine>::OK{data: projection1} => {
+                            println!("machine combined: {}", serde_json::to_string_pretty(&projection1).unwrap());
+                        },
+                        DataResult::<Machine>::ERROR{ errors: e } => println!("errors combined: {:?}", e),
+                    };
+                    println!("machine: {}", serde_json::to_string_pretty(&projection.unwrap()).unwrap());
+                    println!("composition: {}", serde_json::to_string_pretty(&composition).unwrap());
+                    for v in &vec.0 {
+                        println!("component: {}", serde_json::to_string_pretty(&v.protocol).unwrap());
+                    }
+                    println!("errors: {:?}", e); assert!(false)
+                },
             }
         }
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(1))]
+    #[test]
+    #[ignore]
+    fn test_combine_machines_prop_1(vec in generate_interfacing_swarms_refinement_2(5, 5, 7)) {
+        let protos = serde_json::to_string(&vec).unwrap();
+        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let granularity = serde_json::to_string(&Granularity::Medium).unwrap();
+        let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+
+        assert!(subscriptions.is_some());
+
+        let subscriptions = subscriptions.unwrap();
+
+        //let composition = InterfacingSwarms::<Role>(vec![CompositionComponent{protocol: composition.unwrap(), interface: None}]);
+        let sub_string = serde_json::to_string(&subscriptions).unwrap();
+
+        for role in subscriptions.keys() {
+            let role_string = role.to_string();
+
+            let projection_combined = match serde_json::from_str(&project_combine(protos.clone(), sub_string.clone(), role_string.clone())).unwrap() {
+                DataResult::<Machine>::OK{data: projection} => {
+                Some(projection) },
+                DataResult::<Machine>::ERROR{ .. } => None,
+            };
+            assert!(projection_combined.is_some());
+        }
+        println!("done projecting");
+        let composition = match serde_json::from_str(&compose_protocols(protos.clone())).unwrap() {
+            DataResult::<SwarmProtocol>::OK{data: composition} => {
+                Some(composition) },
+            DataResult::<SwarmProtocol>::ERROR{ .. } => None,
+        };
+        println!("done composing");
+        println!("size of composition state space: {}", composition.unwrap().transitions.into_iter().flat_map(|label| [label.source, label.target]).collect::<BTreeSet<State>>().len());
+
     }
 }
 
@@ -796,7 +966,8 @@ proptest! {
 
         let protos = serde_json::to_string(&vec).unwrap();
         //let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone())).unwrap() {
-        let subscriptions = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone())).unwrap() {
+        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let subscriptions = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs)).unwrap() {
             DataResult::<Subscriptions>::OK{data: subscriptions} => {
                 write_file(&format!("{parent_path}/{dir_name}/subscription.txt"), serde_json::to_string(&subscriptions).unwrap());
                 Some(subscriptions) },

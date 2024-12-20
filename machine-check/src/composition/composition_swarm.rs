@@ -4,13 +4,16 @@ use crate::{
     EdgeId, NodeId, Subscriptions, SwarmProtocol,
 };
 use itertools::Itertools;
+use petgraph::algo::floyd_warshall;
 use petgraph::visit::DfsPostOrder;
+use petgraph::Directed;
+use std::collections::HashMap;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
 };
 
-use super::composition_types::InterfacingSwarms;
+use super::composition_types::{CompositionComponent, Granularity, InterfacingSwarms, ProtoStruct};
 use super::MapVec;
 use super::{
     composition_types::{
@@ -52,7 +55,7 @@ impl Error {
             Error::RoleNotSubscribedToBranch(event_types, edge, node, role) => {
                 let events = event_types.join(", ");
                 format!(
-                    "role {role} does not subscribe to event types {events} in branching transitions at state {}, but is involved in or after transition {}",
+                    "role {role} does not subscribe to event types {events} in branching transitions at state {}, but is involved after transition {}",
                     &graph[*node].state_name(),
                     Edge(graph, *edge)
                 )
@@ -146,7 +149,7 @@ pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptio
 }
 
 // construct wwf subscription by constructing the composition of all protocols in protos and inspecting the result
-pub fn exact_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Result<Subscriptions, ErrorReport> {
+pub fn exact_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions) -> Result<Subscriptions, ErrorReport> {
     let combined_proto_info = swarms_to_proto_info(protos, &BTreeMap::new());
     if !combined_proto_info.no_errors() {
         return Err(proto_info_to_error_report(combined_proto_info));
@@ -156,7 +159,7 @@ pub fn exact_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwarms<T
     // we construct a ProtoInfo with the composition as the only protocol and all the
     // information about branches etc. from combined_proto_info
     let composition = explicit_composition_proto_info(combined_proto_info);
-    let sub = exact_wwf_sub(composition, 0);
+    let sub = exact_wwf_sub(composition, 0, subs);
 
     Ok(sub)
 }
@@ -164,7 +167,7 @@ pub fn exact_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwarms<T
 // construct wwf sub by adding all branching events, joining events, events immediately preceding joins to
 // the subsription of each role. For each role also add the events emitted by the role to its sub and any
 // events immediately preceding these.
-pub fn overapprox_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Result<Subscriptions, ErrorReport> {
+pub fn overapprox_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions, granularity: Granularity) -> Result<Subscriptions, ErrorReport> {
     let combined_proto_info = swarms_to_proto_info(protos, &BTreeMap::new());
     if !combined_proto_info.no_errors() {
         return Err(proto_info_to_error_report(combined_proto_info));
@@ -173,7 +176,7 @@ pub fn overapprox_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwa
     // if we reach this point the protocols can interface and are all confusion free
     // we construct a ProtoInfo with the composition as the only protocol and all the
     // information about branches etc. from combined_proto_info
-    let sub = overapprox_wwf_sub(&combined_proto_info);
+    let sub = overapprox_wwf_sub(&mut combined_proto_info.clone(), subs, granularity);
     Ok(sub)
 }
 
@@ -191,9 +194,9 @@ pub fn compose_protocols<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Res
         return Err(proto_info_to_error_report(combined_proto_info));
     }
 
-    let composition = explicit_composition_proto_info(combined_proto_info);
-    let (graph, initial, _) = composition.get_ith_proto(0).unwrap();
-    Ok((graph, initial.unwrap()))
+    //let (graph, initial, _) = explicit_composition_proto_info(combined_proto_info).get_ith_proto(0).unwrap();
+    let p = explicit_composition_proto_info(combined_proto_info).get_ith_proto(0).unwrap();
+    Ok((p.graph, p.initial.unwrap()))
 }
 
 // perform wwf check on every protocol in a ProtoInfo
@@ -203,9 +206,9 @@ fn weak_well_formed_proto_info(proto_info: ProtoInfo, subs: &Subscriptions) -> P
         .clone()
         .into_iter()
         .enumerate()
-        .map(|(i, ((graph, initial, errors), interface))| {
-            let errors = vec![errors, weak_well_formed(&proto_info, i, subs)].concat();
-            ((graph, initial, errors), interface)
+        .map(|(i, p)| {
+            let errors = vec![p.errors, weak_well_formed(&proto_info, i, subs)].concat();
+            ProtoStruct {errors, .. p}
         })
         .collect();
 
@@ -222,9 +225,9 @@ fn confusion_free_proto_info(proto_info: ProtoInfo, subs: &Subscriptions) -> Pro
         .clone()
         .into_iter()
         .enumerate()
-        .map(|(i, ((graph, initial, errors), interface))| {
-            let errors = vec![errors, confusion_free(&proto_info, i, subs)].concat();
-            ((graph, initial, errors), interface)
+        .map(|(i, p)| {
+            let errors = vec![p.errors, confusion_free(&proto_info, i, subs)].concat();
+            ProtoStruct {errors, .. p}
         })
         .collect();
 
@@ -247,8 +250,8 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize, subs: &Subscri
     let empty = BTreeSet::new(); // just for `sub` but needs its own lifetime
     let sub = |r: &Role| subs.get(r).unwrap_or(&empty);
     let (graph, initial, _) = match proto_info.get_ith_proto(proto_pointer) {
-        Some((g, Some(i), e)) => (g, i, e),
-        Some((_, None, e)) => return e,
+        Some(ProtoStruct {graph: g, initial: Some(i), errors: e, interface: _}) => (g, i, e),
+        Some(ProtoStruct {graph: _, initial: None, errors: e, interface: _}) => return e,
         None => return vec![Error::InvalidArg],
     };
 
@@ -294,27 +297,27 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize, subs: &Subscri
             let involved_roles = roles_on_path(event_type.clone(), &proto_info, subs);
             // weak determinacy.
             // corresponds to branching rule of weak determinacy.
-            if proto_info.branching_events.contains(&event_type) {
+            if proto_info.branching_events.iter().any(|branch_set| branch_set.contains(&event_type)) {
                 // if event is branching get all branching event related to 'original' branch
                 // we could have multiple branching events from different protocols at node
                 // these are concurrent, we only worry about the original branches for this event_type
-                let branching_events_this_node: BTreeSet<EventType> = graph.edges_directed(node, Outgoing)
+                let branching_with_this_event = proto_info.branching_events.iter().find(|set| set.contains(&event_type)).cloned().unwrap();
+                let branching_this_node: BTreeSet<EventType> = graph.edges_directed(node, Outgoing)
                             .map(|e| e.weight().get_event_type())
-                            .filter(|e| proto_info.branching_events.contains(e) && !proto_info.concurrent_events.contains(&unord_event_pair(event_type.clone(), e.clone())))
+                            .filter(|e| branching_with_this_event.contains(e))
                             .collect();
                 // if only one event labeled as branching at this node, do not count it as an error if not subbed.
-                // could happen due to concurrency and loss of behavior. In such case we will encounter the 'original'
-                // branch and it will be checked there.
-                let branching_events_this_node = if branching_events_this_node.len() > 1 {
-                    branching_events_this_node
+                // could happen due to concurrency and loss of behavior.
+                let branches = if branching_this_node.len() > 1 {
+                    branching_this_node
                 } else {
                     BTreeSet::new()
                 };
                 let involved_not_subbed = involved_roles
                     .iter()
-                    .filter(|r| !branching_events_this_node.is_subset(&sub(&r)));
+                    .filter(|r| !branches.is_subset(&sub(&r)));
                 let mut branching_errors: Vec<_> = involved_not_subbed
-                    .map(|r| (r, branching_events_this_node.difference(&sub(&r)).cloned().collect::<Vec<EventType>>()))
+                    .map(|r| (r, branches.difference(&sub(&r)).cloned().collect::<Vec<EventType>>()))
                     .map(|(r, event_types)| Error::RoleNotSubscribedToBranch(event_types, edge.id(), node, r.clone()))
                     .collect();
                 errors.append(&mut branching_errors);
@@ -333,10 +336,6 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize, subs: &Subscri
                 let involved_not_subbed = involved_roles
                     .iter()
                     .filter(|r| !join_set.is_subset(sub(r)));
-                /* let pre: Vec<_> = proto_info.immediately_pre[&event_type]
-                    .clone()
-                    .into_iter()
-                    .collect(); */
                 let mut joining_errors: Vec<_> = involved_not_subbed
                     .map(|r| (r, join_set.difference(&sub(r)).cloned().collect::<Vec<EventType>>()))
                     .map(|(r, event_types)| Error::RoleNotSubscribedToJoin(event_types.clone(), edge.id(), r.clone()))
@@ -351,8 +350,8 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize, subs: &Subscri
 fn confusion_free(proto_info: &ProtoInfo, proto_pointer: usize, subs: &Subscriptions) -> Vec<Error> {
     let mut event_to_command_map = BTreeMap::new();
     let (graph, initial, _) = match proto_info.get_ith_proto(proto_pointer) {
-        Some((g, Some(i), e)) => (g, i, e),
-        Some((_, None, e)) => return e, // this error would be returned twice in this case?
+        Some(ProtoStruct {graph: g, initial: Some(i), errors: e, interface: _}) => (g, i, e),
+        Some(ProtoStruct {graph: _, initial: None, errors: e, interface: _}) => return e,
         None => return vec![Error::InvalidArg],
     };
     // make old confusion freeness check. requires us to call swarm::prepare_graph through swarm::from_json
@@ -412,25 +411,34 @@ fn confusion_free(proto_info: &ProtoInfo, proto_pointer: usize, subs: &Subscript
  * assume graph was constructed from a prepare_graph call with an empty subscription -- empty roles and active fields
  * log and command determinism?
  */
-fn exact_wwf_sub(proto_info: ProtoInfo, proto_pointer: usize) -> Subscriptions {
-    let mut subscriptions: BTreeMap<Role, BTreeSet<EventType>> = BTreeMap::new();
-    let (graph, initial, _) = match proto_info.get_ith_proto(proto_pointer) {
-        Some((g, Some(i), e)) => (g, i, e),
+fn exact_wwf_sub(proto_info: ProtoInfo, proto_pointer: usize, subscriptions: &Subscriptions) -> Subscriptions {
+    let (graph, initial) = match proto_info.get_ith_proto(proto_pointer) {
+        Some(ProtoStruct{graph: g, initial: Some(i), errors: _, interface: _}) => (g, i),
         _ => return BTreeMap::new(),
     };
-
-    let mut next_subscriptions = exact_wwf_sub_step(&proto_info, &graph, initial, subscriptions.clone());
-
-    while subscriptions != next_subscriptions {
-        subscriptions = next_subscriptions;
-        next_subscriptions = exact_wwf_sub_step(&proto_info, &graph, initial, subscriptions.clone());
+    let mut subscriptions = subscriptions.clone();
+    let mut is_stable = exact_wwf_sub_step(&proto_info, &graph, initial, &mut subscriptions);
+    while !is_stable {
+        is_stable = exact_wwf_sub_step(&proto_info, &graph, initial, &mut subscriptions);
     }
 
     subscriptions
 }
+fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, subscriptions: &mut Subscriptions) -> bool {
+    let mut is_stable = true;
+    let add_to_sub = |role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subscriptions| -> bool {
+        if subs.contains_key(&role) && event_types.iter().all(|e| subs[&role].contains(e)) {
+            return true;
+        }
+        subs
+            .entry(role)
+            .and_modify(|curr| {
+                curr.append(&mut event_types);
+            })
+            .or_insert(event_types);
+        false
 
-fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, subs: Subscriptions) -> Subscriptions {
-    let mut subscriptions = subs;
+    };
     for node in Dfs::new(&graph, initial).iter(&graph) {
         // for each edge going out of node:
         // extend subscriptions to satisfy conditions for weak causal consistency
@@ -440,12 +448,7 @@ fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, su
         for edge in graph.edges_directed(node, Outgoing) {
             let event_type = edge.weight().get_event_type();
             // weak causal consistency 1: a role subscribes to the events it emits
-            subscriptions
-                .entry(edge.weight().role.clone())
-                .and_modify(|curr| {
-                    curr.insert(event_type.clone());
-                })
-                .or_insert(BTreeSet::from([event_type.clone()]));
+            is_stable = add_to_sub(edge.weight().role.clone(), BTreeSet::from([event_type.clone()]), subscriptions) && is_stable;
 
             // weak causal consistency 2: a role subscribes to events that immediately precedes its own commands
             for active in active_transitions_not_conc(
@@ -454,42 +457,34 @@ fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, su
                 &event_type,
                 &proto_info.concurrent_events,
             ) {
-                subscriptions
-                    .entry(active.role)
-                    .and_modify(|curr| {
-                        curr.insert(event_type.clone());
-                    })
-                    .or_insert(BTreeSet::from([event_type.clone()]));
+                is_stable = add_to_sub(active.role, BTreeSet::from([event_type.clone()]), subscriptions) && is_stable;
             }
+
             let involved_roles = roles_on_path(event_type.clone(), &proto_info, &subscriptions);
             // weak determinacy 1: roles subscribe to branching events.
-            if proto_info.branching_events.contains(&event_type) {
-                let branching_events_this_node: BTreeSet<EventType> = graph.edges_directed(node, Outgoing)
+            if proto_info.branching_events.iter().any(|branch_set| branch_set.contains(&event_type)) {
+                let branching_with_this_event = proto_info.branching_events.iter().find(|set| set.contains(&event_type)).cloned().unwrap();
+                let branching_this_node: BTreeSet<EventType> = graph.edges_directed(node, Outgoing)
                             .map(|e| e.weight().get_event_type())
-                            .filter(|e| proto_info.branching_events.contains(e) && !proto_info.concurrent_events.contains(&unord_event_pair(event_type.clone(), e.clone())))
+                            .filter(|e| branching_with_this_event.contains(e))
                             .collect();
 
                 // if only one event labeled as branching at this node, do not count it as an error if not subbed.
                 // could happen due to concurrency and loss of behavior. In such case we will encounter the 'original'
                 // branch and it will be checked there. nope do not do this... slight overapprox without if maybe?
-                let branching_events_this_node = if branching_events_this_node.len() > 1 {
-                    branching_events_this_node
+                let branches = if branching_this_node.len() > 1 {
+                    branching_this_node
                 } else {
                     BTreeSet::new()
                 };
 
                 for r in involved_roles.iter() {
-                    subscriptions
-                        .entry(r.clone())
-                        .and_modify(|curr| {
-                            curr.append(&mut branching_events_this_node.clone());
-                        })
-                        .or_insert(branching_events_this_node.clone());
+                    is_stable = add_to_sub(r.clone(), branches.clone(), subscriptions) && is_stable;
                 }
             }
 
             // weak determinacy 2. joining events.
-            // With new strategy: the joining events are an overapproximation.
+           // With new strategy: the joining events are an overapproximation.
             // so check if there are two or more incoming concurrent not concurrent with event type
             if proto_info.joining_events.contains(&event_type) {
                 let incoming_pairs_concurrent: Vec<UnordEventPair> = event_pairs_from_node(node, &graph, Incoming)
@@ -501,33 +496,48 @@ fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, su
                     .into_iter()
                     .flat_map(|pair| pair.into_iter().chain([event_type.clone()])).collect();
                 for r in involved_roles.iter() {
-                    subscriptions
-                        .entry(r.clone())
-                        .and_modify(|curr| {
-                            curr.append(&mut events_to_add.clone());
-                        })
-                        .or_insert(events_to_add.clone());
+                    is_stable = add_to_sub(r.clone(), events_to_add.clone(), subscriptions) && is_stable;
                 }
             }
         }
     }
 
-    subscriptions
+    is_stable
 }
 
-fn overapprox_wwf_sub(proto_info: &ProtoInfo) -> Subscriptions {
+fn overapprox_wwf_sub(proto_info: &mut ProtoInfo, subscription: &Subscriptions, granularity: Granularity) -> Subscriptions {
+    /* match granularity {
+        Granularity::Fine => finer_overapprox_wwf_sub(proto_info, false),
+        Granularity::Medium => finer_overapprox_wwf_sub(proto_info, true),
+        Granularity::Coarse => coarse_overapprox_wwf_sub(proto_info)
+    } */
+    match granularity {
+        Granularity::Fine => { println!("FINE"); finer_overapprox_wwf_sub(proto_info, subscription, false) },
+        Granularity::Medium => { println!("MEDIUM"); finer_overapprox_wwf_sub(proto_info, subscription, true)},
+        Granularity::Coarse => { println!("COARSE");coarse_overapprox_wwf_sub(proto_info, subscription)}
+    }
+}
+
+fn coarse_overapprox_wwf_sub(proto_info: &ProtoInfo, subscription: &Subscriptions) -> Subscriptions {
     // for each role add all branching.
-    // for each role add all joining and immediately pre joining
+    // for each role add all joining and immediately pre joining that are concurrent
     // for each role, add own events and the events immediately preceding these
-    let default = BTreeSet::new();
+    let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
+        let pre = proto_info.immediately_pre.get(e).cloned().unwrap_or_default();
+        let product = pre.clone().into_iter().cartesian_product(&pre);
+        product.filter(|(e1, e2)| *e1 != **e2 && proto_info.concurrent_events.contains(&unord_event_pair(e1.clone(), (*e2).clone())))
+            .map(|(e1, e2)| [e1, e2.clone()])
+            .flatten()
+            .collect()
+    };
     let events_to_add_to_all:BTreeSet<EventType> = proto_info
-        .branching_events.clone().into_iter()
+        .branching_events.clone().into_iter().flatten()
         .chain(proto_info.joining_events.clone().into_iter())
         .chain(
             proto_info
                 .joining_events
                 .iter()
-                .flat_map(|e| proto_info.immediately_pre.get(e).unwrap_or(&default).clone()))
+                .flat_map(|e| get_pre_joins(e)))//proto_info.immediately_pre.get(e).unwrap_or(&default).clone()))
         .collect();
 
     let sub: BTreeMap<Role, BTreeSet<EventType>> = proto_info.role_event_map
@@ -536,7 +546,7 @@ fn overapprox_wwf_sub(proto_info: &ProtoInfo) -> Subscriptions {
             (role.clone(), labels
                 .iter()
                 .flat_map(|label|
-                        proto_info.immediately_pre.get(&label.get_event_type()).unwrap_or(&default)
+                        proto_info.immediately_pre.get(&label.get_event_type()).cloned().unwrap_or_default()
                         .clone()
                         .into_iter()
                         .chain([label.get_event_type()]))
@@ -544,7 +554,70 @@ fn overapprox_wwf_sub(proto_info: &ProtoInfo) -> Subscriptions {
                 .collect::<BTreeSet<EventType>>()))
         .collect();
 
-    sub
+    combine_maps(subscription.clone(), sub, None)
+}
+
+fn finer_overapprox_wwf_sub(proto_info: &mut ProtoInfo, subscription: &Subscriptions, with_all_interfacing: bool) -> Subscriptions {
+    let mut subscription = subscription.clone();
+    proto_info.succeeding_events = transitive_closure_succeeding(proto_info.succeeding_events.clone());
+    // causal consistency
+    for (role, labels) in &proto_info.role_event_map {
+        let event_types: BTreeSet<_> = labels.iter().map(|label| label.get_event_type()).collect();
+        let preceding_event_types: BTreeSet<_> = event_types.iter().flat_map(|e| proto_info.immediately_pre.get(e).cloned().unwrap_or_default()).collect();
+        let mut events_to_add = event_types.into_iter().chain(preceding_event_types.into_iter()).collect();
+        subscription.entry(role.clone()).and_modify(|set| { set.append(&mut events_to_add); }).or_insert_with(|| events_to_add);
+    }
+
+    // determinacy
+    finer_approx_add_branches_and_joins(proto_info, &mut subscription, with_all_interfacing);
+
+    subscription
+}
+
+fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mut Subscriptions, with_all_interfacing: bool) {
+    let mut is_stable = false;
+    let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
+        let pre = proto_info.immediately_pre.get(e).cloned().unwrap_or_default();
+        let product = pre.clone().into_iter().cartesian_product(&pre);
+        product.filter(|(e1, e2)| *e1 != **e2 && proto_info.concurrent_events.contains(&unord_event_pair(e1.clone(), (*e2).clone())))
+            .map(|(e1, e2)| [e1, e2.clone()])
+            .flatten()
+            .collect()
+    };
+
+    let add_to_sub = |role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subscriptions| -> bool {
+        if subs.contains_key(&role) && event_types.iter().all(|e| subs[&role].contains(e)) {
+            return true;
+        }
+        subs
+            .entry(role)
+            .and_modify(|curr| {
+                curr.append(&mut event_types);
+            })
+            .or_insert(event_types);
+        false
+
+    };
+
+    while !is_stable {
+        is_stable = true;
+        // determinacy: joins
+        for joining_event in &proto_info.joining_events {
+            let interested_roles = if with_all_interfacing { subscription.keys().cloned().collect() } else { roles_on_path(joining_event.clone(), proto_info, &subscription) };
+            let join_and_prejoin: BTreeSet<_> = [joining_event.clone()].into_iter().chain(get_pre_joins(&joining_event).into_iter()).collect();
+            for role in interested_roles {
+                is_stable = add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
+            }
+        }
+
+        // determinacy: branches
+        for branching_events in &proto_info.branching_events {
+            let interested_roles = branching_events.iter().flat_map(|e| roles_on_path(e.clone(), proto_info, &subscription)).collect::<BTreeSet<_>>();
+            for role in interested_roles {
+                is_stable = add_to_sub(role, branching_events.clone(), subscription) && is_stable;
+            }
+        }
+    }
 }
 
 fn combine_proto_infos<T: SwarmInterface>(
@@ -557,7 +630,7 @@ fn combine_proto_infos<T: SwarmInterface>(
         let protocols = vec![
             proto_info1.protocols.clone(),
             proto_info2.protocols.clone(),
-            vec![((Graph::new(), None, errors), BTreeSet::new())],
+            vec![ProtoStruct::new(Graph::new(), None, errors, BTreeSet::new())]
         ]
         .concat();
         // Would work to construct it just like normally. but..
@@ -571,10 +644,11 @@ fn combine_proto_infos<T: SwarmInterface>(
         None,
     );
     let concurrent_events = get_concurrent_events(&proto_info1, &proto_info2, &interface);
-    let branching_events: BTreeSet<EventType> = proto_info1
+    let branching_events: Vec<BTreeSet<EventType>> = proto_info1
         .branching_events
-        .union(&proto_info2.branching_events)
-        .cloned()
+        .into_iter()
+        .chain(proto_info2.branching_events.into_iter())
+        //.cloned()
         .collect();
     // add the interfacing events to the set of joining events
     let joining_events: BTreeSet<EventType> = proto_info1
@@ -593,6 +667,7 @@ fn combine_proto_infos<T: SwarmInterface>(
         proto_info2.succeeding_events,
         None
     );
+    let happens_after = happens_after;
 
     ProtoInfo::new(
         protocols,
@@ -610,10 +685,7 @@ fn combine_proto_infos_fold<T: SwarmInterface>(protos: Vec<(ProtoInfo, Option<T>
         || protos[0].1.is_some()
         || protos[1..].iter().any(|(_, interface)| interface.is_none())
     {
-        return ProtoInfo::new_only_proto(vec![(
-            (Graph::new(), None, vec![Error::InvalidArg]),
-            BTreeSet::new(),
-        )]);
+        return ProtoInfo::new_only_proto(vec![ProtoStruct::new(Graph::new(), None, vec![Error::InvalidArg], BTreeSet::new())]);
     }
 
     let (proto, _) = protos[0].clone();
@@ -645,27 +717,16 @@ fn active_transitions_not_conc(
 // the involved roles on a path are those roles that subscribe (or perform) to one or
 // more of the events taking place in a transition reachable from the transition
 // represented by its emitted event 'event_type'
+// Remove event_type from succeeding...
 fn roles_on_path(event_type: EventType, proto_info: &ProtoInfo, subs: &Subscriptions) -> BTreeSet<Role> {
-    let default = BTreeSet::new();
-    let event_and_succeeding_events: BTreeSet<EventType> = [event_type.clone()]
-        .iter()
-        .chain([event_type].iter().flat_map(|e| proto_info.succeeding_events.get(e).unwrap_or(&default)))
+    let succeeding_events: BTreeSet<EventType> =
+        proto_info.succeeding_events
+        .get(&event_type)
         .cloned()
-        .collect();
-    proto_info.role_event_map
-        .iter()
-        .filter(|(role, labels)| {
-            !labels
-                .iter()
-                .map(|label| label.get_event_type())
-                .chain(subs.get(*role).unwrap_or(&default).clone())
-                .collect::<BTreeSet<EventType>>()
-                .intersection(&event_and_succeeding_events)
-                .cloned()
-                .collect::<BTreeSet<EventType>>()
-                .is_empty()
-        })
-        .map(|(role, _)| role.clone())
+        .unwrap_or_default();
+    subs.iter()
+        .filter(|(_, events)| events.intersection(&succeeding_events).count() != 0)
+        .map(|(r, _)| r.clone())
         .collect()
 }
 
@@ -676,65 +737,91 @@ fn after_not_concurrent(
 )-> BTreeMap<EventType, BTreeSet<EventType>> {
     let mut succ_map: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
 
-    let mut new_succ_map = after_not_concurrent_step(graph, initial, concurrent_events, succ_map.clone());
+    let mut is_stable = after_not_concurrent_step(graph, initial, concurrent_events, &mut succ_map);
 
-    while succ_map != new_succ_map {
-        succ_map = new_succ_map;
-        new_succ_map = after_not_concurrent_step(graph, initial, concurrent_events, succ_map.clone());
+    while !is_stable {
+        is_stable = after_not_concurrent_step(graph, initial, concurrent_events, &mut succ_map);
     }
 
     succ_map
 }
 
-
 fn after_not_concurrent_step(
     graph: &Graph,
     initial: NodeId,
     concurrent_events: &BTreeSet<BTreeSet<EventType>>,
-    succ_map: BTreeMap<EventType, BTreeSet<EventType>>,
-) -> BTreeMap<EventType, BTreeSet<EventType>> {
+    succ_map: &mut BTreeMap<EventType, BTreeSet<EventType>>,
+) -> bool {
+    let mut is_stable = true;
     let mut walk = DfsPostOrder::new(&graph, initial);
-    let mut new_succ_map: BTreeMap<EventType, BTreeSet<EventType>> = succ_map;
-
-
     // we should not need the outcommented filter
     // for each edge e we get a set of 'active_in_successor' edges
     // that only contains events immediately after e and not concurrent with e
     while let Some(node) = walk.next(&graph) {
         for edge in graph.edges_directed(node, Outgoing) {
+            let event_type = edge.weight().get_event_type();
             let active_in_successor = active_transitions_not_conc(
                 edge.target(),
                 graph,
-                &edge.weight().get_event_type(),
+                &event_type,
                 concurrent_events,
             )
             .map(|label| label.get_event_type());
 
-            let default = BTreeSet::new();
             let mut succ_events: BTreeSet<EventType> = active_in_successor
                 .clone()
                 .into_iter()
                 .flat_map(|e| {
-                    let events = new_succ_map.get(&e).unwrap_or(&default);
+                    let events = succ_map.get(&e).cloned().unwrap_or_default();
                     events.clone()
                 })
                 .chain(active_in_successor.into_iter())
-                //.filter(|e| {
-                //    !concurrent_events
-                //        .contains(&unord_event_pair(edge.weight().get_event_type(), e.clone()))
-                //})
                 .collect();
 
-            new_succ_map
-                .entry(edge.weight().get_event_type())
-                .and_modify(|events| {
-                    events.append(&mut succ_events);
-                })
-                .or_insert(succ_events);
+            if !succ_map.contains_key(&event_type) || !succ_events.iter().all(|e| succ_map[&event_type].contains(e)) {
+                succ_map
+                    .entry(event_type)
+                    .and_modify(|events| {
+                        events.append(&mut succ_events);
+                    })
+                    .or_insert(succ_events);
+                is_stable = false;
+            }
+        }
+    }
+    is_stable
+}
+
+fn transitive_closure_succeeding(succ_map: BTreeMap<EventType, BTreeSet<EventType>>) -> BTreeMap<EventType, BTreeSet<EventType>> {
+    let mut graph: petgraph::Graph::<EventType, (), Directed> = petgraph::Graph::new();
+    let mut node_map = BTreeMap::new();
+    for (event, succeeding) in &succ_map {
+        if !node_map.contains_key(event) {
+            node_map.insert(event.clone(), graph.add_node(event.clone()));
+        }
+        for succ in succeeding {
+            if !node_map.contains_key(succ) {
+                node_map.insert(succ.clone(), graph.add_node(succ.clone()));
+            }
+            graph.add_edge(node_map[event], node_map[succ], ());
         }
     }
 
-    new_succ_map
+    let reflexive_transitive_closure = floyd_warshall(&graph, |_| 1);
+    let transitive_closure: Vec<_> = reflexive_transitive_closure
+        .unwrap_or_else(|_| HashMap::new())
+        .into_iter()
+        .filter(|(_, v)| *v != i32::MAX && *v != 0)
+        .map(|(related_pair, _)| related_pair)
+        .collect();
+
+    let mut succ_map_new: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
+    for (i1, i2) in transitive_closure {
+        succ_map_new.entry(graph[i1].clone()).and_modify(|succeeding_events| { succeeding_events.insert(graph[i2].clone()); }).or_insert_with(|| BTreeSet::from([graph[i2].clone()]));
+    }
+
+    // do this because of loops. everything reachable from itself in result from floyd_warshall(), but we filter these out. add them again if loops.
+    combine_maps(succ_map, succ_map_new, None)
 }
 
 fn prepare_proto_infos<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Vec<(ProtoInfo, Option<T>)> {
@@ -742,7 +829,7 @@ fn prepare_proto_infos<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Vec<(
         .iter()
         .map(|p| {
             (
-                prepare_proto_info::<T>(p.protocol.clone(), p.interface.clone()),
+                prepare_proto_info::<T>(p.clone()),
                 p.interface.clone(),
             )
         })
@@ -751,21 +838,20 @@ fn prepare_proto_infos<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Vec<(
 
 // precondition: proto is a simple protocol, i.e. it does not contain concurrency.
 fn prepare_proto_info<T: SwarmInterface>(
-    proto: SwarmProtocol,
-    interface: Option<T>,
+    proto: CompositionComponent<T>
 ) -> ProtoInfo {
     let mut role_event_map: RoleEventMap = BTreeMap::new();
-    let mut branching_events = BTreeSet::new();
+    let mut branching_events = Vec::new();
     let mut immediately_pre_map: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
-    let (graph, initial, errors) = swarm_to_graph(&proto);
+    let (graph, initial, errors) = swarm_to_graph(&proto.protocol);
     if initial.is_none() || !errors.is_empty() {
-        return ProtoInfo::new_only_proto(vec![((graph, initial, errors), BTreeSet::new())]);
+        return ProtoInfo::new_only_proto(vec![ProtoStruct::new(graph, initial, errors, BTreeSet::new())]);
     }
     // If interface is some, then we want to interface this protocol
     // with some other protocol on this set of events.
     // We do not know if we can do that yet though, but we prepare as if we can.
-    let interface = if interface.is_some() {
-        interface.unwrap().interfacing_event_types_single(&graph)
+    let interface = if proto.interface.is_some() {
+        proto.interface.unwrap().interfacing_event_types_single(&graph)
     } else {
         BTreeSet::new()
     };
@@ -779,8 +865,9 @@ fn prepare_proto_info<T: SwarmInterface>(
             .edges_directed(node_id, Outgoing)
             .map(|edge| edge.weight().get_event_type())
             .collect::<BTreeSet<EventType>>();
-        branching_events.append(&mut if outgoing_event_types.len() > 1 { outgoing_event_types } else { BTreeSet::new() });
-
+        if outgoing_event_types.len() > 1 {
+            branching_events.push(outgoing_event_types);
+        }
 
         for edge in graph.edges_directed(node_id, Outgoing) {
             role_event_map
@@ -804,7 +891,7 @@ fn prepare_proto_info<T: SwarmInterface>(
     // consider changing after_not_concurrent to not take concurrent events as argument. now that we do not consider swarms with concurrency here.
     let happens_after = after_not_concurrent(&graph, initial.unwrap(), &BTreeSet::new());
     ProtoInfo::new(
-        vec![((graph, initial, errors), interface)],
+        vec![ProtoStruct::new(graph, initial, errors, interface)],
         role_event_map,
         BTreeSet::new(),
         branching_events,
@@ -852,9 +939,9 @@ fn swarm_to_graph(proto: &SwarmProtocol) -> (Graph, Option<NodeId>, Vec<Error>) 
 pub fn from_json(
     proto: SwarmProtocol,
 ) -> (Graph, Option<NodeId>, Vec<String>) {
-    let proto_info = prepare_proto_info::<Role>(proto, None);
+    let proto_info = prepare_proto_info::<Role>(CompositionComponent{protocol: proto, interface: None});
     let (g, i, e) = match proto_info.get_ith_proto(0) {
-        Some((g, i, e)) => (g, i, e),
+        Some(ProtoStruct { graph: g, initial: i, errors: e, interface: _}) => (g, i, e),
         _ => return (Graph::new(), None, vec![]),
     };
     let e = e.map(Error::convert(&g));
@@ -866,7 +953,7 @@ pub fn proto_info_to_error_report(proto_info: ProtoInfo) -> ErrorReport {
         proto_info
             .protocols
             .into_iter()
-            .map(|((graph, _, errors), _)| (graph, errors))
+            .map(|p| (p.graph, p.errors))
             .collect(),
     )
 }
@@ -915,6 +1002,7 @@ fn event_pairs_from_node(
 
 // get events that are immediately before some event and not concurrent.
 // backtrack if immediately preceding is concurrent. not sure if this is needed or ok though
+// do not think we should 'backtrack' outcommented now
 fn get_immediately_pre(
     graph: &Graph,
     edge: EdgeReference<'_, SwarmLabel>,
@@ -922,7 +1010,7 @@ fn get_immediately_pre(
 ) -> BTreeSet<EventType> {
     let node = edge.source();
     let event_type = edge.weight().get_event_type();
-    let mut visited = BTreeSet::from([node]);
+    //let mut visited = BTreeSet::from([node]);
     let mut to_visit = Vec::from([node]);
     let mut immediately_pre = BTreeSet::new();
 
@@ -933,13 +1021,6 @@ fn get_immediately_pre(
                 e.weight().get_event_type(),
             )) {
                 immediately_pre.insert(e.weight().get_event_type());
-            } else {
-                // not sure this else branch is actually needed. when concurrency, one of the incoming will be noncurrent with event?
-                let source = e.source();
-                if !visited.contains(&source) {
-                    visited.insert(source);
-                    to_visit.push(source);
-                }
             }
         }
     }
@@ -1008,7 +1089,8 @@ fn explicit_composition_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
     let (composed, composed_initial) = explicit_composition(&proto_info);
     let succeeding_events = after_not_concurrent(&composed, composed_initial, &proto_info.concurrent_events);
     ProtoInfo {
-        protocols: vec![((composed, Some(composed_initial), vec![]), BTreeSet::new())],
+        //protocols: vec![((composed, Some(composed_initial), vec![]), BTreeSet::new())],
+        protocols: vec![ProtoStruct::new(composed, Some(composed_initial), vec![], BTreeSet::new())],
         succeeding_events,
         ..proto_info
     }
@@ -1020,12 +1102,14 @@ fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
         return (Graph::new(), NodeId::end());
     }
 
-    let ((g, i, _), _) = proto_info.protocols[0].clone();
+    //let ((g, i, _), _) = proto_info.protocols[0].clone();
+    let (g, i, _) = proto_info.protocols[0].get_triple();
     let folder =
         |(acc_g, acc_i): (Graph, NodeId),
-         ((g, i, _), interface): ((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)|
+         //((g, i, _), interface): ((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)|
+         p: ProtoStruct|
          -> (Graph, NodeId) {
-            crate::composition::composition_machine::compose(acc_g, acc_i, g, i.unwrap(), interface)
+            crate::composition::composition_machine::compose(acc_g, acc_i, p.graph, p.initial.unwrap(), p.interface)
         };
     proto_info.protocols[1..]
         .to_vec()
@@ -1137,6 +1221,20 @@ mod tests {
                 "F": ["car", "report1"],
                 "TR": ["car", "report1", "report2"],
                 "QCR": ["report2", "ok", "notOk"]
+            }"#,
+        )
+        .unwrap()
+    }
+    fn get_proto31() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "observe", "logType": ["report1"], "role": "QCR" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "observe", "logType": ["report2"], "role": "QCR" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
+                    { "source": "3", "target": "4", "label": { "cmd": "assess", "logType": ["report3"], "role": "QCR" } }
+                ]
             }"#,
         )
         .unwrap()
@@ -1330,6 +1428,44 @@ mod tests {
         )
     }
 
+    fn get_interfacing_swarms_3() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_proto1(),
+                    interface: None,
+                },
+                CompositionComponent {
+                    protocol: get_proto2(),
+                    interface: Some(Role::new("T")),
+                },
+                CompositionComponent {
+                    protocol: get_proto31(),
+                    interface: Some(Role::new("F")),
+                },
+            ]
+        )
+    }
+
+    fn get_interfacing_swarms_4() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_proto1(),
+                    interface: None,
+                },
+                CompositionComponent {
+                    protocol: get_proto2(),
+                    interface: Some(Role::new("T")),
+                },
+                CompositionComponent {
+                    protocol: get_proto3(),
+                    interface: Some(Role::new("F")),
+                },
+            ]
+        )
+    }
+
     fn get_fail_1_swarms() -> InterfacingSwarms<Role> {
             InterfacingSwarms(
                 vec![
@@ -1388,7 +1524,7 @@ mod tests {
         let proto_info = explicit_composition_proto_info(proto_info);
 
         assert!(proto_info.get_ith_proto(0).is_some());
-        assert!(proto_info.get_ith_proto(0).unwrap().2.is_empty());
+        assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
         assert_eq!(
             proto_info.concurrent_events,
             BTreeSet::from(
@@ -1403,7 +1539,7 @@ mod tests {
         );
         assert_eq!(
             proto_info.branching_events,
-            BTreeSet::from([EventType::new("time"), EventType::new("partID")])
+            vec![BTreeSet::from([EventType::new("time"), EventType::new("partID")])]
         );
         assert_eq!(proto_info.joining_events, BTreeSet::from([EventType::new("part"), EventType::new("partID")]));
         let expected_role_event_map = BTreeMap::from([
@@ -1448,30 +1584,30 @@ mod tests {
             ),
         ]);
         assert_eq!(proto_info.role_event_map, expected_role_event_map);
-        let proto_info = prepare_proto_info::<Role>(get_proto1(), None);
+        let proto_info = prepare_proto_info::<Role>(CompositionComponent{ protocol: get_proto1(), interface: None} );
         assert!(proto_info.get_ith_proto(0).is_some());
-        assert!(proto_info.get_ith_proto(0).unwrap().2.is_empty());
+        assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
         assert_eq!(proto_info.concurrent_events, BTreeSet::new());
         assert_eq!(
             proto_info.branching_events,
-            BTreeSet::from([EventType::new("time"), EventType::new("partID")])
+            vec![BTreeSet::from([EventType::new("time"), EventType::new("partID")])]
         );
         assert_eq!(proto_info.joining_events, BTreeSet::new());
 
-        let proto_info = prepare_proto_info::<Role>(get_proto2(), None);
+        let proto_info = prepare_proto_info::<Role>(CompositionComponent{ protocol: get_proto2(), interface: None} );//get_proto2(), None);
         assert!(proto_info.get_ith_proto(0).is_some());
-        assert!(proto_info.get_ith_proto(0).unwrap().2.is_empty());
+        assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
         assert_eq!(proto_info.concurrent_events, BTreeSet::new());
-        assert_eq!(proto_info.branching_events, BTreeSet::new());
+        assert_eq!(proto_info.branching_events, Vec::new());
         assert_eq!(proto_info.joining_events, BTreeSet::new());
 
-        let proto_info = prepare_proto_info::<Role>(get_proto3(), None);
+        let proto_info = prepare_proto_info::<Role>(CompositionComponent{ protocol: get_proto3(), interface: None} );//get_proto2(), None);//get_proto3(), None);
         assert!(proto_info.get_ith_proto(0).is_some());
-        assert!(proto_info.get_ith_proto(0).unwrap().2.is_empty());
+        assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
         assert_eq!(proto_info.concurrent_events, BTreeSet::new());
         assert_eq!(
             proto_info.branching_events,
-            BTreeSet::from([EventType::new("notOk"), EventType::new("ok")])
+            vec![BTreeSet::from([EventType::new("notOk"), EventType::new("ok")])]
         );
         assert_eq!(proto_info.joining_events, BTreeSet::new());
     }
@@ -1479,12 +1615,12 @@ mod tests {
     #[test]
     fn test_prepare_graph_malformed() {
         let proto1 = get_malformed_proto1();
-        let proto_info = prepare_proto_info::<Role>(proto1.clone(), None);
+        let proto_info = prepare_proto_info::<Role>(CompositionComponent {protocol: proto1.clone(), interface: None});//proto1.clone(), None);
         let mut errors = vec![
-            proto_info.get_ith_proto(0).unwrap().2,
+            proto_info.get_ith_proto(0).unwrap().errors,
         ]
         .concat()
-        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
+        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
 
         let mut expected_erros = vec![
             "transition (0)--[close@D<time,time2>]-->(0) emits more than one event type",
@@ -1494,13 +1630,13 @@ mod tests {
         expected_erros.sort();
         assert_eq!(errors, expected_erros);
 
-        let proto_info = prepare_proto_info::<Role>(get_malformed_proto2(), None);
+        let proto_info = prepare_proto_info::<Role>(CompositionComponent {protocol: get_malformed_proto2(), interface: None});//get_malformed_proto2(), None);
         let errors = vec![
             confusion_free(&proto_info, 0, &BTreeMap::new()),
-            proto_info.get_ith_proto(0).unwrap().2,
+            proto_info.get_ith_proto(0).unwrap().errors,
         ]
         .concat()
-        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
+        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
         // recorded twice fix this!
         let expected_errors = vec![
             "initial swarm protocol state has no transitions",
@@ -1508,10 +1644,10 @@ mod tests {
         ];
         assert_eq!(errors, expected_errors);
 
-        let proto_info = prepare_proto_info::<Role>(get_malformed_proto3(), None);
+        let proto_info = prepare_proto_info::<Role>(CompositionComponent{protocol: get_malformed_proto3(), interface: None});//get_malformed_proto3(), None);
         let errors =
-                proto_info.get_ith_proto(0).unwrap().2
-            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
+                proto_info.get_ith_proto(0).unwrap().errors
+            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
         // recorded twice fix this!
         let expected_errors = vec![
             "state 2 is unreachable from initial state",
@@ -1527,13 +1663,13 @@ mod tests {
     fn test_prepare_graph_confusionful() {
         let proto = get_confusionful_proto1();
 
-        let proto_info = prepare_proto_info::<Role>(proto, None);
+        let proto_info = prepare_proto_info::<Role>(CompositionComponent{protocol: proto, interface: None});  //proto, None);
         let mut errors = vec![
             confusion_free(&proto_info, 0, &BTreeMap::new()),
-            proto_info.get_ith_proto(0).unwrap().2,
+            proto_info.get_ith_proto(0).unwrap().errors,
         ]
         .concat()
-        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().0));
+        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
 
         // TODO CHECK THAT COMMANDS are only associated with a single event? is it allowed two have c@R<e1> c@R<e2>??
         // are "guard event..." and "event type pos..." same thing?
@@ -1555,7 +1691,7 @@ mod tests {
     #[test]
     fn test_wwf_ok() {
         let proto1: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{protocol: get_proto1(), interface: None}]);
-        let result1 = exact_weak_well_formed_sub(proto1.clone());
+        let result1 = exact_weak_well_formed_sub(proto1.clone(), &BTreeMap::new());
         assert!(result1.is_ok());
         let subs1 = result1.unwrap();
         let error_report = check(proto1, &subs1);
@@ -1563,7 +1699,7 @@ mod tests {
         assert_eq!(get_subs1(), subs1);
 
         let proto2: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{protocol: get_proto2(), interface: None}]);
-        let result2 = exact_weak_well_formed_sub(proto2.clone());
+        let result2 = exact_weak_well_formed_sub(proto2.clone(), &BTreeMap::new());
         assert!(result2.is_ok());
         let subs2 = result2.unwrap();
         let error_report = check(proto2, &subs2);
@@ -1571,7 +1707,7 @@ mod tests {
         assert_eq!(get_subs2(), subs2);
 
         let proto3: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{protocol: get_proto3(), interface: None}]);
-        let result3 = exact_weak_well_formed_sub(proto3.clone());
+        let result3 = exact_weak_well_formed_sub(proto3.clone(), &BTreeMap::new());
         assert!(result3.is_ok());
         let subs3 = result3.unwrap();
         let error_report = check(proto3, &subs3);
@@ -1579,7 +1715,7 @@ mod tests {
         assert_eq!(get_subs3(), subs3);
 
         let composition1: InterfacingSwarms<Role> = get_interfacing_swarms_1();
-        let result_composition1 = exact_weak_well_formed_sub(composition1.clone());
+        let result_composition1 = exact_weak_well_formed_sub(composition1.clone(), &BTreeMap::new());
         assert!(result_composition1.is_ok());
         let subs_composition = result_composition1.unwrap();
         let error_report = check(composition1, &subs_composition);
@@ -1587,7 +1723,7 @@ mod tests {
         assert_eq!(get_subs_composition_1(), subs_composition);
 
         let composition2: InterfacingSwarms<Role> = get_interfacing_swarms_2();
-        let result_composition2 = exact_weak_well_formed_sub(composition2.clone());
+        let result_composition2 = exact_weak_well_formed_sub(composition2.clone(), &BTreeMap::new());
         assert!(result_composition2.is_ok());
         let subs_composition = result_composition2.unwrap();
         let error_report = check(composition2, &subs_composition);
@@ -1598,19 +1734,30 @@ mod tests {
     #[test]
     fn test_wwf_fail() {
         let input: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{ protocol: get_proto1(), interface: None }]);
-        let error_report = check(input, &get_subs2());
+        let subs = BTreeMap::from([
+            (Role::new("T"), BTreeSet::from(
+                [EventType::new("pos")]
+            )),
+            (Role::new("D"), BTreeSet::from(
+                [EventType::new("pos")]
+            )),
+            (Role::new("FL"), BTreeSet::from(
+                [EventType::new("partID")]
+            )),
+        ]);
+        let error_report = check(input, &subs);
         let mut errors = error_report_to_strings(error_report);
         errors.sort();
         let mut expected_errors = vec![
             "active role does not subscribe to any of its emitted event types in transition (0)--[close@D<time>]-->(3)",
+            "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
+            "active role does not subscribe to any of its emitted event types in transition (2)--[deliver@T<part>]-->(0)",
             "active role does not subscribe to any of its emitted event types in transition (1)--[get@FL<pos>]-->(2)",
-            "role T does not subscribe to event types time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
-            "role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[close@D<time>]-->(3)",
-            "role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
-            "role FL does not subscribe to event types partID, time in branching transitions at state 0, but is involved in or after transition (0)--[request@T<partID>]-->(1)",
+            "role T does not subscribe to event types partID, time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
+            "role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
+            "role FL does not subscribe to event types time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
             "subsequently active role D does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
-            "subsequently active role FL does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
-            "subsequently active role T does not subscribe to events in transition (1)--[get@FL<pos>]-->(2)"
+            "subsequently active role T does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
         ];
 
         expected_errors.sort();
@@ -1640,8 +1787,8 @@ mod tests {
             "active role does not subscribe to any of its emitted event types in transition (2)--[test@TR<report2>]-->(3)",
             "active role does not subscribe to any of its emitted event types in transition (3)--[accept@QCR<ok>]-->(4)",
             "active role does not subscribe to any of its emitted event types in transition (3)--[reject@QCR<notOk>]-->(4)",
-            "role QCR does not subscribe to event types notOk, ok in branching transitions at state 3, but is involved in or after transition (3)--[accept@QCR<ok>]-->(4)",
-            "role QCR does not subscribe to event types notOk, ok in branching transitions at state 3, but is involved in or after transition (3)--[reject@QCR<notOk>]-->(4)",
+            //"role QCR does not subscribe to event types notOk, ok in branching transitions at state 3, but is involved in or after transition (3)--[accept@QCR<ok>]-->(4)",
+            //"role QCR does not subscribe to event types notOk, ok in branching transitions at state 3, but is involved in or after transition (3)--[reject@QCR<notOk>]-->(4)",
             "subsequently active role F does not subscribe to events in transition (0)--[observe@TR<report1>]-->(1)",
             "subsequently active role QCR does not subscribe to events in transition (2)--[test@TR<report2>]-->(3)",
             "subsequently active role QCR does not subscribe to events in transition (2)--[test@TR<report2>]-->(3)",
@@ -1656,107 +1803,116 @@ mod tests {
 
     #[test]
     fn test_weak_well_formed_sub() {
-        let result = exact_weak_well_formed_sub(get_interfacing_swarms_1());
+        let result = exact_weak_well_formed_sub(get_interfacing_swarms_1(), &BTreeMap::new());
         assert!(result.is_ok());
         let subs1 = result.unwrap();
         let error_report = check(get_interfacing_swarms_1(), &subs1);
         assert!(error_report.is_empty());
-        let result = overapprox_weak_well_formed_sub(get_interfacing_swarms_1());
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_1(), &subs2);
-        assert!(error_report.is_empty());
-        //println!("exact: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        //println!("approx: {}", serde_json::to_string_pretty(&subs2).unwrap());
-        assert!(is_sub_subscription(subs1, subs2));
 
-        let result = exact_weak_well_formed_sub(get_interfacing_swarms_2());
-        assert!(result.is_ok());
-        let subs1 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_1(), &subs1);
-        assert!(error_report.is_empty());
-        let result = overapprox_weak_well_formed_sub(get_interfacing_swarms_2());
+        let result = overapprox_weak_well_formed_sub(get_interfacing_swarms_1(), &BTreeMap::new(), Granularity::Coarse);
         assert!(result.is_ok());
         let subs2 = result.unwrap();
         let error_report = check(get_interfacing_swarms_1(), &subs2);
         assert!(error_report.is_empty());
         assert!(is_sub_subscription(subs1, subs2));
-    }
-    /*
-    #[test]
-    fn test_compose_subs() {
-        let composition_input = vec![
-            CompositionInput {
-                protocol: get_proto1(),
-                subscription: weak_well_formed_sub(get_proto1()).0,
-                interface: None,
-            },
-            CompositionInput {
-                protocol: get_proto2(),
-                subscription: weak_well_formed_sub(get_proto2()).0,
-                interface: Some(Role::from("T")),
-            },
-        ];
 
-        let (sub, errors) = compose_subscriptions(composition_input);
-        assert!(errors.is_empty());
-        let (_, _, e) = check(get_proto1_proto2_composed(), &sub);
-        assert!(e.is_empty());
+        let result = exact_weak_well_formed_sub(get_interfacing_swarms_2(), &BTreeMap::new());
+        assert!(result.is_ok());
+        let subs1 = result.unwrap();
+        println!("exact: {}", serde_json::to_string_pretty(&subs1).unwrap());
+        let error_report = check(get_interfacing_swarms_2(), &subs1);
+        assert!(error_report.is_empty());
 
-        let composition_input = vec![
-            CompositionInput {
-                protocol: get_proto1(),
-                subscription: weak_well_formed_sub(get_proto1()).0,
-                interface: None,
-            },
-            CompositionInput {
-                protocol: get_proto2(),
-                subscription: weak_well_formed_sub(get_proto2()).0,
-                interface: Some(Role::from("FL")),
-            },
-        ];
+        let result = overapprox_weak_well_formed_sub(get_interfacing_swarms_2(), &BTreeMap::new(), Granularity::Coarse);
+        assert!(result.is_ok());
+        let subs2 = result.unwrap();
+        println!("approx: {}", serde_json::to_string_pretty(&subs2).unwrap());
+        let error_report = check(get_interfacing_swarms_2(), &subs2);
+        assert!(error_report.is_empty());
+        assert!(is_sub_subscription(subs1, subs2));
 
-        let (_, errors) = compose_subscriptions(composition_input);
-        assert_eq!(
-            error_report_to_strings(errors),
-            vec![
-                "role FL can not be used as interface",
-                "event type pos does not appear in both protocols"
-            ]
-        );
+        let result = overapprox_weak_well_formed_sub(get_interfacing_swarms_1(), &BTreeMap::new(), Granularity::Medium);
+        assert!(result.is_ok());
+        let subs2 = result.unwrap();
+        let error_report = check(get_interfacing_swarms_1(), &subs2);
+        assert!(error_report.is_empty());
+
+        let result = overapprox_weak_well_formed_sub(get_interfacing_swarms_1(), &BTreeMap::new(), Granularity::Fine);
+        assert!(result.is_ok());
+        let subs2 = result.unwrap();
+        let error_report = check(get_interfacing_swarms_1(), &subs2);
+        assert!(error_report.is_empty());
+
+        let result = overapprox_weak_well_formed_sub(get_interfacing_swarms_2(), &BTreeMap::new(), Granularity::Medium);
+        assert!(result.is_ok());
+        let subs2 = result.unwrap();
+        let error_report = check(get_interfacing_swarms_2(), &subs2);
+        assert!(error_report.is_empty());
+
+        let result = overapprox_weak_well_formed_sub(get_interfacing_swarms_2(), &BTreeMap::new(), Granularity::Fine);
+        assert!(result.is_ok());
+        let subs2 = result.unwrap();
+        let error_report = check(get_interfacing_swarms_2(), &subs2);
+        assert!(error_report.is_empty());
     }
 
     #[test]
-    fn test_explicit_composition_555() {
-        let composition = compose_protocols(get_composition_input_vec1());
-        assert!(composition.is_ok());
+    fn test_extend_subs() {
+        let sub_to_extend = BTreeMap::from([
+            (Role::new("D"), BTreeSet::from([EventType::new("pos")])),
+            (Role::new("TR"), BTreeSet::from([EventType::new("ok")])),
+        ]);
+        let result1 = exact_weak_well_formed_sub(get_interfacing_swarms_4(), &sub_to_extend);
+        let result2 = overapprox_weak_well_formed_sub(get_interfacing_swarms_4(), &sub_to_extend, Granularity::Coarse);
+        assert!(result1.is_ok());
+        assert!(result2.is_ok());
+        let subs1 = result1.unwrap();
+        let subs2 = result2.unwrap();
+        println!("exact: {}", serde_json::to_string_pretty(&subs1).unwrap());
+        println!("approx: {}", serde_json::to_string_pretty(&subs2).unwrap());
+        assert!(check(get_interfacing_swarms_4(), &subs1).is_empty());
+        assert!(check(get_interfacing_swarms_4(), &subs2).is_empty());
+        assert!(subs1[&Role::new("D")].contains(&EventType::new("pos")));
+        assert!(subs2[&Role::new("D")].contains(&EventType::new("pos")));
+        assert!(subs1[&Role::new("TR")].contains(&EventType::new("ok")));
+        assert!(subs2[&Role::new("TR")].contains(&EventType::new("ok")));
 
-        let (g, i) = composition.unwrap();
-        let swarm = to_swarm_json(g, i);
-        let (wwf_sub, _) = compose_subscriptions(get_composition_input_vec1());
-        let (_, _, errors) = check(swarm.clone(), &wwf_sub);
-        println!("HERRRRREEEE");
-        weak_well_formed_sub(swarm);
-        println!("STOP");
-        // check if subscription generated using implicit composition is actually wwf for the explicit composition.
-        assert!(errors.is_empty());
+        let result2 = overapprox_weak_well_formed_sub(get_interfacing_swarms_4(), &sub_to_extend, Granularity::Medium);
+        assert!(result2.is_ok());
+        let subs2 = result2.unwrap();
+        println!("exact: {}", serde_json::to_string_pretty(&subs1).unwrap());
+        println!("approx: {}", serde_json::to_string_pretty(&subs2).unwrap());
+        assert!(check(get_interfacing_swarms_4(), &subs2).is_empty());
+        assert!(subs2[&Role::new("D")].contains(&EventType::new("pos")));
+        assert!(subs2[&Role::new("TR")].contains(&EventType::new("ok")));
 
-        let composition = compose_protocols(get_composition_input_vec1()[..2].to_vec());
-        assert!(composition.is_ok());
-
-        let (g, i) = composition.unwrap();
-        let swarm = to_swarm_json(g, i);
-        let (wwf_sub, _) = compose_subscriptions(get_composition_input_vec1()[..2].to_vec());
-        let (_, _, errors) = check(swarm.clone(), &wwf_sub);
-
-        // check if subscription generated using implicit composition is actually wwf for the explicit composition.
-        assert!(errors.is_empty());
+        let result2 = overapprox_weak_well_formed_sub(get_interfacing_swarms_4(), &sub_to_extend, Granularity::Fine);
+        assert!(result2.is_ok());
+        let subs2 = result2.unwrap();
+        println!("exact: {}", serde_json::to_string_pretty(&subs1).unwrap());
+        println!("approx: {}", serde_json::to_string_pretty(&subs2).unwrap());
+        assert!(check(get_interfacing_swarms_4(), &subs2).is_empty());
+        assert!(subs2[&Role::new("D")].contains(&EventType::new("pos")));
+        assert!(subs2[&Role::new("TR")].contains(&EventType::new("ok")));
     }
-    */
+
     #[test]
     fn test_compose_non_wwf_swarms() {
         let input = get_interfacing_swarms_1();
-        let subs = BTreeMap::from([(Role::new("T"), BTreeSet::new()), (Role::new("F"), BTreeSet::new())]);
+        let subs = BTreeMap::from([
+            (Role::new("T"), BTreeSet::from(
+                [EventType::new("part")]
+            )),
+            (Role::new("D"), BTreeSet::from(
+                [EventType::new("part")]
+            )),
+            (Role::new("FL"), BTreeSet::from(
+                [EventType::new("part")]
+            )),
+            (Role::new("F"), BTreeSet::from(
+                [EventType::new("part")]
+            )),
+        ]);
         let error_report = check(input, &subs);
         let mut errors = error_report_to_strings(error_report);
         errors.sort();
@@ -1764,20 +1920,16 @@ mod tests {
             "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[close@D<time>]-->(3 || 0)",
             "active role does not subscribe to any of its emitted event types in transition (1 || 1)--[get@FL<pos>]-->(2 || 1)",
-            "active role does not subscribe to any of its emitted event types in transition (2 || 1)--[deliver@T<part>]-->(0 || 2)",
             "active role does not subscribe to any of its emitted event types in transition (0 || 2)--[build@F<car>]-->(0 || 3)",
             "active role does not subscribe to any of its emitted event types in transition (0 || 3)--[close@D<time>]-->(3 || 3)",
             "active role does not subscribe to any of its emitted event types in transition (0 || 2)--[close@D<time>]-->(3 || 2)",
             "active role does not subscribe to any of its emitted event types in transition (3 || 2)--[build@F<car>]-->(3 || 3)",
-            "role D does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[close@D<time>]-->(3 || 0)",
-            "role D does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "role T does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "role FL does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "role F does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved in or after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+            "role D does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+            "role T does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+            "role FL does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+            "role F does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "subsequently active role FL does not subscribe to events in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
             "subsequently active role T does not subscribe to events in transition (1 || 1)--[get@FL<pos>]-->(2 || 1)",
-            "subsequently active role F does not subscribe to events in transition (2 || 1)--[deliver@T<part>]-->(0 || 2)",
-            "subsequently active role D does not subscribe to events in transition (2 || 1)--[deliver@T<part>]-->(0 || 2)",
         ];
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
@@ -1785,7 +1937,7 @@ mod tests {
 
     #[test]
     fn test_fail1() {
-        let result = exact_weak_well_formed_sub(get_fail_1_swarms());
+        let result = exact_weak_well_formed_sub(get_fail_1_swarms(), &BTreeMap::new());
         assert!(result.is_ok());
         let subs1 = result.unwrap();
         let error_report = check(get_fail_1_swarms(), &subs1);
@@ -1800,12 +1952,12 @@ mod tests {
             "active role does not subscribe to any of its emitted event types in transition (456 || 459)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 459)",
             "subsequently active role R454 does not subscribe to events in transition (456 || 459)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 459)",
             "active role does not subscribe to any of its emitted event types in transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
-            "role R454 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved in or after transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
-            "role R454 does not subscribe to event types R453_e_0, R454_e_0, R455_e_1 leading to or in joining event in transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
+            //"role R454 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved in or after transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
+            //"role R454 does not subscribe to event types R453_e_0, R454_e_0, R455_e_1 leading to or in joining event in transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
             "active role does not subscribe to any of its emitted event types in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
             "subsequently active role R455 does not subscribe to events in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
-            "role R454 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved in or after transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
-            "role R455 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved in or after transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
+            //"role R454 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved after transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
+            //"role R455 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved after transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
             "active role does not subscribe to any of its emitted event types in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
             "subsequently active role R454 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
             "subsequently active role R455 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
@@ -1821,7 +1973,7 @@ mod tests {
     #[test]
     fn test_join_errors() {
         let composition: InterfacingSwarms<Role> = get_interfacing_swarms_2();
-        let result_composition = exact_weak_well_formed_sub(composition.clone());
+        let result_composition = exact_weak_well_formed_sub(composition.clone(), &BTreeMap::new());
         assert!(result_composition.is_ok());
         let mut subs_composition = result_composition.unwrap();
         subs_composition.entry(Role::new("QCR")).and_modify(|s| *s = BTreeSet::from([EventType::new("report2"), EventType::new("ok"), EventType::new("notOk"), EventType::new("partID"), EventType::new("time") ]));
@@ -1832,10 +1984,27 @@ mod tests {
         let mut expected_errors = vec![
             "subsequently active role F does not subscribe to events in transition (0 || 2 || 0)--[observe@TR<report1>]-->(0 || 2 || 1)",
             "subsequently active role F does not subscribe to events in transition (3 || 2 || 0)--[observe@TR<report1>]-->(3 || 2 || 1)",
-            "role F does not subscribe to event types report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)",
+            //"role F does not subscribe to event types report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)",
             "role QCR does not subscribe to event types car, part, report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)"];
         errors.sort();
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
+    }
+    #[test]
+    fn test_example_3() {
+        let composition = compose_protocols(get_interfacing_swarms_3());
+        assert!(composition.is_ok());
+
+        let (g, i) = composition.unwrap();
+        let swarm = to_swarm_json(g, i);
+        println!("proto:\n {}", serde_json::to_string_pretty(&swarm).unwrap());
+        let result_composition = exact_weak_well_formed_sub(get_interfacing_swarms_3(), &BTreeMap::new());
+        assert!(result_composition.is_ok());
+        let subs_composition = result_composition.unwrap();
+        println!("subs exact: {}", serde_json::to_string_pretty(&subs_composition).unwrap());
+        let result_composition = overapprox_weak_well_formed_sub(get_interfacing_swarms_3(), &BTreeMap::new(), Granularity::Coarse);
+        assert!(result_composition.is_ok());
+        let subs_composition = result_composition.unwrap();
+        println!("subs approx: {}", serde_json::to_string_pretty(&subs_composition).unwrap());
     }
 }

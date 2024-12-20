@@ -26,11 +26,43 @@ pub fn unord_event_pair(a: EventType, b: EventType) -> UnordEventPair {
 }
 
 #[derive(Debug, Clone)]
+pub struct ProtoStruct {
+    pub graph: Graph,
+    pub initial: Option<NodeId>,
+    pub errors: Vec<Error>,
+    pub interface: BTreeSet<EventType>,
+}
+
+impl ProtoStruct {
+    pub fn new(
+        graph: Graph,
+        initial: Option<NodeId>,
+        errors: Vec<Error>,
+        interface: BTreeSet<EventType>,
+    ) -> Self {
+        Self {
+            graph,
+            initial,
+            errors,
+            interface,
+        }
+    }
+
+    pub fn get_triple(&self) -> (Graph, Option<NodeId>, Vec<Error>) {
+        (self.graph.clone(), self.initial.clone(), self.errors.clone())
+    }
+
+    pub fn no_errors(&self) -> bool {
+        self.errors.is_empty()
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ProtoInfo {
-    pub protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>, // maybe weird to have an interface as if it was related to one protocol. but convenient. "a graph interfaces with rest on if"
+    pub protocols: Vec<ProtoStruct>,//Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>, // maybe weird to have an interface as if it was related to one protocol. but convenient. "a graph interfaces with rest on if"
     pub role_event_map: RoleEventMap,
     pub concurrent_events: BTreeSet<UnordEventPair>, // consider to make a more specific type. unordered pair.
-    pub branching_events: BTreeSet<EventType>,
+    pub branching_events: Vec<BTreeSet<EventType>>,
     pub joining_events: BTreeSet<EventType>,
     pub immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
     pub succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
@@ -38,10 +70,10 @@ pub struct ProtoInfo {
 // TODO: remove subscriptions field
 impl ProtoInfo {
     pub fn new(
-        protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>,
+        protocols: Vec<ProtoStruct>,//Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>,
         role_event_map: RoleEventMap,
         concurrent_events: BTreeSet<UnordEventPair>,
-        branching_events: BTreeSet<EventType>,
+        branching_events: Vec<BTreeSet<EventType>>,
         joining_events: BTreeSet<EventType>,
         immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
         succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
@@ -58,35 +90,30 @@ impl ProtoInfo {
     }
 
     pub fn new_only_proto(
-        protocols: Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>
+        protocols: Vec<ProtoStruct>//Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>
     ) -> Self {
         Self {
             protocols,
             role_event_map: BTreeMap::new(),
             concurrent_events: BTreeSet::new(),
-            branching_events: BTreeSet::new(),
+            branching_events: Vec::new(),
             joining_events: BTreeSet::new(),
             immediately_pre: BTreeMap::new(),
             succeeding_events: BTreeMap::new(),
         }
     }
 
-    pub fn get_ith_proto(&self, i: usize) -> Option<(Graph, Option<NodeId>, Vec<Error>)> {
+    pub fn get_ith_proto(&self, i: usize) -> Option<ProtoStruct>{//Option<(Graph, Option<NodeId>, Vec<Error>)> { // Option<ProtoStruct>{//
         if i >= self.protocols.len() {
             None
         } else {
-            Some(self.protocols[i].0.clone())
-        }
-    }
-
-    pub fn add_errors_ith(&mut self, i: usize, mut errors: Vec<Error>) -> () {
-        if i >= self.protocols.len() {
-            self.protocols[0].0.2.append(&mut errors);
+            Some(self.protocols[i].clone())
         }
     }
 
     pub fn no_errors(&self) -> bool {
-        self.protocols.iter().all(|((_, _, e), _)| e.is_empty())
+        self.protocols.iter().all(|p| p.no_errors())
+
     }
 }
 
@@ -99,7 +126,12 @@ pub struct CompositionComponent<T: SwarmInterface> {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct InterfacingSwarms<T: SwarmInterface>(pub Vec<CompositionComponent<T>>);
 
-
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum  Granularity {
+    Fine,
+    Medium,
+    Coarse
+}
 
 /* Used when combining machines and protocols */
 pub trait EventLabel: Clone + Ord {

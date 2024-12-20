@@ -1,5 +1,5 @@
 use composition_swarm::{proto_info_to_error_report, swarms_to_proto_info, ErrorReport};
-use composition_types::{DataResult, InterfacingSwarms};
+use composition_types::{DataResult, Granularity, InterfacingSwarms};
 
 use super::*;
 
@@ -27,12 +27,16 @@ pub fn check_wwf_swarm(protos: String, subs: String) -> String {
 }
 
 #[wasm_bindgen]
-pub fn exact_weak_well_formed_sub(protos: String) -> String {
+pub fn exact_weak_well_formed_sub(protos: String, subs: String) -> String {
     let protos = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
         Ok(p) => p,
         Err(e) => return derr::<Subscriptions>(vec![format!("parsing swarm protocol: {}", e)]),
     };
-    let result = composition_swarm::exact_weak_well_formed_sub(protos);
+    let subs = match serde_json::from_str::<Subscriptions>(&subs) {
+        Ok(p) => p,
+        Err(e) => return err(vec![format!("parsing subscriptions: {}", e)]),
+    };
+    let result = composition_swarm::exact_weak_well_formed_sub(protos, &subs);
     match result {
         Ok(subscriptions) => dok(subscriptions),
         Err(error_report) => derr::<Subscriptions>(error_report_to_strings(error_report)),
@@ -40,12 +44,20 @@ pub fn exact_weak_well_formed_sub(protos: String) -> String {
 }
 
 #[wasm_bindgen]
-pub fn overapproximated_weak_well_formed_sub(protos: String) -> String {
+pub fn overapproximated_weak_well_formed_sub(protos: String, subs: String, granularity: String) -> String {
     let protos = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
         Ok(p) => p,
         Err(e) => return derr::<Subscriptions>(vec![format!("parsing swarm protocol: {}", e)]),
     };
-    let result = composition_swarm::overapprox_weak_well_formed_sub(protos);
+    let subs = match serde_json::from_str::<Subscriptions>(&subs) {
+        Ok(p) => p,
+        Err(e) => return err(vec![format!("parsing subscriptions: {}", e)]),
+    };
+    let granularity = match serde_json::from_str::<Granularity>(&granularity) {
+        Ok(g) => g,
+        Err(e) => return derr::<Subscriptions>(vec![format!("parsing granularity parameter: {}", e)]),
+    };
+    let result = composition_swarm::overapprox_weak_well_formed_sub(protos, &subs, granularity);
     match result {
         Ok(subscriptions) => dok(subscriptions),
         Err(error_report) => derr::<Subscriptions>(error_report_to_strings(error_report)),
@@ -91,10 +103,10 @@ pub fn project_combine(protos: String, subs: String, role: String) -> String {
     if !proto_info.no_errors() {
         return derr::<Machine>(error_report_to_strings(proto_info_to_error_report(proto_info)));
     }
-    let swarms = proto_info.protocols
+    /* let swarms = proto_info.protocols
             .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
-            .collect();
-    let (proj, proj_initial) = composition_machine::project_combine(&swarms, &subs, role);
+            .collect(); */
+    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role);
 
     dok(
         composition::composition_machine::from_option_to_machine(proj, proj_initial.unwrap())
@@ -116,10 +128,10 @@ pub fn project_combine_all(protos: String, subs: String) -> String {
     if !proto_info.no_errors() {
         return derr::<Vec<Machine>>(error_report_to_strings(proto_info_to_error_report(proto_info)));
     }
-    let swarms = proto_info.protocols
+    /* let swarms = proto_info.protocols
         .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
-        .collect();
-    let projections = composition_machine::project_combine_all(&swarms, &subs);
+        .collect(); */
+    let projections = composition_machine::project_combine_all(&proto_info.protocols, &subs);
 
     // do not think we need this check here
     if projections.iter().any(|(_, i)| i.is_none()) {
@@ -163,10 +175,10 @@ pub fn check_composed_projection(
     if !proto_info.no_errors() {
         return err(error_report_to_strings(proto_info_to_error_report(proto_info)));
     }
-    let swarms = proto_info.protocols
+    /* let swarms = proto_info.protocols
         .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
-        .collect();
-    let (proj, proj_initial) = composition_machine::project_combine(&swarms, &subs, role);
+        .collect(); */
+    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role);
     let (machine, json_initial, m_errors) = machine::from_json(machine);
     let machine_problem = !m_errors.is_empty();
     let mut errors = vec![];
