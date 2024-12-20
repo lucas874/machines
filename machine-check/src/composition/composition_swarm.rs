@@ -512,9 +512,9 @@ fn overapprox_wwf_sub(proto_info: &mut ProtoInfo, subscription: &Subscriptions, 
         Granularity::Coarse => coarse_overapprox_wwf_sub(proto_info)
     } */
     match granularity {
-        Granularity::Fine => { println!("FINE"); finer_overapprox_wwf_sub(proto_info, subscription, false) },
-        Granularity::Medium => { println!("MEDIUM"); finer_overapprox_wwf_sub(proto_info, subscription, true)},
-        Granularity::Coarse => { println!("COARSE");coarse_overapprox_wwf_sub(proto_info, subscription)}
+        Granularity::Fine => finer_overapprox_wwf_sub(proto_info, subscription, false),
+        Granularity::Medium => finer_overapprox_wwf_sub(proto_info, subscription, true),
+        Granularity::Coarse => coarse_overapprox_wwf_sub(proto_info, subscription)
     }
 }
 

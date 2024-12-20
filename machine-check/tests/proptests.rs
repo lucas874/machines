@@ -999,11 +999,14 @@ proptest! {
         }
     }
 }
-
+fn print_type<T>(_: &T) {
+    println!("{:?}", std::any::type_name::<T>());
+}
 fn create_directory(parent: &String, dir_name: &String) -> () {
     match create_dir(format!("{parent}/{dir_name}")) {
         Ok(_) => (),
-        Err(e) => panic!("couldn't create directory {}/{}: {}", parent, dir_name, e),
+        Err(ref e) if e.kind() == std::io::ErrorKind::AlreadyExists => (),
+        Err(e) => {print_type(&e); panic!("couldn't create directory {}/{}: {}", parent, dir_name, e)},
     }
 }
 
@@ -1013,6 +1016,7 @@ fn write_file(file_name: &String, content: String) -> () {
 
     // Open a file in write-only mode, returns `io::Result<File>`
     let mut file = match File::create(&path) {
+        //Err(Error::)
         Err(why) => panic!("couldn't create {}: {}", display, why),
         Ok(file) => file,
     };
@@ -1070,3 +1074,38 @@ proptest! {
 
 
 */
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BenchMarkInput  {
+    pub state_space_size: usize,
+    pub interfacing_swarms: InterfacingSwarms<Role>
+}
+
+fn wrap_and_write(interfacing_swarms: InterfacingSwarms<Role>, parent_path: String, dir_name: String) {
+    let interfacing_swarms_string = serde_json::to_string(&interfacing_swarms).unwrap();
+    let composition = match serde_json::from_str(&compose_protocols(interfacing_swarms_string.clone())).unwrap() {
+        DataResult::<SwarmProtocol>::OK{data: composition} => {
+            Some(composition) },
+        DataResult::<SwarmProtocol>::ERROR{ .. } => None,
+    };
+    let state_space_size = composition.unwrap().transitions.into_iter().flat_map(|label| [label.source, label.target]).collect::<BTreeSet<State>>().len();
+    let benchmark_input = BenchMarkInput {state_space_size, interfacing_swarms};
+    let mut mut_guard = FILE_COUNTER_MAX.lock().unwrap();
+    let i: u32 = *mut_guard;
+    *mut_guard += 1;
+    let file_name = format!("{parent_path}/{dir_name}/{:010}_{:010}_{dir_name}.json", state_space_size, i);
+    let out = serde_json::to_string(&benchmark_input).unwrap();
+    write_file(&file_name, out);
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(1))]
+    #[test]
+    #[ignore]
+    fn write_bench_file(interfacing_swarms in generate_interfacing_swarms_refinement_2(3, 4, 2)) {
+        let parent_path = "benches/protocols/refinement_pattern_2".to_string();
+        let dir_name = format!("max_3_roles_max_4_commands_2_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
