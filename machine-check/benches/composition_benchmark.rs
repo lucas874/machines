@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, AxisScale, BenchmarkId, Criterion, PlotConfiguration};
 use machine_check::composition::composition_types::Granularity;
 use machine_check::composition::{
     composition_types::InterfacingSwarms, exact_weak_well_formed_sub,
@@ -62,6 +62,7 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
         match entry {
             Ok(entry) => {
                 if entry.file_type().is_file() {
+                    println!("file: {}", entry.path().as_os_str().to_str().unwrap().to_string());
                     inputs.push(prepare_input(
                         entry.path().as_os_str().to_str().unwrap().to_string(),
                     ));
@@ -75,9 +76,11 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
 }
 
 fn bench_composition(c: &mut Criterion) {
+    let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
     let mut group = c.benchmark_group("Composition");
+    group.plot_config(plot_config);
     let mut interfacing_swarms_refinement_2 =
-        prepare_files_in_directory(String::from("./benches/protocols/refinement_pattern_2_2/"));
+        prepare_files_in_directory(String::from("./benches/protocols/refinement_pattern_2_3/"));
     interfacing_swarms_refinement_2.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
     //interfacing_swarms_refinement_2.dedup_by(|(size1, _), (size2, _)| size1 == size2);
     //group.measurement_time(Duration::new(20, 0));
@@ -122,18 +125,6 @@ fn bench_composition(c: &mut Criterion) {
             },
         );
     }
-    /* for (i, (size, interfacing_swarm)) in interfacing_swarms_refinement_2.iter().enumerate() {
-            //let parameter_string = format!("id: {}, size: {}", i, size);
-            group.bench_with_input(BenchmarkId::new(format!("coarse_{i}"), size), interfacing_swarm,
-            |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), granularity.clone())));
-            group.bench_with_input(BenchmarkId::new(format!("exact_{i}"), size), interfacing_swarm,
-            |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone())));
-    /*         group.bench_with_input(BenchmarkId::new("Overapproximation", &parameter_string), interfacing_swarm,
-            |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), granularity.clone())));
-            group.bench_with_input(BenchmarkId::new("Exact", &parameter_string), interfacing_swarm,
-            |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone()))); */
-
-        } */
     group.finish();
 }
 

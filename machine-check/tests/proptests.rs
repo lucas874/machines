@@ -1096,7 +1096,7 @@ fn wrap_and_write(interfacing_swarms: InterfacingSwarms<Role>, parent_path: Stri
     let mut mut_guard = FILE_COUNTER_MAX.lock().unwrap();
     let i: u32 = *mut_guard;
     *mut_guard += 1;
-    let file_name = format!("{parent_path}/{:010}_{:010}_{dir_name}.json", state_space_size, i);
+    let file_name = format!("{parent_path}/{dir_name}/{:010}_{:010}_{dir_name}.json", state_space_size, i);
     let out = serde_json::to_string(&benchmark_input).unwrap();
     write_file(&file_name, out);
 }
@@ -1106,9 +1106,9 @@ proptest! {
     #[test]
     #[ignore]
     fn write_bench_file(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 2)) {
-        let parent_path = "benches/protocols/refinement_pattern_2_2".to_string();
-        let dir_name = format!("max_3_roles_max_4_commands_2_protos");
-        //create_directory(&parent_path, &dir_name);
+        let parent_path = "benches/protocols/refinement_pattern_2_3".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_2_protos");
+        create_directory(&parent_path, &dir_name);
         wrap_and_write(interfacing_swarms, parent_path, dir_name);
     }
 }
