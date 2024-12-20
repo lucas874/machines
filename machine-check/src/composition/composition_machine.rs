@@ -99,7 +99,9 @@ pub fn project(
             );
         }
     }
-    nfa_to_dfa(machine, m_nodes[initial.index()])
+    //nfa_to_dfa(machine, m_nodes[initial.index()])
+    let (dfa, dfa_initial) = nfa_to_dfa(machine, m_nodes[initial.index()]); // make deterministic. slight deviation from projection operation formally.
+    minimal_machine(&dfa, dfa_initial) // when minimizing we get a machine that is a little different but equivalent to the one prescribed by the projection operator formally
 }
 
 // precondition: the protocols interfaces on the supplied interfaces.
@@ -121,9 +123,8 @@ pub fn project_combine(
         return (OptionGraph::new(), None);
     }
 
-    let mapper = |p: &ProtoStruct| -> (Graph, NodeId, BTreeSet<EventType>) { //|(graph, initial, interface): &(super::Graph, NodeId, BTreeSet<EventType>)| -> (Graph, NodeId, BTreeSet<EventType>) {
+    let mapper = |p: &ProtoStruct| -> (Graph, NodeId, BTreeSet<EventType>) {
         let (projection, projection_initial) = project(&p.graph, p.initial.unwrap(), subs, role.clone());
-        //let (projection, projection_initial) = project(&graph, *initial, subs, role.clone());
         (projection, projection_initial, p.interface.clone())
     };
 
@@ -204,6 +205,84 @@ fn nfa_to_dfa(nfa: Graph, i: NodeId) -> (Graph, NodeId) {
     }
 
     (dfa, dfa_nodes[&BTreeSet::from([i])])
+}
+
+fn minimal_machine(graph: &Graph, i: NodeId) -> (Graph, NodeId) {
+    let partition = partition_refinement(graph);
+    let mut minimal = Graph::new();
+    let mut node_to_partition = BTreeMap::new();
+    let mut partition_to_minimal_graph_node = BTreeMap::new();
+    let mut edges = BTreeSet::new();
+    let state_name = |nodes: &BTreeSet<NodeId>| -> State {
+        let name = format!("{{ {} }}", nodes.iter().map(|n| graph[*n].clone()).join(", "));
+        State::new(&name)
+    };
+
+    for n in graph.node_indices() {
+        node_to_partition.insert(n, partition.iter().find(|block| block.contains(&n)).unwrap());
+    }
+    for block in &partition {
+        partition_to_minimal_graph_node.insert(block, minimal.add_node(state_name(block)));
+    }
+    for node in graph.node_indices() {
+        for edge in graph.edges_directed(node, Outgoing) {
+
+            let source = partition_to_minimal_graph_node[node_to_partition[&node]];
+            let target = partition_to_minimal_graph_node[node_to_partition[&edge.target()]];
+            if !edges.contains(&(source, edge.weight().clone(), target)) {
+                minimal.add_edge(source, target, edge.weight().clone());
+                edges.insert((source, edge.weight().clone(), target));
+            }
+
+        }
+    }
+    let initial = partition_to_minimal_graph_node[node_to_partition[&i]];
+    (minimal, initial)
+
+
+}
+
+
+fn partition_refinement(graph: &Graph) -> BTreeSet<BTreeSet<NodeId>> {
+    let mut partition_old = BTreeSet::new();
+    let tmp: (BTreeSet<_>, BTreeSet<_>) = graph
+        .node_indices()
+        .partition(|n| graph.edges_directed(*n, Outgoing).count() == 0);
+    let mut partition: BTreeSet<BTreeSet<NodeId>> = BTreeSet::from([tmp.0, tmp.1]);
+
+    let pre_labels = |block: &BTreeSet<NodeId>| -> BTreeSet<MachineLabel> {
+        block.iter().flat_map(|n| graph.edges_directed(*n, Incoming).map(|e|e.weight().clone())).collect()
+    };
+
+    while partition.len() != partition_old.len() {
+        partition_old = partition.clone();
+        for superblock in &partition_old {
+            for label in pre_labels(superblock) {
+                partition = refine_partition(graph, partition, superblock, &label);
+            }
+        }
+    }
+
+    partition
+}
+
+fn refine_partition(graph: &Graph, partition: BTreeSet<BTreeSet<NodeId>>, superblock: &BTreeSet<NodeId>, label: &MachineLabel) -> BTreeSet<BTreeSet<NodeId>> {
+    partition
+        .iter()
+        .flat_map(|block| refine_block(graph, block, superblock, label))
+        .collect()
+}
+
+fn refine_block(graph: &Graph, block: &BTreeSet<NodeId>, superblock: &BTreeSet<NodeId>, label: &MachineLabel) -> BTreeSet<BTreeSet<NodeId>> {
+    let predicate = |node: &NodeId| -> bool {
+        graph.edges_directed(*node, Outgoing).any(|e| *e.weight() == *label && superblock.contains(&e.target()))
+    };
+
+    let tmp: (BTreeSet<_>, BTreeSet<_>) = block
+        .iter()
+        .partition(|n| predicate(n));
+
+    BTreeSet::from([tmp.0, tmp.1]).into_iter().filter(|s| !s.is_empty()).collect()
 }
 
 // precondition: both machines are projected from wwf protocols?
@@ -353,7 +432,7 @@ mod tests {
     use super::*;
     use crate::{
         composition::{
-            composition_swarm::{compose_protocols, exact_weak_well_formed_sub, from_json, swarms_to_proto_info},
+            composition_swarm::{compose_protocols, exact_weak_well_formed_sub, from_json, overapprox_weak_well_formed_sub, swarms_to_proto_info},
             composition_types::{CompositionComponent, Granularity, InterfacingSwarms},
         }, types::{Command, EventType, Role, Transition}, Machine, Subscriptions, SwarmProtocol
     };
@@ -545,7 +624,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_projection_2() {
         // warehouse example from coplaws slides
         let proto = get_proto1();
@@ -554,7 +632,7 @@ mod tests {
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
         let (g, i, _) = from_json(proto);
-        let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role);
+        let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role.clone());
         let expected_m = Machine {
             initial: State::new("0"),
             transitions: vec![
@@ -578,7 +656,21 @@ mod tests {
                         event_type: EventType::new("pos"),
                     },
                     source: State::new("1"),
-                    target: State::new("0"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("3"),
                 },
                 Transition {
                     label: MachineLabel::Input {
@@ -590,8 +682,8 @@ mod tests {
             ],
         };
         let (expected, expected_initial, errors) = crate::machine::from_json(expected_m);
-        //println!("computed {:?}: {}", role.clone(), serde_json::to_string_pretty(&to_machine(proj.clone(), proj_initial)).unwrap());
-        //println!("expected {:?}: {}", role, serde_json::to_string_pretty(&to_machine(expected.clone(), expected_initial.unwrap())).unwrap());
+        println!("computed {:?}: {}", role.clone(), serde_json::to_string_pretty(&to_json_machine(proj.clone(), proj_initial)).unwrap());
+        println!("expected {:?}: {}", role, serde_json::to_string_pretty(&from_option_to_machine(expected.clone(), expected_initial.unwrap())).unwrap());
         assert!(errors.is_empty());
         assert!(expected_initial.is_some());
         // from machine::equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
@@ -643,6 +735,108 @@ mod tests {
         };
         let (expected, expected_initial, errors) = crate::machine::from_json(expected_m);
 
+        assert!(errors.is_empty());
+        assert!(expected_initial.is_some());
+        // from machine::equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
+        assert!(crate::machine::equivalent(
+            &expected,
+            expected_initial.unwrap(),
+            &to_option_machine(&proj),
+            proj_initial
+        )
+        .is_empty());
+    }
+
+    #[test]
+    fn test_projection_4() {
+        // car factory from coplaws example
+        let protos = get_interfacing_swarms_1();
+        let result_subs = overapprox_weak_well_formed_sub(protos.clone(), &BTreeMap::from([(Role::new("T"), BTreeSet::from([EventType::new("car")]))]), Granularity::Coarse);
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
+        //println!("sub: {}", serde_json::to_string_pretty(&subs).unwrap());
+        let role = Role::new("T");
+        let (g, i) = compose_protocols(protos).unwrap();
+        let (proj, proj_initial) = project(&g, i, &subs, role);
+        let expected_m = Machine {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("request"),
+                        log_type: vec![EventType::new("partID")],
+                    },
+                    source: State::new("0"),
+                    target: State::new("0"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("1"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("deliver"),
+                        log_type: vec![EventType::new("part")],
+                    },
+                    source: State::new("3"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("part"),
+                    },
+                    source: State::new("3"),
+                    target: State::new("4"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("4"),
+                    target: State::new("5"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("car"),
+                    },
+                    source: State::new("5"),
+                    target: State::new("7"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("car"),
+                    },
+                    source: State::new("4"),
+                    target: State::new("6"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("6"),
+                    target: State::new("7"),
+                },
+            ],
+        };
+        let (expected, expected_initial, errors) = crate::machine::from_json(expected_m);
+        //println!("actual {}", serde_json::to_string_pretty(&to_json_machine(proj.clone(), proj_initial)).unwrap());
         assert!(errors.is_empty());
         assert!(expected_initial.is_some());
         // from machine::equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
@@ -750,7 +944,7 @@ mod tests {
             .is_empty());
             //println!("machine: {}\n$$$$\n", serde_json::to_string_pretty(&from_option_to_machine(proj_combined2.clone(), proj_combined_initial2.clone().unwrap())).unwrap());
             //println!("{}\n$$$$\n", serde_json::to_string_pretty(&from_option_to_machine(proj_combined2.clone(), proj_combined_initial2.clone().unwrap())).unwrap());
-            //println!("");
+            ////println!("");
             assert_eq!(subs2, subs);
 
             let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, role.clone());

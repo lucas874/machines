@@ -842,7 +842,7 @@ proptest! {
     //#![proptest_config(ProptestConfig::with_cases(1))]
     #[test]
     #[ignore]
-    fn test_combine_machines_prop(vec in generate_interfacing_swarms_refinement_2(3, 3, 2)) {
+    fn test_combine_machines_prop(vec in generate_interfacing_swarms_refinement_2(5, 5, 5)) {
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::Medium).unwrap();
@@ -901,6 +901,48 @@ proptest! {
                 },
             }
         }
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(1))]
+    #[test]
+    #[ignore]
+    fn test_combine_machines_prop_1(vec in generate_interfacing_swarms_refinement_2(5, 5, 7)) {
+        let protos = serde_json::to_string(&vec).unwrap();
+        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let granularity = serde_json::to_string(&Granularity::Medium).unwrap();
+        let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+
+        assert!(subscriptions.is_some());
+
+        let subscriptions = subscriptions.unwrap();
+
+        //let composition = InterfacingSwarms::<Role>(vec![CompositionComponent{protocol: composition.unwrap(), interface: None}]);
+        let sub_string = serde_json::to_string(&subscriptions).unwrap();
+
+        for role in subscriptions.keys() {
+            let role_string = role.to_string();
+
+            let projection_combined = match serde_json::from_str(&project_combine(protos.clone(), sub_string.clone(), role_string.clone())).unwrap() {
+                DataResult::<Machine>::OK{data: projection} => {
+                Some(projection) },
+                DataResult::<Machine>::ERROR{ .. } => None,
+            };
+            assert!(projection_combined.is_some());
+        }
+        println!("done projecting");
+        let composition = match serde_json::from_str(&compose_protocols(protos.clone())).unwrap() {
+            DataResult::<SwarmProtocol>::OK{data: composition} => {
+                Some(composition) },
+            DataResult::<SwarmProtocol>::ERROR{ .. } => None,
+        };
+        println!("done composing");
+        println!("size of composition state space: {}", composition.unwrap().transitions.into_iter().flat_map(|label| [label.source, label.target]).collect::<BTreeSet<State>>().len());
+
     }
 }
 
