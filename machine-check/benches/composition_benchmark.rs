@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, AxisScale, BenchmarkId, Criterion, PlotConfiguration};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use machine_check::composition::composition_types::Granularity;
 use machine_check::composition::{
     composition_types::InterfacingSwarms, exact_weak_well_formed_sub,
@@ -7,7 +7,6 @@ use machine_check::composition::{
 use machine_check::types::{EventType, Role};
 use serde::{Deserialize, Serialize};
 extern crate machine_check;
-use itertools::Itertools;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::prelude::*;
@@ -76,25 +75,32 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
 }
 
 fn bench_composition(c: &mut Criterion) {
-    let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
     let mut group = c.benchmark_group("Composition");
-    group.plot_config(plot_config);
     let mut interfacing_swarms_refinement_2 =
-        prepare_files_in_directory(String::from("./benches/protocols/refinement_pattern_2_3/"));
+        //prepare_files_in_directory(String::from("./benches/protocols/refinement_pattern_2_filtered/"));
+        prepare_files_in_directory(String::from("./benches/protocols/refinement_pattern_22/"));
     interfacing_swarms_refinement_2.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
     //interfacing_swarms_refinement_2.dedup_by(|(size1, _), (size2, _)| size1 == size2);
     //group.measurement_time(Duration::new(20, 0));
-    let mut data_grouped: Vec<(usize, Vec<(usize, String)>)> = Vec::new();
-    for (state_space_size, chunk) in &interfacing_swarms_refinement_2
-        .into_iter()
-        .group_by(|(size, _)| *size)
-    {
-        data_grouped.push((state_space_size, chunk.collect()));
-    }
-    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
-    let granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
 
-    for (size, group_of_interfacing_swarms) in data_grouped.iter() {
+    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let coarse_granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
+    let medium_granularity = serde_json::to_string(&Granularity::Medium).unwrap();
+    let fine_granularity = serde_json::to_string(&Granularity::Fine).unwrap();
+    for (size, interfacing_swarms) in interfacing_swarms_refinement_2.iter() {
+        group.bench_with_input(BenchmarkId::new("coarse", size), interfacing_swarms,
+        |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), coarse_granularity.clone())));
+
+        group.bench_with_input(BenchmarkId::new("medium", size), interfacing_swarms,
+        |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), medium_granularity.clone())));
+
+        group.bench_with_input(BenchmarkId::new("fine", size), interfacing_swarms,
+        |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), fine_granularity.clone())));
+
+        group.bench_with_input(BenchmarkId::new("exact", size), interfacing_swarms,
+        |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone())));
+    }
+    /* for (size, group_of_interfacing_swarms) in data_grouped.iter() {
         group.bench_with_input(
             BenchmarkId::new("coarse", size),
             group_of_interfacing_swarms,
@@ -124,7 +130,7 @@ fn bench_composition(c: &mut Criterion) {
                 });
             },
         );
-    }
+    } */
     group.finish();
 }
 

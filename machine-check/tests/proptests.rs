@@ -1102,12 +1102,48 @@ fn wrap_and_write(interfacing_swarms: InterfacingSwarms<Role>, parent_path: Stri
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(10))]
+    #![proptest_config(ProptestConfig::with_cases(500))]
     #[test]
     #[ignore]
-    fn write_bench_file(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 2)) {
-        let parent_path = "benches/protocols/refinement_pattern_2_3".to_string();
+    fn write_bench_file_ref_2_5_1(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 1)) {
+        let parent_path = "benches/protocols/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_1_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_2(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 2)) {
+        let parent_path = "benches/protocols/refinement_pattern_2".to_string();
         let dir_name = format!("max_5_roles_max_5_commands_2_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_3(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
+        let parent_path = "benches/protocols/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_3_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_4(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 4)) {
+        let parent_path = "benches/protocols/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_4_protos");
         create_directory(&parent_path, &dir_name);
         wrap_and_write(interfacing_swarms, parent_path, dir_name);
     }
