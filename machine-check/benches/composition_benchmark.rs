@@ -74,14 +74,13 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
     inputs
 }
 
-fn bench_composition(c: &mut Criterion) {
-    let mut group = c.benchmark_group("Composition");
+fn bench_composition_refinement_pattern_2(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Composition refinement pattern 2");
     let mut interfacing_swarms_refinement_2 =
-        //prepare_files_in_directory(String::from("./benches/protocols/refinement_pattern_2_filtered/"));
-        prepare_files_in_directory(String::from("./benches/protocols/refinement_pattern_22/"));
+        prepare_files_in_directory(String::from("./benches/benchmark_data/refinement_pattern_2/"));
     interfacing_swarms_refinement_2.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
-    //interfacing_swarms_refinement_2.dedup_by(|(size1, _), (size2, _)| size1 == size2);
-    //group.measurement_time(Duration::new(20, 0));
+
+
 
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
     let coarse_granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
@@ -100,39 +99,8 @@ fn bench_composition(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("exact", size), interfacing_swarms,
         |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone())));
     }
-    /* for (size, group_of_interfacing_swarms) in data_grouped.iter() {
-        group.bench_with_input(
-            BenchmarkId::new("coarse", size),
-            group_of_interfacing_swarms,
-            |b, inputs| {
-                b.iter(|| {
-                    for (_, interfacing_swarms) in inputs {
-                        overapproximated_weak_well_formed_sub(
-                            interfacing_swarms.clone(),
-                            subs.clone(),
-                            granularity.clone(),
-                        );
-                    }
-                });
-            },
-        );
-        group.bench_with_input(
-            BenchmarkId::new("exact", size),
-            group_of_interfacing_swarms,
-            |b, inputs| {
-                b.iter(|| {
-                    for (_, interfacing_swarms) in inputs {
-                        exact_weak_well_formed_sub(
-                            interfacing_swarms.clone(),
-                            subs.clone(),
-                        );
-                    }
-                });
-            },
-        );
-    } */
     group.finish();
 }
 
-criterion_group!(benches, bench_composition);
+criterion_group!(benches, bench_composition_refinement_pattern_2);
 criterion_main!(benches);
