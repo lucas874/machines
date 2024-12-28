@@ -19,6 +19,8 @@ use std::{
     io::prelude::*,
 };
 
+use walkdir::WalkDir;
+
 // reimplemented here because we need to Deserialize. To not change in types.rs
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
@@ -1462,3 +1464,215 @@ proptest! {
         wrap_and_write(interfacing_swarms, parent_path, dir_name);
     }
 } */
+
+fn prepare_input(file_name: String) -> (usize, BenchMarkInput) {
+    // Create a path to the desired file
+    let path = Path::new(&file_name);
+    let display = path.display();
+
+    // Open the path in read-only mode, returns `io::Result<File>`
+    let mut file = match File::open(&path) {
+        Err(why) => panic!("couldn't open {}: {}", display, why),
+        Ok(file) => file,
+    };
+
+    // Read the file contents into a string, returns `io::Result<usize>`
+    let mut protos = String::new();
+    match file.read_to_string(&mut protos) {
+        Err(why) => panic!("couldn't read {}: {}", display, why),
+        Ok(_) => (), //print!("{} contains:\n{}", display, protos),
+    }
+    let (state_space_size, interfacing_swarms) =
+        match serde_json::from_str::<BenchMarkInput>(&protos) {
+            Ok(input) => (input.state_space_size, input),
+            Err(e) => panic!("error parsing input file: {}", e),
+        };
+    (
+        state_space_size,
+        interfacing_swarms//serde_json::to_string(&interfacing_swarms).unwrap(),
+    )
+}
+
+fn prepare_files_in_directory(directory: String) -> Vec<(usize, BenchMarkInput)> {
+    let mut inputs: Vec<(usize, BenchMarkInput)> = vec![];
+
+    for entry in WalkDir::new(directory) {
+        match entry {
+            Ok(entry) => {
+                if entry.file_type().is_file() {
+                    println!("file: {}", entry.path().as_os_str().to_str().unwrap().to_string());
+                    inputs.push(prepare_input(
+                        entry.path().as_os_str().to_str().unwrap().to_string(),
+                    ));
+                }
+            }
+            Err(e) => panic!("error: {}", e),
+        };
+    }
+
+    inputs
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BenchmarkSubSizeOutput  {
+    pub state_space_size: usize,
+    pub number_of_edges: usize,
+    pub subscriptions: Subscriptions,
+}
+
+fn wrap_and_write_sub_out(bench_input: &BenchMarkInput, subscriptions: Subscriptions, granularity: String, parent_path: String) {
+    let out = BenchmarkSubSizeOutput { state_space_size: bench_input.state_space_size, number_of_edges: bench_input.number_of_edges, subscriptions: subscriptions};
+    let file_name = format!("{parent_path}/{:010}_{}.json", bench_input.state_space_size, granularity);
+    let out = serde_json::to_string(&out).unwrap();
+    write_file(&file_name, out);
+}
+
+#[test]
+#[ignore]
+fn sub_sizes_refinement_1() {
+    let mut interfacing_swarms_refinement_1 =
+        prepare_files_in_directory(String::from("./benches/benchmark_data/refinement_pattern_1/"));
+    interfacing_swarms_refinement_1.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let coarse_granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
+    let medium_granularity = serde_json::to_string(&Granularity::Medium).unwrap();
+    let fine_granularity = serde_json::to_string(&Granularity::Fine).unwrap();
+    let granularities = vec![coarse_granularity, medium_granularity, fine_granularity];
+    for (_, bi) in &interfacing_swarms_refinement_1 {
+        //let bi = serde_json::from_str::<BenchMarkInput>(&bench_input).unwrap();
+        let swarms = serde_json::to_string(&bi.interfacing_swarms).unwrap();
+        for g in &granularities {
+
+            let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), g.clone())).unwrap() {
+                DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+                DataResult::<Subscriptions>::ERROR{ .. } => None,
+            };
+
+            wrap_and_write_sub_out(&bi, subscriptions.unwrap(), g.replace("\"", ""), String::from("./subscription_size_benchmarks/refinement_pattern_1"));
+
+        }
+
+        let subscriptions = match serde_json::from_str(&exact_weak_well_formed_sub(swarms.clone(), subs.clone())).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => {
+                Some(subscriptions) },
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+
+
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), String::from("./subscription_size_benchmarks/refinement_pattern_1"));
+
+    }
+}
+
+#[test]
+#[ignore]
+fn sub_sizes_refinement_2() {
+    let mut interfacing_swarms_refinement_2 =
+        prepare_files_in_directory(String::from("./benches/benchmark_data/refinement_pattern_2/"));
+    interfacing_swarms_refinement_2.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let coarse_granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
+    let medium_granularity = serde_json::to_string(&Granularity::Medium).unwrap();
+    let fine_granularity = serde_json::to_string(&Granularity::Fine).unwrap();
+    let granularities = vec![coarse_granularity, medium_granularity, fine_granularity];
+    for (_, bi) in &interfacing_swarms_refinement_2 {
+        //let bi = serde_json::from_str::<BenchMarkInput>(&bench_input).unwrap();
+        let swarms = serde_json::to_string(&bi.interfacing_swarms).unwrap();
+        for g in &granularities {
+
+            let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), g.clone())).unwrap() {
+                DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+                DataResult::<Subscriptions>::ERROR{ .. } => None,
+            };
+
+            wrap_and_write_sub_out(&bi, subscriptions.unwrap(), g.replace("\"", ""), String::from("./subscription_size_benchmarks/refinement_pattern_2"));
+
+        }
+
+        let subscriptions = match serde_json::from_str(&exact_weak_well_formed_sub(swarms.clone(), subs.clone())).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => {
+                Some(subscriptions) },
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+
+
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), String::from("./subscription_size_benchmarks/refinement_pattern_2"));
+
+    }
+}
+
+#[test]
+#[ignore]
+fn sub_sizes_random() {
+    let mut interfacing_swarms_random =
+        prepare_files_in_directory(String::from("./benches/benchmark_data/random/"));
+    interfacing_swarms_random.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let coarse_granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
+    let medium_granularity = serde_json::to_string(&Granularity::Medium).unwrap();
+    let fine_granularity = serde_json::to_string(&Granularity::Fine).unwrap();
+    let granularities = vec![coarse_granularity, medium_granularity, fine_granularity];
+    for (_, bi) in &interfacing_swarms_random {
+        let swarms = serde_json::to_string(&bi.interfacing_swarms).unwrap();
+        for g in &granularities {
+
+            let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), g.clone())).unwrap() {
+                DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+                DataResult::<Subscriptions>::ERROR{ .. } => None,
+            };
+
+            wrap_and_write_sub_out(&bi, subscriptions.unwrap(), g.replace("\"", ""), String::from("./subscription_size_benchmarks/random"));
+
+        }
+
+        let subscriptions = match serde_json::from_str(&exact_weak_well_formed_sub(swarms.clone(), subs.clone())).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => {
+                Some(subscriptions) },
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+
+
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), String::from("./subscription_size_benchmarks/random"));
+
+    }
+}
+
+#[test]
+#[ignore]
+fn sub_sizes_refinement_2_print() {
+    let mut interfacing_swarms_refinement_2 =
+        prepare_files_in_directory(String::from("./benches/benchmark_data/random/"));
+    interfacing_swarms_refinement_2.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let fine_granularity = serde_json::to_string(&Granularity::Fine).unwrap();
+    let mut i = 0;
+    for (_, bi) in &interfacing_swarms_refinement_2 {
+        //let bi = serde_json::from_str::<BenchMarkInput>(&bench_input).unwrap();
+        let swarms = serde_json::to_string(&bi.interfacing_swarms).unwrap();
+        let subscriptions_fine_approx = match serde_json::from_str(&overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), fine_granularity.clone())).unwrap() {
+                DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
+                DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+
+        let subscriptions_exact = match serde_json::from_str(&exact_weak_well_formed_sub(swarms.clone(), subs.clone())).unwrap() {
+            DataResult::<Subscriptions>::OK{data: subscriptions} => {
+                Some(subscriptions) },
+            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        };
+        if subscriptions_fine_approx.clone().unwrap() != subscriptions_exact.clone().unwrap() {
+            if i == 0 {
+                println!("sub approx: {}", serde_json::to_string_pretty(&subscriptions_fine_approx).unwrap());
+                println!("sub exact: {}", serde_json::to_string_pretty(&subscriptions_exact).unwrap());
+                println!("swarms: {}", serde_json::to_string_pretty(&bi.interfacing_swarms).unwrap());
+                let composition = match serde_json::from_str(&compose_protocols(swarms)).unwrap() {
+                    DataResult::<SwarmProtocol>::OK{data: composition} => {
+                        Some(composition) },
+                    DataResult::<SwarmProtocol>::ERROR{ .. } => None,
+                };
+                println!("composition: {}", serde_json::to_string_pretty(&composition.unwrap()).unwrap());
+                break;
+            }
+            i = i + 1;
+        }
+    }
+}
