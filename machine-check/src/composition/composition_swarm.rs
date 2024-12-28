@@ -599,16 +599,41 @@ fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mu
 
     };
 
+    if with_all_interfacing {
+        let interested_roles: Vec<Role> = subscription.keys().cloned().collect();
+        for joining_event in &proto_info.joining_events {
+            let join_and_prejoin: BTreeSet<_> = [joining_event.clone()].into_iter().chain(get_pre_joins(&joining_event).into_iter()).collect();
+            for role in &interested_roles {
+                add_to_sub(role.clone(), join_and_prejoin.clone(), subscription);
+            }
+
+        }
+    }
+
     while !is_stable {
         is_stable = true;
         // determinacy: joins
-        for joining_event in &proto_info.joining_events {
+        if !with_all_interfacing {
+            for joining_event in &proto_info.joining_events {
+                let interested_roles = roles_on_path(joining_event.clone(), proto_info, &subscription);
+                let pre_join_events = get_pre_joins(&joining_event);
+                let join_and_prejoin = if !pre_join_events.is_empty() {
+                    [joining_event.clone()].into_iter().chain(pre_join_events.into_iter()).collect()
+                } else {
+                    BTreeSet::new()
+                };
+                for role in interested_roles {
+                    is_stable = add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
+                }
+            }
+        }
+        /* for joining_event in &proto_info.joining_events {
             let interested_roles = if with_all_interfacing { subscription.keys().cloned().collect() } else { roles_on_path(joining_event.clone(), proto_info, &subscription) };
             let join_and_prejoin: BTreeSet<_> = [joining_event.clone()].into_iter().chain(get_pre_joins(&joining_event).into_iter()).collect();
             for role in interested_roles {
                 is_stable = add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
             }
-        }
+        } */
 
         // determinacy: branches
         for branching_events in &proto_info.branching_events {

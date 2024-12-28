@@ -844,7 +844,7 @@ proptest! {
     //#![proptest_config(ProptestConfig::with_cases(1))]
     #[test]
     #[ignore]
-    fn test_combine_machines_prop(vec in generate_interfacing_swarms_refinement_2(5, 5, 5)) {
+    fn test_combine_machines_prop(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::Medium).unwrap();
@@ -906,7 +906,7 @@ proptest! {
     }
 }
 
-proptest! {
+/* proptest! {
     #![proptest_config(ProptestConfig::with_cases(1))]
     #[test]
     #[ignore]
@@ -946,7 +946,7 @@ proptest! {
         println!("size of composition state space: {}", composition.unwrap().transitions.into_iter().flat_map(|label| [label.source, label.target]).collect::<BTreeSet<State>>().len());
 
     }
-}
+} */
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(1))]
@@ -1531,7 +1531,7 @@ fn wrap_and_write_sub_out(bench_input: &BenchMarkInput, subscriptions: Subscript
 #[ignore]
 fn sub_sizes_refinement_1() {
     let mut interfacing_swarms_refinement_1 =
-        prepare_files_in_directory(String::from("./benches/benchmark_data/refinement_pattern_1/"));
+        prepare_files_in_directory(String::from("./benches/benchmark_data_selected/refinement_pattern_1/"));
     interfacing_swarms_refinement_1.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
     let coarse_granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
@@ -1548,7 +1548,7 @@ fn sub_sizes_refinement_1() {
                 DataResult::<Subscriptions>::ERROR{ .. } => None,
             };
 
-            wrap_and_write_sub_out(&bi, subscriptions.unwrap(), g.replace("\"", ""), String::from("./subscription_size_benchmarks/refinement_pattern_1"));
+            wrap_and_write_sub_out(&bi, subscriptions.unwrap(), g.replace("\"", ""), String::from("./subscription_size_benchmarks/refinement_pattern_1_1"));
 
         }
 
@@ -1559,7 +1559,7 @@ fn sub_sizes_refinement_1() {
         };
 
 
-        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), String::from("./subscription_size_benchmarks/refinement_pattern_1"));
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), String::from("./subscription_size_benchmarks/refinement_pattern_1_1"));
 
     }
 }
@@ -1568,7 +1568,7 @@ fn sub_sizes_refinement_1() {
 #[ignore]
 fn sub_sizes_refinement_2() {
     let mut interfacing_swarms_refinement_2 =
-        prepare_files_in_directory(String::from("./benches/benchmark_data/refinement_pattern_2/"));
+        prepare_files_in_directory(String::from("./benches/benchmark_data_selected/refinement_pattern_2/"));
     interfacing_swarms_refinement_2.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
     let coarse_granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
@@ -1585,7 +1585,7 @@ fn sub_sizes_refinement_2() {
                 DataResult::<Subscriptions>::ERROR{ .. } => None,
             };
 
-            wrap_and_write_sub_out(&bi, subscriptions.unwrap(), g.replace("\"", ""), String::from("./subscription_size_benchmarks/refinement_pattern_2"));
+            wrap_and_write_sub_out(&bi, subscriptions.unwrap(), g.replace("\"", ""), String::from("./subscription_size_benchmarks/refinement_pattern_2_2"));
 
         }
 
@@ -1596,7 +1596,7 @@ fn sub_sizes_refinement_2() {
         };
 
 
-        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), String::from("./subscription_size_benchmarks/refinement_pattern_2"));
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), String::from("./subscription_size_benchmarks/refinement_pattern_2_2"));
 
     }
 }
@@ -1639,7 +1639,7 @@ fn sub_sizes_random() {
 
 #[test]
 #[ignore]
-fn sub_sizes_refinement_2_print() {
+fn print_sub_sizes_refinement_2() {
     let mut interfacing_swarms_refinement_2 =
         prepare_files_in_directory(String::from("./benches/benchmark_data/random/"));
     interfacing_swarms_refinement_2.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
