@@ -136,7 +136,7 @@ fn random_graph(
         (graph, initial, nodes)
     };
     let mut rng = rand::thread_rng();
-    let b_dist = Bernoulli::new(0.2).unwrap(); // bernoulli distribution with propability 0.2 of success
+    let b_dist = Bernoulli::new(0.1).unwrap(); // bernoulli distribution with propability 0.1 of success
     let gen_state_name = || -> State { State::new(&fresh_i().to_string()) };
 
     while let Some(label) = swarm_labels.pop() {
@@ -473,7 +473,7 @@ fn expand_graph(
 ) -> (Graph, NodeId) {
     let mut nodes: Vec<NodeId> = graph.node_indices().into_iter().collect();
     let mut rng = rand::thread_rng();
-    let b_dist = Bernoulli::new(0.2).unwrap(); // bernoulli distribution with propability 0.1 of success
+    let b_dist = Bernoulli::new(0.1).unwrap(); // bernoulli distribution with propability 0.1 of success
     let b_dist_2 = Bernoulli::new(0.5).unwrap(); // bernoulli distribution with propability 0.5 of success
     let gen_state_name = || -> State { State::new(&fresh_i().to_string()) };
 
