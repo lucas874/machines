@@ -1344,6 +1344,491 @@ proptest! {
     }
 }
 
+/* refinement pattern 2 */
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_1(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 1)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_1_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_2(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 2)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_2_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_3(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_3_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(100))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_4(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 4)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_4_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(50))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_5(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 5)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_5_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(50))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_6(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 6)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_6_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_7(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 7)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_7_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_8(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 8)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_8_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_9(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 9)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_9_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_10(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 10)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_10_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_1(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 1)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_1_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_2(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 2)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_2_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(100))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_3(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 3)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_3_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(50))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_4(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 4)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_4_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_5(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 5)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_5_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_6(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 6)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_6_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_7(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 7)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_7_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_8(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 8)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_8_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_9(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 9)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_9_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_10(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 10)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_10_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+/* random pattern */
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_1(interfacing_swarms in generate_interfacing_swarms(5, 5, 1, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_1_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_2(interfacing_swarms in generate_interfacing_swarms(5, 5, 2, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_2_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_3(interfacing_swarms in generate_interfacing_swarms(5, 5, 3, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_3_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(100))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_4(interfacing_swarms in generate_interfacing_swarms(5, 5, 4, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_4_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(50))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_5(interfacing_swarms in generate_interfacing_swarms(5, 5, 5, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_5_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(50))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_6(interfacing_swarms in generate_interfacing_swarms(5, 5, 6, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_6_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_7(interfacing_swarms in generate_interfacing_swarms(5, 5, 7, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_7_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_8(interfacing_swarms in generate_interfacing_swarms(5, 5, 8, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_8_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_9(interfacing_swarms in generate_interfacing_swarms(5, 5, 9, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_9_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_10(interfacing_swarms in generate_interfacing_swarms(5, 5, 10, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_10_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_1(interfacing_swarms in generate_interfacing_swarms(10, 10, 1, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_1_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_2(interfacing_swarms in generate_interfacing_swarms(10, 10, 2, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_2_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(100))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_3(interfacing_swarms in generate_interfacing_swarms(10, 10, 3, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_3_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(50))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_4(interfacing_swarms in generate_interfacing_swarms(10, 10, 4, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_4_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_5(interfacing_swarms in generate_interfacing_swarms(10, 10, 5, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_5_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_6(interfacing_swarms in generate_interfacing_swarms(10, 10, 6, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_6_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_7(interfacing_swarms in generate_interfacing_swarms(10, 10, 7, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_7_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_8(interfacing_swarms in generate_interfacing_swarms(10, 10, 8, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_8_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_9(interfacing_swarms in generate_interfacing_swarms(10, 10, 9, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_9_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_10(interfacing_swarms in generate_interfacing_swarms(10, 10, 10, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_10_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+
 fn prepare_input(file_name: String) -> (usize, BenchMarkInput) {
     // Create a path to the desired file
     let path = Path::new(&file_name);
