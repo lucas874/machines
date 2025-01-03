@@ -221,7 +221,8 @@ pub fn compose_protocols(protos: String) -> String {
 }
 
 fn derr<T: serde::Serialize>(errors: Vec<String>) -> String {
-    serde_json::to_string(&DataResult::<T>::ERROR { errors }).unwrap()
+    let result: DataResult<String> = DataResult::ERROR { errors };
+    serde_json::to_string(&result).unwrap()
 }
 
 fn dok<T: serde::Serialize>(data: T) -> String {
