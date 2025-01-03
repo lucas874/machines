@@ -74,8 +74,9 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
     inputs
 }
 
-/* fn bench_composition_refinement_pattern_1(c: &mut Criterion) {
+fn bench_composition_refinement_pattern_1(c: &mut Criterion) {
     let mut group = c.benchmark_group("Composition refinement pattern 1");
+    group.sample_size(50);
     let mut interfacing_swarms_refinement_1 =
         prepare_files_in_directory(String::from("./benches/benchmark_data_selected/refinement_pattern_1/"));
     interfacing_swarms_refinement_1.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
@@ -98,10 +99,11 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
         |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone())));
     }
     group.finish();
-} */
+}
 
-fn bench_composition_refinement_pattern_2(c: &mut Criterion) {
+/* fn bench_composition_refinement_pattern_2(c: &mut Criterion) {
     let mut group = c.benchmark_group("Composition refinement pattern 2");
+    group.sample_size(50);
     let mut interfacing_swarms_refinement_2 =
         prepare_files_in_directory(String::from("./benches/benchmark_data_selected/refinement_pattern_2/"));
     interfacing_swarms_refinement_2.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
@@ -124,7 +126,7 @@ fn bench_composition_refinement_pattern_2(c: &mut Criterion) {
         |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone())));
     }
     group.finish();
-}
+} */
 
 /* fn bench_composition_random(c: &mut Criterion) {
     let mut group = c.benchmark_group("Composition random");
@@ -152,5 +154,5 @@ fn bench_composition_refinement_pattern_2(c: &mut Criterion) {
     group.finish();
 } */
 
-criterion_group!(benches, bench_composition_refinement_pattern_2);
+criterion_group!(benches, bench_composition_refinement_pattern_1);
 criterion_main!(benches);
