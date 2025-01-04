@@ -30,9 +30,9 @@ export type ResultData<Data> = { type: 'OK'; data: Data } | { type: 'ERROR'; err
 export type CompositionComponent = {protocol: SwarmProtocolType, interface: string | null }
 export type InterfacingSwarms = CompositionComponent[]
 export type Granularity =
-  | "Fine"
-  | "Medium"
-  | "Coarse"
+  | 'Fine'
+  | 'Medium'
+  | 'Coarse'
 
 export function checkSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): Result {
   const p = JSON.stringify(proto)
