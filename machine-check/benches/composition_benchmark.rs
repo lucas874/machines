@@ -74,7 +74,7 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
     inputs
 }
 
-fn bench_composition_refinement_pattern_1(c: &mut Criterion) {
+/* fn bench_composition_refinement_pattern_1(c: &mut Criterion) {
     let mut group = c.benchmark_group("Composition refinement pattern 1");
     group.sample_size(50);
     let mut interfacing_swarms_refinement_1 =
@@ -99,7 +99,7 @@ fn bench_composition_refinement_pattern_1(c: &mut Criterion) {
         |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone())));
     }
     group.finish();
-}
+} */
 
 /* fn bench_composition_refinement_pattern_2(c: &mut Criterion) {
     let mut group = c.benchmark_group("Composition refinement pattern 2");
@@ -154,5 +154,32 @@ fn bench_composition_refinement_pattern_1(c: &mut Criterion) {
     group.finish();
 } */
 
-criterion_group!(benches, bench_composition_refinement_pattern_1);
+fn bench_composition_pattern_3(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Composition pattern 3");
+    group.sample_size(50);
+    let mut interfacing_swarms_random =
+        prepare_files_in_directory(String::from("./benches/pattern_3/1_non_interfacing_1/"));
+    interfacing_swarms_random.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+
+    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let coarse_granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
+    let medium_granularity = serde_json::to_string(&Granularity::Medium).unwrap();
+    let fine_granularity = serde_json::to_string(&Granularity::Fine).unwrap();
+    for (size, interfacing_swarms) in interfacing_swarms_random.iter() {
+        group.bench_with_input(BenchmarkId::new("coarse", size), interfacing_swarms,
+        |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), coarse_granularity.clone())));
+
+        group.bench_with_input(BenchmarkId::new("medium", size), interfacing_swarms,
+        |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), medium_granularity.clone())));
+
+        group.bench_with_input(BenchmarkId::new("fine", size), interfacing_swarms,
+        |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), fine_granularity.clone())));
+
+        group.bench_with_input(BenchmarkId::new("exact", size), interfacing_swarms,
+        |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone())));
+    }
+    group.finish();
+}
+
+criterion_group!(benches, bench_composition_pattern_3);
 criterion_main!(benches);

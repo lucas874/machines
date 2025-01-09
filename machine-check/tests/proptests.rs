@@ -524,6 +524,91 @@ fn expand_graph(
     (graph, initial)
 }
 
+fn make_label_pattern_3(role_name: String, cmd_id: usize) -> SwarmLabel {
+    SwarmLabel {
+        cmd: Command::new(&format!("c_{}_{}", role_name, cmd_id)),
+        log_type: vec![EventType::new(&format!("e_{}_{}", role_name, cmd_id))],
+        role: Role::new(&format!("{}", role_name))
+    }
+}
+
+fn pattern_3_proto(proto_id: usize, n_commands: usize) -> SwarmProtocol {
+    if n_commands == 0 {
+        unimplemented!()
+    }
+    let mut graph = Graph::new();
+    let mut nodes = vec![];
+    nodes.push(graph.add_node(State::new("0")));
+    let n_commands = if proto_id == 0 {
+        n_commands + 1
+    } else {
+        n_commands
+    };
+    for i in 0..n_commands {
+        nodes.push(graph.add_node(State::new(&(i+1).to_string())));
+        let label = make_label_pattern_3(format!("R{}", proto_id), i);
+        graph.add_edge(nodes[i], nodes[i+1], label);
+    }
+    nodes.push(graph.add_node(State::new(&(nodes.len()).to_string())));
+    let label = make_label_pattern_3(format!("IR{}", if proto_id == 0 {0} else {proto_id-1}), 0);
+    graph.add_edge(nodes[nodes.len() - 2], nodes[nodes.len() - 1], label);
+
+    if proto_id != 0 {
+        nodes.push(graph.add_node(State::new(&(nodes.len()).to_string())));
+        let label = make_label_pattern_3(format!("IR{}", proto_id), 0);
+        graph.add_edge(nodes[nodes.len() - 2], nodes[nodes.len() - 1], label);
+    }
+
+    to_swarm_json(graph, nodes[0])
+}
+
+fn componenet_pattern_3(proto_id: usize, n_commands: usize) -> CompositionComponent<Role> {
+    let protocol = pattern_3_proto(proto_id, n_commands);
+    let interface = if proto_id == 0 {
+        None
+    } else {
+        Some(Role::new(&format!("IR{}", proto_id-1)))
+    };
+
+    CompositionComponent {protocol, interface}
+}
+
+fn pattern_3(n_protos: usize, n_commands: usize) -> InterfacingSwarms<Role> {
+    let mut protos = vec![];
+    for i in 0..n_protos {
+        protos.push(componenet_pattern_3(i, n_commands));
+    }
+
+    InterfacingSwarms(protos)
+    /* fn pattern_3_proto_0() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r0_0", "logType": ["e_r0_0"], "role": "R0" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_r0_1", "logType": ["e_r0_1"], "role": "R0" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_0", "logType": ["e_ir_0"], "role": "IR0" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+
+    fn pattern_3_proto_1() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r1_0", "logType": ["e_r1_0"], "role": "R1" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_0", "logType": ["e_ir_0"], "role": "IR0" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_1", "logType": ["e_ir_1"], "role": "IR1" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    } */
+}
+
 /* // true if subs1 is a subset of subs2
 fn is_sub_subscription(subs1: Subscriptions, subs2: Subscriptions) -> bool {
     if !subs1
@@ -1083,7 +1168,7 @@ fn wrap_and_write(interfacing_swarms: InterfacingSwarms<Role>, parent_path: Stri
     let composition: Option<SwarmProtocol> = match serde_json::from_str(&compose_protocols(interfacing_swarms_string.clone())).unwrap() {
         DataResult::OK{data: composition} => {
             Some(composition) },
-        DataResult::ERROR{ .. } => None,
+        DataResult::ERROR{ errors } => {println!("errors: {:?}", errors); None},
     };
     let composition = composition.unwrap();
     let state_space_size = composition.transitions.iter().flat_map(|label| [label.source.clone(), label.target.clone()]).collect::<BTreeSet<State>>().len();
@@ -2032,5 +2117,18 @@ fn print_sub_sizes_refinement_2() {
             }
             i = i + 1;
         }
+    }
+}
+
+#[test]
+#[ignore]
+fn write_bench_file_pattern_3() {
+    let parent_path = "benches/pattern_3".to_string();
+    let dir_name = format!("1_non_interfacing_IR0_first");
+    create_directory(&parent_path, &dir_name);
+    for i in 1..33 {
+        let n_protos = i as usize;
+        let interfacing_swarms = pattern_3(n_protos, 1);
+        wrap_and_write(interfacing_swarms, parent_path.clone(), dir_name.clone());
     }
 }
