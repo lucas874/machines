@@ -136,7 +136,6 @@ pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptio
         return proto_info_to_error_report(combined_proto_info);
     }
 
-    // TODO: remove subscription field from proto info
     // if we reach this point the protocols can interface and are all confusion free
     // we construct a ProtoInfo with the composition as the only protocol and all the
     // information about branches etc. from combined_proto_info
@@ -506,11 +505,6 @@ fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, su
 }
 
 fn overapprox_wwf_sub(proto_info: &mut ProtoInfo, subscription: &Subscriptions, granularity: Granularity) -> Subscriptions {
-    /* match granularity {
-        Granularity::Fine => finer_overapprox_wwf_sub(proto_info, false),
-        Granularity::Medium => finer_overapprox_wwf_sub(proto_info, true),
-        Granularity::Coarse => coarse_overapprox_wwf_sub(proto_info)
-    } */
     match granularity {
         Granularity::Fine => finer_overapprox_wwf_sub(proto_info, subscription, false),
         Granularity::Medium => finer_overapprox_wwf_sub(proto_info, subscription, true),
@@ -537,7 +531,7 @@ fn coarse_overapprox_wwf_sub(proto_info: &ProtoInfo, subscription: &Subscription
             proto_info
                 .joining_events
                 .iter()
-                .flat_map(|e| get_pre_joins(e)))//proto_info.immediately_pre.get(e).unwrap_or(&default).clone()))
+                .flat_map(|e| get_pre_joins(e)))
         .collect();
 
     let sub: BTreeMap<Role, BTreeSet<EventType>> = proto_info.role_event_map
@@ -627,13 +621,6 @@ fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mu
                 }
             }
         }
-        /* for joining_event in &proto_info.joining_events {
-            let interested_roles = if with_all_interfacing { subscription.keys().cloned().collect() } else { roles_on_path(joining_event.clone(), proto_info, &subscription) };
-            let join_and_prejoin: BTreeSet<_> = [joining_event.clone()].into_iter().chain(get_pre_joins(&joining_event).into_iter()).collect();
-            for role in interested_roles {
-                is_stable = add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
-            }
-        } */
 
         // determinacy: branches
         for branching_events in &proto_info.branching_events {
@@ -1114,7 +1101,6 @@ fn explicit_composition_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
     let (composed, composed_initial) = explicit_composition(&proto_info);
     let succeeding_events = after_not_concurrent(&composed, composed_initial, &proto_info.concurrent_events);
     ProtoInfo {
-        //protocols: vec![((composed, Some(composed_initial), vec![]), BTreeSet::new())],
         protocols: vec![ProtoStruct::new(composed, Some(composed_initial), vec![], BTreeSet::new())],
         succeeding_events,
         ..proto_info
@@ -1127,11 +1113,9 @@ fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
         return (Graph::new(), NodeId::end());
     }
 
-    //let ((g, i, _), _) = proto_info.protocols[0].clone();
     let (g, i, _) = proto_info.protocols[0].get_triple();
     let folder =
         |(acc_g, acc_i): (Graph, NodeId),
-         //((g, i, _), interface): ((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)|
          p: ProtoStruct|
          -> (Graph, NodeId) {
             crate::composition::composition_machine::compose(acc_g, acc_i, p.graph, p.initial.unwrap(), p.interface)

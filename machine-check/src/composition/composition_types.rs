@@ -59,7 +59,7 @@ impl ProtoStruct {
 
 #[derive(Debug, Clone)]
 pub struct ProtoInfo {
-    pub protocols: Vec<ProtoStruct>,//Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>, // maybe weird to have an interface as if it was related to one protocol. but convenient. "a graph interfaces with rest on if"
+    pub protocols: Vec<ProtoStruct>,// maybe weird to have an interface as if it was related to one protocol. but convenient. "a graph interfaces with rest on if"
     pub role_event_map: RoleEventMap,
     pub concurrent_events: BTreeSet<UnordEventPair>, // consider to make a more specific type. unordered pair.
     pub branching_events: Vec<BTreeSet<EventType>>,
@@ -67,10 +67,10 @@ pub struct ProtoInfo {
     pub immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
     pub succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
 }
-// TODO: remove subscriptions field
+
 impl ProtoInfo {
     pub fn new(
-        protocols: Vec<ProtoStruct>,//Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>,
+        protocols: Vec<ProtoStruct>,
         role_event_map: RoleEventMap,
         concurrent_events: BTreeSet<UnordEventPair>,
         branching_events: Vec<BTreeSet<EventType>>,
@@ -90,7 +90,7 @@ impl ProtoInfo {
     }
 
     pub fn new_only_proto(
-        protocols: Vec<ProtoStruct>//Vec<((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)>
+        protocols: Vec<ProtoStruct>
     ) -> Self {
         Self {
             protocols,
@@ -103,7 +103,7 @@ impl ProtoInfo {
         }
     }
 
-    pub fn get_ith_proto(&self, i: usize) -> Option<ProtoStruct>{//Option<(Graph, Option<NodeId>, Vec<Error>)> { // Option<ProtoStruct>{//
+    pub fn get_ith_proto(&self, i: usize) -> Option<ProtoStruct>{
         if i >= self.protocols.len() {
             None
         } else {

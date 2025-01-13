@@ -1,6 +1,5 @@
 import { check_swarm, check_projection, check_wwf_swarm, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, check_composed_projection, revised_projection, project_combine, compose_protocols, project_combine_all } from '../pkg/machine_check.js'
 
-//, check_composed_projection, get_wwf_sub, compose_subs, revised_projection, project_combine, project_combine_all, compose_protocols } from '../pkg/machine_check.js'
 export type Protocol<Label> = {
   initial: string
   transitions: { source: string; target: string; label: Label }[]
@@ -21,10 +20,6 @@ export type MachineType = Protocol<MachineLabel>
 export type Subscriptions = Record<string, string[]>
 
 export type Result = { type: 'OK' } | { type: 'ERROR'; errors: string[] }
-
-//export type ResultData = { type: 'OK'; data: string } | { type: 'ERROR'; errors: string[] }
-//export type CompositionInput = { protocol: SwarmProtocolType, subscription: Subscriptions, interface: string | null }
-//export type CompositionInputVec = CompositionInput[]
 
 export type ResultData<Data> = { type: 'OK'; data: Data } | { type: 'ERROR'; errors: string[] }
 export type CompositionComponent = {protocol: SwarmProtocolType, interface: string | null }
