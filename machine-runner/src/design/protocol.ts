@@ -235,7 +235,7 @@ namespace ImplMachine {
 
     const createJSONForAnalysis: Self['createJSONForAnalysis'] = (initial) =>
       MachineAnalysisResource.fromMachineInternals(protocol, initial)
-
+    console.log("LSLSlSLASDJLASJDLA")
     return {
       swarmName,
       machineName,

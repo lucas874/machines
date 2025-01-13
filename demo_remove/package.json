@@ -1,0 +1,20 @@
+{
+  "name": "demo_remove",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start-robot": "tsc && node dist/robot.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "@actyx/machine-runner": "file:../machine-runner",
+    "@actyx/sdk": "file:../machine-runner/node_modules/@actyx"
+  }
+}
