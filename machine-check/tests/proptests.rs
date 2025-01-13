@@ -549,15 +549,22 @@ fn pattern_3_proto(proto_id: usize, n_commands: usize) -> SwarmProtocol {
         let label = make_label_pattern_3(format!("R{}", proto_id), i);
         graph.add_edge(nodes[i], nodes[i+1], label);
     }
-    nodes.push(graph.add_node(State::new(&(nodes.len()).to_string())));
-    let label = make_label_pattern_3(format!("IR{}", if proto_id == 0 {0} else {proto_id-1}), 0);
-    graph.add_edge(nodes[nodes.len() - 2], nodes[nodes.len() - 1], label);
 
     if proto_id != 0 {
         nodes.push(graph.add_node(State::new(&(nodes.len()).to_string())));
         let label = make_label_pattern_3(format!("IR{}", proto_id), 0);
         graph.add_edge(nodes[nodes.len() - 2], nodes[nodes.len() - 1], label);
     }
+    // when these come after the if statement proto_id != 0 we have the ir0 last pattern. if the if statement is after: ir0 first
+    nodes.push(graph.add_node(State::new(&(nodes.len()).to_string())));
+    let label = make_label_pattern_3(format!("IR{}", if proto_id == 0 {0} else {proto_id-1}), 0);
+    graph.add_edge(nodes[nodes.len() - 2], nodes[nodes.len() - 1], label);
+
+    /* if proto_id != 0 {
+        nodes.push(graph.add_node(State::new(&(nodes.len()).to_string())));
+        let label = make_label_pattern_3(format!("IR{}", proto_id), 0);
+        graph.add_edge(nodes[nodes.len() - 2], nodes[nodes.len() - 1], label);
+    } */
 
     to_swarm_json(graph, nodes[0])
 }
@@ -580,33 +587,6 @@ fn pattern_3(n_protos: usize, n_commands: usize) -> InterfacingSwarms<Role> {
     }
 
     InterfacingSwarms(protos)
-    /* fn pattern_3_proto_0() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_r0_0", "logType": ["e_r0_0"], "role": "R0" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_r0_1", "logType": ["e_r0_1"], "role": "R0" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_0", "logType": ["e_ir_0"], "role": "IR0" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
-    fn pattern_3_proto_1() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_r1_0", "logType": ["e_r1_0"], "role": "R1" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_0", "logType": ["e_ir_0"], "role": "IR0" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_1", "logType": ["e_ir_1"], "role": "IR1" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    } */
 }
 
 /* // true if subs1 is a subset of subs2
@@ -2124,7 +2104,7 @@ fn print_sub_sizes_refinement_2() {
 #[ignore]
 fn write_bench_file_pattern_3() {
     let parent_path = "benches/pattern_3".to_string();
-    let dir_name = format!("1_non_interfacing_IR0_first");
+    let dir_name = format!("1_non_interfacing_IR0_last");
     create_directory(&parent_path, &dir_name);
     for i in 1..33 {
         let n_protos = i as usize;

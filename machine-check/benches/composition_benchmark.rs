@@ -154,32 +154,65 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
     group.finish();
 } */
 
-fn bench_composition_pattern_3(c: &mut Criterion) {
+/* fn bench_composition_pattern_3(c: &mut Criterion) {
     let mut group = c.benchmark_group("Composition pattern 3");
     group.sample_size(50);
     let mut interfacing_swarms_random =
-        prepare_files_in_directory(String::from("./benches/pattern_3/1_non_interfacing_1/"));
+        prepare_files_in_directory(String::from("./benches/pattern_3/1_non_interfacing_IR0_first/"));
     interfacing_swarms_random.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+    for (size, _) in interfacing_swarms_random.iter() {
+        println!("{}", size);
+    }
 
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
     let coarse_granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
     let medium_granularity = serde_json::to_string(&Granularity::Medium).unwrap();
     let fine_granularity = serde_json::to_string(&Granularity::Fine).unwrap();
-    for (size, interfacing_swarms) in interfacing_swarms_random.iter() {
-        group.bench_with_input(BenchmarkId::new("coarse", size), interfacing_swarms,
+    for (i, (_, interfacing_swarms)) in interfacing_swarms_random.iter().enumerate() {
+        group.bench_with_input(BenchmarkId::new("coarse", i + 1), interfacing_swarms,
         |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), coarse_granularity.clone())));
 
-        group.bench_with_input(BenchmarkId::new("medium", size), interfacing_swarms,
+        group.bench_with_input(BenchmarkId::new("medium", i + 1), interfacing_swarms,
         |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), medium_granularity.clone())));
 
-        group.bench_with_input(BenchmarkId::new("fine", size), interfacing_swarms,
+        group.bench_with_input(BenchmarkId::new("fine", i + 1), interfacing_swarms,
         |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), fine_granularity.clone())));
 
-        group.bench_with_input(BenchmarkId::new("exact", size), interfacing_swarms,
+        group.bench_with_input(BenchmarkId::new("exact", i + 1), interfacing_swarms,
+        |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone())));
+    }
+    group.finish();
+} */
+
+fn bench_composition_pattern_3_ir0_last(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Composition pattern 3 ir0 last");
+    group.sample_size(50);
+    let mut interfacing_swarms_random =
+        prepare_files_in_directory(String::from("./benches/pattern_3/1_non_interfacing_IR0_last/"));
+    interfacing_swarms_random.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+    for (size, _) in interfacing_swarms_random.iter() {
+        println!("{}", size);
+    }
+
+    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let coarse_granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
+    let medium_granularity = serde_json::to_string(&Granularity::Medium).unwrap();
+    let fine_granularity = serde_json::to_string(&Granularity::Fine).unwrap();
+    for (i, (_, interfacing_swarms)) in interfacing_swarms_random.iter().enumerate() {
+        group.bench_with_input(BenchmarkId::new("coarse", i + 1), interfacing_swarms,
+        |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), coarse_granularity.clone())));
+
+        group.bench_with_input(BenchmarkId::new("medium", i + 1), interfacing_swarms,
+        |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), medium_granularity.clone())));
+
+        group.bench_with_input(BenchmarkId::new("fine", i + 1), interfacing_swarms,
+        |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), fine_granularity.clone())));
+
+        group.bench_with_input(BenchmarkId::new("exact", i + 1), interfacing_swarms,
         |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone())));
     }
     group.finish();
 }
 
-criterion_group!(benches, bench_composition_pattern_3);
+criterion_group!(benches, bench_composition_pattern_3_ir0_last);
 criterion_main!(benches);

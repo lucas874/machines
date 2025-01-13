@@ -1572,6 +1572,31 @@ mod tests {
         .unwrap()
     }
 
+    fn pattern_3_ir0_last_0() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{"initial":"0","transitions":[{"label":{"cmd":"c_R0_0","logType":["e_R0_0"],"role":"R0"},"source":"0","target":"1"},{"label":{"cmd":"c_R0_1","logType":["e_R0_1"],"role":"R0"},"source":"1","target":"2"},{"label":{"cmd":"c_IR0_0","logType":["e_IR0_0"],"role":"IR0"},"source":"2","target":"3"}]}
+            "#,
+        ).unwrap()
+    }
+    fn pattern_3_ir0_last_1() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{"initial":"0","transitions":[{"label":{"cmd":"c_R1_0","logType":["e_R1_0"],"role":"R1"},"source":"0","target":"1"},{"label":{"cmd":"c_IR1_0","logType":["e_IR1_0"],"role":"IR1"},"source":"1","target":"2"},{"label":{"cmd":"c_IR0_0","logType":["e_IR0_0"],"role":"IR0"},"source":"2","target":"3"}]}
+            "#,
+        ).unwrap()
+    }
+    fn pattern_3_ir0_last_2() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{"initial":"0","transitions":[{"label":{"cmd":"c_R2_0","logType":["e_R2_0"],"role":"R2"},"source":"0","target":"1"},{"label":{"cmd":"c_IR2_0","logType":["e_IR2_0"],"role":"IR2"},"source":"1","target":"2"},{"label":{"cmd":"c_IR1_0","logType":["e_IR1_0"],"role":"IR1"},"source":"2","target":"3"}]}
+            "#,
+        ).unwrap()
+    }
+    fn pattern_3_ir0_last_3() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{"initial":"0","transitions":[{"label":{"cmd":"c_R3_0","logType":["e_R3_0"],"role":"R3"},"source":"0","target":"1"},{"label":{"cmd":"c_IR3_0","logType":["e_IR3_0"],"role":"IR3"},"source":"1","target":"2"},{"label":{"cmd":"c_IR2_0","logType":["e_IR2_0"],"role":"IR2"},"source":"2","target":"3"}]}
+            "#,
+        ).unwrap()
+    }
+
     fn get_interfacing_swarms_1() -> InterfacingSwarms<Role> {
         InterfacingSwarms(
             vec![
@@ -1629,7 +1654,7 @@ mod tests {
         InterfacingSwarms(
             vec![
                 CompositionComponent {
-                    protocol: pattern_3_proto_1(),
+                    protocol: get_proto1(),
                     interface: None,
                 },
                 CompositionComponent {
@@ -1663,7 +1688,7 @@ mod tests {
         )
     }
 
-    fn get_interfacing_swarms_6() -> InterfacingSwarms<Role> {
+    fn get_interfacing_swarms_ir0_first() -> InterfacingSwarms<Role> {
         InterfacingSwarms(
             vec![
                 CompositionComponent {
@@ -1706,6 +1731,29 @@ mod tests {
                     protocol: pattern_3_proto_9(),
                     interface: Some(Role::new("IR8")),
                 },
+            ]
+        )
+    }
+
+    fn get_interfacing_swarms_ir0_last() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: pattern_3_ir0_last_0(),
+                    interface: None,
+                },
+                CompositionComponent {
+                    protocol: pattern_3_ir0_last_1(),
+                    interface: Some(Role::new("IR0")),
+                },
+                CompositionComponent {
+                    protocol: pattern_3_ir0_last_2(),
+                    interface: Some(Role::new("IR1")),
+                },
+                CompositionComponent {
+                    protocol: pattern_3_ir0_last_3(),
+                    interface: Some(Role::new("IR2")),
+                }
             ]
         )
     }
@@ -2277,7 +2325,7 @@ mod tests {
     fn test_pattern_3() {
         for i in 1..10 {
             let index = i as usize;
-            let composition = compose_protocols(InterfacingSwarms(get_interfacing_swarms_6().0[..index].to_vec()));
+            let composition = compose_protocols(InterfacingSwarms(get_interfacing_swarms_ir0_first().0[..index].to_vec()));
             assert!(composition.is_ok());
 
             let (g, _) = composition.unwrap();
@@ -2285,6 +2333,22 @@ mod tests {
             let edge_count = g.edge_count();
             //let swarm = to_swarm_json(g, i);
             println!("num states: {}, num edges: {}", node_count, edge_count);
+        }
+
+    }
+    #[test]
+    fn test_pattern_3_ir0_last() {
+        for i in 1..5 {
+            let index = i as usize;
+            let composition = compose_protocols(InterfacingSwarms(get_interfacing_swarms_ir0_last().0[..index].to_vec()));
+            assert!(composition.is_ok());
+
+            let (g, i) = composition.unwrap();
+            //let node_count = g.node_count();
+            //let edge_count = g.edge_count();
+            let swarm = to_swarm_json(g, i);
+            println!("{}\n$$$$\n", serde_json::to_string_pretty(&swarm).unwrap());
+            //println!("num states: {}, num edges: {}", node_count, edge_count);
         }
 
     }
