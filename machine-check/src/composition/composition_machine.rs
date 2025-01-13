@@ -144,7 +144,7 @@ pub fn project_combine(
 }
 
 pub fn project_combine_all(
-    swarms: &Vec<ProtoStruct>,//&Vec<(super::Graph, NodeId, BTreeSet<EventType>)>,
+    swarms: &Vec<ProtoStruct>,
     subs: &Subscriptions,
 ) -> Vec<(OptionGraph, Option<NodeId>)> {
     subs.keys()
