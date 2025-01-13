@@ -136,7 +136,6 @@ pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptio
         return proto_info_to_error_report(combined_proto_info);
     }
 
-    // TODO: remove subscription field from proto info
     // if we reach this point the protocols can interface and are all confusion free
     // we construct a ProtoInfo with the composition as the only protocol and all the
     // information about branches etc. from combined_proto_info
@@ -506,15 +505,10 @@ fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, su
 }
 
 fn overapprox_wwf_sub(proto_info: &mut ProtoInfo, subscription: &Subscriptions, granularity: Granularity) -> Subscriptions {
-    /* match granularity {
-        Granularity::Fine => finer_overapprox_wwf_sub(proto_info, false),
-        Granularity::Medium => finer_overapprox_wwf_sub(proto_info, true),
-        Granularity::Coarse => coarse_overapprox_wwf_sub(proto_info)
-    } */
     match granularity {
-        Granularity::Fine => { println!("FINE"); finer_overapprox_wwf_sub(proto_info, subscription, false) },
-        Granularity::Medium => { println!("MEDIUM"); finer_overapprox_wwf_sub(proto_info, subscription, true)},
-        Granularity::Coarse => { println!("COARSE");coarse_overapprox_wwf_sub(proto_info, subscription)}
+        Granularity::Fine => finer_overapprox_wwf_sub(proto_info, subscription, false),
+        Granularity::Medium => finer_overapprox_wwf_sub(proto_info, subscription, true),
+        Granularity::Coarse => coarse_overapprox_wwf_sub(proto_info, subscription)
     }
 }
 
@@ -537,7 +531,7 @@ fn coarse_overapprox_wwf_sub(proto_info: &ProtoInfo, subscription: &Subscription
             proto_info
                 .joining_events
                 .iter()
-                .flat_map(|e| get_pre_joins(e)))//proto_info.immediately_pre.get(e).unwrap_or(&default).clone()))
+                .flat_map(|e| get_pre_joins(e)))
         .collect();
 
     let sub: BTreeMap<Role, BTreeSet<EventType>> = proto_info.role_event_map
@@ -599,14 +593,32 @@ fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mu
 
     };
 
+    if with_all_interfacing {
+        let interested_roles: Vec<Role> = subscription.keys().cloned().collect();
+        for joining_event in &proto_info.joining_events {
+            let join_and_prejoin: BTreeSet<_> = [joining_event.clone()].into_iter().chain(get_pre_joins(&joining_event).into_iter()).collect();
+            for role in &interested_roles {
+                add_to_sub(role.clone(), join_and_prejoin.clone(), subscription);
+            }
+
+        }
+    }
+
     while !is_stable {
         is_stable = true;
         // determinacy: joins
-        for joining_event in &proto_info.joining_events {
-            let interested_roles = if with_all_interfacing { subscription.keys().cloned().collect() } else { roles_on_path(joining_event.clone(), proto_info, &subscription) };
-            let join_and_prejoin: BTreeSet<_> = [joining_event.clone()].into_iter().chain(get_pre_joins(&joining_event).into_iter()).collect();
-            for role in interested_roles {
-                is_stable = add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
+        if !with_all_interfacing {
+            for joining_event in &proto_info.joining_events {
+                let interested_roles = roles_on_path(joining_event.clone(), proto_info, &subscription);
+                let pre_join_events = get_pre_joins(&joining_event);
+                let join_and_prejoin = if !pre_join_events.is_empty() {
+                    [joining_event.clone()].into_iter().chain(pre_join_events.into_iter()).collect()
+                } else {
+                    BTreeSet::new()
+                };
+                for role in interested_roles {
+                    is_stable = add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
+                }
             }
         }
 
@@ -1089,7 +1101,6 @@ fn explicit_composition_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
     let (composed, composed_initial) = explicit_composition(&proto_info);
     let succeeding_events = after_not_concurrent(&composed, composed_initial, &proto_info.concurrent_events);
     ProtoInfo {
-        //protocols: vec![((composed, Some(composed_initial), vec![]), BTreeSet::new())],
         protocols: vec![ProtoStruct::new(composed, Some(composed_initial), vec![], BTreeSet::new())],
         succeeding_events,
         ..proto_info
@@ -1102,11 +1113,9 @@ fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
         return (Graph::new(), NodeId::end());
     }
 
-    //let ((g, i, _), _) = proto_info.protocols[0].clone();
     let (g, i, _) = proto_info.protocols[0].get_triple();
     let folder =
         |(acc_g, acc_i): (Graph, NodeId),
-         //((g, i, _), interface): ((Graph, Option<NodeId>, Vec<Error>), BTreeSet<EventType>)|
          p: ProtoStruct|
          -> (Graph, NodeId) {
             crate::composition::composition_machine::compose(acc_g, acc_i, p.graph, p.initial.unwrap(), p.interface)
@@ -1234,6 +1243,19 @@ mod tests {
                     { "source": "1", "target": "2", "label": { "cmd": "observe", "logType": ["report2"], "role": "QCR" } },
                     { "source": "2", "target": "3", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
                     { "source": "3", "target": "4", "label": { "cmd": "assess", "logType": ["report3"], "role": "QCR" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+    fn get_proto32() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "observe", "logType": ["observing"], "role": "QCR" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "test", "logType": ["report"], "role": "QCR" } }
                 ]
             }"#,
         )
@@ -1394,6 +1416,171 @@ mod tests {
         .unwrap()
     }
 
+    fn pattern_3_proto_0() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r0_0", "logType": ["e_r0_0"], "role": "R0" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_r0_1", "logType": ["e_r0_1"], "role": "R0" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_0", "logType": ["e_ir_0"], "role": "IR0" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+
+    fn pattern_3_proto_1() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r1_0", "logType": ["e_r1_0"], "role": "R1" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_0", "logType": ["e_ir_0"], "role": "IR0" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_1", "logType": ["e_ir_1"], "role": "IR1" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+
+    fn pattern_3_proto_2() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r2_0", "logType": ["e_r2_0"], "role": "R2" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_1", "logType": ["e_ir_1"], "role": "IR1" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_2", "logType": ["e_ir_2"], "role": "IR2" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+
+    fn pattern_3_proto_3() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r3_0", "logType": ["e_r3_0"], "role": "R3" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_2", "logType": ["e_ir_2"], "role": "IR2" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_3", "logType": ["e_ir_3"], "role": "IR3" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+
+    fn pattern_3_proto_4() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r4_0", "logType": ["e_r4_0"], "role": "R4" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_3", "logType": ["e_ir_3"], "role": "IR3" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_4", "logType": ["e_ir_4"], "role": "IR4" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+
+    fn pattern_3_proto_5() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r5_0", "logType": ["e_r5_0"], "role": "R5" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_4", "logType": ["e_ir_4"], "role": "IR4" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_5", "logType": ["e_ir_5"], "role": "IR5" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+
+    fn pattern_3_proto_6() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r6_0", "logType": ["e_r6_0"], "role": "R6" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_5", "logType": ["e_ir_5"], "role": "IR5" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_6", "logType": ["e_ir_6"], "role": "IR6" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+
+    fn pattern_3_proto_7() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r7_0", "logType": ["e_r7_0"], "role": "R7" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_6", "logType": ["e_ir_6"], "role": "IR6" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_7", "logType": ["e_ir_7"], "role": "IR7" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+
+    fn pattern_3_proto_8() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r8_0", "logType": ["e_r8_0"], "role": "R8" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_7", "logType": ["e_ir_7"], "role": "IR7" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_8", "logType": ["e_ir_8"], "role": "IR8" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+
+    fn pattern_3_proto_9() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r9_0", "logType": ["e_r9_0"], "role": "R9" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_8", "logType": ["e_ir_8"], "role": "IR8" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_9", "logType": ["e_ir_9"], "role": "IR9" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+
+    fn pattern_3_ir0_last_0() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{"initial":"0","transitions":[{"label":{"cmd":"c_R0_0","logType":["e_R0_0"],"role":"R0"},"source":"0","target":"1"},{"label":{"cmd":"c_R0_1","logType":["e_R0_1"],"role":"R0"},"source":"1","target":"2"},{"label":{"cmd":"c_IR0_0","logType":["e_IR0_0"],"role":"IR0"},"source":"2","target":"3"}]}
+            "#,
+        ).unwrap()
+    }
+    fn pattern_3_ir0_last_1() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{"initial":"0","transitions":[{"label":{"cmd":"c_R1_0","logType":["e_R1_0"],"role":"R1"},"source":"0","target":"1"},{"label":{"cmd":"c_IR1_0","logType":["e_IR1_0"],"role":"IR1"},"source":"1","target":"2"},{"label":{"cmd":"c_IR0_0","logType":["e_IR0_0"],"role":"IR0"},"source":"2","target":"3"}]}
+            "#,
+        ).unwrap()
+    }
+    fn pattern_3_ir0_last_2() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{"initial":"0","transitions":[{"label":{"cmd":"c_R2_0","logType":["e_R2_0"],"role":"R2"},"source":"0","target":"1"},{"label":{"cmd":"c_IR2_0","logType":["e_IR2_0"],"role":"IR2"},"source":"1","target":"2"},{"label":{"cmd":"c_IR1_0","logType":["e_IR1_0"],"role":"IR1"},"source":"2","target":"3"}]}
+            "#,
+        ).unwrap()
+    }
+    fn pattern_3_ir0_last_3() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{"initial":"0","transitions":[{"label":{"cmd":"c_R3_0","logType":["e_R3_0"],"role":"R3"},"source":"0","target":"1"},{"label":{"cmd":"c_IR3_0","logType":["e_IR3_0"],"role":"IR3"},"source":"1","target":"2"},{"label":{"cmd":"c_IR2_0","logType":["e_IR2_0"],"role":"IR2"},"source":"2","target":"3"}]}
+            "#,
+        ).unwrap()
+    }
+
     fn get_interfacing_swarms_1() -> InterfacingSwarms<Role> {
         InterfacingSwarms(
             vec![
@@ -1462,6 +1649,95 @@ mod tests {
                     protocol: get_proto3(),
                     interface: Some(Role::new("F")),
                 },
+            ]
+        )
+    }
+
+    fn get_interfacing_swarms_5() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_proto1(),
+                    interface: None,
+                },
+                CompositionComponent {
+                    protocol: get_proto2(),
+                    interface: Some(Role::new("T")),
+                },
+                CompositionComponent {
+                    protocol: get_proto32(),
+                    interface: Some(Role::new("F")),
+                },
+            ]
+        )
+    }
+
+    fn get_interfacing_swarms_ir0_first() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: pattern_3_proto_0(),
+                    interface: None,
+                },
+                CompositionComponent {
+                    protocol: pattern_3_proto_1(),
+                    interface: Some(Role::new("IR0")),
+                },
+                CompositionComponent {
+                    protocol: pattern_3_proto_2(),
+                    interface: Some(Role::new("IR1")),
+                },
+                CompositionComponent {
+                    protocol: pattern_3_proto_3(),
+                    interface: Some(Role::new("IR2")),
+                },
+                CompositionComponent {
+                    protocol: pattern_3_proto_4(),
+                    interface: Some(Role::new("IR3")),
+                },
+                CompositionComponent {
+                    protocol: pattern_3_proto_5(),
+                    interface: Some(Role::new("IR4")),
+                },
+                CompositionComponent {
+                    protocol: pattern_3_proto_6(),
+                    interface: Some(Role::new("IR5")),
+                },
+                CompositionComponent {
+                    protocol: pattern_3_proto_7(),
+                    interface: Some(Role::new("IR6")),
+                },
+                CompositionComponent {
+                    protocol: pattern_3_proto_8(),
+                    interface: Some(Role::new("IR7")),
+                },
+                CompositionComponent {
+                    protocol: pattern_3_proto_9(),
+                    interface: Some(Role::new("IR8")),
+                },
+            ]
+        )
+    }
+
+    fn get_interfacing_swarms_ir0_last() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: pattern_3_ir0_last_0(),
+                    interface: None,
+                },
+                CompositionComponent {
+                    protocol: pattern_3_ir0_last_1(),
+                    interface: Some(Role::new("IR0")),
+                },
+                CompositionComponent {
+                    protocol: pattern_3_ir0_last_2(),
+                    interface: Some(Role::new("IR1")),
+                },
+                CompositionComponent {
+                    protocol: pattern_3_ir0_last_3(),
+                    interface: Some(Role::new("IR2")),
+                }
             ]
         )
     }
@@ -2006,5 +2282,58 @@ mod tests {
         assert!(result_composition.is_ok());
         let subs_composition = result_composition.unwrap();
         println!("subs approx: {}", serde_json::to_string_pretty(&subs_composition).unwrap());
+    }
+
+    #[test]
+    fn test_example_from_text() {
+        let composition = compose_protocols(get_interfacing_swarms_5());
+        assert!(composition.is_ok());
+
+        let (g, i) = composition.unwrap();
+        let swarm = to_swarm_json(g, i);
+        println!("proto:\n {}", serde_json::to_string_pretty(&swarm).unwrap());
+        let result_composition = exact_weak_well_formed_sub(get_interfacing_swarms_5(), &BTreeMap::new());
+        assert!(result_composition.is_ok());
+        let subs_composition = result_composition.unwrap();
+        println!("subs exact: {}", serde_json::to_string_pretty(&subs_composition).unwrap());
+        let result_composition = overapprox_weak_well_formed_sub(get_interfacing_swarms_5(), &BTreeMap::new(), Granularity::Coarse);
+        assert!(result_composition.is_ok());
+        let subs_composition = result_composition.unwrap();
+        println!("subs approx: {}", serde_json::to_string_pretty(&subs_composition).unwrap());
+
+        let result = check(get_interfacing_swarms_5(), &subs_composition);
+        println!("errors is empty: {}", result.is_empty());
+    }
+
+    #[test]
+    fn test_pattern_3() {
+        for i in 1..10 {
+            let index = i as usize;
+            let composition = compose_protocols(InterfacingSwarms(get_interfacing_swarms_ir0_first().0[..index].to_vec()));
+            assert!(composition.is_ok());
+
+            let (g, _) = composition.unwrap();
+            let node_count = g.node_count();
+            let edge_count = g.edge_count();
+            //let swarm = to_swarm_json(g, i);
+            println!("num states: {}, num edges: {}", node_count, edge_count);
+        }
+
+    }
+    #[test]
+    fn test_pattern_3_ir0_last() {
+        for i in 1..5 {
+            let index = i as usize;
+            let composition = compose_protocols(InterfacingSwarms(get_interfacing_swarms_ir0_last().0[..index].to_vec()));
+            assert!(composition.is_ok());
+
+            let (g, i) = composition.unwrap();
+            //let node_count = g.node_count();
+            //let edge_count = g.edge_count();
+            let swarm = to_swarm_json(g, i);
+            println!("{}\n$$$$\n", serde_json::to_string_pretty(&swarm).unwrap());
+            //println!("num states: {}, num edges: {}", node_count, edge_count);
+        }
+
     }
 }

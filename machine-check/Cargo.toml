@@ -23,6 +23,12 @@ pretty_assertions = "1.3.0"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 proptest = "1.5.0"
 rand = "0.8.5"
+criterion = "0.5.1"
+walkdir = "2.5.0"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["-Os"]
+
+[[bench]]
+name = "composition_benchmark"
+harness = false

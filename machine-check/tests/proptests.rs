@@ -10,14 +10,10 @@ use proptest::prelude::*;
 use rand::{distributions::Bernoulli, prelude::*};
 use serde::{Deserialize, Serialize};
 use std::{
-    cmp,
-    collections::{BTreeMap, BTreeSet},
-    iter::zip,
-    sync::Mutex,
-    path::Path,
-    fs::{File, create_dir},
-    io::prelude::*,
+    cmp, collections::{BTreeMap, BTreeSet}, fs::{create_dir, File}, io::prelude::*, iter::zip, path::Path, sync::Mutex
 };
+
+use walkdir::WalkDir;
 
 // reimplemented here because we need to Deserialize. To not change in types.rs
 #[derive(Serialize, Deserialize, Debug)]
@@ -528,6 +524,71 @@ fn expand_graph(
     (graph, initial)
 }
 
+fn make_label_pattern_3(role_name: String, cmd_id: usize) -> SwarmLabel {
+    SwarmLabel {
+        cmd: Command::new(&format!("c_{}_{}", role_name, cmd_id)),
+        log_type: vec![EventType::new(&format!("e_{}_{}", role_name, cmd_id))],
+        role: Role::new(&format!("{}", role_name))
+    }
+}
+
+fn pattern_3_proto(proto_id: usize, n_commands: usize) -> SwarmProtocol {
+    if n_commands == 0 {
+        unimplemented!()
+    }
+    let mut graph = Graph::new();
+    let mut nodes = vec![];
+    nodes.push(graph.add_node(State::new("0")));
+    let n_commands = if proto_id == 0 {
+        n_commands + 1
+    } else {
+        n_commands
+    };
+    for i in 0..n_commands {
+        nodes.push(graph.add_node(State::new(&(i+1).to_string())));
+        let label = make_label_pattern_3(format!("R{}", proto_id), i);
+        graph.add_edge(nodes[i], nodes[i+1], label);
+    }
+
+    if proto_id != 0 {
+        nodes.push(graph.add_node(State::new(&(nodes.len()).to_string())));
+        let label = make_label_pattern_3(format!("IR{}", proto_id), 0);
+        graph.add_edge(nodes[nodes.len() - 2], nodes[nodes.len() - 1], label);
+    }
+    // when these come after the if statement proto_id != 0 we have the ir0 last pattern. if the if statement is after: ir0 first
+    nodes.push(graph.add_node(State::new(&(nodes.len()).to_string())));
+    let label = make_label_pattern_3(format!("IR{}", if proto_id == 0 {0} else {proto_id-1}), 0);
+    graph.add_edge(nodes[nodes.len() - 2], nodes[nodes.len() - 1], label);
+
+    /* if proto_id != 0 {
+        nodes.push(graph.add_node(State::new(&(nodes.len()).to_string())));
+        let label = make_label_pattern_3(format!("IR{}", proto_id), 0);
+        graph.add_edge(nodes[nodes.len() - 2], nodes[nodes.len() - 1], label);
+    } */
+
+    to_swarm_json(graph, nodes[0])
+}
+
+fn componenet_pattern_3(proto_id: usize, n_commands: usize) -> CompositionComponent<Role> {
+    let protocol = pattern_3_proto(proto_id, n_commands);
+    let interface = if proto_id == 0 {
+        None
+    } else {
+        Some(Role::new(&format!("IR{}", proto_id-1)))
+    };
+
+    CompositionComponent {protocol, interface}
+}
+
+fn pattern_3(n_protos: usize, n_commands: usize) -> InterfacingSwarms<Role> {
+    let mut protos = vec![];
+    for i in 0..n_protos {
+        protos.push(componenet_pattern_3(i, n_commands));
+    }
+
+    InterfacingSwarms(protos)
+}
+
 /* // true if subs1 is a subset of subs2
 fn is_sub_subscription(subs1: Subscriptions, subs2: Subscriptions) -> bool {
     if !subs1
@@ -580,9 +641,9 @@ proptest! {
     fn test_exact_1(vec in generate_interfacing_swarms(5, 5, 5, false)) {
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
-        let subscription = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs)).unwrap() {
-            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        let subscription: Option<Subscriptions> = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs)).unwrap() {
+            DataResult::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
@@ -608,9 +669,9 @@ proptest! {
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
-        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
-            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        let subscription: Option<Subscriptions> = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
+            DataResult::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
@@ -632,9 +693,9 @@ proptest! {
     fn test_exact_2(vec in generate_interfacing_swarms_refinement(5, 5, 5)) {
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
-        let subscription = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs)).unwrap() {
-            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        let subscription: Option<Subscriptions> = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs)).unwrap() {
+            DataResult::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
@@ -656,9 +717,9 @@ proptest! {
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
-        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
-            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        let subscription: Option<Subscriptions> = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
+            DataResult::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
@@ -680,9 +741,9 @@ proptest! {
     fn test_exact_3(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
-        let subscription = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs)).unwrap() {
-            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        let subscription: Option<Subscriptions> = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs)).unwrap() {
+            DataResult::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
@@ -704,9 +765,9 @@ proptest! {
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
-        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
-            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        let subscription: Option<Subscriptions> = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
+            DataResult::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
@@ -728,9 +789,9 @@ proptest! {
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::Medium).unwrap();
-        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
-            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        let subscription: Option<Subscriptions> = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
+            DataResult::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
@@ -752,9 +813,9 @@ proptest! {
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::Fine).unwrap();
-        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
-            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        let subscription: Option<Subscriptions> = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
+            DataResult::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
@@ -777,9 +838,9 @@ proptest! {
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
-        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
-            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        let subscription: Option<Subscriptions> = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
+            DataResult::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
     }
@@ -802,9 +863,9 @@ proptest! {
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
-        let subscription = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs.clone(), granularity)).unwrap() {
-            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        let subscription: Option<Subscriptions> = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs.clone(), granularity)).unwrap() {
+            DataResult::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription1 = subscription.unwrap();
@@ -817,9 +878,9 @@ proptest! {
 
         };
         assert!(ok); */
-        let subscription = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs.clone())).unwrap() {
-            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        let subscription: Option<Subscriptions> = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs.clone())).unwrap() {
+            DataResult::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription2 = subscription.unwrap();
@@ -842,17 +903,17 @@ proptest! {
     //#![proptest_config(ProptestConfig::with_cases(1))]
     #[test]
     #[ignore]
-    fn test_combine_machines_prop(vec in generate_interfacing_swarms_refinement_2(5, 5, 5)) {
+    fn test_combine_machines_prop(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::Medium).unwrap();
-        let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
-            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::<Subscriptions>::ERROR{ .. } => None,
+        let subscriptions: Option<Subscriptions> = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
+            DataResult::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::ERROR{ .. } => None,
         };
-        let composition = match serde_json::from_str(&compose_protocols(protos.clone())).unwrap() {
-            DataResult::<SwarmProtocol>::OK{data: composition} => Some(composition),
-            DataResult::<SwarmProtocol>::ERROR{ .. } => None,
+        let composition: Option<SwarmProtocol> = match serde_json::from_str(&compose_protocols(protos.clone())).unwrap() {
+            DataResult::OK{data: composition} => Some(composition),
+            DataResult::ERROR{ .. } => None,
         };
         assert!(subscriptions.is_some());
         assert!(composition.is_some());
@@ -863,10 +924,10 @@ proptest! {
         let composition_string = serde_json::to_string(&composition.clone()).unwrap();
         for role in subscriptions.keys() {
             let role_string = role.to_string();
-            let projection = match serde_json::from_str(&revised_projection(composition_string.clone(), sub_string.clone(), role_string.clone())).unwrap() {
-                DataResult::<Machine>::OK{data: projection} => {
+            let projection: Option<Machine> = match serde_json::from_str(&revised_projection(composition_string.clone(), sub_string.clone(), role_string.clone())).unwrap() {
+                DataResult::OK{data: projection} => {
                 Some(projection) },
-                DataResult::<Machine>::ERROR{ .. } => None,
+                DataResult::ERROR{ .. } => None,
             };
             /* let projection_combined = match serde_json::from_str(&project_combine(protos.clone(), sub_string.clone(), role_string.clone())).unwrap() {
                 DataResult::<Machine>::OK{data: projection} => {
@@ -887,10 +948,10 @@ proptest! {
                 CheckResult::OK => (),
                 CheckResult::ERROR {errors: e} => {
                     match serde_json::from_str(&project_combine(protos.clone(), sub_string.clone(), role.clone().to_string())).unwrap() {
-                        DataResult::<Machine>::OK{data: projection1} => {
-                            println!("machine combined: {}", serde_json::to_string_pretty(&projection1).unwrap());
+                        DataResult::OK{data: projection1} => {
+                            println!("machine combined: {}", serde_json::to_string_pretty::<Machine>(&projection1).unwrap());
                         },
-                        DataResult::<Machine>::ERROR{ errors: e } => println!("errors combined: {:?}", e),
+                        DataResult::ERROR{ errors: e } => println!("errors combined: {:?}", e),
                     };
                     println!("machine: {}", serde_json::to_string_pretty(&projection.unwrap()).unwrap());
                     println!("composition: {}", serde_json::to_string_pretty(&composition).unwrap());
@@ -904,7 +965,7 @@ proptest! {
     }
 }
 
-proptest! {
+/* proptest! {
     #![proptest_config(ProptestConfig::with_cases(1))]
     #[test]
     #[ignore]
@@ -944,7 +1005,7 @@ proptest! {
         println!("size of composition state space: {}", composition.unwrap().transitions.into_iter().flat_map(|label| [label.source, label.target]).collect::<BTreeSet<State>>().len());
 
     }
-}
+} */
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(1))]
@@ -967,17 +1028,17 @@ proptest! {
         let protos = serde_json::to_string(&vec).unwrap();
         //let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone())).unwrap() {
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
-        let subscriptions = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs)).unwrap() {
-            DataResult::<Subscriptions>::OK{data: subscriptions} => {
+        let subscriptions: Option<Subscriptions> = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs)).unwrap() {
+            DataResult::OK{data: subscriptions} => {
                 write_file(&format!("{parent_path}/{dir_name}/subscription.txt"), serde_json::to_string(&subscriptions).unwrap());
                 Some(subscriptions) },
-            DataResult::<Subscriptions>::ERROR{ .. } => None,
+            DataResult::ERROR{ .. } => None,
         };
-        let composition = match serde_json::from_str(&compose_protocols(protos.clone())).unwrap() {
-            DataResult::<SwarmProtocol>::OK{data: composition} => {
+        let composition: Option<SwarmProtocol> = match serde_json::from_str(&compose_protocols(protos.clone())).unwrap() {
+            DataResult::OK{data: composition} => {
                 write_file(&format!("{parent_path}/{dir_name}/composition.json"), serde_json::to_string(&composition).unwrap());
                 Some(composition) },
-            DataResult::<SwarmProtocol>::ERROR{ .. } => None,
+            DataResult::ERROR{ .. } => None,
         };
         assert!(subscriptions.is_some());
         assert!(composition.is_some());
@@ -989,21 +1050,24 @@ proptest! {
         create_directory(&format!("{parent_path}/{dir_name}"), &machine_dir);
         for role in subscriptions.keys() {
             let role_string = role.to_string();
-            let projection = match serde_json::from_str(&revised_projection(composition_string.clone(), sub_string.clone(), role_string.clone())).unwrap() {
-                DataResult::<Machine>::OK{data: projection} => {
+            let projection: Option<Machine> = match serde_json::from_str(&revised_projection(composition_string.clone(), sub_string.clone(), role_string.clone())).unwrap() {
+                DataResult::OK{data: projection} => {
                 write_file(&format!("{parent_path}/{dir_name}/{machine_dir}/{role_string}.json"), serde_json::to_string(&projection).unwrap());
                 Some(projection) },
-                DataResult::<Machine>::ERROR{ .. } => None,
+                DataResult::ERROR{ .. } => None,
             };
             assert!(projection.is_some());
         }
     }
 }
-
+fn print_type<T>(_: &T) {
+    println!("{:?}", std::any::type_name::<T>());
+}
 fn create_directory(parent: &String, dir_name: &String) -> () {
     match create_dir(format!("{parent}/{dir_name}")) {
         Ok(_) => (),
-        Err(e) => panic!("couldn't create directory {}/{}: {}", parent, dir_name, e),
+        Err(ref e) if e.kind() == std::io::ErrorKind::AlreadyExists => (),
+        Err(e) => {print_type(&e); panic!("couldn't create directory {}/{}: {}", parent, dir_name, e)},
     }
 }
 
@@ -1013,6 +1077,7 @@ fn write_file(file_name: &String, content: String) -> () {
 
     // Open a file in write-only mode, returns `io::Result<File>`
     let mut file = match File::create(&path) {
+        //Err(Error::)
         Err(why) => panic!("couldn't create {}: {}", display, why),
         Ok(file) => file,
     };
@@ -1070,3 +1135,980 @@ proptest! {
 
 
 */
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BenchMarkInput  {
+    pub state_space_size: usize,
+    pub number_of_edges: usize,
+    pub interfacing_swarms: InterfacingSwarms<Role>
+}
+
+fn wrap_and_write(interfacing_swarms: InterfacingSwarms<Role>, parent_path: String, dir_name: String) {
+    let interfacing_swarms_string = serde_json::to_string(&interfacing_swarms).unwrap();
+    let composition: Option<SwarmProtocol> = match serde_json::from_str(&compose_protocols(interfacing_swarms_string.clone())).unwrap() {
+        DataResult::OK{data: composition} => {
+            Some(composition) },
+        DataResult::ERROR{ errors } => {println!("errors: {:?}", errors); None},
+    };
+    let composition = composition.unwrap();
+    let state_space_size = composition.transitions.iter().flat_map(|label| [label.source.clone(), label.target.clone()]).collect::<BTreeSet<State>>().len();
+    let number_of_edges = composition.transitions.iter().len();
+    let benchmark_input = BenchMarkInput {state_space_size, number_of_edges, interfacing_swarms};
+    let mut mut_guard = FILE_COUNTER_MAX.lock().unwrap();
+    let i: u32 = *mut_guard;
+    *mut_guard += 1;
+    let file_name = format!("{parent_path}/{dir_name}/{:010}_{:010}_{dir_name}.json", state_space_size, i);
+    let out = serde_json::to_string(&benchmark_input).unwrap();
+    write_file(&file_name, out);
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_5_1(interfacing_swarms in generate_interfacing_swarms_refinement(5, 5, 1)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_1_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_5_2(interfacing_swarms in generate_interfacing_swarms_refinement(5, 5, 2)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_2_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_5_3(interfacing_swarms in generate_interfacing_swarms_refinement(5, 5, 3)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_3_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_5_4(interfacing_swarms in generate_interfacing_swarms_refinement(5, 5, 4)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_4_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_5_5(interfacing_swarms in generate_interfacing_swarms_refinement(5, 5, 5)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_5_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_5_6(interfacing_swarms in generate_interfacing_swarms_refinement(5, 5, 6)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_6_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_5_7(interfacing_swarms in generate_interfacing_swarms_refinement(5, 5, 7)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_7_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_5_8(interfacing_swarms in generate_interfacing_swarms_refinement(5, 5, 8)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_8_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_5_9(interfacing_swarms in generate_interfacing_swarms_refinement(5, 5, 9)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_9_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_5_10(interfacing_swarms in generate_interfacing_swarms_refinement(5, 5, 10)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_10_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_10_1(interfacing_swarms in generate_interfacing_swarms_refinement(10, 10, 1)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_1_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_10_2(interfacing_swarms in generate_interfacing_swarms_refinement(10, 10, 2)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_2_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_10_3(interfacing_swarms in generate_interfacing_swarms_refinement(10, 10, 3)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_3_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_10_4(interfacing_swarms in generate_interfacing_swarms_refinement(10, 10, 4)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_4_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_10_5(interfacing_swarms in generate_interfacing_swarms_refinement(10, 10, 5)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_5_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_10_6(interfacing_swarms in generate_interfacing_swarms_refinement(10, 10, 6)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_6_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_10_7(interfacing_swarms in generate_interfacing_swarms_refinement(10, 10, 7)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_7_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_10_8(interfacing_swarms in generate_interfacing_swarms_refinement(10, 10, 8)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_8_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_10_9(interfacing_swarms in generate_interfacing_swarms_refinement(10, 10, 9)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_9_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_1_10_10(interfacing_swarms in generate_interfacing_swarms_refinement(10, 10, 10)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_1".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_10_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+/* refinement pattern 2 */
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_1(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 1)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_1_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_2(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 2)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_2_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_3(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_3_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(100))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_4(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 4)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_4_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(50))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_5(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 5)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_5_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(50))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_6(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 6)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_6_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_7(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 7)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_7_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_8(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 8)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_8_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_9(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 9)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_9_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_5_10(interfacing_swarms in generate_interfacing_swarms_refinement_2(5, 5, 10)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_10_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_1(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 1)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_1_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_2(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 2)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_2_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(100))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_3(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 3)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_3_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(50))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_4(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 4)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_4_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_5(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 5)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_5_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_6(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 6)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_6_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_7(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 7)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_7_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_8(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 8)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_8_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_9(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 9)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_9_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_ref_2_10_10(interfacing_swarms in generate_interfacing_swarms_refinement_2(10, 10, 10)) {
+        let parent_path = "benches/benchmark_data/refinement_pattern_2".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_10_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+/* random pattern */
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_1(interfacing_swarms in generate_interfacing_swarms(5, 5, 1, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_1_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_2(interfacing_swarms in generate_interfacing_swarms(5, 5, 2, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_2_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_3(interfacing_swarms in generate_interfacing_swarms(5, 5, 3, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_3_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(100))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_4(interfacing_swarms in generate_interfacing_swarms(5, 5, 4, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_4_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(50))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_5(interfacing_swarms in generate_interfacing_swarms(5, 5, 5, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_5_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(50))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_6(interfacing_swarms in generate_interfacing_swarms(5, 5, 6, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_6_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_7(interfacing_swarms in generate_interfacing_swarms(5, 5, 7, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_7_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_8(interfacing_swarms in generate_interfacing_swarms(5, 5, 8, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_8_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_9(interfacing_swarms in generate_interfacing_swarms(5, 5, 9, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_9_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_5_10(interfacing_swarms in generate_interfacing_swarms(5, 5, 10, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_5_roles_max_5_commands_10_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_1(interfacing_swarms in generate_interfacing_swarms(10, 10, 1, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_1_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(500))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_2(interfacing_swarms in generate_interfacing_swarms(10, 10, 2, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_2_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(100))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_3(interfacing_swarms in generate_interfacing_swarms(10, 10, 3, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_3_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(50))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_4(interfacing_swarms in generate_interfacing_swarms(10, 10, 4, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_4_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_5(interfacing_swarms in generate_interfacing_swarms(10, 10, 5, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_5_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_6(interfacing_swarms in generate_interfacing_swarms(10, 10, 6, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_6_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_7(interfacing_swarms in generate_interfacing_swarms(10, 10, 7, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_7_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_8(interfacing_swarms in generate_interfacing_swarms(10, 10, 8, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_8_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_9(interfacing_swarms in generate_interfacing_swarms(10, 10, 9, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_9_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+    #[test]
+    #[ignore]
+    fn write_bench_file_random_10_10(interfacing_swarms in generate_interfacing_swarms(10, 10, 10, true)) {
+        let parent_path = "benches/benchmark_data/random".to_string();
+        let dir_name = format!("max_10_roles_max_10_commands_10_protos");
+        create_directory(&parent_path, &dir_name);
+        wrap_and_write(interfacing_swarms, parent_path, dir_name);
+    }
+}
+
+
+fn prepare_input(file_name: String) -> (usize, BenchMarkInput) {
+    // Create a path to the desired file
+    let path = Path::new(&file_name);
+    let display = path.display();
+
+    // Open the path in read-only mode, returns `io::Result<File>`
+    let mut file = match File::open(&path) {
+        Err(why) => panic!("couldn't open {}: {}", display, why),
+        Ok(file) => file,
+    };
+
+    // Read the file contents into a string, returns `io::Result<usize>`
+    let mut protos = String::new();
+    match file.read_to_string(&mut protos) {
+        Err(why) => panic!("couldn't read {}: {}", display, why),
+        Ok(_) => (), //print!("{} contains:\n{}", display, protos),
+    }
+    let (state_space_size, interfacing_swarms) =
+        match serde_json::from_str::<BenchMarkInput>(&protos) {
+            Ok(input) => (input.state_space_size, input),
+            Err(e) => panic!("error parsing input file: {}", e),
+        };
+    (
+        state_space_size,
+        interfacing_swarms//serde_json::to_string(&interfacing_swarms).unwrap(),
+    )
+}
+
+fn prepare_files_in_directory(directory: String) -> Vec<(usize, BenchMarkInput)> {
+    let mut inputs: Vec<(usize, BenchMarkInput)> = vec![];
+
+    for entry in WalkDir::new(directory) {
+        match entry {
+            Ok(entry) => {
+                if entry.file_type().is_file() {
+                    println!("file: {}", entry.path().as_os_str().to_str().unwrap().to_string());
+                    inputs.push(prepare_input(
+                        entry.path().as_os_str().to_str().unwrap().to_string(),
+                    ));
+                }
+            }
+            Err(e) => panic!("error: {}", e),
+        };
+    }
+
+    inputs
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BenchmarkSubSizeOutput  {
+    pub state_space_size: usize,
+    pub number_of_edges: usize,
+    pub subscriptions: Subscriptions,
+}
+
+fn wrap_and_write_sub_out(bench_input: &BenchMarkInput, subscriptions: Subscriptions, granularity: String, parent_path: String) {
+    let out = BenchmarkSubSizeOutput { state_space_size: bench_input.state_space_size, number_of_edges: bench_input.number_of_edges, subscriptions: subscriptions};
+    let file_name = format!("{parent_path}/{:010}_{}.json", bench_input.state_space_size, granularity);
+    let out = serde_json::to_string(&out).unwrap();
+    write_file(&file_name, out);
+}
+
+#[test]
+#[ignore]
+fn bench_sub_sizes_refinement_1() {
+    let mut interfacing_swarms_refinement_1 =
+        prepare_files_in_directory(String::from("./benches/benchmark_data_selected/refinement_pattern_1/"));
+    interfacing_swarms_refinement_1.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let coarse_granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
+    let medium_granularity = serde_json::to_string(&Granularity::Medium).unwrap();
+    let fine_granularity = serde_json::to_string(&Granularity::Fine).unwrap();
+    let granularities = vec![coarse_granularity, medium_granularity, fine_granularity];
+    for (_, bi) in &interfacing_swarms_refinement_1 {
+        //let bi = serde_json::from_str::<BenchMarkInput>(&bench_input).unwrap();
+        let swarms = serde_json::to_string(&bi.interfacing_swarms).unwrap();
+        for g in &granularities {
+
+            let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), g.clone())).unwrap() {
+                DataResult::OK{data: subscriptions} => Some(subscriptions),
+                DataResult::ERROR{ .. } => None,
+            };
+
+            wrap_and_write_sub_out(&bi, subscriptions.unwrap(), g.replace("\"", ""), String::from("./subscription_size_benchmarks/refinement_pattern_1_2"));
+
+        }
+
+        let subscriptions = match serde_json::from_str(&exact_weak_well_formed_sub(swarms.clone(), subs.clone())).unwrap() {
+            DataResult::OK{data: subscriptions} => {
+                Some(subscriptions) },
+            DataResult::ERROR{ .. } => None,
+        };
+
+
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), String::from("./subscription_size_benchmarks/refinement_pattern_1_2"));
+
+    }
+}
+
+#[test]
+#[ignore]
+fn bench_sub_sizes_refinement_2() {
+    let mut interfacing_swarms_refinement_2 =
+        prepare_files_in_directory(String::from("./benches/benchmark_data_selected/refinement_pattern_2/"));
+    interfacing_swarms_refinement_2.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let coarse_granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
+    let medium_granularity = serde_json::to_string(&Granularity::Medium).unwrap();
+    let fine_granularity = serde_json::to_string(&Granularity::Fine).unwrap();
+    let granularities = vec![coarse_granularity, medium_granularity, fine_granularity];
+    for (_, bi) in &interfacing_swarms_refinement_2 {
+        //let bi = serde_json::from_str::<BenchMarkInput>(&bench_input).unwrap();
+        let swarms = serde_json::to_string(&bi.interfacing_swarms).unwrap();
+        for g in &granularities {
+
+            let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), g.clone())).unwrap() {
+                DataResult::OK{data: subscriptions} => Some(subscriptions),
+                DataResult::ERROR{ .. } => None,
+            };
+
+            wrap_and_write_sub_out(&bi, subscriptions.unwrap(), g.replace("\"", ""), String::from("./subscription_size_benchmarks/refinement_pattern_2_2"));
+
+        }
+
+        let subscriptions = match serde_json::from_str(&exact_weak_well_formed_sub(swarms.clone(), subs.clone())).unwrap() {
+            DataResult::OK{data: subscriptions} => {
+                Some(subscriptions) },
+            DataResult::ERROR{ .. } => None,
+        };
+
+
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), String::from("./subscription_size_benchmarks/refinement_pattern_2_2"));
+
+    }
+}
+
+#[test]
+#[ignore]
+fn bench_sub_sizes_random() {
+    let mut interfacing_swarms_random =
+        prepare_files_in_directory(String::from("./benches/benchmark_data_selected/random/"));
+    interfacing_swarms_random.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let coarse_granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
+    let medium_granularity = serde_json::to_string(&Granularity::Medium).unwrap();
+    let fine_granularity = serde_json::to_string(&Granularity::Fine).unwrap();
+    let granularities = vec![coarse_granularity, medium_granularity, fine_granularity];
+    for (_, bi) in &interfacing_swarms_random {
+        let swarms = serde_json::to_string(&bi.interfacing_swarms).unwrap();
+        for g in &granularities {
+
+            let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), g.clone())).unwrap() {
+                DataResult::OK{data: subscriptions} => Some(subscriptions),
+                DataResult::ERROR{ .. } => None,
+            };
+
+            wrap_and_write_sub_out(&bi, subscriptions.unwrap(), g.replace("\"", ""), String::from("./subscription_size_benchmarks/random_2"));
+
+        }
+
+        let subscriptions = match serde_json::from_str(&exact_weak_well_formed_sub(swarms.clone(), subs.clone())).unwrap() {
+            DataResult::OK{data: subscriptions} => {
+                Some(subscriptions) },
+            DataResult::ERROR{ .. } => None,
+        };
+
+
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), String::from("./subscription_size_benchmarks/random_2"));
+
+    }
+}
+
+#[test]
+#[ignore]
+fn print_sub_sizes_refinement_2() {
+    let mut interfacing_swarms_refinement_2 =
+        prepare_files_in_directory(String::from("./benches/benchmark_data/random/"));
+    interfacing_swarms_refinement_2.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let fine_granularity = serde_json::to_string(&Granularity::Fine).unwrap();
+    let mut i = 0;
+    for (_, bi) in &interfacing_swarms_refinement_2 {
+        //let bi = serde_json::from_str::<BenchMarkInput>(&bench_input).unwrap();
+        let swarms = serde_json::to_string(&bi.interfacing_swarms).unwrap();
+        let subscriptions_fine_approx: Option<Subscriptions> = match serde_json::from_str(&overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), fine_granularity.clone())).unwrap() {
+                DataResult::OK{data: subscriptions} => Some(subscriptions),
+                DataResult::ERROR{ .. } => None,
+        };
+
+        let subscriptions_exact = match serde_json::from_str(&exact_weak_well_formed_sub(swarms.clone(), subs.clone())).unwrap() {
+            DataResult::OK{data: subscriptions} => {
+                Some(subscriptions) },
+            DataResult::ERROR{ .. } => None,
+        };
+        if subscriptions_fine_approx.clone().unwrap() != subscriptions_exact.clone().unwrap() {
+            if i == 0 {
+                println!("sub approx: {}", serde_json::to_string_pretty(&subscriptions_fine_approx).unwrap());
+                println!("sub exact: {}", serde_json::to_string_pretty(&subscriptions_exact).unwrap());
+                println!("swarms: {}", serde_json::to_string_pretty(&bi.interfacing_swarms).unwrap());
+                let composition: Option<SwarmProtocol> = match serde_json::from_str(&compose_protocols(swarms)).unwrap() {
+                    DataResult::OK{data: composition} => {
+                        Some(composition) },
+                    DataResult::ERROR{ .. } => None,
+                };
+                println!("composition: {}", serde_json::to_string_pretty(&composition.unwrap()).unwrap());
+                break;
+            }
+            i = i + 1;
+        }
+    }
+}
+
+#[test]
+#[ignore]
+fn write_bench_file_pattern_3() {
+    let parent_path = "benches/pattern_3".to_string();
+    let dir_name = format!("1_non_interfacing_IR0_last");
+    create_directory(&parent_path, &dir_name);
+    for i in 1..33 {
+        let n_protos = i as usize;
+        let interfacing_swarms = pattern_3(n_protos, 1);
+        wrap_and_write(interfacing_swarms, parent_path.clone(), dir_name.clone());
+    }
+}

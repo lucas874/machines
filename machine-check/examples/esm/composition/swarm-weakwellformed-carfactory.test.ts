@@ -191,3 +191,17 @@ describe('checkWWFSwarmProtocol for protocols with overapproximated wwf subscrip
     })
   })
 })
+
+
+const Gcomposed: InterfacingSwarms = [{protocol: G1, interface: null}, {protocol: G2, interface: 'T'}, {protocol: G3, interface: 'F'}]
+const overapprox_result_subscriptions_composed: ResultData<Subscriptions> = overapproxWWFSubscriptions(Gcomposed, {}, "Fine")
+if (overapprox_result_subscriptions_composed.type === 'ERROR') throw new Error('error getting subscription')
+const overapprox_subscriptions_composed: Subscriptions = overapprox_result_subscriptions_composed.data
+
+describe('checkWWFSwarmProtocol for composition with overapproximated wwf subscription', () => {
+  it('should be weak-well-formed protocol G1', () => {
+    expect(checkWWFSwarmProtocol(Gcomposed, overapprox_subscriptions_composed)).toEqual({
+      type: 'OK',
+    })
+  })
+})

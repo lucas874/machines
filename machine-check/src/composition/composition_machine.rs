@@ -479,6 +479,19 @@ mod tests {
         )
         .unwrap()
     }
+    fn get_proto32() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "observe", "logType": ["observing"], "role": "QCR" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "test", "logType": ["report"], "role": "QCR" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
 
     fn get_interfacing_swarms_1() -> InterfacingSwarms<Role> {
         InterfacingSwarms(
@@ -543,6 +556,25 @@ mod tests {
                 CompositionComponent {
                     protocol: get_proto1(),
                     interface: Some(Role::new("T")),
+                },
+            ]
+        )
+    }
+
+    fn get_interfacing_swarms_3() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_proto1(),
+                    interface: None,
+                },
+                CompositionComponent {
+                    protocol: get_proto2(),
+                    interface: Some(Role::new("T")),
+                },
+                CompositionComponent {
+                    protocol: get_proto32(),
+                    interface: Some(Role::new("F")),
                 },
             ]
         )
@@ -959,5 +991,18 @@ mod tests {
             //print!("errors: {:?}", errors.map(crate::machine::Error::convert(&proj_combined2, &to_option_machine(&proj))));
             assert!(errors.is_empty());
             }
+    }
+
+    #[test]
+    fn test_example_from_text_machine() {
+        let role = Role::new("F");
+        let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_3(), &BTreeMap::new(), Granularity::Medium);
+        assert!(subs.is_ok());
+        let subs = subs.unwrap();
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_3(), &subs);
+            assert!(proto_info.no_errors());
+        let (proj, proj_initial) =
+            project_combine(&proto_info.protocols, &subs, role.clone());
+        println!("projection of {}: {}", role.to_string(), serde_json::to_string_pretty(&from_option_to_machine(proj, proj_initial.unwrap())).unwrap());
     }
 }
