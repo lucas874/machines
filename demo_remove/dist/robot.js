@@ -22,21 +22,18 @@ const machine_runner_1 = require("@actyx/machine-runner");
 const sdk_1 = require("@actyx/sdk");
 const protocol_1 = require("./protocol");
 const machine = protocol_1.protocol.makeMachine('robot');
-//protocol.makeBasicMachine("LARS")
 exports.Idle = machine.designEmpty('Idle').finish();
 exports.WateringPlant = machine.designEmpty('WateringPlant').finish();
 exports.Idle.react([protocol_1.Events.NeedsWater], exports.WateringPlant, (_) => exports.WateringPlant.make());
 exports.WateringPlant.react([protocol_1.Events.HasWater], exports.Idle, (_) => exports.Idle.make());
 var m = machine.createJSONForAnalysis(exports.Idle);
-const [m2, i2] = protocol_1.protocol.makeProjMachine("lars", m);
-//console.log(m2, i2)
+const [m2, i2] = protocol_1.protocol.makeProjMachine("robot", m, protocol_1.Events.All);
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
         const sdk = yield sdk_1.Actyx.of(protocol_1.manifest);
         const tags = protocol_1.protocol.tagWithEntityId('robot-1');
         const machine = (0, machine_runner_1.createMachineRunner)(sdk, tags, i2, undefined);
-        console.log(machine);
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;

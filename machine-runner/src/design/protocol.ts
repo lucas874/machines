@@ -25,7 +25,8 @@ export type SwarmProtocol<
   tagWithEntityId: (id: string) => Tags<MachineEvents>
   makeProjMachine: <MachineName extends string>(
     machineName: MachineName,
-    proj: MachineAnalysisResource
+    proj: MachineAnalysisResource,
+    events: readonly MachineEvent.Factory<any, Record<never, never>>[]
   ) => [Machine<any, any, any>, any]
 }
 //Machine<SwarmProtocolName, MachineName, MachineEventFactories>
@@ -73,7 +74,7 @@ export namespace SwarmProtocol {
     return {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
-      makeProjMachine: (machineName, proj) => ProjMachine.machineFromProj(ImplMachine.make(swarmName, machineName, eventFactories), proj)
+      makeProjMachine: (machineName, proj, events) => ProjMachine.machineFromProj(ImplMachine.make(swarmName, machineName, eventFactories), proj, events)
     }
   }
 }
@@ -359,9 +360,6 @@ export namespace MachineAnalysisResource {
 }
 
 export namespace ProjMachine {
-  export function sayHi(m: Machine<string, string, MachineEvent.Factory.Any>) {
-    console.log("HI ", m)
-  }
   type Transition = {
     source: string
     target: string
@@ -370,10 +368,12 @@ export namespace ProjMachine {
 
   export function machineFromProj(
     m: Machine<any, any, any>,
-    proj: MachineAnalysisResource
+    proj: MachineAnalysisResource,
+    events: readonly MachineEvent.Factory<any, Record<never, never>>[]
   ): [Machine<any, any, MachineEvent.Factory.Any>, any] {
     var projStatesToStates: Map<string, any> = new Map()
     var projStatesToTransitions: Map<string, Transition[]> = new Map()
+    var eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> = new Map()
 
     proj.transitions.forEach((transition) => {
       if (!projStatesToTransitions.has(transition.source)) {
@@ -383,19 +383,45 @@ export namespace ProjMachine {
        projStatesToTransitions.set(transition.target, new Array())
       }
       projStatesToTransitions.get(transition.source)?.push(transition)
-    })
-    projStatesToTransitions.forEach((value, key) => {
-      projStatesToStates.set(key, m.designEmpty(key).finish())
-      value.forEach((transition) => {
-        if (transition.label.tag == 'Execute') {
-          projStatesToStates.get(key).command(transition.label.cmd, transition.label.logType, () => [{}])
-        } else if (transition.label.tag == 'Input') {
-          projStatesToStates.get(key).react([transition.label.eventType], transition.target, () => undefined)
+      if (transition.label.tag === 'Execute') {
+        for (let eventType of transition.label.logType) {
+          for (let event of events) {
+              if (eventType === event.type) {
+              eventTypeStringToEvent.set(eventType, event)
+              break
+            }
+          }
         }
+      } else if (transition.label.tag === 'Input') {
+        for (let event of events) {
+          if (transition.label.eventType === event.type) {
+            eventTypeStringToEvent.set(transition.label.eventType, event)
+            break
+          }
+        }
+      }
+    })
+
+    projStatesToTransitions.forEach((value, key) => {
+      if (projStatesToStates.get(key) === undefined) {
+        projStatesToStates.set(key, m.designEmpty(key).finish())
+      }
+
+      value.forEach((transition) => {
+        if (transition.label.tag === 'Execute') {
+          var eventTypes = transition.label.logType.map((et: string) => {
+            return eventTypeStringToEvent.get(et)
+          })
+          projStatesToStates.get(key).command(transition.label.cmd, eventTypes, () => [{}])
+        } else if (transition.label.tag === 'Input') {
+          if (projStatesToStates.get(transition.target) === undefined) {
+            projStatesToStates.set(transition.target, m.designEmpty(transition.target).finish())
+          }
+          projStatesToStates.get(key).react([eventTypeStringToEvent.get(transition.label.eventType)], projStatesToStates.get(transition.target), (_: any) => projStatesToStates.get(transition.target).make())
+          }
       })
     })
     var initial = projStatesToStates.get(proj.initial)
-
     return [m, initial]
   }
 }
