@@ -4,7 +4,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start-robot": "tsc && node dist/robot.js"
+    "start-robot": "tsc && node dist/robot.js",
+    "start-sensor": "tsc && node dist/sensor.js"
   },
   "keywords": [],
   "author": "",
@@ -15,6 +16,6 @@
   },
   "dependencies": {
     "@actyx/machine-runner": "file:../machine-runner",
-    "@actyx/sdk": "file:../machine-runner/node_modules/@actyx"
+    "@actyx/sdk": "^0.5.9"
   }
 }

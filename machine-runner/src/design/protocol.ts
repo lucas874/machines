@@ -23,8 +23,12 @@ export type SwarmProtocol<
     machineName: MachineName,
   ) => Machine<SwarmProtocolName, MachineName, MachineEventFactories>
   tagWithEntityId: (id: string) => Tags<MachineEvents>
+  makeProjMachine: <MachineName extends string>(
+    machineName: MachineName,
+    proj: MachineAnalysisResource
+  ) => [Machine<any, any, any>, any]
 }
-
+//Machine<SwarmProtocolName, MachineName, MachineEventFactories>
 /**
  * Utilities for SwarmProtocol
  * @see SwarmProtocol.make
@@ -69,6 +73,7 @@ export namespace SwarmProtocol {
     return {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
+      makeProjMachine: (machineName, proj) => ProjMachine.machineFromProj(ImplMachine.make(swarmName, machineName, eventFactories), proj)
     }
   }
 }
@@ -235,7 +240,7 @@ namespace ImplMachine {
 
     const createJSONForAnalysis: Self['createJSONForAnalysis'] = (initial) =>
       MachineAnalysisResource.fromMachineInternals(protocol, initial)
-    console.log("LSLSlSLASDJLASJDLA")
+
     return {
       swarmName,
       machineName,
@@ -350,5 +355,47 @@ export namespace MachineAnalysisResource {
     }
 
     return resource
+  }
+}
+
+export namespace ProjMachine {
+  export function sayHi(m: Machine<string, string, MachineEvent.Factory.Any>) {
+    console.log("HI ", m)
+  }
+  type Transition = {
+    source: string
+    target: string
+    label: { tag: 'Execute'; cmd: string; logType: string[] } | { tag: 'Input'; eventType: string }
+  }
+
+  export function machineFromProj(
+    m: Machine<any, any, any>,
+    proj: MachineAnalysisResource
+  ): [Machine<any, any, MachineEvent.Factory.Any>, any] {
+    var projStatesToStates: Map<string, any> = new Map()
+    var projStatesToTransitions: Map<string, Transition[]> = new Map()
+
+    proj.transitions.forEach((transition) => {
+      if (!projStatesToTransitions.has(transition.source)) {
+       projStatesToTransitions.set(transition.source, new Array())
+      }
+      if (!projStatesToTransitions.has(transition.target)) {
+       projStatesToTransitions.set(transition.target, new Array())
+      }
+      projStatesToTransitions.get(transition.source)?.push(transition)
+    })
+    projStatesToTransitions.forEach((value, key) => {
+      projStatesToStates.set(key, m.designEmpty(key).finish())
+      value.forEach((transition) => {
+        if (transition.label.tag == 'Execute') {
+          projStatesToStates.get(key).command(transition.label.cmd, transition.label.logType, () => [{}])
+        } else if (transition.label.tag == 'Input') {
+          projStatesToStates.get(key).react([transition.label.eventType], transition.target, () => undefined)
+        }
+      })
+    })
+    var initial = projStatesToStates.get(proj.initial)
+
+    return [m, initial]
   }
 }
