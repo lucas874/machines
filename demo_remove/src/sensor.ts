@@ -1,7 +1,23 @@
 import { Actyx } from '@actyx/sdk'
+import { createMachineRunner } from '@actyx/machine-runner'
 import { Events, manifest, protocol } from './protocol'
 
-async function main() {
+const machine = protocol.makeMachine('sensor')
+export const s0 = machine.designEmpty('Thirsty')
+    .command('req', [Events.NeedsWater], () => [{}])
+    .command('done', [Events.Done], () => [{}])
+    .finish()
+export const s1 = machine.designEmpty('Wet')
+    .command('get', [Events.HasWater], () => [{}])
+    .finish()
+export const s2 = machine.designEmpty('isDone').finish()
+
+s0.react([Events.NeedsWater], s1, (_) => s1.make())
+s0.react([Events.Done], s2, (_) => s2.make())
+s1.react([Events.HasWater], s0, (_) => s0.make())
+
+
+/* async function main() {
   const app = await Actyx.of(manifest)
   const tags = protocol.tagWithEntityId('robot-1')
 
@@ -12,6 +28,36 @@ async function main() {
   console.log('Publishing HasWater')
 
   app.dispose()
+} */
+async function main() {
+  const sdk = await Actyx.of(manifest)
+  const tags = protocol.tagWithEntityId('robot-1')
+  const machine = createMachineRunner(sdk, tags, s0, undefined)
+  var hasRequested = false
+
+  for await (const state of machine) {
+    console.log(state)
+    if (state.is(s0)) {
+        const open = state.cast()
+        setTimeout(() => {
+            if (!hasRequested) {
+                hasRequested = true
+                open.commands()?.req()
+            } else {
+                open.commands()?.done()
+            }
+        }, 3000)
+    } else if (state.is(s1)) {
+        const open = state.cast()
+        setTimeout(() => {
+            open.commands()?.get()
+        }, 3000)
+    } else if (state.is(s2)) {
+        console.log("shutting down")
+        break
+    }
+  }
+  sdk.dispose()
 }
 
 main()

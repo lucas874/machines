@@ -9,7 +9,8 @@ export const manifest = {
 export namespace Events {
   export const HasWater = MachineEvent.design('HasWater').withoutPayload()
   export const NeedsWater = MachineEvent.design('NeedsWater').withoutPayload()
-  export const All = [HasWater, NeedsWater] as const
+  export const Done = MachineEvent.design('Done').withoutPayload()
+  export const All = [HasWater, NeedsWater, Done] as const
 }
 
 export const protocol = SwarmProtocol.make('wateringRobot', Events.All)

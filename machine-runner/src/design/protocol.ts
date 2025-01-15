@@ -403,7 +403,7 @@ export namespace ProjMachine {
     })
 
     projStatesToTransitions.forEach((value, key) => {
-      if (projStatesToStates.get(key) === undefined) {
+      if (!projStatesToStates.has(key)) {
         projStatesToStates.set(key, m.designEmpty(key).finish())
       }
 
@@ -414,7 +414,7 @@ export namespace ProjMachine {
           })
           projStatesToStates.get(key).command(transition.label.cmd, eventTypes, () => [{}])
         } else if (transition.label.tag === 'Input') {
-          if (projStatesToStates.get(transition.target) === undefined) {
+          if (!projStatesToStates.has(transition.target)) {
             projStatesToStates.set(transition.target, m.designEmpty(transition.target).finish())
           }
           projStatesToStates.get(key).react([eventTypeStringToEvent.get(transition.label.eventType)], projStatesToStates.get(transition.target), (_: any) => projStatesToStates.get(transition.target).make())

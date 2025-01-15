@@ -8,18 +8,113 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __asyncValues = (this && this.__asyncValues) || function (o) {
+    if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
+    var m = o[Symbol.asyncIterator], i;
+    return m ? m.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i);
+    function verb(n) { i[n] = o[n] && function (v) { return new Promise(function (resolve, reject) { v = o[n](v), settle(resolve, reject, v.done, v.value); }); }; }
+    function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.s2 = exports.s1 = exports.s0 = void 0;
 const sdk_1 = require("@actyx/sdk");
+const machine_runner_1 = require("@actyx/machine-runner");
 const protocol_1 = require("./protocol");
+const machine = protocol_1.protocol.makeMachine('sensor');
+exports.s0 = machine.designEmpty('Thirsty')
+    .command('req', [protocol_1.Events.NeedsWater], () => [{}])
+    .command('done', [protocol_1.Events.Done], () => [{}])
+    .finish();
+exports.s1 = machine.designEmpty('Wet')
+    .command('get', [protocol_1.Events.HasWater], () => [{}])
+    .finish();
+exports.s2 = machine.designEmpty('isDone').finish();
+exports.s0.react([protocol_1.Events.NeedsWater], exports.s1, (_) => exports.s1.make());
+exports.s0.react([protocol_1.Events.Done], exports.s2, (_) => exports.s2.make());
+exports.s1.react([protocol_1.Events.HasWater], exports.s0, (_) => exports.s0.make());
+/* async function main() {
+  const app = await Actyx.of(manifest)
+  const tags = protocol.tagWithEntityId('robot-1')
+
+  await app.publish(tags.apply(Events.NeedsWater.make({})))
+  console.log('Publishing NeedsWater')
+
+  await app.publish(tags.apply(Events.HasWater.make({})))
+  console.log('Publishing HasWater')
+
+  app.dispose()
+} */
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
-        const app = yield sdk_1.Actyx.of(protocol_1.manifest);
+        var _a, e_1, _b, _c;
+        const sdk = yield sdk_1.Actyx.of(protocol_1.manifest);
         const tags = protocol_1.protocol.tagWithEntityId('robot-1');
-        yield app.publish(tags.apply(protocol_1.Events.NeedsWater.make({})));
-        console.log('Publishing NeedsWater');
-        yield app.publish(tags.apply(protocol_1.Events.HasWater.make({})));
-        console.log('Publishing HasWater');
-        app.dispose();
+        const machine = (0, machine_runner_1.createMachineRunner)(sdk, tags, exports.s0, undefined);
+        var hasRequested = false;
+        try {
+            for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
+                _c = machine_1_1.value;
+                _d = false;
+                const state = _c;
+                console.log(state);
+                if (state.is(exports.s0)) {
+                    const open = state.cast();
+                    setTimeout(() => {
+                        var _a, _b;
+                        if (!hasRequested) {
+                            hasRequested = true;
+                            (_a = open.commands()) === null || _a === void 0 ? void 0 : _a.req();
+                        }
+                        else {
+                            (_b = open.commands()) === null || _b === void 0 ? void 0 : _b.done();
+                        }
+                    }, 3000);
+                }
+                else if (state.is(exports.s1)) {
+                    const open = state.cast();
+                    setTimeout(() => {
+                        var _a;
+                        (_a = open.commands()) === null || _a === void 0 ? void 0 : _a.get();
+                    }, 3000);
+                }
+                else if (state.is(exports.s2)) {
+                    console.log("shutting down");
+                    break;
+                }
+            }
+        }
+        catch (e_1_1) { e_1 = { error: e_1_1 }; }
+        finally {
+            try {
+                if (!_d && !_a && (_b = machine_1.return)) yield _b.call(machine_1);
+            }
+            finally { if (e_1) throw e_1.error; }
+        }
+        /*   await app.publish(tags.apply(Events.NeedsWater.make({})))
+          console.log('Publishing NeedsWater')
+        
+          await app.publish(tags.apply(Events.HasWater.make({})))
+          console.log('Publishing HasWater')
+         */
+        sdk.dispose();
     });
 }
 main();
+/*
+  if (state.is(Auction)) {
+    const open = state.cast()
+    if (!open.payload.scores.find((s) => s.robot === open.payload.robot)) {
+      await open.commands()?.bid(1)
+      setTimeout(() => {
+        const open = robot1.get()?.as(Auction)
+        open && open.commands()?.select(bestRobot(open.payload.scores))
+      }, 5000)
+    }
+  } else if (state.is(DoIt)) {
+    const assigned = state.cast()
+    IamWinner = assigned.payload.winner === assigned.payload.robot
+    if (!IamWinner) break
+    // now we have the order and can start the mission
+  }
+
+*/ 
