@@ -42,38 +42,45 @@ function main() {
         const tags = protocol_1.protocol.tagWithEntityId('robot-1');
         const machine = (0, machine_runner_1.createMachineRunner)(sdk, tags, i2, undefined);
         var hasRequested = false;
+        var isDone = false;
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
                 _d = false;
                 const state = _c;
+                if (isDone) {
+                    console.log("shutting down");
+                    break;
+                }
                 console.log("state is: ", state);
                 const t = state.cast();
                 console.log("t: ", t);
                 console.log("to.commands()?", t.commands());
-                if (state.is(exports.s0)) {
-                    const open = state.cast();
-                    setTimeout(() => {
-                        var _a, _b;
-                        if (!hasRequested) {
-                            hasRequested = true;
-                            (_a = open.commands()) === null || _a === void 0 ? void 0 : _a.req();
-                        }
-                        else {
-                            (_b = open.commands()) === null || _b === void 0 ? void 0 : _b.done();
-                        }
-                    }, 3000);
-                }
-                else if (state.is(exports.s1)) {
-                    const open = state.cast();
-                    setTimeout(() => {
-                        var _a;
-                        (_a = open.commands()) === null || _a === void 0 ? void 0 : _a.get();
-                    }, 3000);
-                }
-                else if (state.is(exports.s2)) {
-                    console.log("shutting down");
-                    break;
+                console.log(state.commandsAvailable());
+                for (var c in t.commands()) {
+                    var tt = t.commands();
+                    if (c === 'req' && !hasRequested) {
+                        console.log("found: ", c);
+                        setTimeout(() => {
+                            console.log("has req: ", hasRequested);
+                            if (!hasRequested) {
+                                hasRequested = true;
+                                tt === null || tt === void 0 ? void 0 : tt.req();
+                            }
+                        }, 3000);
+                        break;
+                    }
+                    else if (c === 'get') {
+                        setTimeout(() => {
+                            tt === null || tt === void 0 ? void 0 : tt.get();
+                        }, 3000);
+                        break;
+                    }
+                    else if (c === 'done') {
+                        tt === null || tt === void 0 ? void 0 : tt.done();
+                        isDone = true;
+                        break;
+                    }
                 }
             }
         }
@@ -88,3 +95,25 @@ function main() {
     });
 }
 main();
+/*
+
+if (state.is(s0)) {
+        const open = state.cast()
+        setTimeout(() => {
+            if (!hasRequested) {
+                hasRequested = true
+                open.commands()?.req()
+            } else {
+                open.commands()?.done()
+            }
+        }, 3000)
+    } else if (state.is(s1)) {
+        const open = state.cast()
+        setTimeout(() => {
+            open.commands()?.get()
+        }, 3000)
+    } else if (state.is(s2)) {
+        console.log("shutting down")
+        break
+    }
+*/ 

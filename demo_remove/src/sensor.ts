@@ -25,14 +25,52 @@ async function main() {
   const tags = protocol.tagWithEntityId('robot-1')
   const machine = createMachineRunner(sdk, tags, i2, undefined)
   var hasRequested = false
-
+  var isDone = false
   for await (const state of machine) {
+
+    if (isDone) {
+        console.log("shutting down")
+        break
+    }
     console.log("state is: ", state)
     const t = state.cast()
     console.log("t: ", t)
     console.log("to.commands()?", t.commands())
+    console.log(state.commandsAvailable())
+    for (var c in t.commands()) {
+        var tt = t.commands() as any;
+        if (c === 'req' && !hasRequested) {
+            console.log("found: ", c)
+            setTimeout(() => {
+                console.log("has req: ", hasRequested)
+                if (!hasRequested) {
+                    hasRequested = true
+                    tt?.req()
+                }
+            }, 3000)
+            break
+        } else if (c === 'get') {
+            setTimeout(() => {
+                tt?.get()
+            }, 3000)
+            break
+        } else if (c === 'done') {
+            tt?.done()
+            isDone = true
+            break
+        }
+    }
 
-    if (state.is(s0)) {
+  }
+  sdk.dispose()
+}
+
+main()
+
+
+/*
+
+if (state.is(s0)) {
         const open = state.cast()
         setTimeout(() => {
             if (!hasRequested) {
@@ -51,8 +89,4 @@ async function main() {
         console.log("shutting down")
         break
     }
-  }
-  sdk.dispose()
-}
-
-main()
+*/
