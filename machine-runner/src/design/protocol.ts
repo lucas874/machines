@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Tag, Tags } from '@actyx/sdk'
+import { MsgType, Tag, Tags } from '@actyx/sdk'
 import { StateMechanism, MachineProtocol, ReactionMap, StateFactory } from './state.js'
 import { MachineEvent } from './event.js'
 import { DeepReadonly } from '../utils/type-utils.js'
@@ -365,25 +365,27 @@ export namespace ProjMachine {
     target: string
     label: { tag: 'Execute'; cmd: string; logType: string[] } | { tag: 'Input'; eventType: string }
   }
-
+  /* function $addCmds(m: any, state: any, ...transitions: Array<any>) : any {
+    return +["()", (t: any) => state.command(t.label.cmd, )];
+  } */
   export function machineFromProj(
     m: Machine<any, any, any>,
     proj: MachineAnalysisResource,
     events: readonly MachineEvent.Factory<any, Record<never, never>>[]
   ): [Machine<any, any, MachineEvent.Factory.Any>, any] {
     var projStatesToStates: Map<string, any> = new Map()
-    var projStatesToTransitions: Map<string, Transition[]> = new Map()
+    var projStatesToExec: Map<string, Transition[]> = new Map()
+    var projStatesToInput: Map<string, Transition[]> = new Map()
     var eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> = new Map()
 
     proj.transitions.forEach((transition) => {
-      if (!projStatesToTransitions.has(transition.source)) {
-       projStatesToTransitions.set(transition.source, new Array())
-      }
-      if (!projStatesToTransitions.has(transition.target)) {
-       projStatesToTransitions.set(transition.target, new Array())
-      }
-      projStatesToTransitions.get(transition.source)?.push(transition)
       if (transition.label.tag === 'Execute') {
+        if (!projStatesToExec.has(transition.source)) {
+          projStatesToExec.set(transition.source, new Array())
+        }
+        projStatesToExec.get(transition.source)?.push(transition)
+
+        // map event type string to Event
         for (let eventType of transition.label.logType) {
           for (let event of events) {
               if (eventType === event.type) {
@@ -392,7 +394,19 @@ export namespace ProjMachine {
             }
           }
         }
+
       } else if (transition.label.tag === 'Input') {
+        if (!projStatesToInput.has(transition.source)) {
+          projStatesToInput.set(transition.source, new Array())
+        }
+        projStatesToInput.get(transition.source)?.push(transition)
+
+        // add target to projStatesToInput as well. in case no outgoing transitions.
+        if (!projStatesToInput.has(transition.target)) {
+          projStatesToInput.set(transition.target, new Array())
+        }
+
+        // map event type string to Event
         for (let event of events) {
           if (transition.label.eventType === event.type) {
             eventTypeStringToEvent.set(transition.label.eventType, event)
@@ -401,27 +415,58 @@ export namespace ProjMachine {
         }
       }
     })
-
-    projStatesToTransitions.forEach((value, key) => {
-      if (!projStatesToStates.has(key)) {
-        projStatesToStates.set(key, m.designEmpty(key).finish())
-      }
-
-      value.forEach((transition) => {
+    projStatesToExec.forEach((transitions, state) => {
+      //const mState = m.designEmpty(state)
+      // create state
+      //projStatesToStates.set(state, m.designEmpty(state))
+      var test = new Array()
+      // add self loops
+      transitions.forEach((transition) => {
         if (transition.label.tag === 'Execute') {
           var eventTypes = transition.label.logType.map((et: string) => {
             return eventTypeStringToEvent.get(et)
           })
-          projStatesToStates.get(key).command(transition.label.cmd, eventTypes, () => [{}])
-        } else if (transition.label.tag === 'Input') {
+          test.push([transition.label.cmd, eventTypes, () => [{}]])
+          //projStatesToStates.get(state).command(transition.label.cmd, eventTypes, () => [{}])
+        }
+      })
+      console.log("test is: ", test)
+      projStatesToStates.set(state, m.designEmpty(state).commandFromList(test).finish())
+
+      // finish
+      //console.log("finishing: ", state)
+      //projStatesToStates.get(state).finish()
+      //console.log("finished: ", projStatesToStates.get(state))
+    })
+    //console.log(projStatesToExec)
+    //console.log(projStatesToInput)
+    //console.log(projStatesToStates)
+    projStatesToInput.forEach((value, key) => {
+      if (!projStatesToStates.has(key)) {
+        projStatesToStates.set(key, m.designEmpty(key).finish())
+      }
+      //projStatesToStates.get(key).finish()
+      //console.log("input loop state is: ", projStatesToStates.get(key))
+      value.forEach((transition) => {
+        //console.log(transition)
+        if (transition.label.tag === 'Input') {
           if (!projStatesToStates.has(transition.target)) {
             projStatesToStates.set(transition.target, m.designEmpty(transition.target).finish())
           }
+          console.log(key)
           projStatesToStates.get(key).react([eventTypeStringToEvent.get(transition.label.eventType)], projStatesToStates.get(transition.target), (_: any) => projStatesToStates.get(transition.target).make())
-          }
+        }
       })
     })
     var initial = projStatesToStates.get(proj.initial)
     return [m, initial]
   }
 }
+
+
+/* if (transition.label.tag === 'Execute') {
+          var eventTypes = transition.label.logType.map((et: string) => {
+            return eventTypeStringToEvent.get(et)
+          })
+          projStatesToStates.get(key).command(transition.label.cmd, eventTypes, () => [{}])
+        } else  */

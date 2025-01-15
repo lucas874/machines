@@ -184,6 +184,32 @@ export type StateMechanism<
     }
   >
 
+  readonly commandFromList: <
+    CommandName extends string,
+    EmittedEventFactories extends utils.ReadonlyNonZeroTuple<MachineEventFactories>,
+    CommandArgs extends unknown[],
+  >(
+    cmds: [(CommandName extends `_${string}` ? never : CommandName),
+            (EmittedEventFactories),
+            (CommandDefiner<
+              CommandContext<StatePayload, MachineEvent.Factory.Reduce<EmittedEventFactories>>,
+              CommandArgs,
+              MachineEvent.Factory.MapToPayloadOrContainedPayload<EmittedEventFactories>>)][]
+  ) => StateMechanism<
+    SwarmProtocolName,
+    MachineName,
+    MachineEventFactories,
+    StateName,
+    StatePayload,
+    Commands & {
+      [key in CommandName]: CommandDefiner<
+        CommandContext<StatePayload, MachineEvent.Factory.Reduce<EmittedEventFactories>>,
+        CommandArgs,
+        MachineEvent.Factory.MapToPayloadOrContainedPayload<EmittedEventFactories>
+      >
+    }
+  >
+
   /**
    * Finalize state design process.
    * @returns a StateFactory
@@ -289,6 +315,36 @@ export namespace StateMechanism {
         ],
       })
     }
+    /*
+    (CommandName extends `_${string}` ? never : CommandName),
+    (EmittedEventFactories),
+    (CommandDefiner<
+      CommandContext<StatePayload, MachineEvent.Factory.Reduce<EmittedEventFactories>>,
+      CommandArgs,
+      MachineEvent.Factory.MapToPayloadOrContainedPayload<EmittedEventFactories>>)*/
+    const commandFromList: Self['commandFromList'] = (cmds) => {
+      var acc: any;
+      var acc1 = new Array();
+      console.log("cmds are: ", cmds)
+
+      for (var cmd of cmds) {
+        //const cmdd = cmd as []
+        console.log("cmd is: ", cmd)
+        var zero: any = cmd[0]
+        var one: any = cmd[1]
+        console.log("heeeeey ", one)
+        var two: any = cmd[2]
+        acc = command(cmd[0], cmd[1], cmd[2])
+        acc1.push(acc.commands)
+        console.log("tyype of commands: ", acc.commands)
+        //command(cmd[0], cmd[1], cmd[2])
+      }
+      let allcmds = acc1.reduce((acc, obj) => ({ ...acc, ...obj }), {});
+      acc.commands = allcmds
+      console.log("HELLOO IN THIGNGG: ", acc)
+      console.log("HELLLOOO ", acc1)
+      return acc;
+    }
 
     const finish: Self['finish'] = () => {
       const factory = StateFactory.fromMechanism(mechanism)
@@ -309,11 +365,127 @@ export namespace StateMechanism {
       name: stateName,
       commands,
       command,
+      commandFromList,
       finish,
     }
 
     return mechanism
   }
+  /* export const make1 = <
+    SwarmProtocolName extends string,
+    MachineName extends string,
+    MachineEventFactories extends MachineEvent.Factory.Any,
+    StateName extends string,
+    StatePayload,
+    Commands extends CommandDefinerMap<any, any, Contained.ContainedEvent<MachineEvent.Any>[]>,
+  >(
+    protocol: MachineProtocol<SwarmProtocolName, MachineName, MachineEventFactories>,
+    stateName: StateName,
+    props?: {
+      commands?: Commands
+      commandDataForAnalytics: { commandName: string; events: string[] }[]
+    },
+  ): StateMechanism<
+    SwarmProtocolName,
+    MachineName,
+    MachineEventFactories,
+    StateName,
+    StatePayload,
+    Commands
+  > => {
+    type Self = StateMechanism<
+      SwarmProtocolName,
+      MachineName,
+      MachineEventFactories,
+      StateName,
+      StatePayload,
+      Commands
+    >
+
+    const commands: Self['commands'] = props?.commands || ({} as Commands)
+
+    const commandFromList: Self['command'] = (name, factories, commandDefinition) => {
+      // TODO: make this more sturdy
+      //
+      // commandDefinition now is supposed to be returning event payload and the
+      // patched commandDefinition here
+
+      if (name.startsWith('_')) {
+        throw new Error("Command name cannot start with '_'")
+      }
+
+      type Params = Parameters<typeof commandDefinition>
+
+      const patchedCommandDefinition = (...params: Params) => {
+        // Payload is either 0 or factories.length. Therefore converting
+        // payload to event this way is safe-ish
+        const payloads = commandDefinition(...params)
+        const events = payloads.map(
+          (payloadOrContainedPayload, index): Contained.ContainedEvent<MachineEvent.Any> => {
+            const factory = factories[index]
+
+            const [payload, extraData] =
+              Contained.ContainedPayload.extract(payloadOrContainedPayload)
+
+            return [factory.make(payload), extraData]
+          },
+        )
+
+        return events
+      }
+
+      return make(protocol, stateName, {
+        commands: {
+          ...commands,
+
+          // TODO: continuing "sturdyness" note above.
+          //
+          // This part is eventually used by
+          // convertCommandMapToCommandSignatureMap (find
+          // "convertCommandMapToCommandSignatureMap" in the StateContainer's
+          // code) "convertCommandMapToCommandSignatureMap" doesn't understand
+          // that non-patched commandDefinition is not returning events, but
+          // payloads.
+          //
+          // Therefore, changing this line and the patchedCommandDefinition
+          // above may break the library
+          [name]: patchedCommandDefinition,
+        },
+        commandDataForAnalytics: [
+          ...(props?.commandDataForAnalytics || []),
+          {
+            events: factories.map((eventFactory) => eventFactory.type),
+            commandName: name,
+          },
+        ],
+      })
+    }
+
+    const finish: Self['finish'] = () => {
+      const factory = StateFactory.fromMechanism(mechanism)
+      protocol.states.allFactories.add(factory)
+      protocol.commands.push(
+        ...(props?.commandDataForAnalytics || []).map(
+          (item: { commandName: string; events: string[] }) => ({
+            ...item,
+            ofState: mechanism.name,
+          }),
+        ),
+      )
+      return factory
+    }
+
+    const mechanism: Self = {
+      protocol,
+      name: stateName,
+      commands,
+      command,
+      commandFromList,
+      finish,
+    }
+
+    return mechanism
+  } */
 }
 
 /**

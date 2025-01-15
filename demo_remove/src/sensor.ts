@@ -16,27 +16,22 @@ s0.react([Events.NeedsWater], s1, (_) => s1.make())
 s0.react([Events.Done], s2, (_) => s2.make())
 s1.react([Events.HasWater], s0, (_) => s0.make())
 
+var m = machine.createJSONForAnalysis(s0)
+console.log(m)
+const [m2, i2] = protocol.makeProjMachine("sensor", m, Events.All)
 
-/* async function main() {
-  const app = await Actyx.of(manifest)
-  const tags = protocol.tagWithEntityId('robot-1')
-
-  await app.publish(tags.apply(Events.NeedsWater.make({})))
-  console.log('Publishing NeedsWater')
-
-  await app.publish(tags.apply(Events.HasWater.make({})))
-  console.log('Publishing HasWater')
-
-  app.dispose()
-} */
 async function main() {
   const sdk = await Actyx.of(manifest)
   const tags = protocol.tagWithEntityId('robot-1')
-  const machine = createMachineRunner(sdk, tags, s0, undefined)
+  const machine = createMachineRunner(sdk, tags, i2, undefined)
   var hasRequested = false
 
   for await (const state of machine) {
-    console.log(state)
+    console.log("state is: ", state)
+    const t = state.cast()
+    console.log("t: ", t)
+    console.log("to.commands()?", t.commands())
+
     if (state.is(s0)) {
         const open = state.cast()
         setTimeout(() => {

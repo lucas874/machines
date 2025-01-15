@@ -32,31 +32,25 @@ exports.s2 = machine.designEmpty('isDone').finish();
 exports.s0.react([protocol_1.Events.NeedsWater], exports.s1, (_) => exports.s1.make());
 exports.s0.react([protocol_1.Events.Done], exports.s2, (_) => exports.s2.make());
 exports.s1.react([protocol_1.Events.HasWater], exports.s0, (_) => exports.s0.make());
-/* async function main() {
-  const app = await Actyx.of(manifest)
-  const tags = protocol.tagWithEntityId('robot-1')
-
-  await app.publish(tags.apply(Events.NeedsWater.make({})))
-  console.log('Publishing NeedsWater')
-
-  await app.publish(tags.apply(Events.HasWater.make({})))
-  console.log('Publishing HasWater')
-
-  app.dispose()
-} */
+var m = machine.createJSONForAnalysis(exports.s0);
+console.log(m);
+const [m2, i2] = protocol_1.protocol.makeProjMachine("sensor", m, protocol_1.Events.All);
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
         const sdk = yield sdk_1.Actyx.of(protocol_1.manifest);
         const tags = protocol_1.protocol.tagWithEntityId('robot-1');
-        const machine = (0, machine_runner_1.createMachineRunner)(sdk, tags, exports.s0, undefined);
+        const machine = (0, machine_runner_1.createMachineRunner)(sdk, tags, i2, undefined);
         var hasRequested = false;
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
                 _d = false;
                 const state = _c;
-                console.log(state);
+                console.log("state is: ", state);
+                const t = state.cast();
+                console.log("t: ", t);
+                console.log("to.commands()?", t.commands());
                 if (state.is(exports.s0)) {
                     const open = state.cast();
                     setTimeout(() => {
@@ -90,31 +84,7 @@ function main() {
             }
             finally { if (e_1) throw e_1.error; }
         }
-        /*   await app.publish(tags.apply(Events.NeedsWater.make({})))
-          console.log('Publishing NeedsWater')
-        
-          await app.publish(tags.apply(Events.HasWater.make({})))
-          console.log('Publishing HasWater')
-         */
         sdk.dispose();
     });
 }
 main();
-/*
-  if (state.is(Auction)) {
-    const open = state.cast()
-    if (!open.payload.scores.find((s) => s.robot === open.payload.robot)) {
-      await open.commands()?.bid(1)
-      setTimeout(() => {
-        const open = robot1.get()?.as(Auction)
-        open && open.commands()?.select(bestRobot(open.payload.scores))
-      }, 5000)
-    }
-  } else if (state.is(DoIt)) {
-    const assigned = state.cast()
-    IamWinner = assigned.payload.winner === assigned.payload.robot
-    if (!IamWinner) break
-    // now we have the order and can start the mission
-  }
-
-*/ 
