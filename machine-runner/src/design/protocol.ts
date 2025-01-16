@@ -28,6 +28,13 @@ export type SwarmProtocol<
     proj: MachineAnalysisResource,
     events: readonly MachineEvent.Factory<any, any>[]
   ) => [Machine<any, any, any>, any]
+  extendMachine: <MachineName extends string>(
+    machineName: MachineName,
+    proj: MachineAnalysisResource,
+    events: readonly MachineEvent.Factory<any, any>[],
+    mOriginal: [Machine<any, any, any>, any],
+    fMap: ProjMachine.funMap
+  ) => [Machine<any, any, any>, any]
 }
 //Machine<SwarmProtocolName, MachineName, MachineEventFactories>
 /**
@@ -74,7 +81,8 @@ export namespace SwarmProtocol {
     return {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
-      makeProjMachine: (machineName, proj, events) => ProjMachine.machineFromProj(ImplMachine.make(swarmName, machineName, eventFactories), proj, events)
+      makeProjMachine: (machineName, proj, events) => ProjMachine.machineFromProj(ImplMachine.make(swarmName, machineName, eventFactories), proj, events),
+      extendMachine: (machineName, proj, events, mOriginal, fMap) => ProjMachine.extendMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, mOriginal, fMap)
     }
   }
 }
@@ -460,11 +468,18 @@ export namespace ProjMachine {
     return [m, initial]
   }
 
+  export type funMap = {
+    commands: Map<any, any>,
+    reactions: Map<any, any>,
+    statePayloads: Map<any, any>
+  }
+
   export function extendMachine(
     m: Machine<any, any, any>,
     proj: MachineAnalysisResource,
     events: readonly MachineEvent.Factory<any, Record<never, never>>[],
-    mOriginal: Machine<any, any, any>
+    mOriginal: [Machine<any, any, any>, any],
+    fMap: funMap
   ): [Machine<any, any, MachineEvent.Factory.Any>, any] {
     var projStatesToStates: Map<string, any> = new Map()
     var projStatesToExec: Map<string, Transition[]> = new Map()
@@ -513,10 +528,14 @@ export namespace ProjMachine {
       // add self loops
       transitions.forEach((transition) => {
         if (transition.label.tag === 'Execute') {
-          var eventTypes = transition.label.logType.map((et: string) => {
+          var es = transition.label.logType.map((et: string) => {
             return eventTypeStringToEvent.get(et)
           })
-          cmdTriples.push([transition.label.cmd, eventTypes, () => [{}]])
+          var etypes = transition.label.logType.map((et: string) => {
+            return eventTypeStringToEvent.get(et)?.type
+          })
+          var f = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => [{}]
+          cmdTriples.push([transition.label.cmd, es, f])
 
         }
       })
@@ -534,8 +553,9 @@ export namespace ProjMachine {
           if (!projStatesToStates.has(transition.target)) {
             projStatesToStates.set(transition.target, m.designEmpty(transition.target).finish())
           }
-
-          projStatesToStates.get(key).react([eventTypeStringToEvent.get(transition.label.eventType)], projStatesToStates.get(transition.target), (_: any) => projStatesToStates.get(transition.target).make())
+          var es = eventTypeStringToEvent.get(transition.label.eventType)
+          //var f = fMap.reactions.has(eventType) ? fMap.reactions.get(eventType) : () => [{}]
+          projStatesToStates.get(key).react([es], projStatesToStates.get(transition.target), (_: any) => projStatesToStates.get(transition.target).make())
         }
       })
     })

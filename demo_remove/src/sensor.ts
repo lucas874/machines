@@ -4,7 +4,7 @@ import { Events, manifest, protocol } from './protocol'
 
 const machine = protocol.makeMachine('sensor')
 export const s0 = machine.designEmpty('Thirsty')
-    .command('req', [Events.NeedsWater], () => [Events.NeedsWater.make({requiredWaterMl: 5})])
+    .command('req', [Events.NeedsWater], () => { console.log("hej"); return [Events.NeedsWater.make({requiredWaterMl: 5})] })
     .command('done', [Events.Done], () => [{}])
     .finish()
 export const s1 = machine.designEmpty('Wet')
@@ -19,11 +19,25 @@ s1.react([Events.HasWater], s0, (_) => s0.make())
 var m = machine.createJSONForAnalysis(s0)
 //console.log(m)
 const [m2, i2] = protocol.makeProjMachine("sensor", m, Events.All)
+const cMap = new Map()
+cMap.set(Events.NeedsWater.type, () => { console.log("hej"); return [Events.NeedsWater.make({requiredWaterMl: 5})]})
+cMap.set(Events.Done.type, () => [{}])
+cMap.set(Events.HasWater.type, () => [{}])
+
+const rMap = new Map()
+rMap.set(Events.NeedsWater, () => [Events.NeedsWater.make({requiredWaterMl: 5})])
+rMap.set(Events.Done, () => [{}])
+const statePayloadMap = new Map()
+const fMap : any = {commands: cMap, reactions: rMap, statePayloads: statePayloadMap}
+
+const [m3, i3] = protocol.extendMachine("sensor", m, Events.All, [machine, s0], fMap)
+
+//const _ = protocol.extendMachine("sensor", m, Events.All, [machine, s0])
 
 async function main() {
   const sdk = await Actyx.of(manifest)
   const tags = protocol.tagWithEntityId('robot-1')
-  const machine = createMachineRunner(sdk, tags, i2, undefined)
+  const machine = createMachineRunner(sdk, tags, i3, undefined)
   var hasRequested = false
   var isDone = false
   for await (const state of machine) {

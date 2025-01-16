@@ -22,7 +22,7 @@ const machine_runner_1 = require("@actyx/machine-runner");
 const protocol_1 = require("./protocol");
 const machine = protocol_1.protocol.makeMachine('sensor');
 exports.s0 = machine.designEmpty('Thirsty')
-    .command('req', [protocol_1.Events.NeedsWater], () => [protocol_1.Events.NeedsWater.make({ requiredWaterMl: 5 })])
+    .command('req', [protocol_1.Events.NeedsWater], () => { console.log("hej"); return [protocol_1.Events.NeedsWater.make({ requiredWaterMl: 5 })]; })
     .command('done', [protocol_1.Events.Done], () => [{}])
     .finish();
 exports.s1 = machine.designEmpty('Wet')
@@ -35,12 +35,23 @@ exports.s1.react([protocol_1.Events.HasWater], exports.s0, (_) => exports.s0.mak
 var m = machine.createJSONForAnalysis(exports.s0);
 //console.log(m)
 const [m2, i2] = protocol_1.protocol.makeProjMachine("sensor", m, protocol_1.Events.All);
+const cMap = new Map();
+cMap.set(protocol_1.Events.NeedsWater.type, () => { console.log("hej"); return [protocol_1.Events.NeedsWater.make({ requiredWaterMl: 5 })]; });
+cMap.set(protocol_1.Events.Done.type, () => [{}]);
+cMap.set(protocol_1.Events.HasWater.type, () => [{}]);
+const rMap = new Map();
+rMap.set(protocol_1.Events.NeedsWater, () => [protocol_1.Events.NeedsWater.make({ requiredWaterMl: 5 })]);
+rMap.set(protocol_1.Events.Done, () => [{}]);
+const statePayloadMap = new Map();
+const fMap = { commands: cMap, reactions: rMap, statePayloads: statePayloadMap };
+const [m3, i3] = protocol_1.protocol.extendMachine("sensor", m, protocol_1.Events.All, [machine, exports.s0], fMap);
+//const _ = protocol.extendMachine("sensor", m, Events.All, [machine, s0])
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
         const sdk = yield sdk_1.Actyx.of(protocol_1.manifest);
         const tags = protocol_1.protocol.tagWithEntityId('robot-1');
-        const machine = (0, machine_runner_1.createMachineRunner)(sdk, tags, i2, undefined);
+        const machine = (0, machine_runner_1.createMachineRunner)(sdk, tags, i3, undefined);
         var hasRequested = false;
         var isDone = false;
         try {
