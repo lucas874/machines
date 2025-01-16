@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.all_projections = exports.subsf = exports.subswh = exports.subs = exports.interfacing_swarmsf = exports.interfacing_swarmswh = exports.interfacing_swarms = exports.Gquality = exports.Gfactory = exports.Gwarehouse = exports.Composition = exports.Events = exports.manifest = void 0;
+exports.getRandomInt = getRandomInt;
 /* eslint-disable @typescript-eslint/no-namespace */
 const machine_runner_1 = require("@actyx/machine-runner");
 const machine_check_1 = require("@actyx/machine-check");
@@ -69,3 +70,9 @@ const result_project_all = (0, machine_check_1.projectAll)(exports.interfacing_s
 if (result_project_all.type === 'ERROR')
     throw new Error('error getting subscription');
 exports.all_projections = result_project_all.data;
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
+function getRandomInt(min, max) {
+    const minCeiled = Math.ceil(min);
+    const maxFloored = Math.floor(max);
+    return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled); // The maximum is exclusive and the minimum is inclusive
+}

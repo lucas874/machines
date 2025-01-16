@@ -1,13 +1,13 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, all_projections  } from './factory_protocol'
+import { Events, manifest, Composition, interfacing_swarms, subs, all_projections, getRandomInt } from './factory_protocol'
 import { projectCombineMachines } from '@actyx/machine-check'
 import { MachineAnalysisResource } from '@actyx/machine-runner/lib/esm/design/protocol'
 
-for (var p of all_projections) {
+/* for (var p of all_projections) {
     console.log(JSON.stringify(p))
-}
-//new Date().toLocaleString()
+} */
+
 const door = Composition.makeMachine('D')
 export const s0 = door.designEmpty('s0')
     .command('close', [Events.time], () => {var dateString = new Date().toLocaleString(); console.log(dateString); return [Events.time.make({timeOfDay: dateString})]})
@@ -30,4 +30,34 @@ const statePayloadMap = new Map()
 const fMap : any = {commands: cMap, reactions: rMap, statePayloads: statePayloadMap}
 const mAnalysisResource: MachineAnalysisResource = {initial: projection.initial, subscriptions: [], transitions: projection.transitions}
 const [m3, i3] = Composition.extendMachine("D", mAnalysisResource, Events.allEvents, [door, s0], fMap)
-console.log(m3.createJSONForAnalysis(i3))
+//console.log(m3.createJSONForAnalysis(i3))
+//console.log(getRandomInt(2000, 5000))
+
+async function main() {
+    const app = await Actyx.of(manifest)
+    const tags = Composition.tagWithEntityId('factory-1')
+    const machine = createMachineRunner(app, tags, i3, undefined)
+    //var hasRequested = false
+    //var isDone = false
+    for await (const state of machine) {
+      console.log("state is: ", state)
+      /* if (isDone) {
+          console.log("shutting down")
+          break
+      } */
+
+      const s = state.cast()
+      for (var c in s.commands()) {
+          var cmds = s.commands() as any;
+          if (c === 'close') {
+            setTimeout(() => {
+                cmds?.close()
+            }, getRandomInt(2000, 5000))
+            break
+          }
+      }
+    }
+    app.dispose()
+}
+
+main()
