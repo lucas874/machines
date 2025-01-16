@@ -10,7 +10,7 @@ exports.manifest = {
 var Events;
 (function (Events) {
     Events.HasWater = machine_runner_1.MachineEvent.design('HasWater').withoutPayload();
-    Events.NeedsWater = machine_runner_1.MachineEvent.design('NeedsWater').withoutPayload();
+    Events.NeedsWater = machine_runner_1.MachineEvent.design('NeedsWater').withPayload();
     Events.Done = machine_runner_1.MachineEvent.design('Done').withoutPayload();
     Events.All = [Events.HasWater, Events.NeedsWater, Events.Done];
 })(Events || (exports.Events = Events = {}));

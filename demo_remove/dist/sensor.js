@@ -22,7 +22,7 @@ const machine_runner_1 = require("@actyx/machine-runner");
 const protocol_1 = require("./protocol");
 const machine = protocol_1.protocol.makeMachine('sensor');
 exports.s0 = machine.designEmpty('Thirsty')
-    .command('req', [protocol_1.Events.NeedsWater], () => [{}])
+    .command('req', [protocol_1.Events.NeedsWater], () => [protocol_1.Events.NeedsWater.make({ requiredWaterMl: 5 })])
     .command('done', [protocol_1.Events.Done], () => [{}])
     .finish();
 exports.s1 = machine.designEmpty('Wet')

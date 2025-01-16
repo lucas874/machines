@@ -4,7 +4,7 @@ import { Events, manifest, protocol } from './protocol'
 
 const machine = protocol.makeMachine('sensor')
 export const s0 = machine.designEmpty('Thirsty')
-    .command('req', [Events.NeedsWater], () => [{}])
+    .command('req', [Events.NeedsWater], () => [Events.NeedsWater.make({requiredWaterMl: 5})])
     .command('done', [Events.Done], () => [{}])
     .finish()
 export const s1 = machine.designEmpty('Wet')

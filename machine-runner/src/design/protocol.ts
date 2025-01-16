@@ -26,7 +26,7 @@ export type SwarmProtocol<
   makeProjMachine: <MachineName extends string>(
     machineName: MachineName,
     proj: MachineAnalysisResource,
-    events: readonly MachineEvent.Factory<any, Record<never, never>>[]
+    events: readonly MachineEvent.Factory<any, any>[]
   ) => [Machine<any, any, any>, any]
 }
 //Machine<SwarmProtocolName, MachineName, MachineEventFactories>
@@ -365,18 +365,16 @@ export namespace ProjMachine {
     target: string
     label: { tag: 'Execute'; cmd: string; logType: string[] } | { tag: 'Input'; eventType: string }
   }
-  /* function $addCmds(m: any, state: any, ...transitions: Array<any>) : any {
-    return +["()", (t: any) => state.command(t.label.cmd, )];
-  } */
+
   export function machineFromProj(
     m: Machine<any, any, any>,
     proj: MachineAnalysisResource,
-    events: readonly MachineEvent.Factory<any, Record<never, never>>[]
+    events: readonly MachineEvent.Factory<any, MachineEvent.Any>[]
   ): [Machine<any, any, MachineEvent.Factory.Any>, any] {
     var projStatesToStates: Map<string, any> = new Map()
     var projStatesToExec: Map<string, Transition[]> = new Map()
     var projStatesToInput: Map<string, Transition[]> = new Map()
-    var eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> = new Map()
+    var eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, MachineEvent.Any>> = new Map()
 
     proj.transitions.forEach((transition) => {
       if (transition.label.tag === 'Execute') {
@@ -458,6 +456,90 @@ export namespace ProjMachine {
         }
       })
     })
+    var initial = projStatesToStates.get(proj.initial)
+    return [m, initial]
+  }
+
+  export function extendMachine(
+    m: Machine<any, any, any>,
+    proj: MachineAnalysisResource,
+    events: readonly MachineEvent.Factory<any, Record<never, never>>[],
+    mOriginal: Machine<any, any, any>
+  ): [Machine<any, any, MachineEvent.Factory.Any>, any] {
+    var projStatesToStates: Map<string, any> = new Map()
+    var projStatesToExec: Map<string, Transition[]> = new Map()
+    var projStatesToInput: Map<string, Transition[]> = new Map()
+    var eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> = new Map()
+
+    proj.transitions.forEach((transition) => {
+      if (transition.label.tag === 'Execute') {
+        if (!projStatesToExec.has(transition.source)) {
+          projStatesToExec.set(transition.source, new Array())
+        }
+        projStatesToExec.get(transition.source)?.push(transition)
+
+        // map event type string to Event
+        for (let eventType of transition.label.logType) {
+          for (let event of events) {
+              if (eventType === event.type) {
+              eventTypeStringToEvent.set(eventType, event)
+              break
+            }
+          }
+        }
+
+      } else if (transition.label.tag === 'Input') {
+        if (!projStatesToInput.has(transition.source)) {
+          projStatesToInput.set(transition.source, new Array())
+        }
+        projStatesToInput.get(transition.source)?.push(transition)
+
+        // add target to projStatesToInput as well. in case no outgoing transitions.
+        if (!projStatesToInput.has(transition.target)) {
+          projStatesToInput.set(transition.target, new Array())
+        }
+
+        // map event type string to Event
+        for (let event of events) {
+          if (transition.label.eventType === event.type) {
+            eventTypeStringToEvent.set(transition.label.eventType, event)
+            break
+          }
+        }
+      }
+    })
+    projStatesToExec.forEach((transitions, state) => {
+      var cmdTriples = new Array()
+      // add self loops
+      transitions.forEach((transition) => {
+        if (transition.label.tag === 'Execute') {
+          var eventTypes = transition.label.logType.map((et: string) => {
+            return eventTypeStringToEvent.get(et)
+          })
+          cmdTriples.push([transition.label.cmd, eventTypes, () => [{}]])
+
+        }
+      })
+
+      projStatesToStates.set(state, m.designEmpty(state).commandFromList(cmdTriples).finish())
+    })
+
+    projStatesToInput.forEach((value, key) => {
+      if (!projStatesToStates.has(key)) {
+        projStatesToStates.set(key, m.designEmpty(key).finish())
+      }
+
+      value.forEach((transition) => {
+        if (transition.label.tag === 'Input') {
+          if (!projStatesToStates.has(transition.target)) {
+            projStatesToStates.set(transition.target, m.designEmpty(transition.target).finish())
+          }
+
+          projStatesToStates.get(key).react([eventTypeStringToEvent.get(transition.label.eventType)], projStatesToStates.get(transition.target), (_: any) => projStatesToStates.get(transition.target).make())
+        }
+      })
+    })
+
     var initial = projStatesToStates.get(proj.initial)
     return [m, initial]
   }
