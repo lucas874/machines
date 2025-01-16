@@ -43,7 +43,10 @@ async function main() {
           var cmds = s.commands() as any;
           if (c === 'build') {
             setTimeout(() => {
-                cmds?.build()
+                var s1 = machine.get()?.cast()?.commands() as any
+                if (Object.keys(s1).includes('build')) { //console.log(Object.keys(s1))
+                    s1.build()
+                }
             }, getRandomInt(2000, 5000))
             break
           }

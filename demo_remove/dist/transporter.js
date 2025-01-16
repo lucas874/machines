@@ -50,7 +50,7 @@ const statePayloadMap = new Map();
 const fMap = { commands: cMap, reactions: rMap, statePayloads: statePayloadMap };
 const mAnalysisResource = { initial: projection.initial, subscriptions: [], transitions: projection.transitions };
 const [m3, i3] = factory_protocol_1.Composition.extendMachine("T", mAnalysisResource, factory_protocol_1.Events.allEvents, [transporter, exports.s0], fMap);
-console.log(m3.createJSONForAnalysis(i3));
+//console.log(m3.createJSONForAnalysis(i3))
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
@@ -74,13 +74,24 @@ function main() {
                     var cmds = s.commands();
                     if (c === 'request') {
                         setTimeout(() => {
-                            cmds === null || cmds === void 0 ? void 0 : cmds.request();
+                            var _a, _b;
+                            var s1 = (_b = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.cast()) === null || _b === void 0 ? void 0 : _b.commands();
+                            if (Object.keys(s1).includes('request')) { //console.log(Object.keys(s1))
+                                s1.request();
+                            }
                         }, (0, factory_protocol_1.getRandomInt)(2000, 5000));
                         break;
                     }
                     if (c === 'deliver') {
                         setTimeout(() => {
-                            cmds === null || cmds === void 0 ? void 0 : cmds.deliver();
+                            var _a, _b;
+                            //const canDeliver = machine.get()?.commandsAvailable()
+                            //if (canDeliver) {
+                            var s1 = (_b = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.cast()) === null || _b === void 0 ? void 0 : _b.commands();
+                            if (Object.keys(s1).includes('deliver')) { //console.log(Object.keys(s1))
+                                s1.deliver();
+                            }
+                            //}
                         }, (0, factory_protocol_1.getRandomInt)(2000, 5000));
                         break;
                     }

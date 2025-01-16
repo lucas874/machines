@@ -36,7 +36,7 @@ const statePayloadMap = new Map()
 const fMap : any = {commands: cMap, reactions: rMap, statePayloads: statePayloadMap}
 const mAnalysisResource: MachineAnalysisResource = {initial: projection.initial, subscriptions: [], transitions: projection.transitions}
 const [m3, i3] = Composition.extendMachine("T", mAnalysisResource, Events.allEvents, [transporter, s0], fMap)
-console.log(m3.createJSONForAnalysis(i3))
+//console.log(m3.createJSONForAnalysis(i3))
 
 async function main() {
     const app = await Actyx.of(manifest)
@@ -56,13 +56,22 @@ async function main() {
           var cmds = s.commands() as any;
           if (c === 'request') {
             setTimeout(() => {
-                cmds?.request()
+                var s1 = machine.get()?.cast()?.commands() as any
+                if (Object.keys(s1).includes('request')) { //console.log(Object.keys(s1))
+                    s1.request()
+                }
             }, getRandomInt(2000, 5000))
             break
           }
           if (c === 'deliver') {
             setTimeout(() => {
-                cmds?.deliver()
+                //const canDeliver = machine.get()?.commandsAvailable()
+                //if (canDeliver) {
+                var s1 = machine.get()?.cast()?.commands() as any
+                if (Object.keys(s1).includes('deliver')) { //console.log(Object.keys(s1))
+                    s1.deliver()
+                }
+                //}
             }, getRandomInt(2000, 5000))
             break
           }

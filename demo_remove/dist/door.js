@@ -60,13 +60,16 @@ function main() {
                 console.log("state is: ", state);
                 const s = state.cast();
                 for (var c in s.commands()) {
-                    var cmds = s.commands();
                     if (c === 'close') {
                         setTimeout(() => {
-                            var _a, _b, _c;
-                            const canClose = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.commandsAvailable();
+                            var _a, _b;
+                            /* const canClose = machine.get()?.commandsAvailable()
                             if (canClose) {
-                                var s1 = (_c = (_b = machine.get()) === null || _b === void 0 ? void 0 : _b.cast()) === null || _c === void 0 ? void 0 : _c.commands();
+                                var s1 = machine.get()?.cast()?.commands() as any
+                                s1.close()
+                            } */
+                            var s1 = (_b = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.cast()) === null || _b === void 0 ? void 0 : _b.commands();
+                            if (Object.keys(s1).includes('close')) { //console.log(Object.keys(s1))
                                 s1.close();
                             }
                             /* if ((await machine.peekNext()).done) {

@@ -63,7 +63,11 @@ function main() {
                     var cmds = s.commands();
                     if (c === 'build') {
                         setTimeout(() => {
-                            cmds === null || cmds === void 0 ? void 0 : cmds.build();
+                            var _a, _b;
+                            var s1 = (_b = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.cast()) === null || _b === void 0 ? void 0 : _b.commands();
+                            if (Object.keys(s1).includes('build')) { //console.log(Object.keys(s1))
+                                s1.build();
+                            }
                         }, (0, factory_protocol_1.getRandomInt)(2000, 5000));
                         break;
                     }

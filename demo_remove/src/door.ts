@@ -42,18 +42,17 @@ async function main() {
       console.log("state is: ", state)
       const s = state.cast()
       for (var c in s.commands()) {
-          var cmds = s.commands() as any;
           if (c === 'close') {
             setTimeout(() => {
-                const canClose = machine.get()?.commandsAvailable()
+                /* const canClose = machine.get()?.commandsAvailable()
                 if (canClose) {
                     var s1 = machine.get()?.cast()?.commands() as any
                     s1.close()
+                } */
+                var s1 = machine.get()?.cast()?.commands() as any
+                if (Object.keys(s1).includes('close')) { //console.log(Object.keys(s1))
+                    s1.close()
                 }
-
-
-
-
                 /* if ((await machine.peekNext()).done) {
                     console.log("done")
                     cmds?.close()
@@ -64,8 +63,6 @@ async function main() {
                 if (whenOn) {
                     cmds?.close()
                 } */
-
-
             }, getRandomInt(2000, 5000))
             break
           }
