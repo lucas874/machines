@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import { MachineEvent, SwarmProtocol } from '@actyx/machine-runner'
-import { SwarmProtocolType, Subscriptions, checkWWFSwarmProtocol, ResultData, InterfacingSwarms, overapproxWWFSubscriptions, checkComposedProjection, projectAll, MachineType} from '@actyx/machine-check'
+import { SwarmProtocolType, Subscriptions, checkWWFSwarmProtocol, ResultData, InterfacingSwarms, overapproxWWFSubscriptions, checkComposedProjection, projectAll, MachineType, projectCombineMachines} from '@actyx/machine-check'
 
 
 export const manifest = {
@@ -54,13 +54,23 @@ export const Gquality: SwarmProtocolType = {
 
 //const protocols: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}, {protocol: Gquality, interface: 'R'}]
 export const interfacing_swarms: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}]
-//export const interfacing_swarms: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}]
-//export const interfacing_swarms: InterfacingSwarms = [{protocol: Gfactory, interface: null}]
+export const interfacing_swarmswh: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}]
+export const interfacing_swarmsf: InterfacingSwarms = [{protocol: Gfactory, interface: null}]
+
 const result_subs: ResultData<Subscriptions>
   = overapproxWWFSubscriptions(interfacing_swarms, {}, 'Medium')
 if (result_subs.type === 'ERROR') throw new Error(result_subs.errors.join(', '))
 export const subs: Subscriptions = result_subs.data
 
+const result_subswh: ResultData<Subscriptions>
+  = overapproxWWFSubscriptions(interfacing_swarmswh, {}, 'Medium')
+if (result_subswh.type === 'ERROR') throw new Error(result_subswh.errors.join(', '))
+export const subswh: Subscriptions = result_subswh.data
+
+const result_subsf: ResultData<Subscriptions>
+  = overapproxWWFSubscriptions(interfacing_swarmsf, {}, 'Medium')
+if (result_subsf.type === 'ERROR') throw new Error(result_subsf.errors.join(', '))
+export const subsf: Subscriptions = result_subsf.data
 
 const result_project_all = projectAll(interfacing_swarms, subs)
 

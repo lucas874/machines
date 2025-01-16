@@ -4,8 +4,6 @@ import { Events, manifest, Composition, interfacing_swarms, subs, all_projection
 import { projectCombineMachines } from '@actyx/machine-check'
 import { MachineAnalysisResource } from '@actyx/machine-runner/lib/esm/design/protocol'
 
-//import { protocol } from './protocol'
-
 for (var p of all_projections) {
     console.log(JSON.stringify(p))
 }

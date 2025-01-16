@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.s2 = exports.s1 = exports.s0 = void 0;
 const factory_protocol_1 = require("./factory_protocol");
 const machine_check_1 = require("@actyx/machine-check");
-//import { protocol } from './protocol'
 for (var p of factory_protocol_1.all_projections) {
     console.log(JSON.stringify(p));
 }
