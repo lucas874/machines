@@ -33,7 +33,7 @@ exports.s0.react([protocol_1.Events.NeedsWater], exports.s1, (_) => exports.s1.m
 exports.s0.react([protocol_1.Events.Done], exports.s2, (_) => exports.s2.make());
 exports.s1.react([protocol_1.Events.HasWater], exports.s0, (_) => exports.s0.make());
 var m = machine.createJSONForAnalysis(exports.s0);
-console.log(m);
+//console.log(m)
 const [m2, i2] = protocol_1.protocol.makeProjMachine("sensor", m, protocol_1.Events.All);
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -48,21 +48,21 @@ function main() {
                 _c = machine_1_1.value;
                 _d = false;
                 const state = _c;
+                console.log("state is: ", state);
                 if (isDone) {
                     console.log("shutting down");
                     break;
                 }
-                console.log("state is: ", state);
                 const t = state.cast();
-                console.log("t: ", t);
-                console.log("to.commands()?", t.commands());
-                console.log(state.commandsAvailable());
+                //console.log("t: ", t)
+                //console.log("to.commands()?", t.commands())
+                //console.log(state.commandsAvailable())
                 for (var c in t.commands()) {
                     var tt = t.commands();
                     if (c === 'req' && !hasRequested) {
-                        console.log("found: ", c);
+                        //console.log("found: ", c)
                         setTimeout(() => {
-                            console.log("has req: ", hasRequested);
+                            //console.log("has req: ", hasRequested)
                             if (!hasRequested) {
                                 hasRequested = true;
                                 tt === null || tt === void 0 ? void 0 : tt.req();

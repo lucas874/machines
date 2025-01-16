@@ -17,7 +17,7 @@ s0.react([Events.Done], s2, (_) => s2.make())
 s1.react([Events.HasWater], s0, (_) => s0.make())
 
 var m = machine.createJSONForAnalysis(s0)
-console.log(m)
+//console.log(m)
 const [m2, i2] = protocol.makeProjMachine("sensor", m, Events.All)
 
 async function main() {
@@ -27,22 +27,22 @@ async function main() {
   var hasRequested = false
   var isDone = false
   for await (const state of machine) {
-
+    console.log("state is: ", state)
     if (isDone) {
         console.log("shutting down")
         break
     }
-    console.log("state is: ", state)
+
     const t = state.cast()
-    console.log("t: ", t)
-    console.log("to.commands()?", t.commands())
-    console.log(state.commandsAvailable())
+    //console.log("t: ", t)
+    //console.log("to.commands()?", t.commands())
+    //console.log(state.commandsAvailable())
     for (var c in t.commands()) {
         var tt = t.commands() as any;
         if (c === 'req' && !hasRequested) {
-            console.log("found: ", c)
+            //console.log("found: ", c)
             setTimeout(() => {
-                console.log("has req: ", hasRequested)
+                //console.log("has req: ", hasRequested)
                 if (!hasRequested) {
                     hasRequested = true
                     tt?.req()

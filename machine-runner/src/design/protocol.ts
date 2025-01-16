@@ -430,7 +430,7 @@ export namespace ProjMachine {
           //projStatesToStates.get(state).command(transition.label.cmd, eventTypes, () => [{}])
         }
       })
-      console.log("test is: ", test)
+      //console.log("test is: ", test)
       projStatesToStates.set(state, m.designEmpty(state).commandFromList(test).finish())
 
       // finish
@@ -453,7 +453,7 @@ export namespace ProjMachine {
           if (!projStatesToStates.has(transition.target)) {
             projStatesToStates.set(transition.target, m.designEmpty(transition.target).finish())
           }
-          console.log(key)
+          //console.log(key)
           projStatesToStates.get(key).react([eventTypeStringToEvent.get(transition.label.eventType)], projStatesToStates.get(transition.target), (_: any) => projStatesToStates.get(transition.target).make())
         }
       })

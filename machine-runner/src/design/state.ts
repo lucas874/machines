@@ -325,24 +325,24 @@ export namespace StateMechanism {
     const commandFromList: Self['commandFromList'] = (cmds) => {
       var acc: any;
       var acc1 = new Array();
-      console.log("cmds are: ", cmds)
+      //console.log("cmds are: ", cmds)
 
       for (var cmd of cmds) {
         //const cmdd = cmd as []
-        console.log("cmd is: ", cmd)
-        var zero: any = cmd[0]
-        var one: any = cmd[1]
-        console.log("heeeeey ", one)
-        var two: any = cmd[2]
+        //console.log("cmd is: ", cmd)
+        //var zero: any = cmd[0]
+        //var one: any = cmd[1]
+        //console.log("heeeeey ", one)
+        //var two: any = cmd[2]
         acc = command(cmd[0], cmd[1], cmd[2])
         acc1.push(acc.commands)
-        console.log("tyype of commands: ", acc.commands)
+        //console.log("tyype of commands: ", acc.commands)
         //command(cmd[0], cmd[1], cmd[2])
       }
       let allcmds = acc1.reduce((acc, obj) => ({ ...acc, ...obj }), {});
       acc.commands = allcmds
-      console.log("HELLOO IN THIGNGG: ", acc)
-      console.log("HELLLOOO ", acc1)
+      //console.log("HELLOO IN THIGNGG: ", acc)
+      //console.log("HELLLOOO ", acc1)
       return acc;
     }
 
