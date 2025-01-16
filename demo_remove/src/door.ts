@@ -37,21 +37,35 @@ async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
     const machine = createMachineRunner(app, tags, i3, undefined)
-    //var hasRequested = false
-    //var isDone = false
+
     for await (const state of machine) {
       console.log("state is: ", state)
-      /* if (isDone) {
-          console.log("shutting down")
-          break
-      } */
-
       const s = state.cast()
       for (var c in s.commands()) {
           var cmds = s.commands() as any;
           if (c === 'close') {
             setTimeout(() => {
-                cmds?.close()
+                const canClose = machine.get()?.commandsAvailable()
+                if (canClose) {
+                    var s1 = machine.get()?.cast()?.commands() as any
+                    s1.close()
+                }
+
+
+
+
+                /* if ((await machine.peekNext()).done) {
+                    console.log("done")
+                    cmds?.close()
+                } else {
+                    console.log("not done")
+                } */
+                /* const whenOn = (await machine.peekNext()).done?//.as(peekValue)
+                if (whenOn) {
+                    cmds?.close()
+                } */
+
+
             }, getRandomInt(2000, 5000))
             break
           }

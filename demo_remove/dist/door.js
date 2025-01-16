@@ -53,23 +53,32 @@ function main() {
         const tags = factory_protocol_1.Composition.tagWithEntityId('factory-1');
         const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, undefined);
         try {
-            //var hasRequested = false
-            //var isDone = false
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
                 _d = false;
                 const state = _c;
                 console.log("state is: ", state);
-                /* if (isDone) {
-                    console.log("shutting down")
-                    break
-                } */
                 const s = state.cast();
                 for (var c in s.commands()) {
                     var cmds = s.commands();
                     if (c === 'close') {
                         setTimeout(() => {
-                            cmds === null || cmds === void 0 ? void 0 : cmds.close();
+                            var _a, _b, _c;
+                            const canClose = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.commandsAvailable();
+                            if (canClose) {
+                                var s1 = (_c = (_b = machine.get()) === null || _b === void 0 ? void 0 : _b.cast()) === null || _c === void 0 ? void 0 : _c.commands();
+                                s1.close();
+                            }
+                            /* if ((await machine.peekNext()).done) {
+                                console.log("done")
+                                cmds?.close()
+                            } else {
+                                console.log("not done")
+                            } */
+                            /* const whenOn = (await machine.peekNext()).done?//.as(peekValue)
+                            if (whenOn) {
+                                cmds?.close()
+                            } */
                         }, (0, factory_protocol_1.getRandomInt)(2000, 5000));
                         break;
                     }
