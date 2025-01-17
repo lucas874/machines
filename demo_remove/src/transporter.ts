@@ -1,5 +1,5 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunner } from '@actyx/machine-runner'
+import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, subswh, subsf, all_projections, getRandomInt  } from './factory_protocol'
 import { projectCombineMachines } from '@actyx/machine-check'
 import { MachineAnalysisResource } from '@actyx/machine-runner/lib/esm/design/protocol'
@@ -12,7 +12,7 @@ export const s0 = transporter.designEmpty('s0')
     .finish()
 export const s1 = transporter.designEmpty('s1').finish()
 export const s2 = transporter.designEmpty('s2')
-    .command('deliver', [Events.part], () => [{}])
+    .command('deliver', [Events.part], (s,e) => {console.log("s is: ", s); console.log("e is : ", e); return [Events.part.make({part: "dsasda"})]})
     .finish()
 export const s3 = transporter.designEmpty('s3').finish()
 /* console.log("sub comp: ", JSON.stringify(subs))
@@ -34,8 +34,14 @@ const projection = result_projection.data
 
 const cMap = new Map()
 cMap.set(Events.partID.type, () => {var id = "tire"; console.log("requesting: ", id); return [Events.partID.make({id: id})]})
+cMap.set(Events.part.type, (s: any, e: any) => {console.log("s is: ", s); console.log("e is : ", e); return [Events.part.make({part: s.self.part})]})
 const rMap = new Map()
 const statePayloadMap = new Map()
+const positionReaction : ProjMachine.ReactionEntry = {
+  identifiedByInput: true,
+  genPayloadFun: (_, e) => { console.log("got a ", e.payload.part); return {part: e.payload.part} }
+}
+statePayloadMap.set(Events.position.type, positionReaction)
 const fMap : any = {commands: cMap, reactions: rMap, statePayloads: statePayloadMap}
 
 //const cMap = new Map()

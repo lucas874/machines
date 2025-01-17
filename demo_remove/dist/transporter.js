@@ -30,7 +30,7 @@ exports.s0 = transporter.designEmpty('s0')
     .finish();
 exports.s1 = transporter.designEmpty('s1').finish();
 exports.s2 = transporter.designEmpty('s2')
-    .command('deliver', [factory_protocol_1.Events.part], () => [{}])
+    .command('deliver', [factory_protocol_1.Events.part], (s, e) => { console.log("s is: ", s); console.log("e is : ", e); return [factory_protocol_1.Events.part.make({ part: "dsasda" })]; })
     .finish();
 exports.s3 = transporter.designEmpty('s3').finish();
 /* console.log("sub comp: ", JSON.stringify(subs))
@@ -49,8 +49,14 @@ if (result_projection.type == 'ERROR')
 const projection = result_projection.data;
 const cMap = new Map();
 cMap.set(factory_protocol_1.Events.partID.type, () => { var id = "tire"; console.log("requesting: ", id); return [factory_protocol_1.Events.partID.make({ id: id })]; });
+cMap.set(factory_protocol_1.Events.part.type, (s, e) => { console.log("s is: ", s); console.log("e is : ", e); return [factory_protocol_1.Events.part.make({ part: s.self.part })]; });
 const rMap = new Map();
 const statePayloadMap = new Map();
+const positionReaction = {
+    identifiedByInput: true,
+    genPayloadFun: (_, e) => { console.log("got a ", e.payload.part); return { part: e.payload.part }; }
+};
+statePayloadMap.set(factory_protocol_1.Events.position.type, positionReaction);
 const fMap = { commands: cMap, reactions: rMap, statePayloads: statePayloadMap };
 //const cMap = new Map()
 //const rMap = new Map()

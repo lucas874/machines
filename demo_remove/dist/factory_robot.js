@@ -24,7 +24,7 @@ const machine_check_1 = require("@actyx/machine-check");
 const robot = factory_protocol_1.Composition.makeMachine('R');
 exports.s0 = robot.designEmpty('s0').finish();
 exports.s1 = robot.designEmpty('s1')
-    .command("build", [factory_protocol_1.Events.car], () => [{}])
+    .command("build", [factory_protocol_1.Events.car], (s, e) => { return [factory_protocol_1.Events.car.make({ part: "dsasda", modelName: "sda" })]; })
     .finish();
 exports.s2 = robot.designEmpty('s2').finish();
 exports.s0.react([factory_protocol_1.Events.part], exports.s1, (_) => exports.s1.make());
@@ -34,8 +34,14 @@ if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
 const projection = result_projection.data;
 const cMap = new Map();
+cMap.set(factory_protocol_1.Events.car.type, (s, _) => { var modelName = "sedan"; console.log("got a: ", s.self.part, " using it to build a ", modelName); return [factory_protocol_1.Events.car.make({ part: s.self.part, modelName: modelName })]; });
 const rMap = new Map();
 const statePayloadMap = new Map();
+const partReaction = {
+    identifiedByInput: true,
+    genPayloadFun: (_, e) => { console.log("got a ", e.payload.part); return { part: e.payload.part }; }
+};
+statePayloadMap.set(factory_protocol_1.Events.part.type, partReaction);
 const fMap = { commands: cMap, reactions: rMap, statePayloads: statePayloadMap };
 const mAnalysisResource = { initial: projection.initial, subscriptions: [], transitions: projection.transitions };
 const [m3, i3] = factory_protocol_1.Composition.extendMachine("R", mAnalysisResource, factory_protocol_1.Events.allEvents, fMap);

@@ -1,5 +1,5 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunner } from '@actyx/machine-runner'
+import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, subswh, subsf, all_projections, getRandomInt  } from './factory_protocol'
 import { projectCombineMachines } from '@actyx/machine-check'
 import { MachineAnalysisResource } from '@actyx/machine-runner/lib/esm/design/protocol'
@@ -7,7 +7,7 @@ import { MachineAnalysisResource } from '@actyx/machine-runner/lib/esm/design/pr
 const robot = Composition.makeMachine('R')
 export const s0 = robot.designEmpty('s0').finish()
 export const s1 = robot.designEmpty('s1')
-    .command("build", [Events.car], () => [{}])
+    .command("build", [Events.car], (s,e) => {return [Events.car.make({part: "dsasda", modelName: "sda"})]})
     .finish()
 export const s2 = robot.designEmpty('s2').finish()
 
@@ -19,8 +19,14 @@ if (result_projection.type == 'ERROR') throw new Error('error getting projection
 const projection = result_projection.data
 
 const cMap = new Map()
+cMap.set(Events.car.type, (s: any, _: any) => {var modelName = "sedan"; console.log("got a: ", s.self.part, " using it to build a ", modelName); return [Events.car.make({part: s.self.part, modelName: modelName})]})
 const rMap = new Map()
 const statePayloadMap = new Map()
+const partReaction : ProjMachine.ReactionEntry = {
+  identifiedByInput: true,
+  genPayloadFun: (_, e) => { console.log("got a ", e.payload.part); return {part: e.payload.part} }
+}
+statePayloadMap.set(Events.part.type, partReaction)
 const fMap : any = {commands: cMap, reactions: rMap, statePayloads: statePayloadMap}
 const mAnalysisResource: MachineAnalysisResource = {initial: projection.initial, subscriptions: [], transitions: projection.transitions}
 const [m3, i3] = Composition.extendMachine("R", mAnalysisResource, Events.allEvents, fMap)

@@ -16,10 +16,10 @@ exports.manifest = {
 var Events;
 (function (Events) {
     Events.partID = machine_runner_1.MachineEvent.design('partID').withPayload();
-    Events.part = machine_runner_1.MachineEvent.design('part').withoutPayload();
+    Events.part = machine_runner_1.MachineEvent.design('part').withPayload();
     Events.position = machine_runner_1.MachineEvent.design('position').withPayload();
     Events.time = machine_runner_1.MachineEvent.design('time').withPayload();
-    Events.car = machine_runner_1.MachineEvent.design('car').withoutPayload();
+    Events.car = machine_runner_1.MachineEvent.design('car').withPayload();
     Events.observing = machine_runner_1.MachineEvent.design('ok').withoutPayload();
     Events.report = machine_runner_1.MachineEvent.design('report').withoutPayload();
     Events.allEvents = [Events.partID, Events.part, Events.position, Events.time, Events.car, Events.observing, Events.report];
