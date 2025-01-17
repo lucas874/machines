@@ -43,6 +43,35 @@ var m = machine.createJSONForAnalysis(exports.Idle);
 const cMap = new Map();
 const rMap = new Map();
 const statePayloadMap = new Map();
+const needsWaterReaction = {
+    identifiedByInput: true,
+    genPayloadFun: (state, event) => {
+        console.log(`The plant is requesting ${event.payload.requiredWaterMl} ml of water!`);
+        const newStatePayload = {
+            lastMl: event.payload.requiredWaterMl + 5001,
+            totalMl: state.self.totalMl + event.payload.requiredWaterMl + 5000,
+        };
+        //console.log("heeeeY ", state, event, "dsad")
+        console.log(`Total water consumption: ${newStatePayload.totalMl}`);
+        console.log("new state payload: ", newStatePayload);
+        return newStatePayload;
+    }
+};
+const hasWaterReaction = {
+    identifiedByInput: true,
+    genPayloadFun: (state, _) => { console.log("hej hej in fun ", state.self); console.log("hejj in funnn"); return state.self; } //return {lastMl: 100, totalMl: 100} }
+};
+/* const needsWaterReaction = (state: any, event: any) => {
+    console.log(`The plant is requesting ${event.payload.requiredWaterMl} ml of water!`)
+    const newStatePayload = {
+      lastMl: event.payload.requiredWaterMl,
+      totalMl: state.self.totalMl + event.payload.requiredWaterMl,
+    }
+    console.log(`Total water consumption: ${newStatePayload.totalMl}`)
+    return newStatePayload
+} */
+statePayloadMap.set(protocol_1.Events.NeedsWater.type, needsWaterReaction);
+statePayloadMap.set(protocol_1.Events.HasWater.type, hasWaterReaction);
 const fMap = { commands: cMap, reactions: rMap, statePayloads: statePayloadMap };
 //const [m3, i3] = protocol.extendMachine("robot", m, Events.All, [machine, Idle], fMap)
 const [m3, i3] = protocol_1.protocol.extendMachine("robot", m, protocol_1.Events.All, fMap);
@@ -52,7 +81,7 @@ function main() {
         const sdk = yield sdk_1.Actyx.of(protocol_1.manifest);
         const tags = protocol_1.protocol.tagWithEntityId('robot-1');
         //const machine = createMachineRunner(sdk, tags, i2, undefined)
-        const machine = (0, machine_runner_1.createMachineRunner)(sdk, tags, exports.Idle, {
+        const machine = (0, machine_runner_1.createMachineRunner)(sdk, tags, i3, {
             lastMl: 0,
             totalMl: 0,
         });

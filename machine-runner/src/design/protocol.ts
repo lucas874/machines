@@ -477,10 +477,16 @@ export namespace ProjMachine {
     return [m, initial]
   }
 
+  export type ReactionEntry = {
+    identifiedByInput: boolean
+    genPayloadFun: (...args : any[]) => any
+  }
+
   export type funMap = {
     commands: Map<any, any>,
     reactions: Map<any, any>,
-    statePayloads: Map<any, any>
+    statePayloads: Map<any, ReactionEntry>
+    //statePayloadFuns: Map<any, any>
   }
 
   export type ProjectionType = {
@@ -621,7 +627,7 @@ export namespace ProjMachine {
     var projStatesToExec: Map<string, Transition[]> = new Map()
     var projStatesToInput: Map<string, Transition[]> = new Map()
     var eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> = new Map()
-
+    var projStatesToStatePayload: Map<string, (s: any, e: any) => any> = new Map()
     proj.transitions.forEach((transition) => {
       if (transition.label.tag === 'Execute') {
         if (!projStatesToExec.has(transition.source)) {
@@ -638,7 +644,11 @@ export namespace ProjMachine {
             }
           }
         }
-
+        var e = transition.label.logType[0]
+        if (fMap.statePayloads.has(e) && !fMap.statePayloads.get(e)?.identifiedByInput) {
+          projStatesToStatePayload.set(transition.source, fMap.statePayloads.get(e)!.genPayloadFun)
+          console.log("hej not by input")
+        }
       } else if (transition.label.tag === 'Input') {
         if (!projStatesToInput.has(transition.source)) {
           projStatesToInput.set(transition.source, new Array())
@@ -656,6 +666,12 @@ export namespace ProjMachine {
             eventTypeStringToEvent.set(transition.label.eventType, event)
             break
           }
+        }
+
+        var e = transition.label.eventType
+        if (fMap.statePayloads.has(e) && fMap.statePayloads.get(e)?.identifiedByInput) {
+          projStatesToStatePayload.set(transition.target, fMap.statePayloads.get(e)!.genPayloadFun)
+          console.log("hej by input")
         }
       }
     })
@@ -676,8 +692,15 @@ export namespace ProjMachine {
 
         }
       })
+      if (projStatesToStatePayload.has(state)) {
+        var f = projStatesToStatePayload.get(state)!
+        //type T = ReturnType<typeof f>
+        projStatesToStates.set(state, m.designState(state).withPayload<ReturnType<typeof f>>().commandFromList(cmdTriples).finish())
+        //commandFromList(cmdTriples).finish())
+      } else {
+        projStatesToStates.set(state, m.designEmpty(state).commandFromList(cmdTriples).finish())
+      }
 
-      projStatesToStates.set(state, m.designEmpty(state).commandFromList(cmdTriples).finish())
     })
 
     projStatesToInput.forEach((value, key) => {
@@ -690,9 +713,18 @@ export namespace ProjMachine {
           if (!projStatesToStates.has(transition.target)) {
             projStatesToStates.set(transition.target, m.designEmpty(transition.target).finish())
           }
-          var es = eventTypeStringToEvent.get(transition.label.eventType)
+          var e = transition.label.eventType
+          var es = eventTypeStringToEvent.get(e)
+          var f =
+            fMap.statePayloads.has(e) && fMap.statePayloads.get(e)!.identifiedByInput
+              ? (...args: any[]) => {const sPayload = fMap.statePayloads.get(e)!.genPayloadFun(...args); console.log(args); console.log("computed payload: ", sPayload); return projStatesToStates.get(transition.target).make(sPayload)}
+              : (_: any) => projStatesToStates.get(transition.target).make()
+          /* if (fMap.statePayloads.has(e) && fMap.statePayloads.get(e)?.identifiedByInput) {
+            projStatesToStatePayload.set(transition.target, fMap.statePayloads.get(e)!.genPayloadFun)
+          } */
           //var f = fMap.reactions.has(eventType) ? fMap.reactions.get(eventType) : () => [{}]
-          projStatesToStates.get(key).react([es], projStatesToStates.get(transition.target), (_: any) => projStatesToStates.get(transition.target).make())
+          //projStatesToStates.get(key).react([es], projStatesToStates.get(transition.target), (_: any) => projStatesToStates.get(transition.target).make())
+          projStatesToStates.get(key).react([es], projStatesToStates.get(transition.target), f)
         }
       })
     })
