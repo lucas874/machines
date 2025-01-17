@@ -36,13 +36,12 @@ const projection = result_projection.data;
 const cMap = new Map();
 cMap.set(factory_protocol_1.Events.car.type, (s, _) => { var modelName = "sedan"; console.log("got a: ", s.self.part, " using it to build a ", modelName); return [factory_protocol_1.Events.car.make({ part: s.self.part, modelName: modelName })]; });
 const rMap = new Map();
-const statePayloadMap = new Map();
 const partReaction = {
     identifiedByInput: true,
     genPayloadFun: (_, e) => { console.log("got a ", e.payload.part); return { part: e.payload.part }; }
 };
-statePayloadMap.set(factory_protocol_1.Events.part.type, partReaction);
-const fMap = { commands: cMap, reactions: rMap, statePayloads: statePayloadMap };
+rMap.set(factory_protocol_1.Events.part.type, partReaction);
+const fMap = { commands: cMap, reactions: rMap };
 const mAnalysisResource = { initial: projection.initial, subscriptions: [], transitions: projection.transitions };
 const [m3, i3] = factory_protocol_1.Composition.extendMachine("R", mAnalysisResource, factory_protocol_1.Events.allEvents, fMap);
 //console.log(m3.createJSONForAnalysis(i3))

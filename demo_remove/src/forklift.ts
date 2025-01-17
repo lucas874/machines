@@ -29,14 +29,14 @@ const projection = result_projection.data
 // console.log("getting a ", e.payload.id, "at position x"); return {id: e.payload.id, position: "x"}
 const cMap = new Map()
 cMap.set(Events.position.type, (state: any, _: any) => {console.log("got a ", state.self.id, " at x"); return [Events.position.make({position: "x", part: state.self.id})]})
+
 const rMap = new Map()
-const statePayloadMap = new Map()
 const partIDReaction : ProjMachine.ReactionEntry = {
   identifiedByInput: true,
   genPayloadFun: (_, e) => { console.log("a ", e.payload.id, "was requested"); return {id: e.payload.id} }//return {lastMl: 100, totalMl: 100} }
 }
-statePayloadMap.set(Events.partID.type, partIDReaction)
-const fMap : any = {commands: cMap, reactions: rMap, statePayloads: statePayloadMap}
+rMap.set(Events.partID.type, partIDReaction)
+const fMap : any = {commands: cMap, reactions: rMap}
 const mAnalysisResource: MachineAnalysisResource = {initial: projection.initial, subscriptions: [], transitions: projection.transitions}
 const [m3, i3] = Composition.extendMachine("FL", mAnalysisResource, Events.allEvents, fMap)
 //console.log(m3.createJSONForAnalysis(i3))

@@ -34,15 +34,15 @@ const projection = result_projection.data
 
 const cMap = new Map()
 cMap.set(Events.partID.type, () => {var id = "tire"; console.log("requesting: ", id); return [Events.partID.make({id: id})]})
-cMap.set(Events.part.type, (s: any, e: any) => {console.log("s is: ", s); console.log("e is : ", e); return [Events.part.make({part: s.self.part})]})
+cMap.set(Events.part.type, (s: any, e: any) => {return [Events.part.make({part: s.self.part})]})
+
 const rMap = new Map()
-const statePayloadMap = new Map()
 const positionReaction : ProjMachine.ReactionEntry = {
   identifiedByInput: true,
   genPayloadFun: (_, e) => { console.log("got a ", e.payload.part); return {part: e.payload.part} }
 }
-statePayloadMap.set(Events.position.type, positionReaction)
-const fMap : any = {commands: cMap, reactions: rMap, statePayloads: statePayloadMap}
+rMap.set(Events.position.type, positionReaction)
+const fMap : any = {commands: cMap, reactions: rMap}
 
 //const cMap = new Map()
 //const rMap = new Map()

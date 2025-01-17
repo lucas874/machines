@@ -484,9 +484,7 @@ export namespace ProjMachine {
 
   export type funMap = {
     commands: Map<any, any>,
-    reactions: Map<any, any>,
-    statePayloads: Map<any, ReactionEntry>
-    //statePayloadFuns: Map<any, any>
+    reactions: Map<any, ReactionEntry>
   }
 
   export type ProjectionType = {
@@ -645,8 +643,8 @@ export namespace ProjMachine {
           }
         }
         var e = transition.label.logType[0]
-        if (fMap.statePayloads.has(e) && !fMap.statePayloads.get(e)?.identifiedByInput) {
-          projStatesToStatePayload.set(transition.source, fMap.statePayloads.get(e)!.genPayloadFun)
+        if (fMap.reactions.has(e) && !fMap.reactions.get(e)?.identifiedByInput) {
+          projStatesToStatePayload.set(transition.source, fMap.reactions.get(e)!.genPayloadFun)
         }
       } else if (transition.label.tag === 'Input') {
         if (!projStatesToInput.has(transition.source)) {
@@ -668,8 +666,8 @@ export namespace ProjMachine {
         }
 
         var e = transition.label.eventType
-        if (fMap.statePayloads.has(e) && fMap.statePayloads.get(e)?.identifiedByInput) {
-          projStatesToStatePayload.set(transition.target, fMap.statePayloads.get(e)!.genPayloadFun)
+        if (fMap.reactions.has(e) && fMap.reactions.get(e)?.identifiedByInput) {
+          projStatesToStatePayload.set(transition.target, fMap.reactions.get(e)!.genPayloadFun)
         }
       }
     })
@@ -712,8 +710,8 @@ export namespace ProjMachine {
           var e = transition.label.eventType
           var es = eventTypeStringToEvent.get(e)
           var f =
-            fMap.statePayloads.has(e) && fMap.statePayloads.get(e)!.identifiedByInput
-              ? (...args: any[]) => {const sPayload = fMap.statePayloads.get(e)!.genPayloadFun(...args); console.log(...args); console.log("computed payload: ", sPayload); return projStatesToStates.get(transition.target).make(sPayload)}
+            fMap.reactions.has(e) && fMap.reactions.get(e)!.identifiedByInput
+              ? (...args: any[]) => {const sPayload = fMap.reactions.get(e)!.genPayloadFun(...args); return projStatesToStates.get(transition.target).make(sPayload)}
               : (_: any) => projStatesToStates.get(transition.target).make()
 
           //var f = fMap.reactions.has(eventType) ? fMap.reactions.get(eventType) : () => [{}]

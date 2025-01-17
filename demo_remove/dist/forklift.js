@@ -44,13 +44,12 @@ const projection = result_projection.data;
 const cMap = new Map();
 cMap.set(factory_protocol_1.Events.position.type, (state, _) => { console.log("got a ", state.self.id, " at x"); return [factory_protocol_1.Events.position.make({ position: "x", part: state.self.id })]; });
 const rMap = new Map();
-const statePayloadMap = new Map();
 const partIDReaction = {
     identifiedByInput: true,
     genPayloadFun: (_, e) => { console.log("a ", e.payload.id, "was requested"); return { id: e.payload.id }; } //return {lastMl: 100, totalMl: 100} }
 };
-statePayloadMap.set(factory_protocol_1.Events.partID.type, partIDReaction);
-const fMap = { commands: cMap, reactions: rMap, statePayloads: statePayloadMap };
+rMap.set(factory_protocol_1.Events.partID.type, partIDReaction);
+const fMap = { commands: cMap, reactions: rMap };
 const mAnalysisResource = { initial: projection.initial, subscriptions: [], transitions: projection.transitions };
 const [m3, i3] = factory_protocol_1.Composition.extendMachine("FL", mAnalysisResource, factory_protocol_1.Events.allEvents, fMap);
 //console.log(m3.createJSONForAnalysis(i3))

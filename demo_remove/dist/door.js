@@ -40,8 +40,7 @@ const projection = result_projection.data;
 const cMap = new Map();
 cMap.set(factory_protocol_1.Events.time.type, () => { var dateString = new Date().toLocaleString(); console.log(dateString); return [factory_protocol_1.Events.time.make({ timeOfDay: dateString })]; });
 const rMap = new Map();
-const statePayloadMap = new Map();
-const fMap = { commands: cMap, reactions: rMap, statePayloads: statePayloadMap };
+const fMap = { commands: cMap, reactions: rMap };
 const [m3, i3] = factory_protocol_1.Composition.extendMachine("D", projection, factory_protocol_1.Events.allEvents, fMap);
 //console.log(m3.createJSONForAnalysis(i3))
 //console.log(getRandomInt(2000, 5000))

@@ -21,13 +21,12 @@ const projection = result_projection.data
 const cMap = new Map()
 cMap.set(Events.car.type, (s: any, _: any) => {var modelName = "sedan"; console.log("got a: ", s.self.part, " using it to build a ", modelName); return [Events.car.make({part: s.self.part, modelName: modelName})]})
 const rMap = new Map()
-const statePayloadMap = new Map()
 const partReaction : ProjMachine.ReactionEntry = {
   identifiedByInput: true,
   genPayloadFun: (_, e) => { console.log("got a ", e.payload.part); return {part: e.payload.part} }
 }
-statePayloadMap.set(Events.part.type, partReaction)
-const fMap : any = {commands: cMap, reactions: rMap, statePayloads: statePayloadMap}
+rMap.set(Events.part.type, partReaction)
+const fMap : any = {commands: cMap, reactions: rMap}
 const mAnalysisResource: MachineAnalysisResource = {initial: projection.initial, subscriptions: [], transitions: projection.transitions}
 const [m3, i3] = Composition.extendMachine("R", mAnalysisResource, Events.allEvents, fMap)
 //console.log(m3.createJSONForAnalysis(i3))
