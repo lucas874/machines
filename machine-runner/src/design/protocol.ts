@@ -32,7 +32,7 @@ export type SwarmProtocol<
     machineName: MachineName,
     proj: ProjMachine.ProjectionType,
     events: readonly MachineEvent.Factory<any, any>[],
-    mOriginal: [Machine<any, any, any>, any],
+    //mOriginal: [Machine<any, any, any>, any],
     fMap: ProjMachine.funMap
   ) => [Machine<any, any, any>, any]
 }
@@ -82,7 +82,8 @@ export namespace SwarmProtocol {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
       makeProjMachine: (machineName, proj, events) => ProjMachine.machineFromProj(ImplMachine.make(swarmName, machineName, eventFactories), proj, events),
-      extendMachine: (machineName, proj, events, mOriginal, fMap) => ProjMachine.extendMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, mOriginal, fMap)
+      //extendMachine: (machineName, proj, events, mOriginal, fMap) => ProjMachine.extendMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, mOriginal, fMap)
+      extendMachine: (machineName, proj, events, fMap) => ProjMachine.extendMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, fMap)
     }
   }
 }
@@ -498,7 +499,7 @@ export namespace ProjMachine {
     }[];
   }
 
-  export function extendMachine(
+  export function extendMachineNotWorking(
     m: Machine<any, any, any>,
     proj: ProjectionType,
     events: readonly MachineEvent.Factory<any, Record<never, never>>[],
@@ -509,6 +510,9 @@ export namespace ProjMachine {
     var projStatesToExec: Map<string, Transition[]> = new Map()
     var projStatesToInput: Map<string, Transition[]> = new Map()
     var eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> = new Map()
+    console.log("events arg: ")
+    loopThroughJSON("", events)
+
     console.log("0: ")
     loopThroughJSON("", mOriginal[0])
     console.log("1: ")
@@ -575,9 +579,99 @@ export namespace ProjMachine {
           var etypes = transition.label.logType.map((et: string) => {
             return eventTypeStringToEvent.get(et)?.type
           })
-          //var f = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => [{}]
-          //console.log(ccMap.get(etypes[0]))
-          var f = ccMap.has(etypes[0]) ? ccMap.get(etypes[0]) : () => [{}]
+          var f = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => [{}]
+          console.log("ccmap ", ccMap.get(etypes[0]))
+          //var f = ccMap.has(etypes[0]) ? ccMap.get(etypes[0]) : () => [{}]
+          cmdTriples.push([transition.label.cmd, es, f])
+
+        }
+      })
+
+      projStatesToStates.set(state, m.designEmpty(state).commandFromList(cmdTriples).finish())
+    })
+
+    projStatesToInput.forEach((value, key) => {
+      if (!projStatesToStates.has(key)) {
+        projStatesToStates.set(key, m.designEmpty(key).finish())
+      }
+
+      value.forEach((transition) => {
+        if (transition.label.tag === 'Input') {
+          if (!projStatesToStates.has(transition.target)) {
+            projStatesToStates.set(transition.target, m.designEmpty(transition.target).finish())
+          }
+          var es = eventTypeStringToEvent.get(transition.label.eventType)
+          //var f = fMap.reactions.has(eventType) ? fMap.reactions.get(eventType) : () => [{}]
+          projStatesToStates.get(key).react([es], projStatesToStates.get(transition.target), (_: any) => projStatesToStates.get(transition.target).make())
+        }
+      })
+    })
+
+    var initial = projStatesToStates.get(proj.initial)
+    return [m, initial]
+  }
+
+  export function extendMachine(
+    m: Machine<any, any, any>,
+    proj: ProjectionType,
+    events: readonly MachineEvent.Factory<any, Record<never, never>>[],
+    fMap: funMap
+  ): [Machine<any, any, MachineEvent.Factory.Any>, any] {
+    var projStatesToStates: Map<string, any> = new Map()
+    var projStatesToExec: Map<string, Transition[]> = new Map()
+    var projStatesToInput: Map<string, Transition[]> = new Map()
+    var eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> = new Map()
+
+    proj.transitions.forEach((transition) => {
+      if (transition.label.tag === 'Execute') {
+        if (!projStatesToExec.has(transition.source)) {
+          projStatesToExec.set(transition.source, new Array())
+        }
+        projStatesToExec.get(transition.source)?.push(transition)
+
+        // map event type string to Event
+        for (let eventType of transition.label.logType) {
+          for (let event of events) {
+              if (eventType === event.type) {
+              eventTypeStringToEvent.set(eventType, event)
+              break
+            }
+          }
+        }
+
+      } else if (transition.label.tag === 'Input') {
+        if (!projStatesToInput.has(transition.source)) {
+          projStatesToInput.set(transition.source, new Array())
+        }
+        projStatesToInput.get(transition.source)?.push(transition)
+
+        // add target to projStatesToInput as well. in case no outgoing transitions.
+        if (!projStatesToInput.has(transition.target)) {
+          projStatesToInput.set(transition.target, new Array())
+        }
+
+        // map event type string to Event
+        for (let event of events) {
+          if (transition.label.eventType === event.type) {
+            eventTypeStringToEvent.set(transition.label.eventType, event)
+            break
+          }
+        }
+      }
+    })
+    projStatesToExec.forEach((transitions, state) => {
+      var cmdTriples = new Array()
+      // add self loops
+      transitions.forEach((transition) => {
+        if (transition.label.tag === 'Execute') {
+          var es = transition.label.logType.map((et: string) => {
+            return eventTypeStringToEvent.get(et)
+          })
+          var etypes = transition.label.logType.map((et: string) => {
+            return eventTypeStringToEvent.get(et)?.type
+          })
+          var f = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => [{}]
+          //var f = ccMap.has(etypes[0]) ? ccMap.get(etypes[0]) : () => [{}]
           cmdTriples.push([transition.label.cmd, es, f])
 
         }

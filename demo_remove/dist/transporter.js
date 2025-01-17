@@ -49,7 +49,7 @@ const rMap = new Map();
 const statePayloadMap = new Map();
 const fMap = { commands: cMap, reactions: rMap, statePayloads: statePayloadMap };
 const mAnalysisResource = { initial: projection.initial, subscriptions: [], transitions: projection.transitions };
-const [m3, i3] = factory_protocol_1.Composition.extendMachine("T", mAnalysisResource, factory_protocol_1.Events.allEvents, [transporter, exports.s0], fMap);
+const [m3, i3] = factory_protocol_1.Composition.extendMachine("T", mAnalysisResource, factory_protocol_1.Events.allEvents, fMap);
 //console.log(m3.createJSONForAnalysis(i3))
 function main() {
     return __awaiter(this, void 0, void 0, function* () {

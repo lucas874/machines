@@ -23,7 +23,7 @@ const rMap = new Map()
 const statePayloadMap = new Map()
 const fMap : any = {commands: cMap, reactions: rMap, statePayloads: statePayloadMap}
 const mAnalysisResource: MachineAnalysisResource = {initial: projection.initial, subscriptions: [], transitions: projection.transitions}
-const [m3, i3] = Composition.extendMachine("R", mAnalysisResource, Events.allEvents, [robot, s0], fMap)
+const [m3, i3] = Composition.extendMachine("R", mAnalysisResource, Events.allEvents, fMap)
 //console.log(m3.createJSONForAnalysis(i3))
 async function main() {
     const app = await Actyx.of(manifest)

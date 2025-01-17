@@ -42,7 +42,7 @@ cMap.set(factory_protocol_1.Events.time.type, () => { var dateString = new Date(
 const rMap = new Map();
 const statePayloadMap = new Map();
 const fMap = { commands: cMap, reactions: rMap, statePayloads: statePayloadMap };
-const [m3, i3] = factory_protocol_1.Composition.extendMachine("D", projection, factory_protocol_1.Events.allEvents, [door, exports.s0], fMap);
+const [m3, i3] = factory_protocol_1.Composition.extendMachine("D", projection, factory_protocol_1.Events.allEvents, fMap);
 //console.log(m3.createJSONForAnalysis(i3))
 //console.log(getRandomInt(2000, 5000))
 function main() {

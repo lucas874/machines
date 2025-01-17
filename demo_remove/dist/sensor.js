@@ -44,7 +44,8 @@ rMap.set(protocol_1.Events.NeedsWater, () => [protocol_1.Events.NeedsWater.make(
 rMap.set(protocol_1.Events.Done, () => [{}]);
 const statePayloadMap = new Map();
 const fMap = { commands: cMap, reactions: rMap, statePayloads: statePayloadMap };
-const [m3, i3] = protocol_1.protocol.extendMachine("sensor", m, protocol_1.Events.All, [machine, exports.s0], fMap);
+//const [m3, i3] = protocol.extendMachine("sensor", m, Events.All, [machine, s0], fMap)
+const [m3, i3] = protocol_1.protocol.extendMachine("sensor", m, protocol_1.Events.All, fMap);
 //const _ = protocol.extendMachine("sensor", m, Events.All, [machine, s0])
 function main() {
     return __awaiter(this, void 0, void 0, function* () {

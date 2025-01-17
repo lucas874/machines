@@ -22,12 +22,8 @@ const machine_runner_1 = require("@actyx/machine-runner");
 const sdk_1 = require("@actyx/sdk");
 const protocol_1 = require("./protocol");
 const machine = protocol_1.protocol.makeMachine('robot');
-//export const Idle = machine.designEmpty('Idle').finish()
-//export const WateringPlant = machine.designEmpty('WateringPlant').finish()
 exports.Idle = machine.designState('Idle').withPayload().finish();
 exports.WateringPlant = machine.designState('WateringPlant').withPayload().finish();
-//Idle.react([Events.NeedsWater], WateringPlant, (_) => WateringPlant.make())
-//WateringPlant.react([Events.HasWater], Idle, (_) => Idle.make())
 exports.Idle.react([protocol_1.Events.NeedsWater], exports.WateringPlant, (state, event) => {
     console.log(`The plant is requesting ${event.payload.requiredWaterMl} ml of water!`);
     const newStatePayload = {
@@ -38,20 +34,11 @@ exports.Idle.react([protocol_1.Events.NeedsWater], exports.WateringPlant, (state
     return exports.WateringPlant.make(newStatePayload);
 });
 exports.WateringPlant.react([protocol_1.Events.HasWater], exports.Idle, (state, _) => exports.Idle.make(state.self));
-var m = machine.createJSONForAnalysis(exports.Idle);
-//const [m2, i2] = protocol.makeProjMachine("robot", m, Events.All)
-const cMap = new Map();
-const rMap = new Map();
-const statePayloadMap = new Map();
-const fMap = { commands: cMap, reactions: rMap, statePayloads: statePayloadMap };
-//const [m3, i3] = protocol.extendMachine("robot", m, Events.All, [machine, Idle], fMap)
-const [m3, i3] = protocol_1.protocol.extendMachine("robot", m, protocol_1.Events.All, fMap);
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
         const sdk = yield sdk_1.Actyx.of(protocol_1.manifest);
         const tags = protocol_1.protocol.tagWithEntityId('robot-1');
-        //const machine = createMachineRunner(sdk, tags, i2, undefined)
         const machine = (0, machine_runner_1.createMachineRunner)(sdk, tags, exports.Idle, {
             lastMl: 0,
             totalMl: 0,
