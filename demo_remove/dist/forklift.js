@@ -27,7 +27,7 @@ const machine_check_1 = require("@actyx/machine-check");
 const forklift = factory_protocol_1.Composition.makeMachine('FL');
 exports.s0 = forklift.designEmpty('s0').finish();
 exports.s1 = forklift.designEmpty('s1')
-    .command('get', [factory_protocol_1.Events.position], () => [{}])
+    .command('get', [factory_protocol_1.Events.position], () => { return [factory_protocol_1.Events.position.make({ position: "x", part: "lars" })]; })
     .finish();
 exports.s2 = forklift.designEmpty('s2').finish();
 /* console.log("sub comp: ", JSON.stringify(subs))
@@ -40,9 +40,16 @@ const result_projection = (0, machine_check_1.projectCombineMachines)(factory_pr
 if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
 const projection = result_projection.data;
+// console.log("getting a ", e.payload.id, "at position x"); return {id: e.payload.id, position: "x"}
 const cMap = new Map();
+cMap.set(factory_protocol_1.Events.position.type, (state, _) => { console.log("got a ", state.self.id, " at x"); return [factory_protocol_1.Events.position.make({ position: "x", part: state.self.id })]; });
 const rMap = new Map();
 const statePayloadMap = new Map();
+const partIDReaction = {
+    identifiedByInput: true,
+    genPayloadFun: (_, e) => { console.log("a ", e.payload.id, "was requested"); return { id: e.payload.id }; } //return {lastMl: 100, totalMl: 100} }
+};
+statePayloadMap.set(factory_protocol_1.Events.partID.type, partIDReaction);
 const fMap = { commands: cMap, reactions: rMap, statePayloads: statePayloadMap };
 const mAnalysisResource = { initial: projection.initial, subscriptions: [], transitions: projection.transitions };
 const [m3, i3] = factory_protocol_1.Composition.extendMachine("FL", mAnalysisResource, factory_protocol_1.Events.allEvents, fMap);

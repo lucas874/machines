@@ -8,7 +8,7 @@ import { MachineAnalysisResource } from '@actyx/machine-runner/lib/esm/design/pr
 } */
 const transporter = Composition.makeMachine('T')
 export const s0 = transporter.designEmpty('s0')
-    .command('request', [Events.partID], () => [{}])
+    .command('request', [Events.partID], () => {var id = "tire"; console.log("requesting: ", id); return [Events.partID.make({id: id})]})
     .finish()
 export const s1 = transporter.designEmpty('s1').finish()
 export const s2 = transporter.designEmpty('s2')
@@ -18,7 +18,9 @@ export const s3 = transporter.designEmpty('s3').finish()
 /* console.log("sub comp: ", JSON.stringify(subs))
 console.log("sub wh: ", JSON.stringify(subswh))
 console.log("sub f: ", JSON.stringify(subsf)) */
-
+//export const s0 = door.designEmpty('s0')
+//    .command('close', [Events.time], () => {var dateString = new Date().toLocaleString(); console.log(dateString); return [Events.time.make({timeOfDay: dateString})]})
+//    .finish()
 
 
 s0.react([Events.partID], s1, (_) => s1.make())
@@ -31,9 +33,15 @@ if (result_projection.type == 'ERROR') throw new Error('error getting projection
 const projection = result_projection.data
 
 const cMap = new Map()
+cMap.set(Events.partID.type, () => {var id = "tire"; console.log("requesting: ", id); return [Events.partID.make({id: id})]})
 const rMap = new Map()
 const statePayloadMap = new Map()
 const fMap : any = {commands: cMap, reactions: rMap, statePayloads: statePayloadMap}
+
+//const cMap = new Map()
+//const rMap = new Map()
+//const statePayloadMap = new Map()
+//const fMap : any = {commands: cMap, reactions: rMap, statePayloads: statePayloadMap}
 const mAnalysisResource: MachineAnalysisResource = {initial: projection.initial, subscriptions: [], transitions: projection.transitions}
 const [m3, i3] = Composition.extendMachine("T", mAnalysisResource, Events.allEvents, fMap)
 //console.log(m3.createJSONForAnalysis(i3))

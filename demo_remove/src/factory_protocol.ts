@@ -10,13 +10,15 @@ export const manifest = {
 }
 
 type TimePayload = { timeOfDay: string }
+type PartIDPayload = {id: string}
+type PositionPayload = {position: string, part: string}
 /*
  * Example from CoPLaWS slides by Florian Furbach
  */
 export namespace Events {
-  export const partID = MachineEvent.design('partID').withoutPayload()
+  export const partID = MachineEvent.design('partID').withPayload<PartIDPayload>()
   export const part = MachineEvent.design('part').withoutPayload()
-  export const position = MachineEvent.design('position').withoutPayload()
+  export const position = MachineEvent.design('position').withPayload<PositionPayload>()
   export const time = MachineEvent.design('time').withPayload<TimePayload>()
   export const car = MachineEvent.design('car').withoutPayload()
   export const observing = MachineEvent.design('ok').withoutPayload()

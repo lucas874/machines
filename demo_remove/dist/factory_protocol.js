@@ -15,9 +15,9 @@ exports.manifest = {
  */
 var Events;
 (function (Events) {
-    Events.partID = machine_runner_1.MachineEvent.design('partID').withoutPayload();
+    Events.partID = machine_runner_1.MachineEvent.design('partID').withPayload();
     Events.part = machine_runner_1.MachineEvent.design('part').withoutPayload();
-    Events.position = machine_runner_1.MachineEvent.design('position').withoutPayload();
+    Events.position = machine_runner_1.MachineEvent.design('position').withPayload();
     Events.time = machine_runner_1.MachineEvent.design('time').withPayload();
     Events.car = machine_runner_1.MachineEvent.design('car').withoutPayload();
     Events.observing = machine_runner_1.MachineEvent.design('ok').withoutPayload();

@@ -1,5 +1,5 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunner } from '@actyx/machine-runner'
+import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, subswh, subsf, all_projections, getRandomInt } from './factory_protocol'
 import { projectCombineMachines } from '@actyx/machine-check'
 import { MachineAnalysisResource } from '@actyx/machine-runner/lib/esm/design/protocol'
@@ -9,7 +9,7 @@ import { MachineAnalysisResource } from '@actyx/machine-runner/lib/esm/design/pr
 const forklift = Composition.makeMachine('FL')
 export const s0 = forklift.designEmpty('s0') .finish()
 export const s1 = forklift.designEmpty('s1')
-    .command('get', [Events.position], () => [{}])
+    .command('get', [Events.position], () => { return [Events.position.make({position: "x", part: "lars"})]})
     .finish()
 export const s2 = forklift.designEmpty('s2').finish()
 /* console.log("sub comp: ", JSON.stringify(subs))
@@ -26,9 +26,16 @@ const result_projection = projectCombineMachines(interfacing_swarms, subs, "FL")
 if (result_projection.type == 'ERROR') throw new Error('error getting projection')
 const projection = result_projection.data
 
+// console.log("getting a ", e.payload.id, "at position x"); return {id: e.payload.id, position: "x"}
 const cMap = new Map()
+cMap.set(Events.position.type, (state: any, _: any) => {console.log("got a ", state.self.id, " at x"); return [Events.position.make({position: "x", part: state.self.id})]})
 const rMap = new Map()
 const statePayloadMap = new Map()
+const partIDReaction : ProjMachine.ReactionEntry = {
+  identifiedByInput: true,
+  genPayloadFun: (_, e) => { console.log("a ", e.payload.id, "was requested"); return {id: e.payload.id} }//return {lastMl: 100, totalMl: 100} }
+}
+statePayloadMap.set(Events.partID.type, partIDReaction)
 const fMap : any = {commands: cMap, reactions: rMap, statePayloads: statePayloadMap}
 const mAnalysisResource: MachineAnalysisResource = {initial: projection.initial, subscriptions: [], transitions: projection.transitions}
 const [m3, i3] = Composition.extendMachine("FL", mAnalysisResource, Events.allEvents, fMap)
