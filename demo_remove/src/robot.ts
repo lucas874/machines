@@ -35,7 +35,7 @@ const statePayloadMap = new Map()
 const needsWaterReaction : ProjMachine.ReactionEntry = {
   identifiedByInput: true,
   genPayloadFun:
-    (state: any, event: any) : SpentWater => {
+    (state: any, event: any) => {
       console.log(`The plant is requesting ${event.payload.requiredWaterMl} ml of water!`)
       const newStatePayload = {
         lastMl: event.payload.requiredWaterMl + 5001,
@@ -49,7 +49,7 @@ const needsWaterReaction : ProjMachine.ReactionEntry = {
 }
 const hasWaterReaction : ProjMachine.ReactionEntry = {
   identifiedByInput: true,
-  genPayloadFun: (state: ReactionContext<SpentWater>, _: any) : SpentWater => { console.log("hej hej in fun ", state.self); console.log("hejj in funnn"); return state.self }//return {lastMl: 100, totalMl: 100} }
+  genPayloadFun: (state, _: any) => { console.log("hej hej in fun ", state.self); console.log("hejj in funnn"); return state.self }//return {lastMl: 100, totalMl: 100} }
 }
 /* const needsWaterReaction = (state: any, event: any) => {
     console.log(`The plant is requesting ${event.payload.requiredWaterMl} ml of water!`)
