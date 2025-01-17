@@ -28,8 +28,8 @@ cMap.set(Events.time.type, () => {var dateString = new Date().toLocaleString(); 
 const rMap = new Map()
 const statePayloadMap = new Map()
 const fMap : any = {commands: cMap, reactions: rMap, statePayloads: statePayloadMap}
-const mAnalysisResource: MachineAnalysisResource = {initial: projection.initial, subscriptions: [], transitions: projection.transitions}
-const [m3, i3] = Composition.extendMachine("D", mAnalysisResource, Events.allEvents, [door, s0], fMap)
+
+const [m3, i3] = Composition.extendMachine("D", projection, Events.allEvents, [door, s0], fMap)
 //console.log(m3.createJSONForAnalysis(i3))
 //console.log(getRandomInt(2000, 5000))
 

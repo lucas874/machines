@@ -30,7 +30,7 @@ export type SwarmProtocol<
   ) => [Machine<any, any, any>, any]
   extendMachine: <MachineName extends string>(
     machineName: MachineName,
-    proj: MachineAnalysisResource,
+    proj: ProjMachine.ProjectionType,
     events: readonly MachineEvent.Factory<any, any>[],
     mOriginal: [Machine<any, any, any>, any],
     fMap: ProjMachine.funMap
@@ -422,9 +422,6 @@ export namespace ProjMachine {
       }
     })
     projStatesToExec.forEach((transitions, state) => {
-      //const mState = m.designEmpty(state)
-      // create state
-      //projStatesToStates.set(state, m.designEmpty(state))
       var test = new Array()
       // add self loops
       transitions.forEach((transition) => {
@@ -436,30 +433,21 @@ export namespace ProjMachine {
           //projStatesToStates.get(state).command(transition.label.cmd, eventTypes, () => [{}])
         }
       })
-      //console.log("test is: ", test)
-      projStatesToStates.set(state, m.designEmpty(state).commandFromList(test).finish())
 
-      // finish
-      //console.log("finishing: ", state)
-      //projStatesToStates.get(state).finish()
-      //console.log("finished: ", projStatesToStates.get(state))
+      projStatesToStates.set(state, m.designEmpty(state).commandFromList(test).finish())
     })
-    //console.log(projStatesToExec)
-    //console.log(projStatesToInput)
-    //console.log(projStatesToStates)
+
     projStatesToInput.forEach((value, key) => {
       if (!projStatesToStates.has(key)) {
         projStatesToStates.set(key, m.designEmpty(key).finish())
       }
-      //projStatesToStates.get(key).finish()
-      //console.log("input loop state is: ", projStatesToStates.get(key))
+
       value.forEach((transition) => {
-        //console.log(transition)
         if (transition.label.tag === 'Input') {
           if (!projStatesToStates.has(transition.target)) {
             projStatesToStates.set(transition.target, m.designEmpty(transition.target).finish())
           }
-          //console.log(key)
+
           projStatesToStates.get(key).react([eventTypeStringToEvent.get(transition.label.eventType)], projStatesToStates.get(transition.target), (_: any) => projStatesToStates.get(transition.target).make())
         }
       })
@@ -474,9 +462,25 @@ export namespace ProjMachine {
     statePayloads: Map<any, any>
   }
 
+  export type ProjectionType = {
+    initial: string;
+    transitions: {
+        source: string;
+        target: string;
+        label: {
+            tag: "Execute";
+            cmd: string;
+            logType: string[];
+        } | {
+            tag: "Input";
+            eventType: string;
+        };
+    }[];
+  }
+
   export function extendMachine(
     m: Machine<any, any, any>,
-    proj: MachineAnalysisResource,
+    proj: ProjectionType,
     events: readonly MachineEvent.Factory<any, Record<never, never>>[],
     mOriginal: [Machine<any, any, any>, any],
     fMap: funMap
