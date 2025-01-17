@@ -21,9 +21,6 @@ const sdk_1 = require("@actyx/sdk");
 const machine_runner_1 = require("@actyx/machine-runner");
 const factory_protocol_1 = require("./factory_protocol");
 const machine_check_1 = require("@actyx/machine-check");
-/* type partIDToGet = {
-    pid: string
-} */
 const transporter = factory_protocol_1.Composition.makeMachine('T');
 exports.s0 = transporter.designEmpty('s0')
     .command('request', [factory_protocol_1.Events.partID], () => { var id = "tire"; console.log("requesting: ", id); return [factory_protocol_1.Events.partID.make({ id: id })]; })
@@ -33,12 +30,6 @@ exports.s2 = transporter.designEmpty('s2')
     .command('deliver', [factory_protocol_1.Events.part], (s, e) => { console.log("s is: ", s); console.log("e is : ", e); return [factory_protocol_1.Events.part.make({ part: "dsasda" })]; })
     .finish();
 exports.s3 = transporter.designEmpty('s3').finish();
-/* console.log("sub comp: ", JSON.stringify(subs))
-console.log("sub wh: ", JSON.stringify(subswh))
-console.log("sub f: ", JSON.stringify(subsf)) */
-//export const s0 = door.designEmpty('s0')
-//    .command('close', [Events.time], () => {var dateString = new Date().toLocaleString(); console.log(dateString); return [Events.time.make({timeOfDay: dateString})]})
-//    .finish()
 exports.s0.react([factory_protocol_1.Events.partID], exports.s1, (_) => exports.s1.make());
 exports.s0.react([factory_protocol_1.Events.time], exports.s3, (_) => exports.s3.make());
 exports.s1.react([factory_protocol_1.Events.position], exports.s2, (_) => exports.s2.make());
@@ -57,13 +48,8 @@ const positionReaction = {
 };
 rMap.set(factory_protocol_1.Events.position.type, positionReaction);
 const fMap = { commands: cMap, reactions: rMap };
-//const cMap = new Map()
-//const rMap = new Map()
-//const statePayloadMap = new Map()
-//const fMap : any = {commands: cMap, reactions: rMap, statePayloads: statePayloadMap}
 const mAnalysisResource = { initial: projection.initial, subscriptions: [], transitions: projection.transitions };
 const [m3, i3] = factory_protocol_1.Composition.extendMachine("T", mAnalysisResource, factory_protocol_1.Events.allEvents, fMap);
-//console.log(m3.createJSONForAnalysis(i3))
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
@@ -71,25 +57,18 @@ function main() {
         const tags = factory_protocol_1.Composition.tagWithEntityId('factory-1');
         const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, undefined);
         try {
-            //var hasRequested = false
-            //var isDone = false
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
                 _d = false;
                 const state = _c;
                 console.log("state is: ", state);
-                /* if (isDone) {
-                    console.log("shutting down")
-                    break
-                } */
                 const s = state.cast();
                 for (var c in s.commands()) {
-                    var cmds = s.commands();
                     if (c === 'request') {
                         setTimeout(() => {
                             var _a, _b;
                             var s1 = (_b = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.cast()) === null || _b === void 0 ? void 0 : _b.commands();
-                            if (Object.keys(s1).includes('request')) { //console.log(Object.keys(s1))
+                            if (Object.keys(s1).includes('request')) {
                                 s1.request();
                             }
                         }, (0, factory_protocol_1.getRandomInt)(2000, 5000));
@@ -98,13 +77,10 @@ function main() {
                     if (c === 'deliver') {
                         setTimeout(() => {
                             var _a, _b;
-                            //const canDeliver = machine.get()?.commandsAvailable()
-                            //if (canDeliver) {
                             var s1 = (_b = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.cast()) === null || _b === void 0 ? void 0 : _b.commands();
-                            if (Object.keys(s1).includes('deliver')) { //console.log(Object.keys(s1))
+                            if (Object.keys(s1).includes('deliver')) {
                                 s1.deliver();
                             }
-                            //}
                         }, (0, factory_protocol_1.getRandomInt)(2000, 5000));
                         break;
                     }

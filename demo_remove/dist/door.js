@@ -21,9 +21,6 @@ const sdk_1 = require("@actyx/sdk");
 const machine_runner_1 = require("@actyx/machine-runner");
 const factory_protocol_1 = require("./factory_protocol");
 const machine_check_1 = require("@actyx/machine-check");
-/* for (var p of all_projections) {
-    console.log(JSON.stringify(p))
-} */
 const door = factory_protocol_1.Composition.makeMachine('D');
 exports.s0 = door.designEmpty('s0')
     .command('close', [factory_protocol_1.Events.time], () => { var dateString = new Date().toLocaleString(); console.log(dateString); return [factory_protocol_1.Events.time.make({ timeOfDay: dateString })]; })
@@ -42,8 +39,6 @@ cMap.set(factory_protocol_1.Events.time.type, () => { var dateString = new Date(
 const rMap = new Map();
 const fMap = { commands: cMap, reactions: rMap };
 const [m3, i3] = factory_protocol_1.Composition.extendMachine("D", projection, factory_protocol_1.Events.allEvents, fMap);
-//console.log(m3.createJSONForAnalysis(i3))
-//console.log(getRandomInt(2000, 5000))
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
@@ -61,25 +56,10 @@ function main() {
                     if (c === 'close') {
                         setTimeout(() => {
                             var _a, _b;
-                            /* const canClose = machine.get()?.commandsAvailable()
-                            if (canClose) {
-                                var s1 = machine.get()?.cast()?.commands() as any
-                                s1.close()
-                            } */
                             var s1 = (_b = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.cast()) === null || _b === void 0 ? void 0 : _b.commands();
                             if (Object.keys(s1).includes('close')) { //console.log(Object.keys(s1))
                                 s1.close();
                             }
-                            /* if ((await machine.peekNext()).done) {
-                                console.log("done")
-                                cmds?.close()
-                            } else {
-                                console.log("not done")
-                            } */
-                            /* const whenOn = (await machine.peekNext()).done?//.as(peekValue)
-                            if (whenOn) {
-                                cmds?.close()
-                            } */
                         }, (0, factory_protocol_1.getRandomInt)(2000, 5000));
                         break;
                     }

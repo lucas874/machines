@@ -2,7 +2,6 @@ import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, subswh, subsf, all_projections, getRandomInt  } from './factory_protocol'
 import { projectCombineMachines } from '@actyx/machine-check'
-import { MachineAnalysisResource } from '@actyx/machine-runner/lib/esm/design/protocol'
 
 const robot = Composition.makeMachine('R')
 export const s0 = robot.designEmpty('s0').finish()
@@ -27,21 +26,15 @@ const partReaction : ProjMachine.ReactionEntry = {
 }
 rMap.set(Events.part.type, partReaction)
 const fMap : any = {commands: cMap, reactions: rMap}
-const mAnalysisResource: MachineAnalysisResource = {initial: projection.initial, subscriptions: [], transitions: projection.transitions}
-const [m3, i3] = Composition.extendMachine("R", mAnalysisResource, Events.allEvents, fMap)
-//console.log(m3.createJSONForAnalysis(i3))
+const [m3, i3] = Composition.extendMachine("R", projection, Events.allEvents, fMap)
+
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
     const machine = createMachineRunner(app, tags, i3, undefined)
-    //var hasRequested = false
-    //var isDone = false
+
     for await (const state of machine) {
       console.log("state is: ", state)
-      /* if (isDone) {
-          console.log("shutting down")
-          break
-      } */
 
       const s = state.cast()
       for (var c in s.commands()) {
@@ -49,7 +42,7 @@ async function main() {
           if (c === 'build') {
             setTimeout(() => {
                 var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1).includes('build')) { //console.log(Object.keys(s1))
+                if (Object.keys(s1).includes('build')) {
                     s1.build()
                 }
             }, getRandomInt(2000, 5000))

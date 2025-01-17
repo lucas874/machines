@@ -21,18 +21,12 @@ const sdk_1 = require("@actyx/sdk");
 const machine_runner_1 = require("@actyx/machine-runner");
 const factory_protocol_1 = require("./factory_protocol");
 const machine_check_1 = require("@actyx/machine-check");
-/* type partIDToGet = {
-    pid: string
-} */
 const forklift = factory_protocol_1.Composition.makeMachine('FL');
 exports.s0 = forklift.designEmpty('s0').finish();
 exports.s1 = forklift.designEmpty('s1')
     .command('get', [factory_protocol_1.Events.position], () => { return [factory_protocol_1.Events.position.make({ position: "x", part: "lars" })]; })
     .finish();
 exports.s2 = forklift.designEmpty('s2').finish();
-/* console.log("sub comp: ", JSON.stringify(subs))
-console.log("sub wh: ", JSON.stringify(subswh))
-console.log("sub f: ", JSON.stringify(subsf)) */
 exports.s0.react([factory_protocol_1.Events.partID], exports.s1, (_) => exports.s1.make());
 exports.s1.react([factory_protocol_1.Events.position], exports.s0, (_) => exports.s0.make());
 exports.s0.react([factory_protocol_1.Events.time], exports.s2, (_) => exports.s2.make());
@@ -40,7 +34,6 @@ const result_projection = (0, machine_check_1.projectCombineMachines)(factory_pr
 if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
 const projection = result_projection.data;
-// console.log("getting a ", e.payload.id, "at position x"); return {id: e.payload.id, position: "x"}
 const cMap = new Map();
 cMap.set(factory_protocol_1.Events.position.type, (state, _) => { console.log("got a ", state.self.id, " at x"); return [factory_protocol_1.Events.position.make({ position: "x", part: state.self.id })]; });
 const rMap = new Map();
@@ -52,7 +45,6 @@ rMap.set(factory_protocol_1.Events.partID.type, partIDReaction);
 const fMap = { commands: cMap, reactions: rMap };
 const mAnalysisResource = { initial: projection.initial, subscriptions: [], transitions: projection.transitions };
 const [m3, i3] = factory_protocol_1.Composition.extendMachine("FL", mAnalysisResource, factory_protocol_1.Events.allEvents, fMap);
-//console.log(m3.createJSONForAnalysis(i3))
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
@@ -60,17 +52,11 @@ function main() {
         const tags = factory_protocol_1.Composition.tagWithEntityId('factory-1');
         const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, undefined);
         try {
-            //var hasRequested = false
-            //var isDone = false
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
                 _d = false;
                 const state = _c;
                 console.log("state is: ", state);
-                /* if (isDone) {
-                    console.log("shutting down")
-                    break
-                } */
                 const s = state.cast();
                 for (var c in s.commands()) {
                     var cmds = s.commands();

@@ -42,9 +42,7 @@ const partReaction = {
 };
 rMap.set(factory_protocol_1.Events.part.type, partReaction);
 const fMap = { commands: cMap, reactions: rMap };
-const mAnalysisResource = { initial: projection.initial, subscriptions: [], transitions: projection.transitions };
-const [m3, i3] = factory_protocol_1.Composition.extendMachine("R", mAnalysisResource, factory_protocol_1.Events.allEvents, fMap);
-//console.log(m3.createJSONForAnalysis(i3))
+const [m3, i3] = factory_protocol_1.Composition.extendMachine("R", projection, factory_protocol_1.Events.allEvents, fMap);
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
@@ -52,17 +50,11 @@ function main() {
         const tags = factory_protocol_1.Composition.tagWithEntityId('factory-1');
         const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, undefined);
         try {
-            //var hasRequested = false
-            //var isDone = false
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
                 _d = false;
                 const state = _c;
                 console.log("state is: ", state);
-                /* if (isDone) {
-                    console.log("shutting down")
-                    break
-                } */
                 const s = state.cast();
                 for (var c in s.commands()) {
                     var cmds = s.commands();
@@ -70,7 +62,7 @@ function main() {
                         setTimeout(() => {
                             var _a, _b;
                             var s1 = (_b = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.cast()) === null || _b === void 0 ? void 0 : _b.commands();
-                            if (Object.keys(s1).includes('build')) { //console.log(Object.keys(s1))
+                            if (Object.keys(s1).includes('build')) {
                                 s1.build();
                             }
                         }, (0, factory_protocol_1.getRandomInt)(2000, 5000));
