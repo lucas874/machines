@@ -373,6 +373,26 @@ export namespace ProjMachine {
     target: string
     label: { tag: 'Execute'; cmd: string; logType: string[] } | { tag: 'Input'; eventType: string }
   }
+  // https://medium.com/@alaneicker/how-to-process-json-data-with-recursion-dc530dd3db09
+  function loopThroughJSON(k: string, obj: any) {
+    for (let key in obj) {
+      if (typeof obj[key] === 'object') {
+        if (Array.isArray(obj[key])) {
+          // loop through array
+          for (let i = 0; i < obj[key].length; i++) {
+            loopThroughJSON(k + " " + key, obj[key][i]);
+          }
+        } else {
+          // call function recursively for object
+          loopThroughJSON(k + " " + key, obj[key]);
+        }
+      } else {
+        // do something with value
+        console.log(k + " " + key + ': ' + obj[key]);
+      }
+    }
+  }
+  //type ReplaceReturnType<T extends (...a: any) => any, TNewReturn> = (...a: Parameters<T>) => TNewReturn;
 
   export function machineFromProj(
     m: Machine<any, any, any>,
@@ -489,7 +509,24 @@ export namespace ProjMachine {
     var projStatesToExec: Map<string, Transition[]> = new Map()
     var projStatesToInput: Map<string, Transition[]> = new Map()
     var eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> = new Map()
-
+    console.log("0: ")
+    loopThroughJSON("", mOriginal[0])
+    console.log("1: ")
+    loopThroughJSON("", mOriginal[1])
+    console.log("commands: ", mOriginal[1].mechanism.protocol.commands)
+    var ccMap = new Map()
+    for (var c in mOriginal[1].mechanism.protocol.commands) {
+      console.log("cmd index is: ", c)
+      console.log("cmd is: ", mOriginal[1].mechanism.protocol.commands[c])
+      console.log("cmd event: ", mOriginal[1].mechanism.protocol.commands[c]['events'])
+      console.log("works:? ", mOriginal[1].mechanism.commands[mOriginal[1].mechanism.protocol.commands[c]['commandName']])
+      if (mOriginal[1].mechanism.commands[mOriginal[1].mechanism.protocol.commands[c]['commandName']] !== undefined) {
+        var e = mOriginal[1].mechanism.protocol.commands[c]['events'][0]
+        ccMap.set(e, mOriginal[1].mechanism.commands[mOriginal[1].mechanism.protocol.commands[c]['commandName']])
+      }
+      //ccMap.set(c['events'], mOriginal[1].mechanism.protocol.commands[c.commandName])
+      console.log("works map? ", ccMap)
+    }
     proj.transitions.forEach((transition) => {
       if (transition.label.tag === 'Execute') {
         if (!projStatesToExec.has(transition.source)) {
@@ -538,7 +575,9 @@ export namespace ProjMachine {
           var etypes = transition.label.logType.map((et: string) => {
             return eventTypeStringToEvent.get(et)?.type
           })
-          var f = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => [{}]
+          //var f = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => [{}]
+          //console.log(ccMap.get(etypes[0]))
+          var f = ccMap.has(etypes[0]) ? ccMap.get(etypes[0]) : () => [{}]
           cmdTriples.push([transition.label.cmd, es, f])
 
         }
