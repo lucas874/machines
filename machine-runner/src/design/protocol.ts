@@ -625,7 +625,7 @@ export namespace ProjMachine {
     var projStatesToExec: Map<string, Transition[]> = new Map()
     var projStatesToInput: Map<string, Transition[]> = new Map()
     var eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> = new Map()
-    var projStatesToStatePayload: Map<string, (s: any, e: any) => any> = new Map()
+    var projStatesToStatePayload: Map<string, (...args : any[]) => any> = new Map()
     proj.transitions.forEach((transition) => {
       if (transition.label.tag === 'Execute') {
         if (!projStatesToExec.has(transition.source)) {
@@ -697,6 +697,8 @@ export namespace ProjMachine {
 
     })
 
+    //console.log("projstatestoexec ", projStatesToExec)
+    //console.log("projstatestoinput ", projStatesToInput)
     projStatesToInput.forEach((value, key) => {
       if (!projStatesToStates.has(key)) {
         projStatesToStates.set(key, m.designEmpty(key).finish())
@@ -712,7 +714,10 @@ export namespace ProjMachine {
           var f =
             fMap.reactions.has(e) && fMap.reactions.get(e)!.identifiedByInput
               ? (...args: any[]) => {const sPayload = fMap.reactions.get(e)!.genPayloadFun(...args); return projStatesToStates.get(transition.target).make(sPayload)}
-              : (_: any) => projStatesToStates.get(transition.target).make()
+              : (projStatesToExec.has(transition.target)
+                  ? (s: any, _: any) => { return projStatesToStates.get(transition.target).make(s.self)}
+                  : (_: any) => projStatesToStates.get(transition.target).make()
+              )
 
           //var f = fMap.reactions.has(eventType) ? fMap.reactions.get(eventType) : () => [{}]
           //projStatesToStates.get(key).react([es], projStatesToStates.get(transition.target), (_: any) => projStatesToStates.get(transition.target).make())
