@@ -6,4 +6,6 @@ import { projectCombineMachines } from '@actyx/machine-check'
 for (var p of all_projections) {
     console.log(JSON.stringify(p))
     console.log()
+    console.log("$$$$")
+    console.log()
 }
