@@ -34,11 +34,11 @@ if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
 const projection = result_projection.data;
 const cMap = new Map();
-cMap.set(factory_protocol_1.Events.car.type, (s, _) => { var modelName = "sedan"; console.log("got a ", s.self.part, " using it to build a ", modelName); return [factory_protocol_1.Events.car.make({ part: s.self.part, modelName: modelName })]; });
+cMap.set(factory_protocol_1.Events.car.type, (s, _) => { var modelName = "sedan"; console.log("using the ", s.self.part, " to build a ", modelName); return [factory_protocol_1.Events.car.make({ part: s.self.part, modelName: modelName })]; });
 const rMap = new Map();
 const partReaction = {
     identifiedByInput: true,
-    genPayloadFun: (_, e) => { console.log("got a ", e.payload.part); return { part: e.payload.part }; }
+    genPayloadFun: (_, e) => { console.log("received a ", e.payload.part); return { part: e.payload.part }; }
 };
 rMap.set(factory_protocol_1.Events.part.type, partReaction);
 const fMap = { commands: cMap, reactions: rMap };

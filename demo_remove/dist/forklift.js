@@ -35,7 +35,7 @@ if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
 const projection = result_projection.data;
 const cMap = new Map();
-cMap.set(factory_protocol_1.Events.position.type, (state, _) => { console.log("got a ", state.self.id, " at x"); return [factory_protocol_1.Events.position.make({ position: "x", part: state.self.id })]; });
+cMap.set(factory_protocol_1.Events.position.type, (state, _) => { console.log("retrieved a ", state.self.id, " at x"); return [factory_protocol_1.Events.position.make({ position: "x", part: state.self.id })]; });
 const rMap = new Map();
 const partIDReaction = {
     identifiedByInput: true,

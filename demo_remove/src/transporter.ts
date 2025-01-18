@@ -24,7 +24,7 @@ if (result_projection.type == 'ERROR') throw new Error('error getting projection
 const projection = result_projection.data
 
 const cMap = new Map()
-cMap.set(Events.partID.type, () => {var id = "tire"; console.log("requesting: ", id); return [Events.partID.make({id: id})]})
+cMap.set(Events.partID.type, (s: any, e: any) => {console.log(s, e); var id = s.self.part; console.log("requesting: ", id); return [Events.partID.make({id: id})]})
 cMap.set(Events.part.type, (s: any, e: any) => {return [Events.part.make({part: s.self.part})]})
 
 const rMap = new Map()
@@ -41,7 +41,8 @@ const [m3, i3] = Composition.extendMachine("T", mAnalysisResource, Events.allEve
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const machine = createMachineRunner(app, tags, i3, undefined)
+    const parts = ['tire', 'windshield', 'chassis', 'hood']
+    const machine = createMachineRunner(app, tags, i3, {part: parts[Math.floor(Math.random() * parts.length)]})
 
     for await (const state of machine) {
       console.log("state is: ", state)
