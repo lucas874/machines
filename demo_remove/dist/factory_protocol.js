@@ -50,8 +50,8 @@ exports.Gquality = {
         { source: '2', target: '3', label: { cmd: 'test', role: 'QCR', logType: [Events.report.type] } },
     ]
 };
-//const protocols: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}, {protocol: Gquality, interface: 'R'}]
-exports.interfacing_swarms = [{ protocol: exports.Gwarehouse, interface: null }, { protocol: exports.Gfactory, interface: 'T' }];
+exports.interfacing_swarms = [{ protocol: exports.Gwarehouse, interface: null }, { protocol: exports.Gfactory, interface: 'T' }, { protocol: exports.Gquality, interface: 'R' }];
+//export const interfacing_swarms: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}]
 exports.interfacing_swarmswh = [{ protocol: exports.Gwarehouse, interface: null }];
 exports.interfacing_swarmsf = [{ protocol: exports.Gfactory, interface: null }];
 const result_subs = (0, machine_check_1.overapproxWWFSubscriptions)(exports.interfacing_swarms, {}, 'Medium');

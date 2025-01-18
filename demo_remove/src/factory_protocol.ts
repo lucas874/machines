@@ -56,8 +56,8 @@ export const Gquality: SwarmProtocolType = {
     {source: '2', target: '3', label: { cmd: 'test', role: 'QCR', logType: [Events.report.type] }},
   ]}
 
-//const protocols: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}, {protocol: Gquality, interface: 'R'}]
-export const interfacing_swarms: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}]
+export const interfacing_swarms: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}, {protocol: Gquality, interface: 'R'}]
+//export const interfacing_swarms: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}]
 export const interfacing_swarmswh: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}]
 export const interfacing_swarmsf: InterfacingSwarms = [{protocol: Gfactory, interface: null}]
 
