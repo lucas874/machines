@@ -83,7 +83,7 @@ export namespace SwarmProtocol {
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
       makeProjMachine: (machineName, proj, events) => ProjMachine.machineFromProj(ImplMachine.make(swarmName, machineName, eventFactories), proj, events),
       //extendMachine: (machineName, proj, events, mOriginal, fMap) => ProjMachine.extendMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, mOriginal, fMap)
-      extendMachine: (machineName, proj, events, fMap) => ProjMachine.extendMachine2(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, fMap)
+      extendMachine: (machineName, proj, events, fMap) => ProjMachine.extendMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, fMap)
     }
   }
 }
@@ -563,7 +563,7 @@ export namespace ProjMachine {
     return [states, fs[Symbol.iterator]().next().value]
   }
 
-  export function extendMachine2(
+  export function extendMachine(
     m: Machine<any, any, any>,
     proj: ProjectionType,
     events: readonly MachineEvent.Factory<any, Record<never, never>>[],

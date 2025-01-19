@@ -20,7 +20,7 @@ if (result_projection.type == 'ERROR') throw new Error('error getting projection
 const projection = result_projection.data
 
 const cMap = new Map()
-cMap.set(Events.position.type, (state: any, _: any) => {console.log("retrieved a ", state.self.id, " at x"); return [Events.position.make({position: "x", part: state.self.id})]})
+cMap.set(Events.position.type, (state: any, _: any) => {console.log("retrieved a ", state.self.id, " at position x"); return [Events.position.make({position: "x", part: state.self.id})]})
 
 const rMap = new Map()
 const partIDReaction : ProjMachine.ReactionEntry = {

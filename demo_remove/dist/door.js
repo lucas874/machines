@@ -60,7 +60,7 @@ function main() {
                             if (Object.keys(s1).includes('close')) { //console.log(Object.keys(s1))
                                 s1.close();
                             }
-                        }, (0, factory_protocol_1.getRandomInt)(0, 5));
+                        }, (0, factory_protocol_1.getRandomInt)(3500, 5000));
                         break;
                     }
                 }

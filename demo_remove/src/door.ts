@@ -42,7 +42,7 @@ async function main() {
                 if (Object.keys(s1).includes('close')) { //console.log(Object.keys(s1))
                     s1.close()
                 }
-            }, getRandomInt(0, 5))
+            }, getRandomInt(3500, 5000))
             break
           }
       }
