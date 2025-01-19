@@ -41,10 +41,12 @@ async function main() {
 
       const s = state.cast()
       for (var c in s.commands()) {
-          var cmds = s.commands() as any;
           if (c === 'get') {
             setTimeout(() => {
-                cmds?.get()
+              var s1 = machine.get()?.cast()?.commands() as any
+              if (Object.keys(s1).includes('get')) {
+                s1.close()
+              }
             }, getRandomInt(2000, 5000))
             break
           }

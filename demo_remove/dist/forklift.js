@@ -58,10 +58,13 @@ function main() {
                 console.log("state is: ", state);
                 const s = state.cast();
                 for (var c in s.commands()) {
-                    var cmds = s.commands();
                     if (c === 'get') {
                         setTimeout(() => {
-                            cmds === null || cmds === void 0 ? void 0 : cmds.get();
+                            var _a, _b;
+                            var s1 = (_b = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.cast()) === null || _b === void 0 ? void 0 : _b.commands();
+                            if (Object.keys(s1).includes('get')) {
+                                s1.close();
+                            }
                         }, (0, factory_protocol_1.getRandomInt)(2000, 5000));
                         break;
                     }

@@ -865,6 +865,7 @@ export namespace ProjMachine {
         projStatesToStates.set(state, m.designEmpty(state).commandFromList(cmdTriples).finish())
       } else {
         projStatesToStates.set(state, m.designState(state).withPayload<ReturnType<typeof f>>().commandFromList(cmdTriples).finish())
+        markedStates.add(state)
         for (const samePayloadState of statesWithSamePayloadType) {
           if (!projStatesToExec.has(samePayloadState) && !projStatesToStates.has(samePayloadState)) {
             projStatesToStates.set(samePayloadState, m.designState(samePayloadState).withPayload<ReturnType<typeof f>>().finish())
@@ -878,9 +879,9 @@ export namespace ProjMachine {
               markedStates.add(samePayloadState)
             }
           } */
-          if (!projStatesToStatePayload.has(samePayloadState)) {
-            markedStates.add(samePayloadState)
-          }
+          //if (!projStatesToStatePayload.has(samePayloadState)) {
+          markedStates.add(samePayloadState)
+          //}
         }
       }
       /* if (projStatesToStatePayload.has(state)) {
