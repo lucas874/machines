@@ -44,7 +44,6 @@ const cMap = new Map();
 const rMap = new Map();
 const statePayloadMap = new Map();
 const needsWaterReaction = {
-    identifiedByInput: true,
     genPayloadFun: (state, event) => {
         console.log(`The plant is requesting ${event.payload.requiredWaterMl} ml of water!`);
         const newStatePayload = {
@@ -58,7 +57,6 @@ const needsWaterReaction = {
     }
 };
 const hasWaterReaction = {
-    identifiedByInput: true,
     genPayloadFun: (state, _) => { console.log("hej hej in fun ", state.self); console.log("hejj in funnn"); return state.self; } //return {lastMl: 100, totalMl: 100} }
 };
 /* const needsWaterReaction = (state: any, event: any) => {
@@ -72,7 +70,7 @@ const hasWaterReaction = {
 } */
 statePayloadMap.set(protocol_1.Events.NeedsWater.type, needsWaterReaction);
 statePayloadMap.set(protocol_1.Events.HasWater.type, hasWaterReaction);
-const fMap = { commands: cMap, reactions: rMap, statePayloads: statePayloadMap };
+const fMap = { commands: cMap, reactions: statePayloadMap };
 //const [m3, i3] = protocol.extendMachine("robot", m, Events.All, [machine, Idle], fMap)
 const [m3, i3] = protocol_1.protocol.extendMachine("robot", m, protocol_1.Events.All, fMap);
 function main() {

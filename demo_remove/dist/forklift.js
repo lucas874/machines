@@ -38,7 +38,6 @@ const cMap = new Map();
 cMap.set(factory_protocol_1.Events.position.type, (state, _) => { console.log("retrieved a ", state.self.id, " at x"); return [factory_protocol_1.Events.position.make({ position: "x", part: state.self.id })]; });
 const rMap = new Map();
 const partIDReaction = {
-    identifiedByInput: true,
     genPayloadFun: (_, e) => { console.log("a ", e.payload.id, "was requested"); return { id: e.payload.id }; } //return {lastMl: 100, totalMl: 100} }
 };
 rMap.set(factory_protocol_1.Events.partID.type, partIDReaction);

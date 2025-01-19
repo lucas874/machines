@@ -478,7 +478,6 @@ export namespace ProjMachine {
   }
 
   export type ReactionEntry = {
-    identifiedByInput: boolean
     genPayloadFun: (...args : any[]) => any
   }
 
@@ -642,10 +641,6 @@ export namespace ProjMachine {
             }
           }
         }
-        var e = transition.label.logType[0]
-        if (fMap.reactions.has(e) && !fMap.reactions.get(e)?.identifiedByInput) {
-          projStatesToStatePayload.set(transition.source, fMap.reactions.get(e)!.genPayloadFun)
-        }
       } else if (transition.label.tag === 'Input') {
         if (!projStatesToInput.has(transition.source)) {
           projStatesToInput.set(transition.source, new Array())
@@ -666,7 +661,7 @@ export namespace ProjMachine {
         }
 
         var e = transition.label.eventType
-        if (fMap.reactions.has(e) && fMap.reactions.get(e)?.identifiedByInput) {
+        if (fMap.reactions.has(e)) {
           projStatesToStatePayload.set(transition.target, fMap.reactions.get(e)!.genPayloadFun)
         }
       }
@@ -712,7 +707,7 @@ export namespace ProjMachine {
           var e = transition.label.eventType
           var es = eventTypeStringToEvent.get(e)
           var f =
-            fMap.reactions.has(e) && fMap.reactions.get(e)!.identifiedByInput
+            fMap.reactions.has(e)
               ? (...args: any[]) => {const sPayload = fMap.reactions.get(e)!.genPayloadFun(...args); return projStatesToStates.get(transition.target).make(sPayload)}
               : (projStatesToExec.has(transition.target)
                   ? (s: any, _: any) => { return projStatesToStates.get(transition.target).make(s.self)}
@@ -786,13 +781,7 @@ export namespace ProjMachine {
     }
 
     const [states, fs] = inner(s, initial, incomingEdgesMap, projStatesToStatePayload, new Set())
-    /* if (fs.size > 1) {
-      // maybe this wont work, do not know how equality of functions would work.... the reference?
-      throw new Error("Conflicting types");
-    } */
-    /* if (fs.size == 0) {
-      return [states, undefined]
-    } */
+
     return [states, fs[Symbol.iterator]().next().value]
   }
 
@@ -826,10 +815,6 @@ export namespace ProjMachine {
             }
           }
         }
-        var e = transition.label.logType[0]
-        if (fMap.reactions.has(e) && !fMap.reactions.get(e)?.identifiedByInput) {
-          projStatesToStatePayload.set(transition.source, fMap.reactions.get(e)!.genPayloadFun)
-        }
       } else if (transition.label.tag === 'Input') {
         if (!projStatesToInput.has(transition.source)) {
           projStatesToInput.set(transition.source, new Array())
@@ -850,7 +835,7 @@ export namespace ProjMachine {
         }
 
         var e = transition.label.eventType
-        if (fMap.reactions.has(e) && fMap.reactions.get(e)?.identifiedByInput) {
+        if (fMap.reactions.has(e)) {
           projStatesToStatePayload.set(transition.target, fMap.reactions.get(e)!.genPayloadFun)
         }
       }
@@ -929,7 +914,7 @@ export namespace ProjMachine {
           var e = transition.label.eventType
           var es = eventTypeStringToEvent.get(e)
           var f =
-            fMap.reactions.has(e) && fMap.reactions.get(e)!.identifiedByInput
+            fMap.reactions.has(e)
               ? (...args: any[]) => {const sPayload = fMap.reactions.get(e)!.genPayloadFun(...args); return projStatesToStates.get(transition.target).make(sPayload)}
               : (markedStates.has(transition.target) //(projStatesToExec.has(transition.target)
                   ? (s: any, _: any) => { return projStatesToStates.get(transition.target).make(s.self)}

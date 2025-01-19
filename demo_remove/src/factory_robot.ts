@@ -21,7 +21,6 @@ const cMap = new Map()
 cMap.set(Events.car.type, (s: any, _: any) => {var modelName = "sedan"; console.log("using the ", s.self.part, " to build a ", modelName); return [Events.car.make({part: s.self.part, modelName: modelName})]})
 const rMap = new Map()
 const partReaction : ProjMachine.ReactionEntry = {
-  identifiedByInput: true,
   genPayloadFun: (_, e) => { console.log("received a ", e.payload.part); return {part: e.payload.part} }
 }
 rMap.set(Events.part.type, partReaction)

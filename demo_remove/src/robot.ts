@@ -33,7 +33,6 @@ const cMap = new Map()
 const rMap = new Map()
 const statePayloadMap = new Map()
 const needsWaterReaction : ProjMachine.ReactionEntry = {
-  identifiedByInput: true,
   genPayloadFun:
     (state: any, event: any) => {
       console.log(`The plant is requesting ${event.payload.requiredWaterMl} ml of water!`)
@@ -48,7 +47,6 @@ const needsWaterReaction : ProjMachine.ReactionEntry = {
   }
 }
 const hasWaterReaction : ProjMachine.ReactionEntry = {
-  identifiedByInput: true,
   genPayloadFun: (state, _: any) => { console.log("hej hej in fun ", state.self); console.log("hejj in funnn"); return state.self }//return {lastMl: 100, totalMl: 100} }
 }
 /* const needsWaterReaction = (state: any, event: any) => {
@@ -62,7 +60,7 @@ const hasWaterReaction : ProjMachine.ReactionEntry = {
 } */
 statePayloadMap.set(Events.NeedsWater.type, needsWaterReaction)
 statePayloadMap.set(Events.HasWater.type, hasWaterReaction)
-const fMap : any = {commands: cMap, reactions: rMap, statePayloads: statePayloadMap}
+const fMap : any = {commands: cMap, reactions: statePayloadMap}
 //const [m3, i3] = protocol.extendMachine("robot", m, Events.All, [machine, Idle], fMap)
 const [m3, i3] = protocol.extendMachine("robot", m, Events.All, fMap)
 export async function main() {

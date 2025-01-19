@@ -29,7 +29,6 @@ cMap.set(Events.part.type, (s: any, e: any) => {return [Events.part.make({part: 
 
 const rMap = new Map()
 const positionReaction : ProjMachine.ReactionEntry = {
-  identifiedByInput: true,
   genPayloadFun: (_, e) => { console.log("got a ", e.payload.part); return {part: e.payload.part} }
 }
 rMap.set(Events.position.type, positionReaction)

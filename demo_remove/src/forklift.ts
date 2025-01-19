@@ -24,7 +24,6 @@ cMap.set(Events.position.type, (state: any, _: any) => {console.log("retrieved a
 
 const rMap = new Map()
 const partIDReaction : ProjMachine.ReactionEntry = {
-  identifiedByInput: true,
   genPayloadFun: (_, e) => { console.log("a ", e.payload.id, "was requested"); return {id: e.payload.id} }//return {lastMl: 100, totalMl: 100} }
 }
 rMap.set(Events.partID.type, partIDReaction)

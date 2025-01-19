@@ -43,7 +43,6 @@ cMap.set(factory_protocol_1.Events.partID.type, (s, e) => { console.log(s, e); v
 cMap.set(factory_protocol_1.Events.part.type, (s, e) => { return [factory_protocol_1.Events.part.make({ part: s.self.part })]; });
 const rMap = new Map();
 const positionReaction = {
-    identifiedByInput: true,
     genPayloadFun: (_, e) => { console.log("got a ", e.payload.part); return { part: e.payload.part }; }
 };
 rMap.set(factory_protocol_1.Events.position.type, positionReaction);

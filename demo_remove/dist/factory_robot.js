@@ -37,7 +37,6 @@ const cMap = new Map();
 cMap.set(factory_protocol_1.Events.car.type, (s, _) => { var modelName = "sedan"; console.log("using the ", s.self.part, " to build a ", modelName); return [factory_protocol_1.Events.car.make({ part: s.self.part, modelName: modelName })]; });
 const rMap = new Map();
 const partReaction = {
-    identifiedByInput: true,
     genPayloadFun: (_, e) => { console.log("received a ", e.payload.part); return { part: e.payload.part }; }
 };
 rMap.set(factory_protocol_1.Events.part.type, partReaction);

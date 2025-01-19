@@ -28,7 +28,7 @@ const rMap = new Map()
 rMap.set(Events.NeedsWater, () => [Events.NeedsWater.make({requiredWaterMl: 5})])
 rMap.set(Events.Done, () => [{}])
 const statePayloadMap = new Map()
-const fMap : any = {commands: cMap, reactions: rMap, statePayloads: statePayloadMap}
+const fMap : any = {commands: cMap, reactions: rMap}
 
 //const [m3, i3] = protocol.extendMachine("sensor", m, Events.All, [machine, s0], fMap)
 const [m3, i3] = protocol.extendMachine("sensor", m, Events.All, fMap)
