@@ -584,7 +584,7 @@ export namespace ProjMachine {
             return eventTypeStringToEvent.get(et)?.type
           })
           var f = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => [{}]
-          console.log("ccmap ", ccMap.get(etypes[0]))
+
           //var f = ccMap.has(etypes[0]) ? ccMap.get(etypes[0]) : () => [{}]
           cmdTriples.push([transition.label.cmd, es, f])
 
@@ -864,15 +864,12 @@ export namespace ProjMachine {
 
         }
       })
-      console.log("exec state is: ", state)
+
       const [statesWithSamePayloadType, f] = payloadStates(state, proj.initial, incomingMap, projStatesToStatePayload)
-      console.log("same payload states: ", statesWithSamePayloadType)
-      console.log("payload type: ", typeof f)
+
       if (f === undefined) {
-        console.log("f is undefined s is ", state, "is initial? ", state === proj.initial)
         projStatesToStates.set(state, m.designEmpty(state).commandFromList(cmdTriples).finish())
       } else {
-        console.log("f is defined s is ", state, "is initial? ", state === proj.initial)
         projStatesToStates.set(state, m.designState(state).withPayload<ReturnType<typeof f>>().commandFromList(cmdTriples).finish())
         markedStates.add(state)
         for (const samePayloadState of statesWithSamePayloadType) {
@@ -907,10 +904,6 @@ export namespace ProjMachine {
 
     })
 
-    console.log("projstatestoexec ", projStatesToExec)
-    console.log("projstatestoinput ", projStatesToInput)
-    console.log("projstates to state paylaod: ", projStatesToStatePayload)
-    console.log("marked states: ", markedStates)
     projStatesToInput.forEach((value, key) => {
       if (!projStatesToStates.has(key)) {
         projStatesToStates.set(key, m.designEmpty(key).finish())
