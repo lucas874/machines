@@ -859,9 +859,7 @@ export namespace ProjMachine {
             return eventTypeStringToEvent.get(et)?.type
           })
           var f = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => [{}]
-          //var f = ccMap.has(etypes[0]) ? ccMap.get(etypes[0]) : () => [{}]
           cmdTriples.push([transition.label.cmd, es, f])
-
         }
       })
 
@@ -876,32 +874,10 @@ export namespace ProjMachine {
           if (!projStatesToExec.has(samePayloadState) && !projStatesToStates.has(samePayloadState)) {
             projStatesToStates.set(samePayloadState, m.designState(samePayloadState).withPayload<ReturnType<typeof f>>().finish())
           }
-          /* var samePayloadIncoming = incomingMap.get(samePayloadState)
-          if (samePayloadIncoming !== undefined) {
-            var eventsNoReactions = samePayloadIncoming
-              .flatMap((t) => (t.label.tag == 'Input' ? t.label.eventType : []))
-              .filter((e) => !fMap.reactions.has(e))
-            if (eventsNoReactions.length != 0) {
-              markedStates.add(samePayloadState)
-            }
-          } */
-          //if (!projStatesToStatePayload.has(samePayloadState)) {
+
           markedStates.add(samePayloadState)
-          //}
         }
       }
-      /* if (projStatesToStatePayload.has(state)) {
-        console.log("hello state is: ", state)
-        var f = projStatesToStatePayload.get(state)!
-        projStatesToStates.set(state, m.designState(state).withPayload<ReturnType<typeof f>>().commandFromList(cmdTriples).finish())
-      } else if (projStatesToExec.has(state)){
-        console.log("state in projstates to exec: ", state)
-
-      } else {
-        console.log("hello else branch state not inprojstatestopayload. state: ", state)
-        projStatesToStates.set(state, m.designEmpty(state).commandFromList(cmdTriples).finish())
-      } */
-
     })
 
     projStatesToInput.forEach((value, key) => {
@@ -923,9 +899,6 @@ export namespace ProjMachine {
                   ? (s: any, _: any) => { return projStatesToStates.get(transition.target).make(s.self)}
                   : (_: any) => projStatesToStates.get(transition.target).make()
               )
-
-          //var f = fMap.reactions.has(eventType) ? fMap.reactions.get(eventType) : () => [{}]
-          //projStatesToStates.get(key).react([es], projStatesToStates.get(transition.target), (_: any) => projStatesToStates.get(transition.target).make())
           projStatesToStates.get(key).react([es], projStatesToStates.get(transition.target), f)
         }
       })
@@ -935,11 +908,3 @@ export namespace ProjMachine {
     return [m, initial]
   }
 }
-
-
-/* if (transition.label.tag === 'Execute') {
-          var eventTypes = transition.label.logType.map((et: string) => {
-            return eventTypeStringToEvent.get(et)
-          })
-          projStatesToStates.get(key).command(transition.label.cmd, eventTypes, () => [{}])
-        } else  */
