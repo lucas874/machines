@@ -10,7 +10,7 @@ export const s0 = qcr.designEmpty('s0')
     .finish()
 export const s1 = qcr.designEmpty('s1').finish()
 export const s2 = qcr.designEmpty('s2')
-    .command("test", [Events.report], () => [{}])
+    .command("test", [Events.report], (s,e) => {return [Events.report.make({modelName: "sda", decision: "ok"})]})
     .finish()
 
 s0.react([Events.observing], s1, (_) => s1.make())
@@ -21,10 +21,14 @@ if (result_projection.type == 'ERROR') throw new Error('error getting projection
 const projection = result_projection.data
 
 const cMap = new Map()
-//cMap.set(Events.car.type, (s: any, _: any) => {var modelName = "sedan"; console.log("using the ", s.self.part, " to build a ", modelName); return [Events.car.make({part: s.self.part, modelName: modelName})]})
+cMap.set(Events.report.type, (s: any, _: any) => {console.log("the newly built", s.self.modelName, " is", s.self.decision); return [Events.report.make({modelName: s.self.modelName, decision: s.self.decision})]})
+/* const rMap = new Map()
+const carReaction : ProjMachine.ReactionEntry = {
+  genPayloadFun: (_, e) => { console.log("received a ", e.payload.modelName);  }
+} */
 const rMap = new Map()
 const carReaction : ProjMachine.ReactionEntry = {
-  genPayloadFun: (_, e) => { console.log("received a ", e.payload.modelName) }
+  genPayloadFun: (_, e) => { console.log("received a ", e.payload.modelName); if (e.payload.part !== undefined) {return {modelName: e.payload.modelName, decision: "ok"}} else {return {modelName: e.payload.modelName, decision: "notOk"}} }
 }
 rMap.set(Events.car.type, carReaction)
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}

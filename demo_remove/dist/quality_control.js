@@ -27,7 +27,7 @@ exports.s0 = qcr.designEmpty('s0')
     .finish();
 exports.s1 = qcr.designEmpty('s1').finish();
 exports.s2 = qcr.designEmpty('s2')
-    .command("test", [factory_protocol_1.Events.report], () => [{}])
+    .command("test", [factory_protocol_1.Events.report], (s, e) => { return [factory_protocol_1.Events.report.make({ modelName: "sda", decision: "ok" })]; })
     .finish();
 exports.s0.react([factory_protocol_1.Events.observing], exports.s1, (_) => exports.s1.make());
 exports.s1.react([factory_protocol_1.Events.car], exports.s2, (_) => exports.s2.make());
@@ -36,10 +36,19 @@ if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
 const projection = result_projection.data;
 const cMap = new Map();
-//cMap.set(Events.car.type, (s: any, _: any) => {var modelName = "sedan"; console.log("using the ", s.self.part, " to build a ", modelName); return [Events.car.make({part: s.self.part, modelName: modelName})]})
+cMap.set(factory_protocol_1.Events.report.type, (s, _) => { console.log("the newly built", s.self.modelName, " is", s.self.decision); return [factory_protocol_1.Events.report.make({ modelName: s.self.modelName, decision: s.self.decision })]; });
+/* const rMap = new Map()
+const carReaction : ProjMachine.ReactionEntry = {
+  genPayloadFun: (_, e) => { console.log("received a ", e.payload.modelName);  }
+} */
 const rMap = new Map();
 const carReaction = {
-    genPayloadFun: (_, e) => { console.log("received a ", e.payload.modelName); }
+    genPayloadFun: (_, e) => { console.log("received a ", e.payload.modelName); if (e.payload.part !== undefined) {
+        return { modelName: e.payload.modelName, decision: "ok" };
+    }
+    else {
+        return { modelName: e.payload.modelName, decision: "notOk" };
+    } }
 };
 rMap.set(factory_protocol_1.Events.car.type, carReaction);
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };

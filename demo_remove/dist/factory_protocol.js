@@ -21,7 +21,7 @@ var Events;
     Events.time = machine_runner_1.MachineEvent.design('time').withPayload();
     Events.car = machine_runner_1.MachineEvent.design('car').withPayload();
     Events.observing = machine_runner_1.MachineEvent.design('ok').withoutPayload();
-    Events.report = machine_runner_1.MachineEvent.design('report').withoutPayload();
+    Events.report = machine_runner_1.MachineEvent.design('report').withPayload();
     Events.allEvents = [Events.partID, Events.part, Events.position, Events.time, Events.car, Events.observing, Events.report];
 })(Events || (exports.Events = Events = {}));
 exports.Composition = machine_runner_1.SwarmProtocol.make('Composition', Events.allEvents);
