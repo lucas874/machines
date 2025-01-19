@@ -49,7 +49,7 @@ async function main() {
     const machine = createMachineRunner(app, tags, i3, {part: parts[Math.floor(Math.random() * parts.length)]})
 
     for await (const state of machine) {
-      console.log("state is: ", state)
+      console.log("transporter. state is: ", state)
 
       const s = state.cast()
       for (var c in s.commands()) {
@@ -68,7 +68,7 @@ async function main() {
                 if (Object.keys(s1).includes('deliver')) {
                     s1.deliver()
                 }
-            }, getRandomInt(2000, 5000))
+            }, getRandomInt(4000, 8000))
             break
           }
       }

@@ -50,7 +50,7 @@ function main() {
                 _c = machine_1_1.value;
                 _d = false;
                 const state = _c;
-                console.log("state is: ", state);
+                console.log("door. state is: ", state);
                 const s = state.cast();
                 for (var c in s.commands()) {
                     if (c === 'close') {
@@ -60,7 +60,7 @@ function main() {
                             if (Object.keys(s1).includes('close')) { //console.log(Object.keys(s1))
                                 s1.close();
                             }
-                        }, (0, factory_protocol_1.getRandomInt)(3500, 5000));
+                        }, (0, factory_protocol_1.getRandomInt)(5500, 8000));
                         break;
                     }
                 }

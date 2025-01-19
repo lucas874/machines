@@ -33,7 +33,7 @@ async function main() {
     const machine = createMachineRunner(app, tags, i3, undefined)
 
     for await (const state of machine) {
-      console.log("state is: ", state)
+      console.log("door. state is: ", state)
       const s = state.cast()
       for (var c in s.commands()) {
           if (c === 'close') {
@@ -42,7 +42,7 @@ async function main() {
                 if (Object.keys(s1).includes('close')) { //console.log(Object.keys(s1))
                     s1.close()
                 }
-            }, getRandomInt(3500, 5000))
+            }, getRandomInt(5500, 8000))
             break
           }
       }

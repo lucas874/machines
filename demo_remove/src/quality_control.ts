@@ -36,7 +36,7 @@ async function main() {
     const machine = createMachineRunner(app, tags, i3, undefined)
 
     for await (const state of machine) {
-      console.log("state is: ", state)
+      console.log("quality control robot. state is: ", state)
 
       const s = state.cast()
       for (var c in s.commands()) {
@@ -55,7 +55,7 @@ async function main() {
                 if (Object.keys(s1).includes('test')) {
                     s1.test()
                 }
-            }, getRandomInt(2000, 5000))
+            }, getRandomInt(4000, 8000))
             break
         }
       }

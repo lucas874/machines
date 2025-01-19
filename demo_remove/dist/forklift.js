@@ -55,7 +55,7 @@ function main() {
                 _c = machine_1_1.value;
                 _d = false;
                 const state = _c;
-                console.log("state is: ", state);
+                console.log("forklift. state is: ", state);
                 const s = state.cast();
                 for (var c in s.commands()) {
                     if (c === 'get') {
@@ -65,7 +65,7 @@ function main() {
                             if (Object.keys(s1).includes('get')) {
                                 s1.get();
                             }
-                        }, (0, factory_protocol_1.getRandomInt)(2000, 5000));
+                        }, (0, factory_protocol_1.getRandomInt)(4000, 8000));
                         break;
                     }
                 }

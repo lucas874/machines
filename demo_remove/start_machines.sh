@@ -5,7 +5,6 @@ while [[ $# -gt 0 ]]; do
     --clean)
       pkill actyx
       rm -rf actyx-data
-      ls ~/Actyx
       gnome-terminal -- bash -c "~/Actyx/actyx"
       shift
       ;;
@@ -16,8 +15,8 @@ commands=(
   "echo 'Starting factory-robot'; npm run start-factory-robot"
   "echo 'Starting forklift'; npm run start-forklift"
   "echo 'Starting transporter'; npm run start-transporter"
-  "echo 'Starting door'; npm run start-door"
   "echo 'Starting quality control robot'; npm run start-quality-robot"
+  "echo 'Starting door'; npm run start-door"
 )
 
 # Loop through the commands and open each in a new terminal window

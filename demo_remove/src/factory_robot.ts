@@ -33,7 +33,7 @@ async function main() {
     const machine = createMachineRunner(app, tags, i3, undefined)
 
     for await (const state of machine) {
-      console.log("state is: ", state)
+      console.log("robot. state is: ", state)
 
       const s = state.cast()
       for (var c in s.commands()) {
@@ -44,7 +44,7 @@ async function main() {
                 if (Object.keys(s1).includes('build')) {
                     s1.build()
                 }
-            }, getRandomInt(2000, 5000))
+            }, getRandomInt(4000, 8000))
             break
           }
       }
