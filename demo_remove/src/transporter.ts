@@ -32,7 +32,12 @@ const positionReaction : ProjMachine.ReactionEntry = {
   genPayloadFun: (_, e) => { console.log("got a ", e.payload.part); return {part: e.payload.part} }
 }
 rMap.set(Events.position.type, positionReaction)
-const fMap : any = {commands: cMap, reactions: rMap}
+
+// hacky. we use the return type of this function to set the payload type of initial state and any other state enabling same commands as in initial
+const initialPayloadType : ProjMachine.ReactionEntry = {
+  genPayloadFun: () => { return {part: ""} }
+}
+const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType}
 
 const mAnalysisResource: MachineAnalysisResource = {initial: projection.initial, subscriptions: [], transitions: projection.transitions}
 const [m3, i3] = Composition.extendMachine("T", mAnalysisResource, Events.allEvents, fMap)

@@ -70,7 +70,7 @@ const hasWaterReaction = {
 } */
 statePayloadMap.set(protocol_1.Events.NeedsWater.type, needsWaterReaction);
 statePayloadMap.set(protocol_1.Events.HasWater.type, hasWaterReaction);
-const fMap = { commands: cMap, reactions: statePayloadMap };
+const fMap = { commands: cMap, reactions: statePayloadMap, initialPayloadType: undefined };
 //const [m3, i3] = protocol.extendMachine("robot", m, Events.All, [machine, Idle], fMap)
 const [m3, i3] = protocol_1.protocol.extendMachine("robot", m, protocol_1.Events.All, fMap);
 function main() {

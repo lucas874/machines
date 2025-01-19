@@ -484,6 +484,7 @@ export namespace ProjMachine {
   export type funMap = {
     commands: Map<any, any>,
     reactions: Map<any, ReactionEntry>
+    initialPayloadType: ReactionEntry | undefined // awkward but used to indicate that initial state has some payload type
   }
 
   export type ProjectionType = {
@@ -839,6 +840,12 @@ export namespace ProjMachine {
           projStatesToStatePayload.set(transition.target, fMap.reactions.get(e)!.genPayloadFun)
         }
       }
+
+      if (transition.source === proj.initial
+        && !projStatesToStatePayload.has(transition.source)
+        && fMap.initialPayloadType !== undefined) {
+          projStatesToStatePayload.set(transition.source, fMap.initialPayloadType!.genPayloadFun)
+      }
     })
     projStatesToExec.forEach((transitions, state) => {
       var cmdTriples = new Array()
@@ -862,8 +869,10 @@ export namespace ProjMachine {
       console.log("same payload states: ", statesWithSamePayloadType)
       console.log("payload type: ", typeof f)
       if (f === undefined) {
+        console.log("f is undefined s is ", state, "is initial? ", state === proj.initial)
         projStatesToStates.set(state, m.designEmpty(state).commandFromList(cmdTriples).finish())
       } else {
+        console.log("f is defined s is ", state, "is initial? ", state === proj.initial)
         projStatesToStates.set(state, m.designState(state).withPayload<ReturnType<typeof f>>().commandFromList(cmdTriples).finish())
         markedStates.add(state)
         for (const samePayloadState of statesWithSamePayloadType) {

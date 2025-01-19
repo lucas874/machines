@@ -23,7 +23,7 @@ const cMap = new Map()
 cMap.set(Events.time.type, () => {var dateString = new Date().toLocaleString(); console.log(dateString); return [Events.time.make({timeOfDay: dateString})]})
 
 const rMap = new Map()
-const fMap : any = {commands: cMap, reactions: rMap}
+const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
 
 const [m3, i3] = Composition.extendMachine("D", projection, Events.allEvents, fMap)
 

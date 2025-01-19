@@ -37,7 +37,7 @@ const projection = result_projection.data;
 const cMap = new Map();
 cMap.set(factory_protocol_1.Events.time.type, () => { var dateString = new Date().toLocaleString(); console.log(dateString); return [factory_protocol_1.Events.time.make({ timeOfDay: dateString })]; });
 const rMap = new Map();
-const fMap = { commands: cMap, reactions: rMap };
+const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
 const [m3, i3] = factory_protocol_1.Composition.extendMachine("D", projection, factory_protocol_1.Events.allEvents, fMap);
 function main() {
     return __awaiter(this, void 0, void 0, function* () {

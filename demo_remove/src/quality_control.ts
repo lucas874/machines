@@ -27,7 +27,7 @@ const carReaction : ProjMachine.ReactionEntry = {
   genPayloadFun: (_, e) => { console.log("received a ", e.payload.modelName) }
 }
 rMap.set(Events.car.type, carReaction)
-const fMap : any = {commands: cMap, reactions: rMap}
+const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
 const [m3, i3] = Composition.extendMachine("QCR", projection, Events.allEvents, fMap)
 
 async function main() {

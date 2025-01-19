@@ -40,7 +40,7 @@ const partReaction = {
     genPayloadFun: (_, e) => { console.log("received a ", e.payload.part); return { part: e.payload.part }; }
 };
 rMap.set(factory_protocol_1.Events.part.type, partReaction);
-const fMap = { commands: cMap, reactions: rMap };
+const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
 const [m3, i3] = factory_protocol_1.Composition.extendMachine("R", projection, factory_protocol_1.Events.allEvents, fMap);
 function main() {
     return __awaiter(this, void 0, void 0, function* () {

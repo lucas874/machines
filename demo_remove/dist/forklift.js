@@ -41,7 +41,7 @@ const partIDReaction = {
     genPayloadFun: (_, e) => { console.log("a ", e.payload.id, "was requested"); return { id: e.payload.id }; } //return {lastMl: 100, totalMl: 100} }
 };
 rMap.set(factory_protocol_1.Events.partID.type, partIDReaction);
-const fMap = { commands: cMap, reactions: rMap };
+const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
 const mAnalysisResource = { initial: projection.initial, subscriptions: [], transitions: projection.transitions };
 const [m3, i3] = factory_protocol_1.Composition.extendMachine("FL", mAnalysisResource, factory_protocol_1.Events.allEvents, fMap);
 function main() {
@@ -63,7 +63,7 @@ function main() {
                             var _a, _b;
                             var s1 = (_b = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.cast()) === null || _b === void 0 ? void 0 : _b.commands();
                             if (Object.keys(s1).includes('get')) {
-                                s1.close();
+                                s1.get();
                             }
                         }, (0, factory_protocol_1.getRandomInt)(2000, 5000));
                         break;

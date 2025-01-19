@@ -27,7 +27,7 @@ const partIDReaction : ProjMachine.ReactionEntry = {
   genPayloadFun: (_, e) => { console.log("a ", e.payload.id, "was requested"); return {id: e.payload.id} }//return {lastMl: 100, totalMl: 100} }
 }
 rMap.set(Events.partID.type, partIDReaction)
-const fMap : any = {commands: cMap, reactions: rMap}
+const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
 const mAnalysisResource: MachineAnalysisResource = {initial: projection.initial, subscriptions: [], transitions: projection.transitions}
 const [m3, i3] = Composition.extendMachine("FL", mAnalysisResource, Events.allEvents, fMap)
 
@@ -45,7 +45,7 @@ async function main() {
             setTimeout(() => {
               var s1 = machine.get()?.cast()?.commands() as any
               if (Object.keys(s1).includes('get')) {
-                s1.close()
+                s1.get()
               }
             }, getRandomInt(2000, 5000))
             break

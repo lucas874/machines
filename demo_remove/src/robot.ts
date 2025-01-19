@@ -60,7 +60,7 @@ const hasWaterReaction : ProjMachine.ReactionEntry = {
 } */
 statePayloadMap.set(Events.NeedsWater.type, needsWaterReaction)
 statePayloadMap.set(Events.HasWater.type, hasWaterReaction)
-const fMap : any = {commands: cMap, reactions: statePayloadMap}
+const fMap : any = {commands: cMap, reactions: statePayloadMap, initialPayloadType: undefined}
 //const [m3, i3] = protocol.extendMachine("robot", m, Events.All, [machine, Idle], fMap)
 const [m3, i3] = protocol.extendMachine("robot", m, Events.All, fMap)
 export async function main() {

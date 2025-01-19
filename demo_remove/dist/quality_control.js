@@ -42,7 +42,7 @@ const carReaction = {
     genPayloadFun: (_, e) => { console.log("received a ", e.payload.modelName); }
 };
 rMap.set(factory_protocol_1.Events.car.type, carReaction);
-const fMap = { commands: cMap, reactions: rMap };
+const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
 const [m3, i3] = factory_protocol_1.Composition.extendMachine("QCR", projection, factory_protocol_1.Events.allEvents, fMap);
 function main() {
     return __awaiter(this, void 0, void 0, function* () {

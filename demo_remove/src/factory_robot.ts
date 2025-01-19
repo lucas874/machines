@@ -24,7 +24,7 @@ const partReaction : ProjMachine.ReactionEntry = {
   genPayloadFun: (_, e) => { console.log("received a ", e.payload.part); return {part: e.payload.part} }
 }
 rMap.set(Events.part.type, partReaction)
-const fMap : any = {commands: cMap, reactions: rMap}
+const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
 const [m3, i3] = Composition.extendMachine("R", projection, Events.allEvents, fMap)
 
 async function main() {
