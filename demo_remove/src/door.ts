@@ -2,11 +2,13 @@ import { Actyx } from '@actyx/sdk'
 import { createMachineRunner } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, all_projections, getRandomInt } from './factory_protocol'
 import { projectCombineMachines } from '@actyx/machine-check'
-import { MachineAnalysisResource } from '@actyx/machine-runner/lib/esm/design/protocol'
 
 const door = Composition.makeMachine('D')
 export const s0 = door.designEmpty('s0')
-    .command('close', [Events.time], () => {var dateString = new Date().toLocaleString(); console.log(dateString); return [Events.time.make({timeOfDay: dateString})]})
+    .command('close', [Events.time], () => {
+        var dateString = new Date().toLocaleString();
+        console.log("closed warehouse at:", dateString);
+        return [Events.time.make({timeOfDay: dateString})]})
     .finish()
 export const s1 = door.designEmpty('s1').finish()
 export const s2 = door.designEmpty('s2').finish()
@@ -20,7 +22,10 @@ if (result_projection.type == 'ERROR') throw new Error('error getting projection
 const projection = result_projection.data
 
 const cMap = new Map()
-cMap.set(Events.time.type, () => {var dateString = new Date().toLocaleString(); console.log(dateString); return [Events.time.make({timeOfDay: dateString})]})
+cMap.set(Events.time.type, () => {
+    var dateString = new Date().toLocaleString();
+    console.log("closed warehouse at:", dateString);
+    return [Events.time.make({timeOfDay: dateString})]})
 
 const rMap = new Map()
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
@@ -33,13 +38,17 @@ async function main() {
     const machine = createMachineRunner(app, tags, i3, undefined)
 
     for await (const state of machine) {
-      console.log("door. state is: ", state)
+      console.log("door. state is:", state.type)
+      if (state.payload !== undefined) {
+        console.log("state payload is:", state.payload)
+      }
+      console.log()
       const s = state.cast()
       for (var c in s.commands()) {
           if (c === 'close') {
             setTimeout(() => {
                 var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1).includes('close')) { //console.log(Object.keys(s1))
+                if (Object.keys(s1).includes('close')) {
                     s1.close()
                 }
             }, getRandomInt(5500, 8000))

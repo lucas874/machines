@@ -23,11 +23,20 @@ const factory_protocol_1 = require("./factory_protocol");
 const machine_check_1 = require("@actyx/machine-check");
 const forklift = factory_protocol_1.Composition.makeMachine('FL');
 exports.s0 = forklift.designEmpty('s0').finish();
-exports.s1 = forklift.designEmpty('s1')
-    .command('get', [factory_protocol_1.Events.position], () => { return [factory_protocol_1.Events.position.make({ position: "x", part: "lars" })]; })
+exports.s1 = forklift.designState('s1').withPayload()
+    .command('get', [factory_protocol_1.Events.position], (state, _) => {
+    console.log("retrieved a", state.self.id, "at position x");
+    return [factory_protocol_1.Events.position.make({ position: "x", part: state.self.id })];
+})
     .finish();
 exports.s2 = forklift.designEmpty('s2').finish();
-exports.s0.react([factory_protocol_1.Events.partID], exports.s1, (_) => exports.s1.make());
+exports.s0.react([factory_protocol_1.Events.partID], exports.s1, (_, e) => {
+    console.log("a", e.payload.id, "was requested");
+    if ((0, factory_protocol_1.getRandomInt)(0, 10) >= 9) {
+        return { id: "broken part" };
+    }
+    return exports.s1.make({ id: e.payload.id });
+});
 exports.s1.react([factory_protocol_1.Events.position], exports.s0, (_) => exports.s0.make());
 exports.s0.react([factory_protocol_1.Events.time], exports.s2, (_) => exports.s2.make());
 const result_projection = (0, machine_check_1.projectCombineMachines)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "FL");
@@ -35,10 +44,19 @@ if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
 const projection = result_projection.data;
 const cMap = new Map();
-cMap.set(factory_protocol_1.Events.position.type, (state, _) => { console.log("retrieved a ", state.self.id, " at position x"); return [factory_protocol_1.Events.position.make({ position: "x", part: state.self.id })]; });
+cMap.set(factory_protocol_1.Events.position.type, (state, _) => {
+    console.log("retrieved a", state.self.id, "at position x");
+    return [factory_protocol_1.Events.position.make({ position: "x", part: state.self.id })];
+});
 const rMap = new Map();
 const partIDReaction = {
-    genPayloadFun: (_, e) => { console.log("a ", e.payload.id, "was requested"); return { id: e.payload.id }; } //return {lastMl: 100, totalMl: 100} }
+    genPayloadFun: (_, e) => {
+        console.log("a", e.payload.id, "was requested");
+        if ((0, factory_protocol_1.getRandomInt)(0, 10) >= 9) {
+            return { id: "broken part" };
+        }
+        return { id: e.payload.id };
+    }
 };
 rMap.set(factory_protocol_1.Events.partID.type, partIDReaction);
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
@@ -55,7 +73,11 @@ function main() {
                 _c = machine_1_1.value;
                 _d = false;
                 const state = _c;
-                console.log("forklift. state is: ", state);
+                console.log("forklift. state is:", state.type);
+                if (state.payload !== undefined) {
+                    console.log("state payload is:", state.payload);
+                }
+                console.log();
                 const s = state.cast();
                 for (var c in s.commands()) {
                     if (c === 'get') {

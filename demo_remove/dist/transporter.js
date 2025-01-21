@@ -22,28 +22,45 @@ const machine_runner_1 = require("@actyx/machine-runner");
 const factory_protocol_1 = require("./factory_protocol");
 const machine_check_1 = require("@actyx/machine-check");
 const transporter = factory_protocol_1.Composition.makeMachine('T');
-exports.s0 = transporter.designEmpty('s0')
-    .command('request', [factory_protocol_1.Events.partID], () => { var id = "tire"; console.log("requesting: ", id); return [factory_protocol_1.Events.partID.make({ id: id })]; })
+exports.s0 = transporter.designState('s0').withPayload()
+    .command('request', [factory_protocol_1.Events.partID], (s, e) => {
+    var id = s.self.id;
+    console.log("requesting a", id);
+    return [factory_protocol_1.Events.partID.make({ id: id })];
+})
     .finish();
 exports.s1 = transporter.designEmpty('s1').finish();
-exports.s2 = transporter.designEmpty('s2')
-    .command('deliver', [factory_protocol_1.Events.part], (s, e) => { console.log("s is: ", s); console.log("e is : ", e); return [factory_protocol_1.Events.part.make({ part: "dsasda" })]; })
+exports.s2 = transporter.designState('s2').withPayload()
+    .command('deliver', [factory_protocol_1.Events.part], (s, e) => {
+    console.log("delivering a", s.self.part);
+    return [factory_protocol_1.Events.part.make({ part: s.self.part })];
+})
     .finish();
 exports.s3 = transporter.designEmpty('s3').finish();
 exports.s0.react([factory_protocol_1.Events.partID], exports.s1, (_) => exports.s1.make());
 exports.s0.react([factory_protocol_1.Events.time], exports.s3, (_) => exports.s3.make());
-exports.s1.react([factory_protocol_1.Events.position], exports.s2, (_) => exports.s2.make());
-exports.s2.react([factory_protocol_1.Events.part], exports.s0, (_) => exports.s0.make());
+exports.s1.react([factory_protocol_1.Events.position], exports.s2, (_, e) => {
+    console.log("got a ", e.payload.part);
+    return { part: e.payload.part };
+});
+exports.s2.react([factory_protocol_1.Events.part], exports.s0, (_, e) => { return exports.s0.make({ id: "" }); });
 const result_projection = (0, machine_check_1.projectCombineMachines)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "T");
 if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
 const projection = result_projection.data;
 const cMap = new Map();
-cMap.set(factory_protocol_1.Events.partID.type, (s, e) => { console.log(s, e); var id = s.self.part; console.log("requesting: ", id); return [factory_protocol_1.Events.partID.make({ id: id })]; });
-cMap.set(factory_protocol_1.Events.part.type, (s, e) => { return [factory_protocol_1.Events.part.make({ part: s.self.part })]; });
+cMap.set(factory_protocol_1.Events.partID.type, (s, e) => {
+    var id = s.self.id;
+    console.log("requesting a", id);
+    return [factory_protocol_1.Events.partID.make({ id: id })];
+});
+cMap.set(factory_protocol_1.Events.part.type, (s, e) => {
+    console.log("delivering a", s.self.part);
+    return [factory_protocol_1.Events.part.make({ part: s.self.part })];
+});
 const rMap = new Map();
 const positionReaction = {
-    genPayloadFun: (_, e) => { console.log("got a ", e.payload.part); return { part: e.payload.part }; }
+    genPayloadFun: (_, e) => { return { part: e.payload.part }; }
 };
 rMap.set(factory_protocol_1.Events.position.type, positionReaction);
 // hacky. we use the return type of this function to set the payload type of initial state and any other state enabling same commands as in initial
@@ -58,14 +75,18 @@ function main() {
         var _a, e_1, _b, _c;
         const app = yield sdk_1.Actyx.of(factory_protocol_1.manifest);
         const tags = factory_protocol_1.Composition.tagWithEntityId('factory-1');
-        const parts = ['tire', 'windshield', 'chassis', 'hood'];
-        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, { part: parts[Math.floor(Math.random() * parts.length)] });
+        const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler'];
+        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, { id: parts[Math.floor(Math.random() * parts.length)] });
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
                 _d = false;
                 const state = _c;
-                console.log("transporter. state is: ", state);
+                console.log("transporter. state is:", state.type);
+                if (state.payload !== undefined) {
+                    console.log("state payload is:", state.payload);
+                }
+                console.log();
                 const s = state.cast();
                 for (var c in s.commands()) {
                     if (c === 'request') {

@@ -23,32 +23,52 @@ const factory_protocol_1 = require("./factory_protocol");
 const machine_check_1 = require("@actyx/machine-check");
 const qcr = factory_protocol_1.Composition.makeMachine('QCR');
 exports.s0 = qcr.designEmpty('s0')
-    .command("observe", [factory_protocol_1.Events.observing], () => [{}])
+    .command("observe", [factory_protocol_1.Events.observing], (s, _) => {
+    console.log("began observing");
+    return [factory_protocol_1.Events.observing.make({})];
+})
     .finish();
 exports.s1 = qcr.designEmpty('s1').finish();
-exports.s2 = qcr.designEmpty('s2')
-    .command("test", [factory_protocol_1.Events.report], (s, e) => { return [factory_protocol_1.Events.report.make({ modelName: "sda", decision: "ok" })]; })
+exports.s2 = qcr.designState('s2').withPayload()
+    .command("test", [factory_protocol_1.Events.report], (s, _) => {
+    console.log("the newly built", s.self.modelName, " is", s.self.decision);
+    return [factory_protocol_1.Events.report.make({ modelName: s.self.modelName, decision: s.self.decision })];
+})
     .finish();
 exports.s0.react([factory_protocol_1.Events.observing], exports.s1, (_) => exports.s1.make());
-exports.s1.react([factory_protocol_1.Events.car], exports.s2, (_) => exports.s2.make());
+exports.s1.react([factory_protocol_1.Events.car], exports.s2, (_, e) => {
+    console.log("received a ", e.payload.modelName);
+    if (e.payload.part !== 'broken part') {
+        return exports.s2.make({ modelName: e.payload.modelName, decision: "ok" });
+    }
+    else {
+        return exports.s2.make({ modelName: e.payload.modelName, decision: "notOk" });
+    }
+});
 const result_projection = (0, machine_check_1.projectCombineMachines)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "QCR");
 if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
 const projection = result_projection.data;
 const cMap = new Map();
-cMap.set(factory_protocol_1.Events.report.type, (s, _) => { console.log("the newly built", s.self.modelName, " is", s.self.decision); return [factory_protocol_1.Events.report.make({ modelName: s.self.modelName, decision: s.self.decision })]; });
-/* const rMap = new Map()
-const carReaction : ProjMachine.ReactionEntry = {
-  genPayloadFun: (_, e) => { console.log("received a ", e.payload.modelName);  }
-} */
+cMap.set(factory_protocol_1.Events.report.type, (s, _) => {
+    console.log("the newly built", s.self.modelName, " is", s.self.decision);
+    return [factory_protocol_1.Events.report.make({ modelName: s.self.modelName, decision: s.self.decision })];
+});
+cMap.set(factory_protocol_1.Events.observing.type, (s, _) => {
+    console.log("began observing");
+    return [factory_protocol_1.Events.observing.make({})];
+});
 const rMap = new Map();
 const carReaction = {
-    genPayloadFun: (_, e) => { console.log("received a ", e.payload.modelName); if (e.payload.part !== undefined) {
-        return { modelName: e.payload.modelName, decision: "ok" };
+    genPayloadFun: (_, e) => {
+        console.log("received a ", e.payload.modelName);
+        if (e.payload.part !== 'broken part') {
+            return { modelName: e.payload.modelName, decision: "ok" };
+        }
+        else {
+            return { modelName: e.payload.modelName, decision: "notOk" };
+        }
     }
-    else {
-        return { modelName: e.payload.modelName, decision: "notOk" };
-    } }
 };
 rMap.set(factory_protocol_1.Events.car.type, carReaction);
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
@@ -64,7 +84,11 @@ function main() {
                 _c = machine_1_1.value;
                 _d = false;
                 const state = _c;
-                console.log("quality control robot. state is: ", state);
+                console.log("quality control robot. state is:", state.type);
+                if (state.payload !== undefined) {
+                    console.log("state payload is:", state.payload);
+                }
+                console.log();
                 const s = state.cast();
                 for (var c in s.commands()) {
                     if (c === 'observe') {

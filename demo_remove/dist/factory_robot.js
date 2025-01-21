@@ -23,21 +23,35 @@ const factory_protocol_1 = require("./factory_protocol");
 const machine_check_1 = require("@actyx/machine-check");
 const robot = factory_protocol_1.Composition.makeMachine('R');
 exports.s0 = robot.designEmpty('s0').finish();
-exports.s1 = robot.designEmpty('s1')
-    .command("build", [factory_protocol_1.Events.car], (s, e) => { return [factory_protocol_1.Events.car.make({ part: "dsasda", modelName: "sda" })]; })
+exports.s1 = robot.designState('s1').withPayload()
+    .command("build", [factory_protocol_1.Events.car], (s, _) => {
+    var modelName = s.self.part === 'spoiler' ? "sports car" : "sedan";
+    console.log("using the ", s.self.part, " to build a ", modelName);
+    return [factory_protocol_1.Events.car.make({ part: s.self.part, modelName: modelName })];
+})
     .finish();
 exports.s2 = robot.designEmpty('s2').finish();
-exports.s0.react([factory_protocol_1.Events.part], exports.s1, (_) => exports.s1.make());
+exports.s0.react([factory_protocol_1.Events.part], exports.s1, (_, e) => {
+    console.log("received a ", e.payload.part);
+    return exports.s1.make({ part: e.payload.part });
+});
 exports.s1.react([factory_protocol_1.Events.car], exports.s2, (_) => exports.s2.make());
 const result_projection = (0, machine_check_1.projectCombineMachines)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "R");
 if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
 const projection = result_projection.data;
 const cMap = new Map();
-cMap.set(factory_protocol_1.Events.car.type, (s, _) => { var modelName = "sedan"; console.log("using the ", s.self.part, " to build a ", modelName); return [factory_protocol_1.Events.car.make({ part: s.self.part, modelName: modelName })]; });
+cMap.set(factory_protocol_1.Events.car.type, (s, _) => {
+    var modelName = s.self.part === "spoiler" ? "sports car" : "sedan";
+    console.log("using the ", s.self.part, " to build a ", modelName);
+    return [factory_protocol_1.Events.car.make({ part: s.self.part, modelName: modelName })];
+});
 const rMap = new Map();
 const partReaction = {
-    genPayloadFun: (_, e) => { console.log("received a ", e.payload.part); return { part: e.payload.part }; }
+    genPayloadFun: (_, e) => {
+        console.log("received a ", e.payload.part);
+        return { part: e.payload.part };
+    }
 };
 rMap.set(factory_protocol_1.Events.part.type, partReaction);
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
@@ -53,10 +67,13 @@ function main() {
                 _c = machine_1_1.value;
                 _d = false;
                 const state = _c;
-                console.log("robot. state is: ", state);
+                console.log("robot. state is:", state.type);
+                if (state.payload !== undefined) {
+                    console.log("state payload is:", state.payload);
+                }
+                console.log();
                 const s = state.cast();
                 for (var c in s.commands()) {
-                    var cmds = s.commands();
                     if (c === 'build') {
                         setTimeout(() => {
                             var _a, _b;

@@ -23,7 +23,11 @@ const factory_protocol_1 = require("./factory_protocol");
 const machine_check_1 = require("@actyx/machine-check");
 const door = factory_protocol_1.Composition.makeMachine('D');
 exports.s0 = door.designEmpty('s0')
-    .command('close', [factory_protocol_1.Events.time], () => { var dateString = new Date().toLocaleString(); console.log(dateString); return [factory_protocol_1.Events.time.make({ timeOfDay: dateString })]; })
+    .command('close', [factory_protocol_1.Events.time], () => {
+    var dateString = new Date().toLocaleString();
+    console.log("closed warehouse at:", dateString);
+    return [factory_protocol_1.Events.time.make({ timeOfDay: dateString })];
+})
     .finish();
 exports.s1 = door.designEmpty('s1').finish();
 exports.s2 = door.designEmpty('s2').finish();
@@ -35,7 +39,11 @@ if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
 const projection = result_projection.data;
 const cMap = new Map();
-cMap.set(factory_protocol_1.Events.time.type, () => { var dateString = new Date().toLocaleString(); console.log(dateString); return [factory_protocol_1.Events.time.make({ timeOfDay: dateString })]; });
+cMap.set(factory_protocol_1.Events.time.type, () => {
+    var dateString = new Date().toLocaleString();
+    console.log("closed warehouse at:", dateString);
+    return [factory_protocol_1.Events.time.make({ timeOfDay: dateString })];
+});
 const rMap = new Map();
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
 const [m3, i3] = factory_protocol_1.Composition.extendMachine("D", projection, factory_protocol_1.Events.allEvents, fMap);
@@ -50,14 +58,18 @@ function main() {
                 _c = machine_1_1.value;
                 _d = false;
                 const state = _c;
-                console.log("door. state is: ", state);
+                console.log("door. state is:", state.type);
+                if (state.payload !== undefined) {
+                    console.log("state payload is:", state.payload);
+                }
+                console.log();
                 const s = state.cast();
                 for (var c in s.commands()) {
                     if (c === 'close') {
                         setTimeout(() => {
                             var _a, _b;
                             var s1 = (_b = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.cast()) === null || _b === void 0 ? void 0 : _b.commands();
-                            if (Object.keys(s1).includes('close')) { //console.log(Object.keys(s1))
+                            if (Object.keys(s1).includes('close')) {
                                 s1.close();
                             }
                         }, (0, factory_protocol_1.getRandomInt)(5500, 8000));
