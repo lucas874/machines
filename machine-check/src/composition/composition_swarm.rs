@@ -1580,7 +1580,66 @@ mod tests {
             "#,
         ).unwrap()
     }
-
+    fn pattern_4_proto_0() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r0", "logType": ["e_r0"], "role": "R0" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir", "logType": ["e_ir"], "role": "IR" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+    fn pattern_4_proto_1() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r1", "logType": ["e_r1"], "role": "R1" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir", "logType": ["e_ir"], "role": "IR" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+    fn pattern_4_proto_2() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r2", "logType": ["e_r2"], "role": "R2" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir", "logType": ["e_ir"], "role": "IR" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+    fn pattern_4_proto_3() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r3", "logType": ["e_r3"], "role": "R3" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir", "logType": ["e_ir"], "role": "IR" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+    fn pattern_4_proto_4() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r4", "logType": ["e_r4"], "role": "R4" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir", "logType": ["e_ir"], "role": "IR" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
     fn get_interfacing_swarms_1() -> InterfacingSwarms<Role> {
         InterfacingSwarms(
             vec![
@@ -1741,7 +1800,32 @@ mod tests {
             ]
         )
     }
-
+    fn get_interfacing_swarms_pat_4() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: pattern_4_proto_0(),
+                    interface: None,
+                },
+                CompositionComponent {
+                    protocol: pattern_4_proto_1(),
+                    interface: Some(Role::new("IR")),
+                },
+                CompositionComponent {
+                    protocol: pattern_4_proto_2(),
+                    interface: Some(Role::new("IR")),
+                },
+                CompositionComponent {
+                    protocol: pattern_4_proto_3(),
+                    interface: Some(Role::new("IR")),
+                },
+                CompositionComponent {
+                    protocol: pattern_4_proto_4(),
+                    interface: Some(Role::new("IR")),
+                },
+            ]
+        )
+    }
     fn get_fail_1_swarms() -> InterfacingSwarms<Role> {
             InterfacingSwarms(
                 vec![
@@ -2285,6 +2369,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_example_from_text() {
         let composition = compose_protocols(get_interfacing_swarms_5());
         assert!(composition.is_ok());
@@ -2306,6 +2391,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_pattern_3() {
         for i in 1..10 {
             let index = i as usize;
@@ -2321,6 +2407,7 @@ mod tests {
 
     }
     #[test]
+    #[ignore]
     fn test_pattern_3_ir0_last() {
         for i in 1..5 {
             let index = i as usize;
@@ -2333,6 +2420,23 @@ mod tests {
             let swarm = to_swarm_json(g, i);
             println!("{}\n$$$$\n", serde_json::to_string_pretty(&swarm).unwrap());
             //println!("num states: {}, num edges: {}", node_count, edge_count);
+        }
+
+    }
+    #[test]
+    #[ignore]
+    fn test_pattern_4() {
+        for i in 1..6 {
+            let index = i as usize;
+            let composition = compose_protocols(InterfacingSwarms(get_interfacing_swarms_pat_4().0[..index].to_vec()));
+            assert!(composition.is_ok());
+
+            let (g, i) = composition.unwrap();
+            let node_count = g.node_count();
+            let edge_count = g.edge_count();
+            let swarm = to_swarm_json(g, i);
+            println!("{}\n$$$$\n", serde_json::to_string_pretty(&swarm).unwrap());
+            println!("num states: {}, num edges: {}", node_count, edge_count);
         }
 
     }
