@@ -184,6 +184,32 @@ export type StateMechanism<
     }
   >
 
+  readonly commandFromList: <
+    CommandName extends string,
+    EmittedEventFactories extends utils.ReadonlyNonZeroTuple<MachineEventFactories>,
+    CommandArgs extends unknown[],
+  >(
+    cmds: [(CommandName extends `_${string}` ? never : CommandName),
+            (EmittedEventFactories),
+            (CommandDefiner<
+              CommandContext<StatePayload, MachineEvent.Factory.Reduce<EmittedEventFactories>>,
+              CommandArgs,
+              MachineEvent.Factory.MapToPayloadOrContainedPayload<EmittedEventFactories>>)][]
+  ) => StateMechanism<
+    SwarmProtocolName,
+    MachineName,
+    MachineEventFactories,
+    StateName,
+    StatePayload,
+    Commands & {
+      [key in CommandName]: CommandDefiner<
+        CommandContext<StatePayload, MachineEvent.Factory.Reduce<EmittedEventFactories>>,
+        CommandArgs,
+        MachineEvent.Factory.MapToPayloadOrContainedPayload<EmittedEventFactories>
+      >
+    }
+  >
+
   /**
    * Finalize state design process.
    * @returns a StateFactory
@@ -290,6 +316,20 @@ export namespace StateMechanism {
       })
     }
 
+    const commandFromList: Self['commandFromList'] = (cmds) => {
+      var acc: any;
+      var acc1 = new Array();
+
+      for (var cmd of cmds) {
+        acc = command(cmd[0], cmd[1], cmd[2])
+        acc1.push(acc.commands)
+      }
+      let allcmds = acc1.reduce((acc, obj) => ({ ...acc, ...obj }), {});
+      acc.commands = allcmds
+
+      return acc;
+    }
+
     const finish: Self['finish'] = () => {
       const factory = StateFactory.fromMechanism(mechanism)
       protocol.states.allFactories.add(factory)
@@ -309,6 +349,7 @@ export namespace StateMechanism {
       name: stateName,
       commands,
       command,
+      commandFromList,
       finish,
     }
 

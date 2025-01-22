@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Tag, Tags } from '@actyx/sdk'
+import { MsgType, Tag, Tags } from '@actyx/sdk'
 import { StateMechanism, MachineProtocol, ReactionMap, StateFactory } from './state.js'
 import { MachineEvent } from './event.js'
 import { DeepReadonly } from '../utils/type-utils.js'
@@ -23,8 +23,20 @@ export type SwarmProtocol<
     machineName: MachineName,
   ) => Machine<SwarmProtocolName, MachineName, MachineEventFactories>
   tagWithEntityId: (id: string) => Tags<MachineEvents>
+  makeProjMachine: <MachineName extends string>(
+    machineName: MachineName,
+    proj: MachineAnalysisResource,
+    events: readonly MachineEvent.Factory<any, any>[]
+  ) => [Machine<any, any, any>, any]
+  extendMachine: <MachineName extends string>(
+    machineName: MachineName,
+    proj: ProjMachine.ProjectionType,
+    events: readonly MachineEvent.Factory<any, any>[],
+    //mOriginal: [Machine<any, any, any>, any],
+    fMap: ProjMachine.funMap
+  ) => [Machine<any, any, any>, any]
 }
-
+//Machine<SwarmProtocolName, MachineName, MachineEventFactories>
 /**
  * Utilities for SwarmProtocol
  * @see SwarmProtocol.make
@@ -69,6 +81,9 @@ export namespace SwarmProtocol {
     return {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
+      makeProjMachine: (machineName, proj, events) => ProjMachine.machineFromProj(ImplMachine.make(swarmName, machineName, eventFactories), proj, events),
+      //extendMachine: (machineName, proj, events, mOriginal, fMap) => ProjMachine.extendMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, mOriginal, fMap)
+      extendMachine: (machineName, proj, events, fMap) => ProjMachine.extendMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, fMap)
     }
   }
 }
@@ -350,5 +365,323 @@ export namespace MachineAnalysisResource {
     }
 
     return resource
+  }
+}
+
+export namespace ProjMachine {
+  type Transition = {
+    source: string
+    target: string
+    label: { tag: 'Execute'; cmd: string; logType: string[] } | { tag: 'Input'; eventType: string }
+  }
+  // https://medium.com/@alaneicker/how-to-process-json-data-with-recursion-dc530dd3db09
+  function loopThroughJSON(k: string, obj: any) {
+    for (let key in obj) {
+      if (typeof obj[key] === 'object') {
+        if (Array.isArray(obj[key])) {
+          // loop through array
+          for (let i = 0; i < obj[key].length; i++) {
+            loopThroughJSON(k + " " + key, obj[key][i]);
+          }
+        } else {
+          // call function recursively for object
+          loopThroughJSON(k + " " + key, obj[key]);
+        }
+      } else {
+        // do something with value
+        console.log(k + " " + key + ': ' + obj[key]);
+      }
+    }
+  }
+  //type ReplaceReturnType<T extends (...a: any) => any, TNewReturn> = (...a: Parameters<T>) => TNewReturn;
+
+  export function machineFromProj(
+    m: Machine<any, any, any>,
+    proj: MachineAnalysisResource,
+    events: readonly MachineEvent.Factory<any, MachineEvent.Any>[]
+  ): [Machine<any, any, MachineEvent.Factory.Any>, any] {
+    var projStatesToStates: Map<string, any> = new Map()
+    var projStatesToExec: Map<string, Transition[]> = new Map()
+    var projStatesToInput: Map<string, Transition[]> = new Map()
+    var eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, MachineEvent.Any>> = new Map()
+
+    proj.transitions.forEach((transition) => {
+      if (transition.label.tag === 'Execute') {
+        if (!projStatesToExec.has(transition.source)) {
+          projStatesToExec.set(transition.source, new Array())
+        }
+        projStatesToExec.get(transition.source)?.push(transition)
+
+        // map event type string to Event
+        for (let eventType of transition.label.logType) {
+          for (let event of events) {
+              if (eventType === event.type) {
+              eventTypeStringToEvent.set(eventType, event)
+              break
+            }
+          }
+        }
+
+      } else if (transition.label.tag === 'Input') {
+        if (!projStatesToInput.has(transition.source)) {
+          projStatesToInput.set(transition.source, new Array())
+        }
+        projStatesToInput.get(transition.source)?.push(transition)
+
+        // add target to projStatesToInput as well. in case no outgoing transitions.
+        if (!projStatesToInput.has(transition.target)) {
+          projStatesToInput.set(transition.target, new Array())
+        }
+
+        // map event type string to Event
+        for (let event of events) {
+          if (transition.label.eventType === event.type) {
+            eventTypeStringToEvent.set(transition.label.eventType, event)
+            break
+          }
+        }
+      }
+    })
+    projStatesToExec.forEach((transitions, state) => {
+      var test = new Array()
+      // add self loops
+      transitions.forEach((transition) => {
+        if (transition.label.tag === 'Execute') {
+          var eventTypes = transition.label.logType.map((et: string) => {
+            return eventTypeStringToEvent.get(et)
+          })
+          test.push([transition.label.cmd, eventTypes, () => [{}]])
+          //projStatesToStates.get(state).command(transition.label.cmd, eventTypes, () => [{}])
+        }
+      })
+
+      projStatesToStates.set(state, m.designEmpty(state).commandFromList(test).finish())
+    })
+
+    projStatesToInput.forEach((value, key) => {
+      if (!projStatesToStates.has(key)) {
+        projStatesToStates.set(key, m.designEmpty(key).finish())
+      }
+
+      value.forEach((transition) => {
+        if (transition.label.tag === 'Input') {
+          if (!projStatesToStates.has(transition.target)) {
+            projStatesToStates.set(transition.target, m.designEmpty(transition.target).finish())
+          }
+
+          projStatesToStates.get(key).react([eventTypeStringToEvent.get(transition.label.eventType)], projStatesToStates.get(transition.target), (_: any) => projStatesToStates.get(transition.target).make())
+        }
+      })
+    })
+    var initial = projStatesToStates.get(proj.initial)
+    return [m, initial]
+  }
+
+  export type ReactionEntry = {
+    genPayloadFun: (...args : any[]) => any
+  }
+
+  export type funMap = {
+    commands: Map<any, any>,
+    reactions: Map<any, ReactionEntry>
+    initialPayloadType: ReactionEntry | undefined // awkward but used to indicate that initial state has some payload type
+  }
+
+  export type ProjectionType = {
+    initial: string;
+    transitions: {
+        source: string;
+        target: string;
+        label: {
+            tag: "Execute";
+            cmd: string;
+            logType: string[];
+        } | {
+            tag: "Input";
+            eventType: string;
+        };
+    }[];
+  }
+
+  // all the incoming edges of some state. including self loops
+  function incomingEdgesOfStatesMap(proj: ProjectionType): Map<string, Transition[]> {
+    const m: Map<string, Transition[]> = new Map()
+    proj.transitions.forEach((transition) => {
+      if (!m.has(transition.target)) {
+        m.set(transition.target, [structuredClone(transition)])
+      } else {
+        m.get(transition.target)!.push(structuredClone(transition))
+      }
+    })
+    if (!m.has(proj.initial)) {
+      m.set(proj.initial, [])
+    }
+
+    return m
+  }
+
+  // states with same payload types as s and a function whose retyrn type is this payload type
+  function payloadStates(
+    s: string,
+    initial: string,
+    incomingEdgesMap: Map<string, Transition[]>,
+    projStatesToStatePayload: Map<string, (...args : any[]) => any>
+  ): [Set<string>, ((...args : any[]) => any) | undefined] {
+    function inner(
+      s: string,
+      initial: string,
+      incomingEdgesMap: Map<string, Transition[]>,
+      projStatesToStatePayload: Map<string, (...args : any[]) => any>,
+      visited: Set<string>
+    ): [Set<string>, Set<((...args : any[]) => any)>] {
+      if (projStatesToStatePayload.has(s)) {
+        return [new Set([s]), new Set([projStatesToStatePayload.get(s)!])]
+      } else if (s === initial) {
+        return [new Set(), new Set()]
+      }
+
+      const states: Set<string> = new Set()
+      const fs: Set<((...args : any[]) => any)> = new Set()
+      for (var t of incomingEdgesMap.get(s)!) {
+        if (!visited.has(t.source)) {
+          visited.add(t.source)
+          const [pre_states, pre_fs] = inner(t.source, initial, incomingEdgesMap, projStatesToStatePayload, visited)
+          if (pre_states.size != 0) {
+            pre_states.forEach(states.add, states)
+            states.add(s)
+            pre_fs.forEach(fs.add, fs)
+          }
+        }
+
+      }
+
+      return [states, fs]
+    }
+
+    const [states, fs] = inner(s, initial, incomingEdgesMap, projStatesToStatePayload, new Set())
+
+    return [states, fs[Symbol.iterator]().next().value]
+  }
+
+  export function extendMachine(
+    m: Machine<any, any, any>,
+    proj: ProjectionType,
+    events: readonly MachineEvent.Factory<any, Record<never, never>>[],
+    fMap: funMap
+  ): [Machine<any, any, MachineEvent.Factory.Any>, any] {
+    var projStatesToStates: Map<string, any> = new Map()
+    var projStatesToExec: Map<string, Transition[]> = new Map()
+    var projStatesToInput: Map<string, Transition[]> = new Map()
+    var eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> = new Map()
+    var projStatesToStatePayload: Map<string, (...args : any[]) => any> = new Map()
+    var incomingMap = incomingEdgesOfStatesMap(proj)
+    var markedStates: Set<string> = new Set()
+
+    proj.transitions.forEach((transition) => {
+      if (transition.label.tag === 'Execute') {
+        if (!projStatesToExec.has(transition.source)) {
+          projStatesToExec.set(transition.source, new Array())
+        }
+        projStatesToExec.get(transition.source)?.push(transition)
+
+        // map event type string to Event
+        for (let eventType of transition.label.logType) {
+          for (let event of events) {
+              if (eventType === event.type) {
+              eventTypeStringToEvent.set(eventType, event)
+              break
+            }
+          }
+        }
+      } else if (transition.label.tag === 'Input') {
+        if (!projStatesToInput.has(transition.source)) {
+          projStatesToInput.set(transition.source, new Array())
+        }
+        projStatesToInput.get(transition.source)?.push(transition)
+
+        // add target to projStatesToInput as well. in case no outgoing transitions.
+        if (!projStatesToInput.has(transition.target)) {
+          projStatesToInput.set(transition.target, new Array())
+        }
+
+        // map event type string to Event
+        for (let event of events) {
+          if (transition.label.eventType === event.type) {
+            eventTypeStringToEvent.set(transition.label.eventType, event)
+            break
+          }
+        }
+
+        var e = transition.label.eventType
+        if (fMap.reactions.has(e)) {
+          projStatesToStatePayload.set(transition.target, fMap.reactions.get(e)!.genPayloadFun)
+        }
+      }
+
+      if (transition.source === proj.initial
+        && !projStatesToStatePayload.has(transition.source)
+        && fMap.initialPayloadType !== undefined) {
+          projStatesToStatePayload.set(transition.source, fMap.initialPayloadType!.genPayloadFun)
+      }
+    })
+    projStatesToExec.forEach((transitions, state) => {
+      var cmdTriples = new Array()
+      // add self loops
+      transitions.forEach((transition) => {
+        if (transition.label.tag === 'Execute') {
+          var es = transition.label.logType.map((et: string) => {
+            return eventTypeStringToEvent.get(et)
+          })
+          var etypes = transition.label.logType.map((et: string) => {
+            return eventTypeStringToEvent.get(et)?.type
+          })
+          var f = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => [{}]
+          cmdTriples.push([transition.label.cmd, es, f])
+        }
+      })
+
+      const [statesWithSamePayloadType, f] = payloadStates(state, proj.initial, incomingMap, projStatesToStatePayload)
+
+      if (f === undefined) {
+        projStatesToStates.set(state, m.designEmpty(state).commandFromList(cmdTriples).finish())
+      } else {
+        projStatesToStates.set(state, m.designState(state).withPayload<ReturnType<typeof f>>().commandFromList(cmdTriples).finish())
+        markedStates.add(state)
+        for (const samePayloadState of statesWithSamePayloadType) {
+          if (!projStatesToExec.has(samePayloadState) && !projStatesToStates.has(samePayloadState)) {
+            projStatesToStates.set(samePayloadState, m.designState(samePayloadState).withPayload<ReturnType<typeof f>>().finish())
+          }
+
+          markedStates.add(samePayloadState)
+        }
+      }
+    })
+
+    projStatesToInput.forEach((value, key) => {
+      if (!projStatesToStates.has(key)) {
+        projStatesToStates.set(key, m.designEmpty(key).finish())
+      }
+
+      value.forEach((transition) => {
+        if (transition.label.tag === 'Input') {
+          if (!projStatesToStates.has(transition.target)) {
+            projStatesToStates.set(transition.target, m.designEmpty(transition.target).finish())
+          }
+          var e = transition.label.eventType
+          var es = eventTypeStringToEvent.get(e)
+          var f =
+            fMap.reactions.has(e)
+              ? (...args: any[]) => {const sPayload = fMap.reactions.get(e)!.genPayloadFun(...args); return projStatesToStates.get(transition.target).make(sPayload)}
+              : (markedStates.has(transition.target) //(projStatesToExec.has(transition.target)
+                  ? (s: any, _: any) => { return projStatesToStates.get(transition.target).make(s.self)}
+                  : (_: any) => projStatesToStates.get(transition.target).make()
+              )
+          projStatesToStates.get(key).react([es], projStatesToStates.get(transition.target), f)
+        }
+      })
+    })
+
+    var initial = projStatesToStates.get(proj.initial)
+    return [m, initial]
   }
 }
