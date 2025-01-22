@@ -16,36 +16,46 @@ var __asyncValues = (this && this.__asyncValues) || function (o) {
     function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.s2 = exports.s1 = exports.s0 = void 0;
 const sdk_1 = require("@actyx/sdk");
 const machine_runner_1 = require("@actyx/machine-runner");
 const factory_protocol_1 = require("./factory_protocol");
 const machine_check_1 = require("@actyx/machine-check");
-const robot = factory_protocol_1.Composition.makeMachine('R');
-exports.s0 = robot.designEmpty('s0').finish();
-exports.s1 = robot.designState('s1').withPayload()
-    .command("build", [factory_protocol_1.Events.car], (s, _) => {
+/*
+
+Using the machine runner DSL an implmentation of robot in Gfactory is:
+
+const robot = Composition.makeMachine('R')
+export const s0 = robot.designEmpty('s0').finish()
+export const s1 = robot.designState('s1').withPayload<{part: string}>()
+  .command("build", [Events.car], (s: any, _: any) => {
     var modelName = s.self.part === 'spoiler' ? "sports car" : "sedan";
     console.log("using the ", s.self.part, " to build a ", modelName);
-    return [factory_protocol_1.Events.car.make({ part: s.self.part, modelName: modelName })];
-})
-    .finish();
-exports.s2 = robot.designEmpty('s2').finish();
-exports.s0.react([factory_protocol_1.Events.part], exports.s1, (_, e) => {
-    console.log("received a ", e.payload.part);
-    return exports.s1.make({ part: e.payload.part });
-});
-exports.s1.react([factory_protocol_1.Events.car], exports.s2, (_) => exports.s2.make());
+    return [Events.car.make({part: s.self.part, modelName: modelName})]})
+  .finish()
+export const s2 = robot.designEmpty('s2').finish()
+
+s0.react([Events.part], s1, (_, e) => {
+  console.log("received a ", e.payload.part);
+  return s1.make({part: e.payload.part})})
+s1.react([Events.car], s2, (_) => s2.make())
+
+*/
+// With our extension of the library we create a map from events to reactions
+// and commands instead and use the projection of the composition over
+// the role to create the extended machine
+// Projection of Gwarehouse || Gfactory || Gquality over R
 const result_projection = (0, machine_check_1.projectCombineMachines)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "R");
 if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
 const projection = result_projection.data;
+// Command map
 const cMap = new Map();
 cMap.set(factory_protocol_1.Events.car.type, (s, _) => {
     var modelName = s.self.part === "spoiler" ? "sports car" : "sedan";
     console.log("using the ", s.self.part, " to build a ", modelName);
     return [factory_protocol_1.Events.car.make({ part: s.self.part, modelName: modelName })];
 });
+// Reaction map
 const rMap = new Map();
 const partReaction = {
     genPayloadFun: (_, e) => {
@@ -55,7 +65,9 @@ const partReaction = {
 };
 rMap.set(factory_protocol_1.Events.part.type, partReaction);
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
+// Extended machine
 const [m3, i3] = factory_protocol_1.Composition.extendMachine("R", projection, factory_protocol_1.Events.allEvents, fMap);
+// Run the extended machine
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;

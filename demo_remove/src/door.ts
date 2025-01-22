@@ -1,7 +1,11 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, all_projections, getRandomInt } from './factory_protocol'
+import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt } from './factory_protocol'
 import { projectCombineMachines } from '@actyx/machine-check'
+
+/*
+
+Using the machine runner DSL an implmentation of door in Gwarehouse is:
 
 const door = Composition.makeMachine('D')
 export const s0 = door.designEmpty('s0')
@@ -16,22 +20,29 @@ export const s2 = door.designEmpty('s2').finish()
 s0.react([Events.partID], s1, (_) => s1.make())
 s1.react([Events.part], s0, (_) => s0.make())
 s0.react([Events.time], s2, (_) => s2.make())
+*/
 
+
+// Projection of Gwarehouse || Gfactory || Gquality over D
 const result_projection = projectCombineMachines(interfacing_swarms, subs, "D")
 if (result_projection.type == 'ERROR') throw new Error('error getting projection')
 const projection = result_projection.data
 
+// Command map
 const cMap = new Map()
 cMap.set(Events.time.type, () => {
     var dateString = new Date().toLocaleString();
     console.log("closed warehouse at:", dateString);
     return [Events.time.make({timeOfDay: dateString})]})
 
+// Reaction map
 const rMap = new Map()
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
 
+// Extended machine
 const [m3, i3] = Composition.extendMachine("D", projection, Events.allEvents, fMap)
 
+// Run the extended machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')

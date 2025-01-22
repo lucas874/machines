@@ -16,38 +16,45 @@ var __asyncValues = (this && this.__asyncValues) || function (o) {
     function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.s2 = exports.s1 = exports.s0 = void 0;
 const sdk_1 = require("@actyx/sdk");
 const machine_runner_1 = require("@actyx/machine-runner");
 const factory_protocol_1 = require("./factory_protocol");
 const machine_check_1 = require("@actyx/machine-check");
-const forklift = factory_protocol_1.Composition.makeMachine('FL');
-exports.s0 = forklift.designEmpty('s0').finish();
-exports.s1 = forklift.designState('s1').withPayload()
-    .command('get', [factory_protocol_1.Events.position], (state, _) => {
+/*
+
+Using the machine runner DSL an implmentation of forklift in Gwarehouse is:
+
+const forklift = Composition.makeMachine('FL')
+export const s0 = forklift.designEmpty('s0') .finish()
+export const s1 = forklift.designState('s1').withPayload<{id: string}>()
+  .command('get', [Events.position], (state: any, _: any) => {
     console.log("retrieved a", state.self.id, "at position x");
-    return [factory_protocol_1.Events.position.make({ position: "x", part: state.self.id })];
-})
-    .finish();
-exports.s2 = forklift.designEmpty('s2').finish();
-exports.s0.react([factory_protocol_1.Events.partID], exports.s1, (_, e) => {
+    return [Events.position.make({position: "x", part: state.self.id})]})
+  .finish()
+export const s2 = forklift.designEmpty('s2').finish()
+
+s0.react([Events.partID], s1, (_, e) => {
     console.log("a", e.payload.id, "was requested");
-    if ((0, factory_protocol_1.getRandomInt)(0, 10) >= 9) {
-        return { id: "broken part" };
-    }
-    return exports.s1.make({ id: e.payload.id });
-});
-exports.s1.react([factory_protocol_1.Events.position], exports.s0, (_) => exports.s0.make());
-exports.s0.react([factory_protocol_1.Events.time], exports.s2, (_) => exports.s2.make());
+    if (getRandomInt(0, 10) >= 9) { return { id: "broken part" } }
+    return s1.make({id: e.payload.id}) })
+s1.react([Events.position], s0, (_) => s0.make())
+s0.react([Events.time], s2, (_) => s2.make())
+*/
+// With our extension of the library we create a map from events to reactions
+// and commands instead and use the projection of the composition over
+// the role to create the extended machine
+// Projection of Gwarehouse || Gfactory || Gquality over FL
 const result_projection = (0, machine_check_1.projectCombineMachines)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "FL");
 if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
 const projection = result_projection.data;
+// Command map
 const cMap = new Map();
 cMap.set(factory_protocol_1.Events.position.type, (state, _) => {
     console.log("retrieved a", state.self.id, "at position x");
     return [factory_protocol_1.Events.position.make({ position: "x", part: state.self.id })];
 });
+// Reaction map
 const rMap = new Map();
 const partIDReaction = {
     genPayloadFun: (_, e) => {
@@ -60,8 +67,9 @@ const partIDReaction = {
 };
 rMap.set(factory_protocol_1.Events.partID.type, partIDReaction);
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
-const mAnalysisResource = { initial: projection.initial, subscriptions: [], transitions: projection.transitions };
-const [m3, i3] = factory_protocol_1.Composition.extendMachine("FL", mAnalysisResource, factory_protocol_1.Events.allEvents, fMap);
+// Extended machine
+const [m3, i3] = factory_protocol_1.Composition.extendMachine("FL", projection, factory_protocol_1.Events.allEvents, fMap);
+// Run the extended machine
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;

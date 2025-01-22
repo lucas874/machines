@@ -2,7 +2,10 @@ import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, subswh, subsf, all_projections, getRandomInt  } from './factory_protocol'
 import { projectCombineMachines } from '@actyx/machine-check'
-import { MachineAnalysisResource } from '@actyx/machine-runner/lib/esm/design/protocol'
+
+/*
+
+Using the machine runner DSL an implmentation of transporter in Gwarehouse is:
 
 const transporter = Composition.makeMachine('T')
 export const s0 = transporter.designState('s0').withPayload<{id: string}>()
@@ -26,11 +29,14 @@ s1.react([Events.position], s2, (_, e) => {
     return { part: e.payload.part } })
 
 s2.react([Events.part], s0, (_, e) => { return s0.make({id: ""}) })
+*/
 
+// Projection of Gwarehouse || Gfactory || Gquality over D
 const result_projection = projectCombineMachines(interfacing_swarms, subs, "T")
 if (result_projection.type == 'ERROR') throw new Error('error getting projection')
 const projection = result_projection.data
 
+// Command map
 const cMap = new Map()
 cMap.set(Events.partID.type, (s: any, e: any) => {
   var id = s.self.id;
@@ -41,6 +47,7 @@ cMap.set(Events.part.type, (s: any, e: any) => {
   console.log("delivering a", s.self.part)
   return [Events.part.make({part: s.self.part})] })
 
+// Reaction map
 const rMap = new Map()
 const positionReaction : ProjMachine.ReactionEntry = {
   genPayloadFun: (_, e) => {  return { part: e.payload.part } }
@@ -53,9 +60,10 @@ const initialPayloadType : ProjMachine.ReactionEntry = {
 }
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType}
 
-const mAnalysisResource: MachineAnalysisResource = {initial: projection.initial, subscriptions: [], transitions: projection.transitions}
-const [m3, i3] = Composition.extendMachine("T", mAnalysisResource, Events.allEvents, fMap)
+// Extended machine
+const [m3, i3] = Composition.extendMachine("T", projection, Events.allEvents, fMap)
 
+// Run the extended machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')

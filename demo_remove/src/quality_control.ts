@@ -1,10 +1,14 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, subswh, subsf, all_projections, getRandomInt  } from './factory_protocol'
+import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt  } from './factory_protocol'
 import { projectCombineMachines } from '@actyx/machine-check'
 
-const qcr = Composition.makeMachine('QCR')
 
+/*
+
+Using the machine runner DSL an implmentation of quality control robot in Gquality is:
+
+const qcr = Composition.makeMachine('QCR')
 export const s0 = qcr.designEmpty('s0')
     .command("observe", [Events.observing], (s, _) => {
         console.log("began observing");
@@ -23,11 +27,14 @@ s1.react([Events.car], s2, (_, e) => {
     console.log("received a ", e.payload.modelName);
     if (e.payload.part !== 'broken part') { return s2.make({modelName: e.payload.modelName, decision: "ok"}) }
     else { return s2.make({ modelName: e.payload.modelName, decision: "notOk"}) }})
+*/
 
+// Projection of Gwarehouse || Gfactory || Gquality over QCR
 const result_projection = projectCombineMachines(interfacing_swarms, subs, "QCR")
 if (result_projection.type == 'ERROR') throw new Error('error getting projection')
 const projection = result_projection.data
 
+// Command map
 const cMap = new Map()
 cMap.set(Events.report.type, (s: any, _: any) => {
     console.log("the newly built", s.self.modelName, " is", s.self.decision);
@@ -35,6 +42,8 @@ cMap.set(Events.report.type, (s: any, _: any) => {
 cMap.set(Events.observing.type, (s: any, _: any) => {
     console.log("began observing");
     return [Events.observing.make({})]})
+
+// Reaction map
 const rMap = new Map()
 const carReaction : ProjMachine.ReactionEntry = {
   genPayloadFun: (_, e) => {
@@ -45,8 +54,11 @@ const carReaction : ProjMachine.ReactionEntry = {
 
 rMap.set(Events.car.type, carReaction)
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
+
+// Extended machine
 const [m3, i3] = Composition.extendMachine("QCR", projection, Events.allEvents, fMap)
 
+// Run the extended machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')

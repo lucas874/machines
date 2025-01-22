@@ -16,38 +16,43 @@ var __asyncValues = (this && this.__asyncValues) || function (o) {
     function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.s3 = exports.s2 = exports.s1 = exports.s0 = void 0;
 const sdk_1 = require("@actyx/sdk");
 const machine_runner_1 = require("@actyx/machine-runner");
 const factory_protocol_1 = require("./factory_protocol");
 const machine_check_1 = require("@actyx/machine-check");
-const transporter = factory_protocol_1.Composition.makeMachine('T');
-exports.s0 = transporter.designState('s0').withPayload()
-    .command('request', [factory_protocol_1.Events.partID], (s, e) => {
-    var id = s.self.id;
-    console.log("requesting a", id);
-    return [factory_protocol_1.Events.partID.make({ id: id })];
-})
-    .finish();
-exports.s1 = transporter.designEmpty('s1').finish();
-exports.s2 = transporter.designState('s2').withPayload()
-    .command('deliver', [factory_protocol_1.Events.part], (s, e) => {
-    console.log("delivering a", s.self.part);
-    return [factory_protocol_1.Events.part.make({ part: s.self.part })];
-})
-    .finish();
-exports.s3 = transporter.designEmpty('s3').finish();
-exports.s0.react([factory_protocol_1.Events.partID], exports.s1, (_) => exports.s1.make());
-exports.s0.react([factory_protocol_1.Events.time], exports.s3, (_) => exports.s3.make());
-exports.s1.react([factory_protocol_1.Events.position], exports.s2, (_, e) => {
+/*
+
+Using the machine runner DSL an implmentation of transporter in Gwarehouse is:
+
+const transporter = Composition.makeMachine('T')
+export const s0 = transporter.designState('s0').withPayload<{id: string}>()
+    .command('request', [Events.partID], (s: any, e: any) => {
+      var id = s.self.id;
+      console.log("requesting a", id);
+      return [Events.partID.make({id: id})]})
+    .finish()
+export const s1 = transporter.designEmpty('s1').finish()
+export const s2 = transporter.designState('s2').withPayload<{part: string}>()
+    .command('deliver', [Events.part], (s: any, e: any) => {
+      console.log("delivering a", s.self.part)
+      return [Events.part.make({part: s.self.part})] })
+    .finish()
+export const s3 = transporter.designEmpty('s3').finish()
+
+s0.react([Events.partID], s1, (_) => s1.make())
+s0.react([Events.time], s3, (_) => s3.make())
+s1.react([Events.position], s2, (_, e) => {
     console.log("got a ", e.payload.part);
-    return { part: e.payload.part };
-});
-exports.s2.react([factory_protocol_1.Events.part], exports.s0, (_, e) => { return exports.s0.make({ id: "" }); });
+    return { part: e.payload.part } })
+
+s2.react([Events.part], s0, (_, e) => { return s0.make({id: ""}) })
+*/
+// Projection of Gwarehouse || Gfactory || Gquality over D
 const result_projection = (0, machine_check_1.projectCombineMachines)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "T");
 if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
 const projection = result_projection.data;
+// Command map
 const cMap = new Map();
 cMap.set(factory_protocol_1.Events.partID.type, (s, e) => {
     var id = s.self.id;
@@ -58,6 +63,7 @@ cMap.set(factory_protocol_1.Events.part.type, (s, e) => {
     console.log("delivering a", s.self.part);
     return [factory_protocol_1.Events.part.make({ part: s.self.part })];
 });
+// Reaction map
 const rMap = new Map();
 const positionReaction = {
     genPayloadFun: (_, e) => { return { part: e.payload.part }; }
@@ -68,8 +74,9 @@ const initialPayloadType = {
     genPayloadFun: () => { return { part: "" }; }
 };
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType };
-const mAnalysisResource = { initial: projection.initial, subscriptions: [], transitions: projection.transitions };
-const [m3, i3] = factory_protocol_1.Composition.extendMachine("T", mAnalysisResource, factory_protocol_1.Events.allEvents, fMap);
+// Extended machine
+const [m3, i3] = factory_protocol_1.Composition.extendMachine("T", projection, factory_protocol_1.Events.allEvents, fMap);
+// Run the extended machine
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;

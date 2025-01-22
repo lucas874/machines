@@ -1,7 +1,11 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, subswh, subsf, all_projections, getRandomInt  } from './factory_protocol'
+import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt  } from './factory_protocol'
 import { projectCombineMachines } from '@actyx/machine-check'
+
+/*
+
+Using the machine runner DSL an implmentation of robot in Gfactory is:
 
 const robot = Composition.makeMachine('R')
 export const s0 = robot.designEmpty('s0').finish()
@@ -18,10 +22,18 @@ s0.react([Events.part], s1, (_, e) => {
   return s1.make({part: e.payload.part})})
 s1.react([Events.car], s2, (_) => s2.make())
 
+*/
+
+// With our extension of the library we create a map from events to reactions
+// and commands instead and use the projection of the composition over
+// the role to create the extended machine
+
+// Projection of Gwarehouse || Gfactory || Gquality over R
 const result_projection = projectCombineMachines(interfacing_swarms, subs, "R")
 if (result_projection.type == 'ERROR') throw new Error('error getting projection')
 const projection = result_projection.data
 
+// Command map
 const cMap = new Map()
 cMap.set(Events.car.type,
   (s: any, _: any) => {
@@ -29,6 +41,7 @@ cMap.set(Events.car.type,
     console.log("using the ", s.self.part, " to build a ", modelName);
     return [Events.car.make({part: s.self.part, modelName: modelName})]})
 
+// Reaction map
 const rMap = new Map()
 const partReaction : ProjMachine.ReactionEntry = {
   genPayloadFun: (_, e) => {
@@ -38,8 +51,11 @@ const partReaction : ProjMachine.ReactionEntry = {
 
 rMap.set(Events.part.type, partReaction)
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
+
+// Extended machine
 const [m3, i3] = Composition.extendMachine("R", projection, Events.allEvents, fMap)
 
+// Run the extended machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
