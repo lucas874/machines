@@ -135,6 +135,7 @@ pub fn project_combine(
         (acc_machine, acc_initial),
         |(acc, acc_i), (m, i, interface)| compose(acc, acc_i, m, i, interface),
     );
+    let (combined_projection, combined_initial) = minimal_machine(&combined_projection, combined_initial);
     // why option here COME BACK
     (
         to_option_machine(&combined_projection),
