@@ -38,6 +38,10 @@ s0.react([Events.partID], s1, (_) => s1.make())
 s1.react([Events.part], s0, (_) => s0.make())
 s0.react([Events.time], s2, (_) => s2.make())
 */
+/* for (var p of all_projections) {
+    console.log(JSON.stringify(p))
+    console.log("$$$$")
+} */
 // Projection of Gwarehouse || Gfactory || Gquality over D
 const result_projection = (0, machine_check_1.projectCombineMachines)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "D");
 if (result_projection.type == 'ERROR')

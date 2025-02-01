@@ -2102,7 +2102,7 @@ fn bench_sub_sizes_random() {
 #[ignore]
 fn print_sub_sizes_refinement_2() {
     let mut interfacing_swarms_refinement_2 =
-        prepare_files_in_directory(String::from("./benches/benchmark_data/random/"));
+        prepare_files_in_directory(String::from("./benches/benchmark_data_selected/refinement_pattern_2/"));
     interfacing_swarms_refinement_2.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
     let fine_granularity = serde_json::to_string(&Granularity::Fine).unwrap();
@@ -2122,6 +2122,15 @@ fn print_sub_sizes_refinement_2() {
         };
         if subscriptions_fine_approx.clone().unwrap() != subscriptions_exact.clone().unwrap() {
             if i == 0 {
+                let a = subscriptions_fine_approx.clone().unwrap();
+                let e = subscriptions_exact.clone().unwrap();
+                for (k,v) in a.iter() {
+                    let vv = v.clone();
+                    let diff = vv.difference(&e.get(k).unwrap()).collect::<Vec<_>>(); //e.get(k).unwrap().difference(&v).collect::<Vec<_>>();
+                    if !diff.is_empty() {
+                        println!("role: {:?}, diff: {:?}", k, diff);
+                    }
+                }
                 println!("sub approx: {}", serde_json::to_string_pretty(&subscriptions_fine_approx).unwrap());
                 println!("sub exact: {}", serde_json::to_string_pretty(&subscriptions_exact).unwrap());
                 println!("swarms: {}", serde_json::to_string_pretty(&bi.interfacing_swarms).unwrap());

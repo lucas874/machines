@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt } from './factory_protocol'
+import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt, all_projections } from './factory_protocol'
 import { projectCombineMachines } from '@actyx/machine-check'
 
 /*
@@ -21,7 +21,10 @@ s0.react([Events.partID], s1, (_) => s1.make())
 s1.react([Events.part], s0, (_) => s0.make())
 s0.react([Events.time], s2, (_) => s2.make())
 */
-
+/* for (var p of all_projections) {
+    console.log(JSON.stringify(p))
+    console.log("$$$$")
+} */
 
 // Projection of Gwarehouse || Gfactory || Gquality over D
 const result_projection = projectCombineMachines(interfacing_swarms, subs, "D")
