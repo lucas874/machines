@@ -8,7 +8,6 @@ use machine_check::composition::{
 use machine_check::types::{EventType, Role};
 use machine_check::{Machine, Subscriptions, SwarmProtocol};
 use serde::{Deserialize, Serialize};
-use tracing_subscriber::registry::Data;
 extern crate machine_check;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
