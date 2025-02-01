@@ -1,12 +1,13 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use machine_check::composition::{compose_protocols, project_combine, revised_projection};
-use machine_check::composition::composition_types::{DataResult, Granularity};
+//use machine_check::composition::{compose_protocols, project_combine, revised_projection};
+//use machine_check::composition::composition_types::{DataResult, Granularity};
+use machine_check::composition::composition_types::Granularity;
 use machine_check::composition::{
     composition_types::InterfacingSwarms, exact_weak_well_formed_sub,
     overapproximated_weak_well_formed_sub,
 };
 use machine_check::types::{EventType, Role};
-use machine_check::{Machine, Subscriptions, SwarmProtocol};
+//use machine_check::{Machine, Subscriptions, SwarmProtocol};
 use serde::{Deserialize, Serialize};
 extern crate machine_check;
 use std::collections::{BTreeMap, BTreeSet};
@@ -216,7 +217,7 @@ fn bench_composition_pattern_3_ir0_last(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_projection(c: &mut Criterion) {
+/* fn bench_projection(c: &mut Criterion) {
     let mut group = c.benchmark_group("Projection benchmarks");
     group.sample_size(10);
     let mut interfacing_swarms_refine_2 =
@@ -271,7 +272,7 @@ fn bench_projection(c: &mut Criterion) {
 
     }
     group.finish();
-}
+} */
 
-criterion_group!(benches, bench_projection);
+criterion_group!(benches, bench_composition_pattern_3_ir0_last);
 criterion_main!(benches);
