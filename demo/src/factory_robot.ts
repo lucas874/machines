@@ -1,7 +1,10 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt  } from './factory_protocol'
-import { projectCombineMachines } from '@actyx/machine-check'
+import { projectCombineMachines, checkWWFSwarmProtocol, checkComposedProjection } from '@actyx/machine-check'
+
+const checkResult = checkWWFSwarmProtocol(interfacing_swarms, subs)
+if (checkResult.type == 'ERROR') throw new Error(checkResult.errors.join(", "))
 
 /*
 
@@ -50,10 +53,13 @@ const partReaction : ProjMachine.ReactionEntry = {
 }
 
 rMap.set(Events.part.type, partReaction)
-const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
+const fMap = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
 
 // Extended machine
 const [m3, i3] = Composition.extendMachine("R", projection, Events.allEvents, fMap)
+
+const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "R", m3.createJSONForAnalysis(i3))
+if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
 // Run the extended machine
 async function main() {

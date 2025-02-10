@@ -589,6 +589,44 @@ fn pattern_3(n_protos: usize, n_commands: usize) -> InterfacingSwarms<Role> {
     InterfacingSwarms(protos)
 }
 
+fn pattern_4_proto(proto_id: usize, n_commands: usize) -> SwarmProtocol {
+    if n_commands == 0 {
+        unimplemented!()
+    }
+    let mut graph = Graph::new();
+    let mut nodes = vec![];
+    nodes.push(graph.add_node(State::new("0")));
+    for i in 0..n_commands {
+        nodes.push(graph.add_node(State::new(&(i+1).to_string())));
+        let label = make_label_pattern_3(format!("R{}", proto_id), i);
+        graph.add_edge(nodes[i], nodes[i+1], label);
+    }
+    nodes.push(graph.add_node(State::new(&(nodes.len()).to_string())));
+    let label = make_label_pattern_3(format!("IR"), 0);
+    graph.add_edge(nodes[nodes.len() - 2], nodes[nodes.len() - 1], label);
+    to_swarm_json(graph, nodes[0])
+}
+
+fn componenet_pattern_4(proto_id: usize, n_commands: usize) -> CompositionComponent<Role> {
+    let protocol = pattern_4_proto(proto_id, n_commands);
+    let interface = if proto_id == 0 {
+        None
+    } else {
+        Some(Role::new(&format!("IR")))
+    };
+
+    CompositionComponent {protocol, interface}
+}
+
+fn pattern_4(n_protos: usize, n_commands: usize) -> InterfacingSwarms<Role> {
+    let mut protos = vec![];
+    for i in 0..n_protos {
+        protos.push(componenet_pattern_4(i, n_commands));
+    }
+
+    InterfacingSwarms(protos)
+}
+
 /* // true if subs1 is a subset of subs2
 fn is_sub_subscription(subs1: Subscriptions, subs2: Subscriptions) -> bool {
     if !subs1
@@ -2064,7 +2102,7 @@ fn bench_sub_sizes_random() {
 #[ignore]
 fn print_sub_sizes_refinement_2() {
     let mut interfacing_swarms_refinement_2 =
-        prepare_files_in_directory(String::from("./benches/benchmark_data/random/"));
+        prepare_files_in_directory(String::from("./benches/benchmark_data_selected/refinement_pattern_2/"));
     interfacing_swarms_refinement_2.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
     let fine_granularity = serde_json::to_string(&Granularity::Fine).unwrap();
@@ -2084,6 +2122,15 @@ fn print_sub_sizes_refinement_2() {
         };
         if subscriptions_fine_approx.clone().unwrap() != subscriptions_exact.clone().unwrap() {
             if i == 0 {
+                let a = subscriptions_fine_approx.clone().unwrap();
+                let e = subscriptions_exact.clone().unwrap();
+                for (k,v) in a.iter() {
+                    let vv = v.clone();
+                    let diff = vv.difference(&e.get(k).unwrap()).collect::<Vec<_>>(); //e.get(k).unwrap().difference(&v).collect::<Vec<_>>();
+                    if !diff.is_empty() {
+                        println!("role: {:?}, diff: {:?}", k, diff);
+                    }
+                }
                 println!("sub approx: {}", serde_json::to_string_pretty(&subscriptions_fine_approx).unwrap());
                 println!("sub exact: {}", serde_json::to_string_pretty(&subscriptions_exact).unwrap());
                 println!("swarms: {}", serde_json::to_string_pretty(&bi.interfacing_swarms).unwrap());
@@ -2110,5 +2157,18 @@ fn write_bench_file_pattern_3() {
         let n_protos = i as usize;
         let interfacing_swarms = pattern_3(n_protos, 1);
         wrap_and_write(interfacing_swarms, parent_path.clone(), dir_name.clone());
+    }
+}
+
+#[test]
+#[ignore]
+fn write_bench_file_pattern_4() {
+    let parent_path = "benches/pattern_4".to_string();
+    let dir_name = format!("1_non_interfacing_IR_last");
+    create_directory(&parent_path, &dir_name);
+    for i in 1..6 {
+        let n_protos = i as usize;
+        let interfacing_swarms = pattern_4(n_protos, 1);
+        wrap_and_write(interfacing_swarms.clone(), parent_path.clone(), dir_name.clone());
     }
 }

@@ -200,23 +200,22 @@ describe('all projections', () => {
     if (result_project_all.type === 'ERROR') throw new Error('error getting subscription')
     const all_projections: MachineType[] = result_project_all.data
     const expectedFL: MachineType =
-      { initial: "{ { 0 } } || { { 0 } } || { { 0 } }",
-        transitions:[
-          {label:{tag:"Input", eventType:"partID"}, source:"{ { 0 } } || { { 0 } } || { { 0 } }", target: "{ { 1 } } || { { 1 } } || { { 0 } }"},
-          {label:{tag:"Input", eventType: "time"}, source: "{ { 0 } } || { { 0 } } || { { 0 } }", target: "{ { 3 }, { 1 }, { 0 } } || { { 0 } } || { { 0 } }"},
-          {label:{tag:"Input", eventType:"position"},source:"{ { 1 } } || { { 1 } } || { { 0 } }",target:"{ { 2 } } || { { 1 } } || { { 0 } }"},
-          {label:{tag:"Execute",cmd:"get","logType":["position"]},source:"{ { 1 } } || { { 1 } } || { { 0 } }",target:"{ { 1 } } || { { 1 } } || { { 0 } }"},
-          {label:{tag:"Input",eventType:"part"},source:"{ { 2 } } || { { 1 } } || { { 0 } }",target:"{ { 0 } } || { { 2 } } || { { 0 } }"},
-          {label:{tag:"Input",eventType:"time"},source:"{ { 0 } } || { { 2 } } || { { 0 } }",target:"{ { 3 }, { 1 }, { 0 } } || { { 2 } } || { { 0 } }"},
-          {label:{tag:"Input",eventType:"car"},source:"{ { 0 } } || { { 2 } } || { { 0 } }",target:"{ { 0 } } || { { 3 } } || { { 1 } }"},
-          {label:{tag:"Input",eventType:"time"},source:"{ { 0 } } || { { 3 } } || { { 1 } }",target:"{ { 3 }, { 1 }, { 0 } } || { { 3 } } || { { 1 } }"},
-          {label:{tag:"Input",eventType:"notOk"},source:"{ { 0 } } || { { 3 } } || { { 1 } }",target:"{ { 0 } } || { { 3 } } || { { 3 }, { 3 } }"},
-          {label:{tag:"Input",eventType:"ok"},source:"{ { 0 } } || { { 3 } } || { { 1 } }",target:"{ { 0 } } || { { 3 } } || { { 3 }, { 3 } }"},
-          {label:{tag:"Input",eventType:"time"},source:"{ { 0 } } || { { 3 } } || { { 3 }, { 3 } }",target:"{ { 3 }, { 1 }, { 0 } } || { { 3 } } || { { 3 }, { 3 } }"},
-          {label:{tag:"Input",eventType:"notOk"},source:"{ { 3 }, { 1 }, { 0 } } || { { 3 } } || { { 1 } }",target:"{ { 3 }, { 1 }, { 0 } } || { { 3 } } || { { 3 }, { 3 } }"},
-          {label:{tag:"Input",eventType:"ok"},source:"{ { 3 }, { 1 }, { 0 } } || { { 3 } } || { { 1 } }",target:"{ { 3 }, { 1 }, { 0 } } || { { 3 } } || { { 3 }, { 3 } }"},
-          {label:{tag:"Input",eventType:"car"},source:"{ { 3 }, { 1 }, { 0 } } || { { 2 } } || { { 0 } }",target:"{ { 3 }, { 1 }, { 0 } } || { { 3 } } || { { 1 } }"}]
-      }
+     { initial: "{ { { 0 } } || { { 0 } } || { { 0 } } }",
+      transitions:[
+        { label: { tag:"Input",eventType:"time"}, source: "{ { { 0 } } || { { 0 } } || { { 0 } } }", target:"{ { { 3 }, { 1 }, { 0 } } || { { 0 } } || { { 0 } }, { { 3 }, { 1 }, { 0 } } || { { 3 } } || { { 3 }, { 3 } } }"},
+        { label: { tag:"Input",eventType:"partID"}, source:"{ { { 0 } } || { { 0 } } || { { 0 } } }", target:"{ { { 1 } } || { { 1 } } || { { 0 } } }"},
+        { label: { tag:"Execute","cmd":"get","logType":["position"]}, source:"{ { { 1 } } || { { 1 } } || { { 0 } } }", target:"{ { { 1 } } || { { 1 } } || { { 0 } } }"},
+        { label: { tag:"Input",eventType:"position"}, source:"{ { { 1 } } || { { 1 } } || { { 0 } } }", target:"{ { { 2 } } || { { 1 } } || { { 0 } } }"},
+        { label: { tag:"Input",eventType:"part"}, source:"{ { { 2 } } || { { 1 } } || { { 0 } } }", target:"{ { { 0 } } || { { 2 } } || { { 0 } } }"},
+        { label: { tag:"Input",eventType:"car"}, source:"{ { { 0 } } || { { 2 } } || { { 0 } } }", target:"{ { { 0 } } || { { 3 } } || { { 1 } } }"},
+        { label: { tag:"Input",eventType:"time"}, source:"{ { { 0 } } || { { 2 } } || { { 0 } } }", target:"{ { { 3 }, { 1 }, { 0 } } || { { 2 } } || { { 0 } } }"},
+        { label: { tag:"Input",eventType:"car"}, source:"{ { { 3 }, { 1 }, { 0 } } || { { 2 } } || { { 0 } } }", target:"{ { { 3 }, { 1 }, { 0 } } || { { 3 } } || { { 1 } } }"},
+        { label: { tag:"Input",eventType:"ok"}, source:"{ { { 0 } } || { { 3 } } || { { 1 } } }", target:"{ { { 0 } } || { { 3 } } || { { 3 }, { 3 } } }"},
+        { label: { tag:"Input",eventType:"notOk"}, source:"{ { { 0 } } || { { 3 } } || { { 1 } } }", target: "{ { { 0 } } || { { 3 } } || { { 3 }, { 3 } } }"},
+        { label: { tag:"Input",eventType:"time"}, source:"{ { { 0 } } || { { 3 } } || { { 1 } } }", target:"{ { { 3 }, { 1 }, { 0 } } || { { 3 } } || { { 1 } } }"},
+        { label: { tag:"Input",eventType:"ok"}, source:"{ { { 3 }, { 1 }, { 0 } } || { { 3 } } || { { 1 } } }", target: "{ { { 3 }, { 1 }, { 0 } } || { { 0 } } || { { 0 } }, { { 3 }, { 1 }, { 0 } } || { { 3 } } || { { 3 }, { 3 } } }"},
+        { label: { tag:"Input",eventType:"notOk"}, source:"{ { { 3 }, { 1 }, { 0 } } || { { 3 } } || { { 1 } } }", target:"{ { { 3 }, { 1 }, { 0 } } || { { 0 } } || { { 0 } }, { { 3 }, { 1 }, { 0 } } || { { 3 } } || { { 3 }, { 3 } } }"},
+        { label: { tag:"Input",eventType:"time"}, source:"{ { { 0 } } || { { 3 } } || { { 3 }, { 3 } } }", target:"{ { { 3 }, { 1 }, { 0 } } || { { 0 } } || { { 0 } }, { { 3 }, { 1 }, { 0 } } || { { 3 } } || { { 3 }, { 3 } } }"}]}
     const expectedFLString = JSON.stringify(expectedFL)
     const FLstring = JSON.stringify(all_projections[2])
     expect(FLstring).toBe(expectedFLString)

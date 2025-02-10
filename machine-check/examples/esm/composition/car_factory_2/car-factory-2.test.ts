@@ -13,7 +13,7 @@ export namespace Events {
   export const position = MachineEvent.design('position').withoutPayload()
   export const time = MachineEvent.design('time').withoutPayload()
   export const car = MachineEvent.design('car').withoutPayload()
-  export const observing = MachineEvent.design('ok').withoutPayload()
+  export const observing = MachineEvent.design('obs').withoutPayload()
   export const report = MachineEvent.design('report').withoutPayload()
 
   export const allEvents = [partID, part, position, time, car, observing, report] as const
@@ -62,13 +62,20 @@ describe('checkWWFSwarmProtocol for composition with overapproximated wwf subscr
 })
 
 var fail_subs: Subscriptions = {...subs}
-fail_subs['D'] = []
+fail_subs['R'] = [Events.car.type]
 
 describe('checkWWFSwarmProtocol for composition with non-wwf subscription', () => {
   it('should not be weak-well-formed protocol composition', () => {
     expect(checkWWFSwarmProtocol(protocols, fail_subs)).toEqual({
       type: 'ERROR',
       errors: [
+        "role R does not subscribe to event types partID, time in branching transitions at state 0 || 0 || 0, but is involved after transition (0 || 0 || 0)--[request@T<partID>]-->(1 || 1 || 0)",
+        "subsequently active role R does not subscribe to events in transition (0 || 2 || 0)--[observe@QCR<obs>]-->(0 || 2 || 1)",
+        "subsequently active role R does not subscribe to events in transition (3 || 2 || 0)--[observe@QCR<obs>]-->(3 || 2 || 1)",
+        "subsequently active role R does not subscribe to events in transition (2 || 1 || 1)--[deliver@T<part>]-->(0 || 2 || 1)",
+        "role R does not subscribe to event types partID, time in branching transitions at state 0 || 0 || 1, but is involved after transition (0 || 0 || 1)--[request@T<partID>]-->(1 || 1 || 1)"
+      ]
+      /* errors: [
         "active role does not subscribe to any of its emitted event types in transition (0 || 0 || 0)--[close@D<time>]-->(3 || 0 || 0)",
         "subsequently active role D does not subscribe to events in transition (2 || 1 || 0)--[deliver@T<part>]-->(0 || 2 || 0)",
         "active role does not subscribe to any of its emitted event types in transition (0 || 2 || 0)--[close@D<time>]-->(3 || 2 || 0)",
@@ -77,7 +84,7 @@ describe('checkWWFSwarmProtocol for composition with non-wwf subscription', () =
         "active role does not subscribe to any of its emitted event types in transition (0 || 3 || 3)--[close@D<time>]-->(3 || 3 || 3)",
         "subsequently active role D does not subscribe to events in transition (2 || 1 || 1)--[deliver@T<part>]-->(0 || 2 || 1)",
         "active role does not subscribe to any of its emitted event types in transition (0 || 0 || 1)--[close@D<time>]-->(3 || 0 || 1)"
-      ]
+      ] */
     })
   })
 })

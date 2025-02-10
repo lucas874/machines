@@ -133,7 +133,7 @@ describe('checkComposedProjection', () => {
         ),
       ).toEqual({
         type: 'ERROR',
-        errors: ["missing transition deliver/part in state S21 (from reference state { { 2 } } || { { 1 } })"]
+        errors: ["missing transition deliver/part in state S21 (from reference state { { { 2 } } || { { 1 } } })"]
       })
     })
   })

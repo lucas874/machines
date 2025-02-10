@@ -34,7 +34,7 @@ export type SwarmProtocol<
     events: readonly MachineEvent.Factory<any, any>[],
     //mOriginal: [Machine<any, any, any>, any],
     fMap: ProjMachine.funMap
-  ) => [Machine<any, any, any>, any]
+  ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
 }
 //Machine<SwarmProtocolName, MachineName, MachineEventFactories>
 /**
@@ -563,12 +563,31 @@ export namespace ProjMachine {
     return [states, fs[Symbol.iterator]().next().value]
   }
 
-  export function extendMachine(
-    m: Machine<any, any, any>,
+/*
+
+  export const make = <
+    SwarmProtocolName extends string,
+    MachineName extends string,
+    MachineEventFactories extends MachineEvent.Factory.Any,
+  >(
+    swarmName: SwarmProtocolName,
+    machineName: MachineName,
+    registeredEventFactories: MachineEventFactories[],
+  ): Machine<SwarmProtocolName, MachineName, MachineEventFactories> => {
+
+*/
+
+
+  export const extendMachine = <
+    SwarmProtocolName extends string,
+    MachineName extends string,
+    MachineEventFactories extends MachineEvent.Factory.Any,
+  >(
+    m: Machine<SwarmProtocolName, MachineName, MachineEventFactories>,
     proj: ProjectionType,
     events: readonly MachineEvent.Factory<any, Record<never, never>>[],
     fMap: funMap
-  ): [Machine<any, any, MachineEvent.Factory.Any>, any] {
+  ): [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]  => {
     var projStatesToStates: Map<string, any> = new Map()
     var projStatesToExec: Map<string, Transition[]> = new Map()
     var projStatesToInput: Map<string, Transition[]> = new Map()

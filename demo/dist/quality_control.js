@@ -22,53 +22,63 @@ const factory_protocol_1 = require("./factory_protocol");
 const machine_check_1 = require("@actyx/machine-check");
 /*
 
-Using the machine runner DSL an implmentation of forklift in Gwarehouse is:
+Using the machine runner DSL an implmentation of quality control robot in Gquality is:
 
-const forklift = Composition.makeMachine('FL')
-export const s0 = forklift.designEmpty('s0') .finish()
-export const s1 = forklift.designState('s1').withPayload<{id: string}>()
-  .command('get', [Events.position], (state: any, _: any) => {
-    console.log("retrieved a", state.self.id, "at position x");
-    return [Events.position.make({position: "x", part: state.self.id})]})
-  .finish()
-export const s2 = forklift.designEmpty('s2').finish()
+const qcr = Composition.makeMachine('QCR')
+export const s0 = qcr.designEmpty('s0')
+    .command("observe", [Events.observing], (s, _) => {
+        console.log("began observing");
+        return [Events.observing.make({})]
+    })
+    .finish()
+export const s1 = qcr.designEmpty('s1').finish()
+export const s2 = qcr.designState('s2').withPayload<{modelName: string, decision: string}>()
+    .command("test", [Events.report], (s: any, _: any) => {
+        console.log("the newly built", s.self.modelName, " is", s.self.decision);
+        return [Events.report.make({modelName: s.self.modelName, decision: s.self.decision})]})
+    .finish()
 
-s0.react([Events.partID], s1, (_, e) => {
-    console.log("a", e.payload.id, "was requested");
-    if (getRandomInt(0, 10) >= 9) { return { id: "broken part" } }
-    return s1.make({id: e.payload.id}) })
-s1.react([Events.position], s0, (_) => s0.make())
-s0.react([Events.time], s2, (_) => s2.make())
+s0.react([Events.observing], s1, (_) => s1.make())
+s1.react([Events.car], s2, (_, e) => {
+    console.log("received a ", e.payload.modelName);
+    if (e.payload.part !== 'broken part') { return s2.make({modelName: e.payload.modelName, decision: "ok"}) }
+    else { return s2.make({ modelName: e.payload.modelName, decision: "notOk"}) }})
 */
-// With our extension of the library we create a map from events to reactions
-// and commands instead and use the projection of the composition over
-// the role to create the extended machine
-// Projection of Gwarehouse || Gfactory || Gquality over FL
-const result_projection = (0, machine_check_1.projectCombineMachines)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "FL");
+// Projection of Gwarehouse || Gfactory || Gquality over QCR
+const result_projection = (0, machine_check_1.projectCombineMachines)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "QCR");
 if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
 const projection = result_projection.data;
 // Command map
 const cMap = new Map();
-cMap.set(factory_protocol_1.Events.position.type, (state, _) => {
-    console.log("retrieved a", state.self.id, "at position x");
-    return [factory_protocol_1.Events.position.make({ position: "x", part: state.self.id })];
+cMap.set(factory_protocol_1.Events.report.type, (s, _) => {
+    console.log("the newly built", s.self.modelName, " is", s.self.decision);
+    return [factory_protocol_1.Events.report.make({ modelName: s.self.modelName, decision: s.self.decision })];
+});
+cMap.set(factory_protocol_1.Events.observing.type, (s, _) => {
+    console.log("began observing");
+    return [factory_protocol_1.Events.observing.make({})];
 });
 // Reaction map
 const rMap = new Map();
-const partIDReaction = {
+const carReaction = {
     genPayloadFun: (_, e) => {
-        console.log("a", e.payload.id, "was requested");
-        if ((0, factory_protocol_1.getRandomInt)(0, 10) >= 9) {
-            return { id: "broken part" };
+        console.log("received a ", e.payload.modelName);
+        if (e.payload.part !== 'broken part') {
+            return { modelName: e.payload.modelName, decision: "ok" };
         }
-        return { id: e.payload.id };
+        else {
+            return { modelName: e.payload.modelName, decision: "notOk" };
+        }
     }
 };
-rMap.set(factory_protocol_1.Events.partID.type, partIDReaction);
+rMap.set(factory_protocol_1.Events.car.type, carReaction);
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
 // Extended machine
-const [m3, i3] = factory_protocol_1.Composition.extendMachine("FL", projection, factory_protocol_1.Events.allEvents, fMap);
+const [m3, i3] = factory_protocol_1.Composition.extendMachine("QCR", projection, factory_protocol_1.Events.allEvents, fMap);
+const checkProjResult = (0, machine_check_1.checkComposedProjection)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "QCR", m3.createJSONForAnalysis(i3));
+if (checkProjResult.type == 'ERROR')
+    throw new Error(checkProjResult.errors.join(", "));
 // Run the extended machine
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -81,19 +91,29 @@ function main() {
                 _c = machine_1_1.value;
                 _d = false;
                 const state = _c;
-                console.log("forklift. state is:", state.type);
+                console.log("quality control robot. state is:", state.type);
                 if (state.payload !== undefined) {
                     console.log("state payload is:", state.payload);
                 }
                 console.log();
                 const s = state.cast();
                 for (var c in s.commands()) {
-                    if (c === 'get') {
+                    if (c === 'observe') {
                         setTimeout(() => {
                             var _a, _b;
                             var s1 = (_b = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.cast()) === null || _b === void 0 ? void 0 : _b.commands();
-                            if (Object.keys(s1).includes('get')) {
-                                s1.get();
+                            if (Object.keys(s1).includes('observe')) {
+                                s1.observe();
+                            }
+                        }, (0, factory_protocol_1.getRandomInt)(2000, 5000));
+                        break;
+                    }
+                    if (c === 'test') {
+                        setTimeout(() => {
+                            var _a, _b;
+                            var s1 = (_b = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.cast()) === null || _b === void 0 ? void 0 : _b.commands();
+                            if (Object.keys(s1).includes('test')) {
+                                s1.test();
                             }
                         }, (0, factory_protocol_1.getRandomInt)(4000, 8000));
                         break;
