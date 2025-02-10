@@ -1,7 +1,7 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt } from './factory_protocol'
-import { projectCombineMachines } from '@actyx/machine-check'
+import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
 
 /*
 
@@ -52,8 +52,10 @@ const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefin
 
 // Extended machine
 const [m3, i3] = Composition.extendMachine("FL", projection, Events.allEvents, fMap)
+const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "FL", m3.createJSONForAnalysis(i3))
+if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
-// Run the extended machine
+  // Run the extended machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')

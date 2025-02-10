@@ -1,7 +1,7 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt, all_projections } from './factory_protocol'
-import { projectCombineMachines } from '@actyx/machine-check'
+import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
 
 /*
 
@@ -44,6 +44,8 @@ const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefin
 
 // Extended machine
 const [m3, i3] = Composition.extendMachine("D", projection, Events.allEvents, fMap)
+const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "D", m3.createJSONForAnalysis(i3))
+if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
 // Run the extended machine
 async function main() {

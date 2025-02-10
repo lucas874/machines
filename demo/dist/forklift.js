@@ -22,51 +22,56 @@ const factory_protocol_1 = require("./factory_protocol");
 const machine_check_1 = require("@actyx/machine-check");
 /*
 
-Using the machine runner DSL an implmentation of robot in Gfactory is:
+Using the machine runner DSL an implmentation of forklift in Gwarehouse is:
 
-const robot = Composition.makeMachine('R')
-export const s0 = robot.designEmpty('s0').finish()
-export const s1 = robot.designState('s1').withPayload<{part: string}>()
-  .command("build", [Events.car], (s: any, _: any) => {
-    var modelName = s.self.part === 'spoiler' ? "sports car" : "sedan";
-    console.log("using the ", s.self.part, " to build a ", modelName);
-    return [Events.car.make({part: s.self.part, modelName: modelName})]})
+const forklift = Composition.makeMachine('FL')
+export const s0 = forklift.designEmpty('s0') .finish()
+export const s1 = forklift.designState('s1').withPayload<{id: string}>()
+  .command('get', [Events.position], (state: any, _: any) => {
+    console.log("retrieved a", state.self.id, "at position x");
+    return [Events.position.make({position: "x", part: state.self.id})]})
   .finish()
-export const s2 = robot.designEmpty('s2').finish()
+export const s2 = forklift.designEmpty('s2').finish()
 
-s0.react([Events.part], s1, (_, e) => {
-  console.log("received a ", e.payload.part);
-  return s1.make({part: e.payload.part})})
-s1.react([Events.car], s2, (_) => s2.make())
-
+s0.react([Events.partID], s1, (_, e) => {
+    console.log("a", e.payload.id, "was requested");
+    if (getRandomInt(0, 10) >= 9) { return { id: "broken part" } }
+    return s1.make({id: e.payload.id}) })
+s1.react([Events.position], s0, (_) => s0.make())
+s0.react([Events.time], s2, (_) => s2.make())
 */
 // With our extension of the library we create a map from events to reactions
 // and commands instead and use the projection of the composition over
 // the role to create the extended machine
-// Projection of Gwarehouse || Gfactory || Gquality over R
-const result_projection = (0, machine_check_1.projectCombineMachines)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "R");
+// Projection of Gwarehouse || Gfactory || Gquality over FL
+const result_projection = (0, machine_check_1.projectCombineMachines)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "FL");
 if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
 const projection = result_projection.data;
 // Command map
 const cMap = new Map();
-cMap.set(factory_protocol_1.Events.car.type, (s, _) => {
-    var modelName = s.self.part === "spoiler" ? "sports car" : "sedan";
-    console.log("using the ", s.self.part, " to build a ", modelName);
-    return [factory_protocol_1.Events.car.make({ part: s.self.part, modelName: modelName })];
+cMap.set(factory_protocol_1.Events.position.type, (state, _) => {
+    console.log("retrieved a", state.self.id, "at position x");
+    return [factory_protocol_1.Events.position.make({ position: "x", part: state.self.id })];
 });
 // Reaction map
 const rMap = new Map();
-const partReaction = {
+const partIDReaction = {
     genPayloadFun: (_, e) => {
-        console.log("received a ", e.payload.part);
-        return { part: e.payload.part };
+        console.log("a", e.payload.id, "was requested");
+        if ((0, factory_protocol_1.getRandomInt)(0, 10) >= 9) {
+            return { id: "broken part" };
+        }
+        return { id: e.payload.id };
     }
 };
-rMap.set(factory_protocol_1.Events.part.type, partReaction);
+rMap.set(factory_protocol_1.Events.partID.type, partIDReaction);
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
 // Extended machine
-const [m3, i3] = factory_protocol_1.Composition.extendMachine("R", projection, factory_protocol_1.Events.allEvents, fMap);
+const [m3, i3] = factory_protocol_1.Composition.extendMachine("FL", projection, factory_protocol_1.Events.allEvents, fMap);
+const checkProjResult = (0, machine_check_1.checkComposedProjection)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "FL", m3.createJSONForAnalysis(i3));
+if (checkProjResult.type == 'ERROR')
+    throw new Error(checkProjResult.errors.join(", "));
 // Run the extended machine
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -79,19 +84,19 @@ function main() {
                 _c = machine_1_1.value;
                 _d = false;
                 const state = _c;
-                console.log("robot. state is:", state.type);
+                console.log("forklift. state is:", state.type);
                 if (state.payload !== undefined) {
                     console.log("state payload is:", state.payload);
                 }
                 console.log();
                 const s = state.cast();
                 for (var c in s.commands()) {
-                    if (c === 'build') {
+                    if (c === 'get') {
                         setTimeout(() => {
                             var _a, _b;
                             var s1 = (_b = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.cast()) === null || _b === void 0 ? void 0 : _b.commands();
-                            if (Object.keys(s1).includes('build')) {
-                                s1.build();
+                            if (Object.keys(s1).includes('get')) {
+                                s1.get();
                             }
                         }, (0, factory_protocol_1.getRandomInt)(4000, 8000));
                         break;

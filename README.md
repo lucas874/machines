@@ -45,3 +45,19 @@ Please be sure to `nvm use` the right node.js version!
 ## Acknowledgements
 
 The implementation of these libraries and the underlying theory has been supported by the Horizon Europe EU project «TaRDIS» (grant number 101093006).
+
+
+# MSc Project: Methods and Tools for the Verification of Swarm Protocols
+Demo is found in demo/ and in machine-check/examples/composition
+
+To run the demo in demo/:
+
+1. install Actyx on your machine
+
+2. run `npm run build` in the machine-check directory and in the machine-runner directory
+
+3. move to the demo/ directory `bash demo_run_machines.sh --clean`
+
+To run the demo in machine-check:
+1. cd to the machine-check directory
+2. run `npm run test`
