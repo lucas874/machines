@@ -50,7 +50,7 @@ const partReaction : ProjMachine.ReactionEntry = {
 }
 
 rMap.set(Events.part.type, partReaction)
-const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
+const fMap = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
 
 // Extended machine
 const [m3, i3] = Composition.extendMachine("R", projection, Events.allEvents, fMap)

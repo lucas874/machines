@@ -1668,6 +1668,47 @@ mod tests {
         )
         .unwrap()
     }
+    fn ref_pat_proto_0() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_ir0_0", "logType": ["e_ir0_0"], "role": "IR0" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir0_1", "logType": ["e_ir0_1"], "role": "IR0" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+    fn ref_pat_proto_1() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_ir0_0", "logType": ["e_ir0_0"], "role": "IR0" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir1_0", "logType": ["e_ir1_0"], "role": "IR1" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "c_ir1_1", "logType": ["e_ir1_1"], "role": "IR1" } },
+                    { "source": "3", "target": "4", "label": { "cmd": "c_rb", "logType": ["e_rb"], "role": "RB" } },
+                    { "source": "4", "target": "5", "label": { "cmd": "c_ir0_1", "logType": ["e_ir0_1"], "role": "IR0" } },
+                    { "source": "1", "target": "6", "label": { "cmd": "c_ra", "logType": ["e_ra"], "role": "RA" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+    fn ref_pat_proto_2() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_ir1_0", "logType": ["e_ir1_0"], "role": "IR1" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_rc", "logType": ["e_rc"], "role": "RC" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "c_ir1_1", "logType": ["e_ir1_1"], "role": "IR1" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
     fn get_interfacing_swarms_diff_example() -> InterfacingSwarms<Role> {
         InterfacingSwarms(
             vec![
@@ -1678,6 +1719,24 @@ mod tests {
                 CompositionComponent {
                     protocol: diff_example_proto_1(),
                     interface: Some(Role::new("IR")),
+                },
+            ]
+        )
+    }
+    fn get_ref_pat_protos() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: ref_pat_proto_0(),
+                    interface: None,
+                },
+                CompositionComponent {
+                    protocol: ref_pat_proto_1(),
+                    interface: Some(Role::new("IR0")),
+                },
+                CompositionComponent {
+                    protocol: ref_pat_proto_2(),
+                    interface: Some(Role::new("IR1")),
                 },
             ]
         )
@@ -2489,6 +2548,33 @@ mod tests {
         let composition = compose_protocols(get_interfacing_swarms_diff_example());
         assert!(composition.is_ok());
         let protos = get_interfacing_swarms_diff_example();
+        for p in protos.0.iter() {
+            println!("{}", serde_json::to_string_pretty(&p.protocol.clone()).unwrap());
+            //let subbbb = exact_weak_well_formed_sub(InterfacingSwarms(vec![p.clone()]), &BTreeMap::new());
+            //println!("sub for component: {}", serde_json::to_string_pretty(&subbbb.unwrap()).unwrap());
+        }
+        let (g, i) = composition.unwrap();
+        let swarm = to_swarm_json(g, i);
+        println!("composition:\n {}", serde_json::to_string_pretty(&swarm).unwrap());
+        let result_composition = exact_weak_well_formed_sub(protos.clone(), &BTreeMap::new());
+        assert!(result_composition.is_ok());
+        let subs_composition = result_composition.unwrap();
+        println!("subs exact: {}", serde_json::to_string_pretty(&subs_composition).unwrap());
+        let result_composition = overapprox_weak_well_formed_sub(protos.clone(), &BTreeMap::new(), Granularity::Fine);
+        assert!(result_composition.is_ok());
+        let subs_composition = result_composition.unwrap();
+        println!("subs approx: {}", serde_json::to_string_pretty(&subs_composition).unwrap());
+
+        let result = check(protos.clone(), &subs_composition);
+        println!("errors is empty: {}", result.is_empty());
+    }
+
+    #[test]
+    #[ignore]
+    fn test_ref_example() {
+        let composition = compose_protocols(get_ref_pat_protos());
+        assert!(composition.is_ok());
+        let protos = get_ref_pat_protos();
         for p in protos.0.iter() {
             println!("{}", serde_json::to_string_pretty(&p.protocol.clone()).unwrap());
             //let subbbb = exact_weak_well_formed_sub(InterfacingSwarms(vec![p.clone()]), &BTreeMap::new());
