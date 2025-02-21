@@ -2179,6 +2179,10 @@ mod tests {
         let result_composition1 = exact_weak_well_formed_sub(composition1.clone(), &BTreeMap::new());
         assert!(result_composition1.is_ok());
         let subs_composition = result_composition1.unwrap();
+        let (g, i) = compose_protocols(composition1.clone()).unwrap();
+        let thing = to_swarm_json(g, i);
+        println!("{}", serde_json::to_string_pretty(&thing).unwrap());
+        println!("{}", serde_json::to_string_pretty(&subs_composition).unwrap());
         let error_report = check(composition1, &subs_composition);
         assert!(error_report.is_empty());
         assert_eq!(get_subs_composition_1(), subs_composition);

@@ -1,15 +1,43 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt  } from './factory_protocol'
-import { projectCombineMachines, checkWWFSwarmProtocol, checkComposedProjection } from '@actyx/machine-check'
+import { Events, manifest, Composition, interfacing_swarms,getRandomInt  } from './factory_protocol'
+import { projectCombineMachines, checkWWFSwarmProtocol, checkComposedProjection, Subscriptions, ResultData, InterfacingSwarms, overapproxWWFSubscriptions } from '@actyx/machine-check'
 
-const checkResult = checkWWFSwarmProtocol(interfacing_swarms, subs)
+
+// Generate a subscription w.r.t. which Gwarehouse || Gfactory || Gquality is well-formed
+const result_sub: ResultData<Subscriptions>
+  = overapproxWWFSubscriptions(interfacing_swarms, {}, 'Medium')
+if (result_sub.type === 'ERROR') throw new Error(result_sub.errors.join(', '))
+export const sub: Subscriptions = result_sub.data
+
+
+// Check well-formedness (only here for demonstration purposes)
+const checkResult = checkWWFSwarmProtocol(interfacing_swarms, sub)
 if (checkResult.type == 'ERROR') throw new Error(checkResult.errors.join(", "))
 
-/*
 
-Using the machine runner DSL an implmentation of robot in Gfactory is:
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Using the machine runner DSL an implmentation of robot in Gfactory is:
 const robot = Composition.makeMachine('R')
 export const s0 = robot.designEmpty('s0').finish()
 export const s1 = robot.designState('s1').withPayload<{part: string}>()
@@ -25,16 +53,46 @@ s0.react([Events.part], s1, (_, e) => {
   return s1.make({part: e.payload.part})})
 s1.react([Events.car], s2, (_) => s2.make())
 
-*/
 
-// With our extension of the library we create a map from events to reactions
-// and commands instead and use the projection of the composition over
-// the role to create the extended machine
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Projection of Gwarehouse || Gfactory || Gquality over R
-const result_projection = projectCombineMachines(interfacing_swarms, subs, "R")
+const result_projection = projectCombineMachines(interfacing_swarms, sub, "R")
 if (result_projection.type == 'ERROR') throw new Error('error getting projection')
 const projection = result_projection.data
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Command map
 const cMap = new Map()
@@ -55,11 +113,73 @@ const partReaction : ProjMachine.ReactionEntry = {
 rMap.set(Events.part.type, partReaction)
 const fMap = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
 
-// Extended machine
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Extend machine
 const [m3, i3] = Composition.extendMachine("R", projection, Events.allEvents, fMap)
 
-const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "R", m3.createJSONForAnalysis(i3))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Check machine (for demonstration purposes)
+const checkProjResult = checkComposedProjection(interfacing_swarms, sub, "R", m3.createJSONForAnalysis(i3))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Run the extended machine
 async function main() {
