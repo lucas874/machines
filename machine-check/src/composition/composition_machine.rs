@@ -787,7 +787,7 @@ mod tests {
         let result_subs = overapprox_weak_well_formed_sub(protos.clone(), &BTreeMap::from([(Role::new("T"), BTreeSet::from([EventType::new("car")]))]), Granularity::Coarse);
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
-        //println!("sub: {}", serde_json::to_string_pretty(&subs).unwrap());
+
         let role = Role::new("T");
         let (g, i) = compose_protocols(protos).unwrap();
         let (proj, proj_initial) = project(&g, i, &subs, role);
@@ -869,7 +869,7 @@ mod tests {
             ],
         };
         let (expected, expected_initial, errors) = crate::machine::from_json(expected_m);
-        //println!("actual {}", serde_json::to_string_pretty(&to_json_machine(proj.clone(), proj_initial)).unwrap());
+
         assert!(errors.is_empty());
         assert!(expected_initial.is_some());
         // from machine::equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
@@ -891,9 +891,7 @@ mod tests {
         let subs1 = subs1.unwrap();
         let proto_info = swarms_to_proto_info(get_interfacing_swarms_1(), &subs1);
         assert!(proto_info.no_errors());
-        //let swarms = proto_info.protocols
-        //    .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
-        //    .collect();
+
         let (proj_combined1, proj_combined_initial1) =
             project_combine(&proto_info.protocols, &subs1, role.clone());
 
@@ -902,9 +900,7 @@ mod tests {
         let subs2 = subs2.unwrap();
         let proto_info = swarms_to_proto_info(get_interfacing_swarms_1_reversed(), &subs2);
         assert!(proto_info.no_errors());
-        //let swarms = proto_info.protocols
-        //    .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
-        //    .collect();
+
         let (proj_combined2, proj_combined_initial2) =
             project_combine(&proto_info.protocols, &subs2, role.clone());
 
@@ -949,9 +945,7 @@ mod tests {
             let subs1 = subs1.unwrap();
             let proto_info = swarms_to_proto_info(get_interfacing_swarms_2(), &subs1);
             assert!(proto_info.no_errors());
-            /* let swarms = proto_info.protocols
-                .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
-                .collect(); */
+
             let (proj_combined1, proj_combined_initial1) =
                 project_combine(&proto_info.protocols, &subs1, role.clone());
 
@@ -960,9 +954,7 @@ mod tests {
             let subs2 = subs2.unwrap();
             let proto_info = swarms_to_proto_info(get_interfacing_swarms_2_reversed(), &subs2);
             assert!(proto_info.no_errors());
-            /* let swarms = proto_info.protocols
-                .into_iter().map(|((graph, initial, _), interface)| (graph, initial.unwrap(), interface))
-                .collect(); */
+
             let (proj_combined2, proj_combined_initial2) =
                 project_combine(&proto_info.protocols, &subs2, role.clone());
 
@@ -975,9 +967,6 @@ mod tests {
                 proj_combined_initial2.unwrap()
             )
             .is_empty());
-            //println!("machine: {}\n$$$$\n", serde_json::to_string_pretty(&from_option_to_machine(proj_combined2.clone(), proj_combined_initial2.clone().unwrap())).unwrap());
-            //println!("{}\n$$$$\n", serde_json::to_string_pretty(&from_option_to_machine(proj_combined2.clone(), proj_combined_initial2.clone().unwrap())).unwrap());
-            ////println!("");
             assert_eq!(subs2, subs);
 
             let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, role.clone());
@@ -987,9 +976,7 @@ mod tests {
                 &to_option_machine(&proj),
                 proj_initial
             );
-            //println!("explicit {}\n$$$$\n", serde_json::to_string_pretty(&to_json_machine(proj.clone(), proj_initial)).unwrap());
-            //println!("{}\n$$$$\n", serde_json::to_string_pretty(&to_json_machine(proj.clone(), proj_initial)).unwrap());
-            //print!("errors: {:?}", errors.map(crate::machine::Error::convert(&proj_combined2, &to_option_machine(&proj))));
+
             assert!(errors.is_empty());
             }
     }

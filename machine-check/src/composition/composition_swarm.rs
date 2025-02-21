@@ -1416,170 +1416,6 @@ mod tests {
         .unwrap()
     }
 
-    fn pattern_3_proto_0() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_r0_0", "logType": ["e_r0_0"], "role": "R0" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_r0_1", "logType": ["e_r0_1"], "role": "R0" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_0", "logType": ["e_ir_0"], "role": "IR0" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
-    fn pattern_3_proto_1() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_r1_0", "logType": ["e_r1_0"], "role": "R1" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_0", "logType": ["e_ir_0"], "role": "IR0" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_1", "logType": ["e_ir_1"], "role": "IR1" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
-    fn pattern_3_proto_2() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_r2_0", "logType": ["e_r2_0"], "role": "R2" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_1", "logType": ["e_ir_1"], "role": "IR1" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_2", "logType": ["e_ir_2"], "role": "IR2" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
-    fn pattern_3_proto_3() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_r3_0", "logType": ["e_r3_0"], "role": "R3" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_2", "logType": ["e_ir_2"], "role": "IR2" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_3", "logType": ["e_ir_3"], "role": "IR3" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
-    fn pattern_3_proto_4() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_r4_0", "logType": ["e_r4_0"], "role": "R4" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_3", "logType": ["e_ir_3"], "role": "IR3" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_4", "logType": ["e_ir_4"], "role": "IR4" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
-    fn pattern_3_proto_5() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_r5_0", "logType": ["e_r5_0"], "role": "R5" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_4", "logType": ["e_ir_4"], "role": "IR4" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_5", "logType": ["e_ir_5"], "role": "IR5" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
-    fn pattern_3_proto_6() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_r6_0", "logType": ["e_r6_0"], "role": "R6" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_5", "logType": ["e_ir_5"], "role": "IR5" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_6", "logType": ["e_ir_6"], "role": "IR6" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
-    fn pattern_3_proto_7() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_r7_0", "logType": ["e_r7_0"], "role": "R7" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_6", "logType": ["e_ir_6"], "role": "IR6" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_7", "logType": ["e_ir_7"], "role": "IR7" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
-    fn pattern_3_proto_8() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_r8_0", "logType": ["e_r8_0"], "role": "R8" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_7", "logType": ["e_ir_7"], "role": "IR7" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_8", "logType": ["e_ir_8"], "role": "IR8" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
-    fn pattern_3_proto_9() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_r9_0", "logType": ["e_r9_0"], "role": "R9" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_8", "logType": ["e_ir_8"], "role": "IR8" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_9", "logType": ["e_ir_9"], "role": "IR9" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
-    fn pattern_3_ir0_last_0() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{"initial":"0","transitions":[{"label":{"cmd":"c_R0_0","logType":["e_R0_0"],"role":"R0"},"source":"0","target":"1"},{"label":{"cmd":"c_R0_1","logType":["e_R0_1"],"role":"R0"},"source":"1","target":"2"},{"label":{"cmd":"c_IR0_0","logType":["e_IR0_0"],"role":"IR0"},"source":"2","target":"3"}]}
-            "#,
-        ).unwrap()
-    }
-    fn pattern_3_ir0_last_1() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{"initial":"0","transitions":[{"label":{"cmd":"c_R1_0","logType":["e_R1_0"],"role":"R1"},"source":"0","target":"1"},{"label":{"cmd":"c_IR1_0","logType":["e_IR1_0"],"role":"IR1"},"source":"1","target":"2"},{"label":{"cmd":"c_IR0_0","logType":["e_IR0_0"],"role":"IR0"},"source":"2","target":"3"}]}
-            "#,
-        ).unwrap()
-    }
-    fn pattern_3_ir0_last_2() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{"initial":"0","transitions":[{"label":{"cmd":"c_R2_0","logType":["e_R2_0"],"role":"R2"},"source":"0","target":"1"},{"label":{"cmd":"c_IR2_0","logType":["e_IR2_0"],"role":"IR2"},"source":"1","target":"2"},{"label":{"cmd":"c_IR1_0","logType":["e_IR1_0"],"role":"IR1"},"source":"2","target":"3"}]}
-            "#,
-        ).unwrap()
-    }
-    fn pattern_3_ir0_last_3() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
-            r#"{"initial":"0","transitions":[{"label":{"cmd":"c_R3_0","logType":["e_R3_0"],"role":"R3"},"source":"0","target":"1"},{"label":{"cmd":"c_IR3_0","logType":["e_IR3_0"],"role":"IR3"},"source":"1","target":"2"},{"label":{"cmd":"c_IR2_0","logType":["e_IR2_0"],"role":"IR2"},"source":"2","target":"3"}]}
-            "#,
-        ).unwrap()
-    }
     fn pattern_4_proto_0() -> SwarmProtocol {
         serde_json::from_str::<SwarmProtocol>(
             r#"{
@@ -1832,75 +1668,6 @@ mod tests {
         )
     }
 
-    fn get_interfacing_swarms_ir0_first() -> InterfacingSwarms<Role> {
-        InterfacingSwarms(
-            vec![
-                CompositionComponent {
-                    protocol: pattern_3_proto_0(),
-                    interface: None,
-                },
-                CompositionComponent {
-                    protocol: pattern_3_proto_1(),
-                    interface: Some(Role::new("IR0")),
-                },
-                CompositionComponent {
-                    protocol: pattern_3_proto_2(),
-                    interface: Some(Role::new("IR1")),
-                },
-                CompositionComponent {
-                    protocol: pattern_3_proto_3(),
-                    interface: Some(Role::new("IR2")),
-                },
-                CompositionComponent {
-                    protocol: pattern_3_proto_4(),
-                    interface: Some(Role::new("IR3")),
-                },
-                CompositionComponent {
-                    protocol: pattern_3_proto_5(),
-                    interface: Some(Role::new("IR4")),
-                },
-                CompositionComponent {
-                    protocol: pattern_3_proto_6(),
-                    interface: Some(Role::new("IR5")),
-                },
-                CompositionComponent {
-                    protocol: pattern_3_proto_7(),
-                    interface: Some(Role::new("IR6")),
-                },
-                CompositionComponent {
-                    protocol: pattern_3_proto_8(),
-                    interface: Some(Role::new("IR7")),
-                },
-                CompositionComponent {
-                    protocol: pattern_3_proto_9(),
-                    interface: Some(Role::new("IR8")),
-                },
-            ]
-        )
-    }
-
-    fn get_interfacing_swarms_ir0_last() -> InterfacingSwarms<Role> {
-        InterfacingSwarms(
-            vec![
-                CompositionComponent {
-                    protocol: pattern_3_ir0_last_0(),
-                    interface: None,
-                },
-                CompositionComponent {
-                    protocol: pattern_3_ir0_last_1(),
-                    interface: Some(Role::new("IR0")),
-                },
-                CompositionComponent {
-                    protocol: pattern_3_ir0_last_2(),
-                    interface: Some(Role::new("IR1")),
-                },
-                CompositionComponent {
-                    protocol: pattern_3_ir0_last_3(),
-                    interface: Some(Role::new("IR2")),
-                }
-            ]
-        )
-    }
     fn get_interfacing_swarms_pat_4() -> InterfacingSwarms<Role> {
         InterfacingSwarms(
             vec![
@@ -2098,7 +1865,7 @@ mod tests {
         ]
         .concat()
         .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
-        // recorded twice fix this!
+
         let expected_errors = vec![
             "initial swarm protocol state has no transitions",
             "initial swarm protocol state has no transitions",
@@ -2109,7 +1876,7 @@ mod tests {
         let errors =
                 proto_info.get_ith_proto(0).unwrap().errors
             .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
-        // recorded twice fix this!
+
         let expected_errors = vec![
             "state 2 is unreachable from initial state",
             "state 3 is unreachable from initial state",
@@ -2132,8 +1899,6 @@ mod tests {
         .concat()
         .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
 
-        // TODO CHECK THAT COMMANDS are only associated with a single event? is it allowed two have c@R<e1> c@R<e2>??
-        // are "guard event..." and "event type pos..." same thing?
         let mut expected_errors = vec![
                 "non-deterministic event guard type partID in state 0",
                 "non-deterministic command request for role T in state 0",
@@ -2252,15 +2017,11 @@ mod tests {
             "active role does not subscribe to any of its emitted event types in transition (2)--[test@TR<report2>]-->(3)",
             "active role does not subscribe to any of its emitted event types in transition (3)--[accept@QCR<ok>]-->(4)",
             "active role does not subscribe to any of its emitted event types in transition (3)--[reject@QCR<notOk>]-->(4)",
-            //"role QCR does not subscribe to event types notOk, ok in branching transitions at state 3, but is involved in or after transition (3)--[accept@QCR<ok>]-->(4)",
-            //"role QCR does not subscribe to event types notOk, ok in branching transitions at state 3, but is involved in or after transition (3)--[reject@QCR<notOk>]-->(4)",
             "subsequently active role F does not subscribe to events in transition (0)--[observe@TR<report1>]-->(1)",
             "subsequently active role QCR does not subscribe to events in transition (2)--[test@TR<report2>]-->(3)",
             "subsequently active role QCR does not subscribe to events in transition (2)--[test@TR<report2>]-->(3)",
             "subsequently active role TR does not subscribe to events in transition (1)--[build@F<car>]-->(2)"
         ];
-
-        // fix the duplicate situation. because of active not conc returning labels not set of roles. Still relevant?
 
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
@@ -2417,12 +2178,8 @@ mod tests {
             "active role does not subscribe to any of its emitted event types in transition (456 || 459)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 459)",
             "subsequently active role R454 does not subscribe to events in transition (456 || 459)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 459)",
             "active role does not subscribe to any of its emitted event types in transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
-            //"role R454 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved in or after transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
-            //"role R454 does not subscribe to event types R453_e_0, R454_e_0, R455_e_1 leading to or in joining event in transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
             "active role does not subscribe to any of its emitted event types in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
             "subsequently active role R455 does not subscribe to events in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
-            //"role R454 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved after transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
-            //"role R455 does not subscribe to event types R454_e_0, R455_e_0 in branching transitions at state 457 || 459, but is involved after transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
             "active role does not subscribe to any of its emitted event types in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
             "subsequently active role R454 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
             "subsequently active role R455 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
@@ -2449,12 +2206,32 @@ mod tests {
         let mut expected_errors = vec![
             "subsequently active role F does not subscribe to events in transition (0 || 2 || 0)--[observe@TR<report1>]-->(0 || 2 || 1)",
             "subsequently active role F does not subscribe to events in transition (3 || 2 || 0)--[observe@TR<report1>]-->(3 || 2 || 1)",
-            //"role F does not subscribe to event types report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)",
             "role QCR does not subscribe to event types car, part, report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)"];
         errors.sort();
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
     }
+
+    #[test]
+    #[ignore]
+    fn test_example_from_text() {
+        let composition = compose_protocols(get_interfacing_swarms_5());
+        assert!(composition.is_ok());
+
+        let result_composition = exact_weak_well_formed_sub(get_interfacing_swarms_5(), &BTreeMap::new());
+        assert!(result_composition.is_ok());
+        let subs_composition = result_composition.unwrap();
+        let result = check(get_interfacing_swarms_5(), &subs_composition);
+        assert!(result.is_empty());
+        let result_composition = overapprox_weak_well_formed_sub(get_interfacing_swarms_5(), &BTreeMap::new(), Granularity::Coarse);
+        assert!(result_composition.is_ok());
+        let subs_composition = result_composition.unwrap();
+
+
+        let result = check(get_interfacing_swarms_5(), &subs_composition);
+        assert!(result.is_empty());
+    }
+
     #[test]
     fn test_example_3() {
         let composition = compose_protocols(get_interfacing_swarms_3());
@@ -2473,61 +2250,7 @@ mod tests {
         println!("subs approx: {}", serde_json::to_string_pretty(&subs_composition).unwrap());
     }
 
-    #[test]
-    #[ignore]
-    fn test_example_from_text() {
-        let composition = compose_protocols(get_interfacing_swarms_5());
-        assert!(composition.is_ok());
 
-        let (g, i) = composition.unwrap();
-        let swarm = to_swarm_json(g, i);
-        println!("proto:\n {}", serde_json::to_string_pretty(&swarm).unwrap());
-        let result_composition = exact_weak_well_formed_sub(get_interfacing_swarms_5(), &BTreeMap::new());
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-        println!("subs exact: {}", serde_json::to_string_pretty(&subs_composition).unwrap());
-        let result_composition = overapprox_weak_well_formed_sub(get_interfacing_swarms_5(), &BTreeMap::new(), Granularity::Coarse);
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-        println!("subs approx: {}", serde_json::to_string_pretty(&subs_composition).unwrap());
-
-        let result = check(get_interfacing_swarms_5(), &subs_composition);
-        println!("errors is empty: {}", result.is_empty());
-    }
-
-    #[test]
-    #[ignore]
-    fn test_pattern_3() {
-        for i in 1..10 {
-            let index = i as usize;
-            let composition = compose_protocols(InterfacingSwarms(get_interfacing_swarms_ir0_first().0[..index].to_vec()));
-            assert!(composition.is_ok());
-
-            let (g, _) = composition.unwrap();
-            let node_count = g.node_count();
-            let edge_count = g.edge_count();
-            //let swarm = to_swarm_json(g, i);
-            println!("num states: {}, num edges: {}", node_count, edge_count);
-        }
-
-    }
-    #[test]
-    #[ignore]
-    fn test_pattern_3_ir0_last() {
-        for i in 1..5 {
-            let index = i as usize;
-            let composition = compose_protocols(InterfacingSwarms(get_interfacing_swarms_ir0_last().0[..index].to_vec()));
-            assert!(composition.is_ok());
-
-            let (g, i) = composition.unwrap();
-            //let node_count = g.node_count();
-            //let edge_count = g.edge_count();
-            let swarm = to_swarm_json(g, i);
-            println!("{}\n$$$$\n", serde_json::to_string_pretty(&swarm).unwrap());
-            //println!("num states: {}, num edges: {}", node_count, edge_count);
-        }
-
-    }
     #[test]
     #[ignore]
     fn test_pattern_4() {
@@ -2543,7 +2266,6 @@ mod tests {
             println!("{}\n$$$$\n", serde_json::to_string_pretty(&swarm).unwrap());
             println!("num states: {}, num edges: {}", node_count, edge_count);
         }
-
     }
 
     #[test]
@@ -2552,25 +2274,16 @@ mod tests {
         let composition = compose_protocols(get_interfacing_swarms_diff_example());
         assert!(composition.is_ok());
         let protos = get_interfacing_swarms_diff_example();
-        for p in protos.0.iter() {
-            println!("{}", serde_json::to_string_pretty(&p.protocol.clone()).unwrap());
-            //let subbbb = exact_weak_well_formed_sub(InterfacingSwarms(vec![p.clone()]), &BTreeMap::new());
-            //println!("sub for component: {}", serde_json::to_string_pretty(&subbbb.unwrap()).unwrap());
-        }
-        let (g, i) = composition.unwrap();
-        let swarm = to_swarm_json(g, i);
-        println!("composition:\n {}", serde_json::to_string_pretty(&swarm).unwrap());
         let result_composition = exact_weak_well_formed_sub(protos.clone(), &BTreeMap::new());
         assert!(result_composition.is_ok());
         let subs_composition = result_composition.unwrap();
-        println!("subs exact: {}", serde_json::to_string_pretty(&subs_composition).unwrap());
+        let result = check(protos.clone(), &subs_composition);
+        assert!(result.is_empty());
         let result_composition = overapprox_weak_well_formed_sub(protos.clone(), &BTreeMap::new(), Granularity::Fine);
         assert!(result_composition.is_ok());
         let subs_composition = result_composition.unwrap();
-        println!("subs approx: {}", serde_json::to_string_pretty(&subs_composition).unwrap());
-
         let result = check(protos.clone(), &subs_composition);
-        println!("errors is empty: {}", result.is_empty());
+        assert!(result.is_empty());
     }
 
     #[test]
@@ -2581,8 +2294,6 @@ mod tests {
         let protos = get_ref_pat_protos();
         for p in protos.0.iter() {
             println!("{}", serde_json::to_string_pretty(&p.protocol.clone()).unwrap());
-            //let subbbb = exact_weak_well_formed_sub(InterfacingSwarms(vec![p.clone()]), &BTreeMap::new());
-            //println!("sub for component: {}", serde_json::to_string_pretty(&subbbb.unwrap()).unwrap());
         }
         let (g, i) = composition.unwrap();
         let swarm = to_swarm_json(g, i);
