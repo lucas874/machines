@@ -627,27 +627,6 @@ fn pattern_4(n_protos: usize, n_commands: usize) -> InterfacingSwarms<Role> {
     InterfacingSwarms(protos)
 }
 
-/* // true if subs1 is a subset of subs2
-fn is_sub_subscription(subs1: Subscriptions, subs2: Subscriptions) -> bool {
-    if !subs1
-        .keys()
-        .cloned()
-        .collect::<BTreeSet<Role>>()
-        .is_subset(&subs2.keys().cloned().collect::<BTreeSet<Role>>())
-    {
-        return false;
-    }
-
-    for role in subs1.keys() {
-        //println!("explicit size: {} implicit size: {}", subs1[role].len(), subs2[role].len());
-        if !subs1[role].is_subset(&subs2[role]) {
-            return false;
-        }
-    }
-
-    true
-} */
-
 // test that we do not generate duplicate labels
 proptest! {
     #[test]
@@ -938,9 +917,9 @@ proptest! {
 }
 
 proptest! {
-    //#![proptest_config(ProptestConfig::with_cases(1))]
+    #![proptest_config(ProptestConfig::with_cases(100))]
     #[test]
-    #[ignore]
+    //#[ignore]
     fn test_combine_machines_prop(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
@@ -967,18 +946,7 @@ proptest! {
                 Some(projection) },
                 DataResult::ERROR{ .. } => None,
             };
-            /* let projection_combined = match serde_json::from_str(&project_combine(protos.clone(), sub_string.clone(), role_string.clone())).unwrap() {
-                DataResult::<Machine>::OK{data: projection} => {
-                Some(projection) },
-                DataResult::<Machine>::ERROR{ .. } => None,
-            };
-            assert!(projection_combined.is_some());
-            let machine_string = serde_json::to_string(&projection_combined.unwrap()).unwrap(); */
-            // we cant do this! because we cant pass explicit composition
-            /* match serde_json::from_str(&check_composed_projection(composition_string.clone(), sub_string.clone(), role.to_string(), machine_string)).unwrap() {
-                CheckResult::OK => assert!(true),
-                CheckResult::ERROR {errors: e} => { println!("errors: {:?}", e); assert!(false) },
-            } */
+
             assert!(projection.is_some());
             let machine_string = serde_json::to_string(&projection.clone().unwrap()).unwrap();
             // should work like this projecting over the explicit composition initially and comparing that with combined machines?
@@ -1003,104 +971,10 @@ proptest! {
     }
 }
 
-/* proptest! {
-    #![proptest_config(ProptestConfig::with_cases(1))]
-    #[test]
-    #[ignore]
-    fn test_combine_machines_prop_1(vec in generate_interfacing_swarms_refinement_2(5, 5, 7)) {
-        let protos = serde_json::to_string(&vec).unwrap();
-        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
-        let granularity = serde_json::to_string(&Granularity::Medium).unwrap();
-        let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
-            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::<Subscriptions>::ERROR{ .. } => None,
-        };
-
-        assert!(subscriptions.is_some());
-
-        let subscriptions = subscriptions.unwrap();
-
-        //let composition = InterfacingSwarms::<Role>(vec![CompositionComponent{protocol: composition.unwrap(), interface: None}]);
-        let sub_string = serde_json::to_string(&subscriptions).unwrap();
-
-        for role in subscriptions.keys() {
-            let role_string = role.to_string();
-
-            let projection_combined = match serde_json::from_str(&project_combine(protos.clone(), sub_string.clone(), role_string.clone())).unwrap() {
-                DataResult::<Machine>::OK{data: projection} => {
-                Some(projection) },
-                DataResult::<Machine>::ERROR{ .. } => None,
-            };
-            assert!(projection_combined.is_some());
-        }
-        println!("done projecting");
-        let composition = match serde_json::from_str(&compose_protocols(protos.clone())).unwrap() {
-            DataResult::<SwarmProtocol>::OK{data: composition} => {
-                Some(composition) },
-            DataResult::<SwarmProtocol>::ERROR{ .. } => None,
-        };
-        println!("done composing");
-        println!("size of composition state space: {}", composition.unwrap().transitions.into_iter().flat_map(|label| [label.source, label.target]).collect::<BTreeSet<State>>().len());
-
-    }
-} */
-
-proptest! {
-    #![proptest_config(ProptestConfig::with_cases(1))]
-    #[test]
-    #[ignore]
-    fn test_write_file(vec in generate_interfacing_swarms_refinement_2(4, 4, 3)) {
-        let mut mut_guard = FILE_COUNTER_MAX.lock().unwrap();
-        let i: u32 = *mut_guard;
-        *mut_guard += 1;
-        let parent_path = "/home/luc/Git/mtvsp-project/notes/trash/graph_visualization/protos_machines_dec3".to_string();
-        let dir_name = format!("4_roles_4_commands_3_protos_{}_{}", i, i);
-        create_directory(&parent_path, &dir_name);
-
-        for (j, v) in vec.clone().0.into_iter().enumerate() {
-            let out = serde_json::to_string(&v.protocol)?;
-            let file_name = format!("{parent_path}/{dir_name}/component_{j}_max_4_roles_max_4.json");
-            write_file(&file_name, out);
-        }
-
-        let protos = serde_json::to_string(&vec).unwrap();
-        //let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone())).unwrap() {
-        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
-        let subscriptions: Option<Subscriptions> = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs)).unwrap() {
-            DataResult::OK{data: subscriptions} => {
-                write_file(&format!("{parent_path}/{dir_name}/subscription.txt"), serde_json::to_string(&subscriptions).unwrap());
-                Some(subscriptions) },
-            DataResult::ERROR{ .. } => None,
-        };
-        let composition: Option<SwarmProtocol> = match serde_json::from_str(&compose_protocols(protos.clone())).unwrap() {
-            DataResult::OK{data: composition} => {
-                write_file(&format!("{parent_path}/{dir_name}/composition.json"), serde_json::to_string(&composition).unwrap());
-                Some(composition) },
-            DataResult::ERROR{ .. } => None,
-        };
-        assert!(subscriptions.is_some());
-        assert!(composition.is_some());
-        let subscriptions = subscriptions.unwrap();
-        let composition = composition.unwrap();
-        let sub_string = serde_json::to_string(&subscriptions).unwrap();
-        let composition_string = serde_json::to_string(&composition).unwrap();
-        let machine_dir = "machines".to_string();
-        create_directory(&format!("{parent_path}/{dir_name}"), &machine_dir);
-        for role in subscriptions.keys() {
-            let role_string = role.to_string();
-            let projection: Option<Machine> = match serde_json::from_str(&revised_projection(composition_string.clone(), sub_string.clone(), role_string.clone())).unwrap() {
-                DataResult::OK{data: projection} => {
-                write_file(&format!("{parent_path}/{dir_name}/{machine_dir}/{role_string}.json"), serde_json::to_string(&projection).unwrap());
-                Some(projection) },
-                DataResult::ERROR{ .. } => None,
-            };
-            assert!(projection.is_some());
-        }
-    }
-}
 fn print_type<T>(_: &T) {
     println!("{:?}", std::any::type_name::<T>());
 }
+
 fn create_directory(parent: &String, dir_name: &String) -> () {
     match create_dir(format!("{parent}/{dir_name}")) {
         Ok(_) => (),
@@ -1127,53 +1001,6 @@ fn write_file(file_name: &String, content: String) -> () {
 
 }
 
-/*
-    THIS ONE HAS LOTS OF PRINTS KEEP BC. NICE FOR DEBUGGING
-// test whether the approximated subscription for compositions
-// is contained within the 'exact' subscription.
-// i.e. is the approximation safe. max five protocols, max five roles
-// in each, max five commands per role. relatively small.
-proptest! {
-    //#![proptest_config(ProptestConfig::with_cases(5))]
-    #[test]
-    fn test_exact_1(vec in generate_interfacing_swarms(5, 5, 5, false)) {
-        let string = serde_json::to_string(&vec).unwrap();
-        let subscription = match serde_json::from_str(&exact_weak_well_formed_sub(string.clone())).unwrap() {
-            DataResult::<Subscriptions>::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::<Subscriptions>::ERROR{ .. } => None,
-        };
-        assert!(subscription.is_some());
-        let subscription = subscription.unwrap();
-        //println!("subs: {:?}", subscription);
-        let subscription = serde_json::to_string(&subscription).unwrap();
-
-        let errors = check_wwf_swarm(string.clone(), subscription.clone());
-        //println!("errors: {:?}", errors);
-        let errors = serde_json::from_str::<CheckResult>(&errors).unwrap();
-        let ok = match errors {
-            CheckResult::OK => true,
-            CheckResult::ERROR { errors: e } => {
-                println!("{:?}", e);
-                println!("subs: {}", serde_json::to_string_pretty(&subscription).unwrap());
-                for v in &vec.0 {
-                    println!("component: {}", serde_json::to_string_pretty(&v.protocol).unwrap());
-                }
-                let c = compose_protocols(string);
-                match serde_json::from_str(&c).unwrap() {
-                    DataResult::<SwarmProtocol>::OK{data: protocol} => {println!("protocol: {}", serde_json::to_string_pretty(&protocol).unwrap())},
-                    DataResult::<SwarmProtocol>::ERROR{..} => (),
-                }
-                false}
-
-        };
-        assert!(ok);
-    }
-}
-
-
-
-*/
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BenchMarkInput  {
     pub state_space_size: usize,
@@ -1199,6 +1026,8 @@ fn wrap_and_write(interfacing_swarms: InterfacingSwarms<Role>, parent_path: Stri
     let out = serde_json::to_string(&benchmark_input).unwrap();
     write_file(&file_name, out);
 }
+
+/*  LOTS of functions for generating example prototocols. Split into mulitple functions so that they can be run in parallel.
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(500))]
@@ -1319,7 +1148,6 @@ proptest! {
         wrap_and_write(interfacing_swarms, parent_path, dir_name);
     }
 }
-
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(500))]
@@ -1924,7 +1752,7 @@ proptest! {
         wrap_and_write(interfacing_swarms, parent_path, dir_name);
     }
 }
-
+*/
 
 fn prepare_input(file_name: String) -> (usize, BenchMarkInput) {
     // Create a path to the desired file
