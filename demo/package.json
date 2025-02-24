@@ -4,8 +4,6 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start-robot": "tsc && node dist/robot.js",
-    "start-sensor": "tsc && node dist/sensor.js",
     "start-door": "tsc && node dist/door.js",
     "start-forklift": "tsc && node dist/forklift.js",
     "start-transporter": "tsc && node dist/transporter.js",
