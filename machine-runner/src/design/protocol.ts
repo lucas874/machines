@@ -23,20 +23,14 @@ export type SwarmProtocol<
     machineName: MachineName,
   ) => Machine<SwarmProtocolName, MachineName, MachineEventFactories>
   tagWithEntityId: (id: string) => Tags<MachineEvents>
-  makeProjMachine: <MachineName extends string>(
-    machineName: MachineName,
-    proj: MachineAnalysisResource,
-    events: readonly MachineEvent.Factory<any, any>[]
-  ) => [Machine<any, any, any>, any]
   extendMachine: <MachineName extends string>(
     machineName: MachineName,
     proj: ProjMachine.ProjectionType,
     events: readonly MachineEvent.Factory<any, any>[],
-    //mOriginal: [Machine<any, any, any>, any],
     fMap: ProjMachine.funMap
   ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
 }
-//Machine<SwarmProtocolName, MachineName, MachineEventFactories>
+
 /**
  * Utilities for SwarmProtocol
  * @see SwarmProtocol.make
@@ -81,8 +75,6 @@ export namespace SwarmProtocol {
     return {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
-      makeProjMachine: (machineName, proj, events) => ProjMachine.machineFromProj(ImplMachine.make(swarmName, machineName, eventFactories), proj, events),
-      //extendMachine: (machineName, proj, events, mOriginal, fMap) => ProjMachine.extendMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, mOriginal, fMap)
       extendMachine: (machineName, proj, events, fMap) => ProjMachine.extendMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, fMap)
     }
   }
@@ -374,108 +366,6 @@ export namespace ProjMachine {
     target: string
     label: { tag: 'Execute'; cmd: string; logType: string[] } | { tag: 'Input'; eventType: string }
   }
-  // https://medium.com/@alaneicker/how-to-process-json-data-with-recursion-dc530dd3db09
-  function loopThroughJSON(k: string, obj: any) {
-    for (let key in obj) {
-      if (typeof obj[key] === 'object') {
-        if (Array.isArray(obj[key])) {
-          // loop through array
-          for (let i = 0; i < obj[key].length; i++) {
-            loopThroughJSON(k + " " + key, obj[key][i]);
-          }
-        } else {
-          // call function recursively for object
-          loopThroughJSON(k + " " + key, obj[key]);
-        }
-      } else {
-        // do something with value
-        console.log(k + " " + key + ': ' + obj[key]);
-      }
-    }
-  }
-  //type ReplaceReturnType<T extends (...a: any) => any, TNewReturn> = (...a: Parameters<T>) => TNewReturn;
-
-  export function machineFromProj(
-    m: Machine<any, any, any>,
-    proj: MachineAnalysisResource,
-    events: readonly MachineEvent.Factory<any, MachineEvent.Any>[]
-  ): [Machine<any, any, MachineEvent.Factory.Any>, any] {
-    var projStatesToStates: Map<string, any> = new Map()
-    var projStatesToExec: Map<string, Transition[]> = new Map()
-    var projStatesToInput: Map<string, Transition[]> = new Map()
-    var eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, MachineEvent.Any>> = new Map()
-
-    proj.transitions.forEach((transition) => {
-      if (transition.label.tag === 'Execute') {
-        if (!projStatesToExec.has(transition.source)) {
-          projStatesToExec.set(transition.source, new Array())
-        }
-        projStatesToExec.get(transition.source)?.push(transition)
-
-        // map event type string to Event
-        for (let eventType of transition.label.logType) {
-          for (let event of events) {
-              if (eventType === event.type) {
-              eventTypeStringToEvent.set(eventType, event)
-              break
-            }
-          }
-        }
-
-      } else if (transition.label.tag === 'Input') {
-        if (!projStatesToInput.has(transition.source)) {
-          projStatesToInput.set(transition.source, new Array())
-        }
-        projStatesToInput.get(transition.source)?.push(transition)
-
-        // add target to projStatesToInput as well. in case no outgoing transitions.
-        if (!projStatesToInput.has(transition.target)) {
-          projStatesToInput.set(transition.target, new Array())
-        }
-
-        // map event type string to Event
-        for (let event of events) {
-          if (transition.label.eventType === event.type) {
-            eventTypeStringToEvent.set(transition.label.eventType, event)
-            break
-          }
-        }
-      }
-    })
-    projStatesToExec.forEach((transitions, state) => {
-      var test = new Array()
-      // add self loops
-      transitions.forEach((transition) => {
-        if (transition.label.tag === 'Execute') {
-          var eventTypes = transition.label.logType.map((et: string) => {
-            return eventTypeStringToEvent.get(et)
-          })
-          test.push([transition.label.cmd, eventTypes, () => [{}]])
-          //projStatesToStates.get(state).command(transition.label.cmd, eventTypes, () => [{}])
-        }
-      })
-
-      projStatesToStates.set(state, m.designEmpty(state).commandFromList(test).finish())
-    })
-
-    projStatesToInput.forEach((value, key) => {
-      if (!projStatesToStates.has(key)) {
-        projStatesToStates.set(key, m.designEmpty(key).finish())
-      }
-
-      value.forEach((transition) => {
-        if (transition.label.tag === 'Input') {
-          if (!projStatesToStates.has(transition.target)) {
-            projStatesToStates.set(transition.target, m.designEmpty(transition.target).finish())
-          }
-
-          projStatesToStates.get(key).react([eventTypeStringToEvent.get(transition.label.eventType)], projStatesToStates.get(transition.target), (_: any) => projStatesToStates.get(transition.target).make())
-        }
-      })
-    })
-    var initial = projStatesToStates.get(proj.initial)
-    return [m, initial]
-  }
 
   export type ReactionEntry = {
     genPayloadFun: (...args : any[]) => any
@@ -520,7 +410,7 @@ export namespace ProjMachine {
     return m
   }
 
-  // states with same payload types as s and a function whose retyrn type is this payload type
+  // states with same payload types as s and a function whose return type is this payload type
   function payloadStates(
     s: string,
     initial: string,
@@ -562,21 +452,6 @@ export namespace ProjMachine {
 
     return [states, fs[Symbol.iterator]().next().value]
   }
-
-/*
-
-  export const make = <
-    SwarmProtocolName extends string,
-    MachineName extends string,
-    MachineEventFactories extends MachineEvent.Factory.Any,
-  >(
-    swarmName: SwarmProtocolName,
-    machineName: MachineName,
-    registeredEventFactories: MachineEventFactories[],
-  ): Machine<SwarmProtocolName, MachineName, MachineEventFactories> => {
-
-*/
-
 
   export const extendMachine = <
     SwarmProtocolName extends string,
