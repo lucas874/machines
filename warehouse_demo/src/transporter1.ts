@@ -87,7 +87,7 @@ async function main() {
           if (c === 'request') {
             //setTimeout(() => {
                 var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1).includes('request')) {
+                if (Object.keys(s1 || {}).includes('request')) {
                     s1.request()
                 }
            // }, getRandomInt(500, 5000))

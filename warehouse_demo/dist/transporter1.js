@@ -104,7 +104,7 @@ function main() {
                     if (c === 'request') {
                         //setTimeout(() => {
                         var s1 = (_e = (_d = machine.get()) === null || _d === void 0 ? void 0 : _d.cast()) === null || _e === void 0 ? void 0 : _e.commands();
-                        if (Object.keys(s1).includes('request')) {
+                        if (Object.keys(s1 || {}).includes('request')) {
                             s1.request();
                         }
                         // }, getRandomInt(500, 5000))
