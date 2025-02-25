@@ -7,8 +7,7 @@
     "start-door": "tsc && node dist/door.js",
     "start-forklift": "tsc && node dist/forklift.js",
     "start-transporter": "tsc && node dist/transporter.js",
-    "start-factory-robot": "tsc && node dist/factory_robot.js",
-    "start-quality-robot": "tsc && node dist/quality_control.js",
+    "start-transporter1": "tsc && node dist/transporter1.js",
     "print-projs": "tsc && node dist/print_projs.js"
   },
   "keywords": [],

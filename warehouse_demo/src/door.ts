@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt, all_projections } from './factory_protocol'
+import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt, all_projections } from './warehouse_protocol'
 import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
 
 /*
@@ -67,7 +67,7 @@ async function main() {
                 if (Object.keys(s1 || {}).includes('close')) {
                     s1.close()
                 }
-            }, getRandomInt(5500, 8000))
+            }, getRandomInt(5000, 8000))
             break
           }
       }

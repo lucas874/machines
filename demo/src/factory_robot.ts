@@ -198,7 +198,7 @@ async function main() {
           if (c === 'build') {
             setTimeout(() => {
                 var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1).includes('build')) {
+                if (Object.keys(s1 || {}).includes('build')) {
                     s1.build()
                 }
             }, getRandomInt(4000, 8000))

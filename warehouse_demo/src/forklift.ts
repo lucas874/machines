@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt } from './factory_protocol'
+import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt } from './warehouse_protocol'
 import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
 
 /*
@@ -75,7 +75,7 @@ async function main() {
               if (Object.keys(s1 || {}).includes('get')) {
                 s1.get()
               }
-            }, getRandomInt(4000, 8000))
+            }, getRandomInt(500, 8000))
             break
           }
       }

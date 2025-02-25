@@ -1,7 +1,9 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, subswh, subsf, all_projections, getRandomInt  } from './factory_protocol'
+import { Events, manifest, Composition, interfacing_swarms, subs, all_projections, getRandomInt  } from './warehouse_protocol'
 import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
+
+const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 
 /*
 
@@ -39,6 +41,7 @@ const projection = result_projection.data
 // Command map
 const cMap = new Map()
 cMap.set(Events.partID.type, (s: any, e: any) => {
+  s.self.id = s.self.id === undefined ? parts[Math.floor(Math.random() * parts.length)] : s.self.id;
   var id = s.self.id;
   console.log("requesting a", id);
   return [Events.partID.make({id: id})]})
@@ -71,7 +74,6 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
     const machine = createMachineRunner(app, tags, i3, {id: parts[Math.floor(Math.random() * parts.length)]})
 
     for await (const state of machine) {
@@ -83,12 +85,13 @@ async function main() {
       const s = state.cast()
       for (var c in s.commands()) {
           if (c === 'request') {
-            setTimeout(() => {
+            //setTimeout(() => {
                 var s1 = machine.get()?.cast()?.commands() as any
                 if (Object.keys(s1 || {}).includes('request')) {
                     s1.request()
                 }
-            }, getRandomInt(2000, 5000))
+           // }, getRandomInt(500, 5000))
+
             break
           }
           if (c === 'deliver') {
@@ -97,7 +100,7 @@ async function main() {
                 if (Object.keys(s1 || {}).includes('deliver')) {
                     s1.deliver()
                 }
-            }, getRandomInt(4000, 8000))
+            }, getRandomInt(500, 8000))
             break
           }
       }

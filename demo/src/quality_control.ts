@@ -77,7 +77,7 @@ async function main() {
         if (c === 'observe') {
             setTimeout(() => {
                 var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1).includes('observe')) {
+                if (Object.keys(s1 || {}).includes('observe')) {
                     s1.observe()
                 }
             }, getRandomInt(2000, 5000))
@@ -86,7 +86,7 @@ async function main() {
         if (c === 'test') {
             setTimeout(() => {
                 var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1).includes('test')) {
+                if (Object.keys(s1 || {}).includes('test')) {
                     s1.test()
                 }
             }, getRandomInt(4000, 8000))
