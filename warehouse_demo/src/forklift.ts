@@ -43,6 +43,7 @@ cMap.set(Events.position.type, (state: any, _: any) => {
 const rMap = new Map()
 const partIDReaction : ProjMachine.ReactionEntry = {
   genPayloadFun: (_, e) => {
+    console.log("e is: ", e);
     console.log("a", e.payload.id, "was requested");
     if (getRandomInt(0, 10) >= 9) { return { id: "broken part" } }
     return {id: e.payload.id} }

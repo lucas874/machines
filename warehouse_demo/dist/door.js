@@ -56,6 +56,13 @@ cMap.set(warehouse_protocol_1.Events.time.type, () => {
 });
 // Reaction map
 const rMap = new Map();
+const partReaction = {
+    genPayloadFun: (_, e) => {
+        console.log("e is: ", e);
+        return {};
+    }
+};
+rMap.set(warehouse_protocol_1.Events.part.type, partReaction);
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
 // Extended machine
 const [m3, i3] = warehouse_protocol_1.Composition.extendMachine("D", projection, warehouse_protocol_1.Events.allEvents, fMap);

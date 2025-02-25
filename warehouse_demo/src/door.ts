@@ -1,5 +1,5 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunner } from '@actyx/machine-runner'
+import { createMachineRunner, ProjMachine} from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt, all_projections } from './warehouse_protocol'
 import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
 
@@ -40,6 +40,13 @@ cMap.set(Events.time.type, () => {
 
 // Reaction map
 const rMap = new Map()
+const partReaction : ProjMachine.ReactionEntry = {
+  genPayloadFun: (_, e) => {
+    console.log("e is: ", e);
+    return {} }
+}
+rMap.set(Events.part.type, partReaction)
+
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
 
 // Extended machine

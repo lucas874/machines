@@ -5,9 +5,9 @@ import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-
 
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 
-/*
 
-Using the machine runner DSL an implmentation of transporter in Gwarehouse is:
+
+// Using the machine runner DSL an implmentation of transporter in Gwarehouse is:
 
 const transporter = Composition.makeMachine('T')
 export const s0 = transporter.designState('s0').withPayload<{id: string}>()
@@ -27,11 +27,12 @@ export const s3 = transporter.designEmpty('s3').finish()
 s0.react([Events.partID], s1, (_) => s1.make())
 s0.react([Events.time], s3, (_) => s3.make())
 s1.react([Events.position], s2, (_, e) => {
+    console.log("e is: ", e)
     console.log("got a ", e.payload.part);
     return { part: e.payload.part } })
 
-s2.react([Events.part], s0, (_, e) => { return s0.make({id: ""}) })
-*/
+s2.react([Events.part], s0, (_, e) => { console.log("e is: ", e); return s0.make({id: ""}) })
+
 
 // Projection of Gwarehouse || Gfactory || Gquality over D
 const result_projection = projectCombineMachines(interfacing_swarms, subs, "T")
@@ -53,7 +54,7 @@ cMap.set(Events.part.type, (s: any, e: any) => {
 // Reaction map
 const rMap = new Map()
 const positionReaction : ProjMachine.ReactionEntry = {
-  genPayloadFun: (_, e) => {  return { part: e.payload.part } }
+  genPayloadFun: (_, e) => {  console.log("e is",e ); return { part: e.payload.part } }
 }
 rMap.set(Events.position.type, positionReaction)
 
@@ -74,7 +75,7 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const machine = createMachineRunner(app, tags, i3, {id: parts[Math.floor(Math.random() * parts.length)]})
+    const machine = createMachineRunner(app, tags, s0, {id: parts[Math.floor(Math.random() * parts.length)]})
 
     for await (const state of machine) {
       console.log("transporter. state is:", state.type)

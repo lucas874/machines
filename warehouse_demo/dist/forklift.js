@@ -58,6 +58,7 @@ cMap.set(warehouse_protocol_1.Events.position.type, (state, _) => {
 const rMap = new Map();
 const partIDReaction = {
     genPayloadFun: (_, e) => {
+        console.log("e is: ", e);
         console.log("a", e.payload.id, "was requested");
         if ((0, warehouse_protocol_1.getRandomInt)(0, 10) >= 9) {
             return { id: "broken part" };
