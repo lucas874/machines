@@ -16,38 +16,37 @@ var __asyncValues = (this && this.__asyncValues) || function (o) {
     function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.s3 = exports.s2 = exports.s1 = exports.s0 = void 0;
 const sdk_1 = require("@actyx/sdk");
 const machine_runner_1 = require("@actyx/machine-runner");
 const warehouse_protocol_1 = require("./warehouse_protocol");
 const machine_check_1 = require("@actyx/machine-check");
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler'];
-/*
-
-Using the machine runner DSL an implmentation of transporter in Gwarehouse is:
-
-const transporter = Composition.makeMachine('T')
-export const s0 = transporter.designState('s0').withPayload<{id: string}>()
-    .command('request', [Events.partID], (s: any, e: any) => {
-      var id = s.self.id;
-      console.log("requesting a", id);
-      return [Events.partID.make({id: id})]})
-    .finish()
-export const s1 = transporter.designEmpty('s1').finish()
-export const s2 = transporter.designState('s2').withPayload<{part: string}>()
-    .command('deliver', [Events.part], (s: any, e: any) => {
-      console.log("delivering a", s.self.part)
-      return [Events.part.make({part: s.self.part})] })
-    .finish()
-export const s3 = transporter.designEmpty('s3').finish()
-
-s0.react([Events.partID], s1, (_) => s1.make())
-s0.react([Events.time], s3, (_) => s3.make())
-s1.react([Events.position], s2, (_, e) => {
+// Using the machine runner DSL an implmentation of transporter in Gwarehouse is:
+const transporter = warehouse_protocol_1.Composition.makeMachine('T');
+exports.s0 = transporter.designState('s0').withPayload()
+    .command('request', [warehouse_protocol_1.Events.partID], (s, e) => {
+    var id = s.self.id;
+    console.log("requesting a", id);
+    return [warehouse_protocol_1.Events.partID.make({ id: id })];
+})
+    .finish();
+exports.s1 = transporter.designEmpty('s1').finish();
+exports.s2 = transporter.designState('s2').withPayload()
+    .command('deliver', [warehouse_protocol_1.Events.part], (s, e) => {
+    console.log("delivering a", s.self.part);
+    return [warehouse_protocol_1.Events.part.make({ part: s.self.part })];
+})
+    .finish();
+exports.s3 = transporter.designEmpty('s3').finish();
+exports.s0.react([warehouse_protocol_1.Events.partID], exports.s1, (_) => exports.s1.make());
+exports.s0.react([warehouse_protocol_1.Events.time], exports.s3, (_) => exports.s3.make());
+exports.s1.react([warehouse_protocol_1.Events.position], exports.s2, (_, e) => {
+    console.log("e is: ", e);
     console.log("got a ", e.payload.part);
-    return { part: e.payload.part } })
-
-s2.react([Events.part], s0, (_, e) => { return s0.make({id: ""}) })
-*/
+    return { part: e.payload.part };
+});
+exports.s2.react([warehouse_protocol_1.Events.part], exports.s0, (_, e) => { console.log("e is: ", e); return exports.s0.make({ id: "" }); });
 // Projection of Gwarehouse || Gfactory || Gquality over D
 const result_projection = (0, machine_check_1.projectCombineMachines)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "T");
 if (result_projection.type == 'ERROR')
@@ -68,7 +67,7 @@ cMap.set(warehouse_protocol_1.Events.part.type, (s, e) => {
 // Reaction map
 const rMap = new Map();
 const positionReaction = {
-    genPayloadFun: (_, e) => { return { part: e.payload.part }; }
+    genPayloadFun: (_, e) => { console.log("e is", e); return { part: e.payload.part }; }
 };
 rMap.set(warehouse_protocol_1.Events.position.type, positionReaction);
 // hacky. we use the return type of this function to set the payload type of initial state and any other state enabling same commands as in initial
@@ -88,7 +87,7 @@ function main() {
         var _d, _e;
         const app = yield sdk_1.Actyx.of(warehouse_protocol_1.manifest);
         const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
-        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, { id: parts[Math.floor(Math.random() * parts.length)] });
+        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, exports.s0, { id: parts[Math.floor(Math.random() * parts.length)] });
         try {
             for (var _f = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _f = true) {
                 _c = machine_1_1.value;
