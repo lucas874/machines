@@ -64,7 +64,7 @@ async function main() {
           if (c === 'close') {
             setTimeout(() => {
                 var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1).includes('close')) {
+                if (Object.keys(s1 || {}).includes('close')) {
                     s1.close()
                 }
             }, getRandomInt(5500, 8000))

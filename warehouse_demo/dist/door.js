@@ -85,7 +85,7 @@ function main() {
                         setTimeout(() => {
                             var _a, _b;
                             var s1 = (_b = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.cast()) === null || _b === void 0 ? void 0 : _b.commands();
-                            if (Object.keys(s1).includes('close')) {
+                            if (Object.keys(s1 || {}).includes('close')) {
                                 s1.close();
                             }
                         }, (0, warehouse_protocol_1.getRandomInt)(5000, 8000));

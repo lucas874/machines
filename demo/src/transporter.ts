@@ -85,7 +85,7 @@ async function main() {
           if (c === 'request') {
             setTimeout(() => {
                 var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1).includes('request')) {
+                if (Object.keys(s1 || {}).includes('request')) {
                     s1.request()
                 }
             }, getRandomInt(2000, 5000))
@@ -94,7 +94,7 @@ async function main() {
           if (c === 'deliver') {
             setTimeout(() => {
                 var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1).includes('deliver')) {
+                if (Object.keys(s1 || {}).includes('deliver')) {
                     s1.deliver()
                 }
             }, getRandomInt(4000, 8000))

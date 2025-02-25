@@ -104,7 +104,7 @@ function main() {
                         setTimeout(() => {
                             var _a, _b;
                             var s1 = (_b = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.cast()) === null || _b === void 0 ? void 0 : _b.commands();
-                            if (Object.keys(s1).includes('request')) {
+                            if (Object.keys(s1 || {}).includes('request')) {
                                 s1.request();
                             }
                         }, (0, warehouse_protocol_1.getRandomInt)(500, 5000));
@@ -114,7 +114,7 @@ function main() {
                         setTimeout(() => {
                             var _a, _b;
                             var s1 = (_b = (_a = machine.get()) === null || _a === void 0 ? void 0 : _a.cast()) === null || _b === void 0 ? void 0 : _b.commands();
-                            if (Object.keys(s1).includes('deliver')) {
+                            if (Object.keys(s1 || {}).includes('deliver')) {
                                 s1.deliver();
                             }
                         }, (0, warehouse_protocol_1.getRandomInt)(500, 8000));
