@@ -127,6 +127,11 @@ export namespace MachineEvent {
         type: key,
       }),
       parse: mkParse(key, zodDefinition),
+      makeBT: (payload, lbj) => ({
+        ...zodDefinition.parse(payload),
+        type: key,
+        lbj: lbj
+      }),
     }),
 
     withPayload: () => ({
@@ -137,6 +142,11 @@ export namespace MachineEvent {
         type: key,
       }),
       parse: mkParse(key),
+      makeBT: (payload, lbj) => ({
+        ...payload,
+        type: key,
+        lbj: lbj,
+      }),
     }),
 
     withoutPayload: () => ({
@@ -146,6 +156,7 @@ export namespace MachineEvent {
       type: key,
       make: () => ({ type: key }),
       parse: mkParse(key),
+      makeBT: (lbj) => ({ type: key, lbj: lbj })
     }),
   })
 
@@ -230,6 +241,12 @@ export namespace MachineEvent {
      * Event.Factory when evaluated with Payload.Of
      */
     [FactoryInternalsAccessor]: FactoryInternals<Payload>
+
+    /**
+     * Machines extended with extendMachine use makeBT to generate events.
+     * Similar to make, but includes lbj in event payload.
+     */
+    makeBT: (payload: Payload, lbj: string) => MachineEvent<Key, Payload>
   }
 
   /**

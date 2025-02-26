@@ -42,19 +42,23 @@ const projection = result_projection.data
 // Command map
 const cMap = new Map()
 cMap.set(Events.partID.type, (s: any, e: any) => {
+  s.self.lala = 500;
   s.self.id = s.self.id === undefined ? parts[Math.floor(Math.random() * parts.length)] : s.self.id;
   var id = s.self.id;
   console.log("requesting a", id);
-  return [Events.partID.make({id: id})]})
+  console.log("in command, s is: ", s)
+  return {id: id}})
+  //return [Events.partID.make({id: id})]})
 
 cMap.set(Events.part.type, (s: any, e: any) => {
   console.log("delivering a", s.self.part)
-  return [Events.part.make({part: s.self.part})] })
+  return {part: s.self.part}})
+  //return [Events.part.make({part: s.self.part})] })
 
 // Reaction map
 const rMap = new Map()
 const positionReaction : ProjMachine.ReactionEntry = {
-  genPayloadFun: (_, e) => {  console.log("e is",e ); return { part: e.payload.part } }
+  genPayloadFun: (s, e) => {  console.log("e is",e ); console.log("s is: :", s); return { part: e.payload.part } }
 }
 rMap.set(Events.position.type, positionReaction)
 
@@ -65,7 +69,7 @@ const initialPayloadType : ProjMachine.ReactionEntry = {
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType}
 
 // Extended machine
-const [m3, i3] = Composition.extendMachine("T", projection, Events.allEvents, fMap)
+const [m3, i3] = Composition.extendMachineBT("T", projection, Events.allEvents, fMap, [])
 
 const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "T", m3.createJSONForAnalysis(i3))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
@@ -75,7 +79,7 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const machine = createMachineRunner(app, tags, s0, {id: parts[Math.floor(Math.random() * parts.length)]})
+    const machine = createMachineRunner(app, tags, i3, {id: parts[Math.floor(Math.random() * parts.length)]})
 
     for await (const state of machine) {
       console.log("transporter. state is:", state.type)

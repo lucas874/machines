@@ -55,19 +55,23 @@ const projection = result_projection.data;
 // Command map
 const cMap = new Map();
 cMap.set(warehouse_protocol_1.Events.partID.type, (s, e) => {
+    s.self.lala = 500;
     s.self.id = s.self.id === undefined ? parts[Math.floor(Math.random() * parts.length)] : s.self.id;
     var id = s.self.id;
     console.log("requesting a", id);
-    return [warehouse_protocol_1.Events.partID.make({ id: id })];
+    console.log("in command, s is: ", s);
+    return { id: id };
 });
+//return [Events.partID.make({id: id})]})
 cMap.set(warehouse_protocol_1.Events.part.type, (s, e) => {
     console.log("delivering a", s.self.part);
-    return [warehouse_protocol_1.Events.part.make({ part: s.self.part })];
+    return { part: s.self.part };
 });
+//return [Events.part.make({part: s.self.part})] })
 // Reaction map
 const rMap = new Map();
 const positionReaction = {
-    genPayloadFun: (_, e) => { console.log("e is", e); return { part: e.payload.part }; }
+    genPayloadFun: (s, e) => { console.log("e is", e); console.log("s is: :", s); return { part: e.payload.part }; }
 };
 rMap.set(warehouse_protocol_1.Events.position.type, positionReaction);
 // hacky. we use the return type of this function to set the payload type of initial state and any other state enabling same commands as in initial
@@ -76,7 +80,7 @@ const initialPayloadType = {
 };
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType };
 // Extended machine
-const [m3, i3] = warehouse_protocol_1.Composition.extendMachine("T", projection, warehouse_protocol_1.Events.allEvents, fMap);
+const [m3, i3] = warehouse_protocol_1.Composition.extendMachineBT("T", projection, warehouse_protocol_1.Events.allEvents, fMap, []);
 const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "T", m3.createJSONForAnalysis(i3));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));
@@ -87,7 +91,7 @@ function main() {
         var _d, _e;
         const app = yield sdk_1.Actyx.of(warehouse_protocol_1.manifest);
         const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
-        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, exports.s0, { id: parts[Math.floor(Math.random() * parts.length)] });
+        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, { id: parts[Math.floor(Math.random() * parts.length)] });
         try {
             for (var _f = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _f = true) {
                 _c = machine_1_1.value;
