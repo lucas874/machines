@@ -42,7 +42,6 @@ const projection = result_projection.data
 // Command map
 const cMap = new Map()
 cMap.set(Events.partID.type, (s: any, e: any) => {
-  s.self.lala = 500;
   s.self.id = s.self.id === undefined ? parts[Math.floor(Math.random() * parts.length)] : s.self.id;
   var id = s.self.id;
   console.log("requesting a", id);
@@ -84,7 +83,7 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const machine = createMachineRunner(app, tags, i3, {id: parts[Math.floor(Math.random() * parts.length)]})
+    const machine = createMachineRunner(app, tags, i3, {lbj: null, payload: {id: parts[Math.floor(Math.random() * parts.length)]}})
 
     for await (const state of machine) {
       console.log("transporter. state is:", state.type)

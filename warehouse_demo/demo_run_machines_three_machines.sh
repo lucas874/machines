@@ -26,13 +26,5 @@ tmux split-window -h "$START_FL"
 tmux select-pane -t 0
 tmux split-window -v "$START_D"
 
-# Focus on the right pane (Pane 1) and split it into 2 horizontal panes
-tmux select-pane -t 1
-tmux split-window -v "$START_FL"
-
-# Focus on the bottom-right pane (Pane 3) and split it vertically for the 5th pane
-tmux select-pane -t 3
-tmux split-window -v "$START_T1"
-
 # Attach to the session
 tmux attach-session -t tiled_shells

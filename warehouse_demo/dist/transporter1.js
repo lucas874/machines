@@ -55,7 +55,6 @@ const projection = result_projection.data;
 // Command map
 const cMap = new Map();
 cMap.set(warehouse_protocol_1.Events.partID.type, (s, e) => {
-    s.self.lala = 500;
     s.self.id = s.self.id === undefined ? parts[Math.floor(Math.random() * parts.length)] : s.self.id;
     var id = s.self.id;
     console.log("requesting a", id);
@@ -96,7 +95,7 @@ function main() {
         var _d, _e;
         const app = yield sdk_1.Actyx.of(warehouse_protocol_1.manifest);
         const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
-        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, { id: parts[Math.floor(Math.random() * parts.length)] });
+        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, { lbj: null, payload: { id: parts[Math.floor(Math.random() * parts.length)] } });
         try {
             for (var _f = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _f = true) {
                 _c = machine_1_1.value;
