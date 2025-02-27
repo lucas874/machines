@@ -56,3 +56,23 @@ export function getRandomInt(min: number, max: number) {
   const maxFloored = Math.floor(max);
   return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled); // The maximum is exclusive and the minimum is inclusive
 }
+
+// https://medium.com/@alaneicker/how-to-process-json-data-with-recursion-dc530dd3db09
+export function loopThroughJSON(k: string, obj: any) {
+    for (let key in obj) {
+      if (typeof obj[key] === 'object') {
+        if (Array.isArray(obj[key])) {
+          // loop through array
+          for (let i = 0; i < obj[key].length; i++) {
+            loopThroughJSON(k + " " + key, obj[key][i]);
+          }
+        } else {
+          // call function recursively for object
+          loopThroughJSON(k + " " + key, obj[key]);
+        }
+      } else {
+        // do something with value
+        console.log(k + " " + key + ': ', obj[key]);
+      }
+    }
+  }

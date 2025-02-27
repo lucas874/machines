@@ -74,13 +74,18 @@ const positionReaction = {
     genPayloadFun: (s, e) => { console.log("e is", e); console.log("s is: :", s); return { part: e.payload.part }; }
 };
 rMap.set(warehouse_protocol_1.Events.position.type, positionReaction);
+const partIDReaction = {
+    genPayloadFun: (s, e) => { console.log("e is", e); console.log("s is: :", s); return {}; }
+};
+rMap.set(warehouse_protocol_1.Events.partID.type, partIDReaction);
 // hacky. we use the return type of this function to set the payload type of initial state and any other state enabling same commands as in initial
 const initialPayloadType = {
     genPayloadFun: () => { return { part: "" }; }
 };
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType };
+console.log(projection);
 // Extended machine
-const [m3, i3] = warehouse_protocol_1.Composition.extendMachineBT("T", projection, warehouse_protocol_1.Events.allEvents, fMap, []);
+const [m3, i3] = warehouse_protocol_1.Composition.extendMachineBT("T", projection, warehouse_protocol_1.Events.allEvents, fMap, new Set([warehouse_protocol_1.Events.partID.type, warehouse_protocol_1.Events.time.type]));
 const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "T", m3.createJSONForAnalysis(i3));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));
@@ -101,6 +106,7 @@ function main() {
                 if (state.payload !== undefined) {
                     console.log("state payload is:", state.payload);
                 }
+                console.log("transporter state is: ", state);
                 console.log();
                 const s = state.cast();
                 for (var c in s.commands()) {

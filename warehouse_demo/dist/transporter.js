@@ -68,7 +68,7 @@ cMap.set(warehouse_protocol_1.Events.part.type, (s, e) => {
 // Reaction map
 const rMap = new Map();
 const positionReaction = {
-    genPayloadFun: (_, e) => { return { part: e.payload.part }; }
+    genPayloadFun: (s, e) => { console.log("e is: ", e); console.log("s is: ", s); return { part: e.payload.part }; }
 };
 rMap.set(warehouse_protocol_1.Events.position.type, positionReaction);
 // hacky. we use the return type of this function to set the payload type of initial state and any other state enabling same commands as in initial

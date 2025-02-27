@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt } from './warehouse_protocol'
+import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt, loopThroughJSON } from './warehouse_protocol'
 import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
 
 /*
@@ -64,6 +64,8 @@ async function main() {
 
     for await (const state of machine) {
       console.log("forklift. state is:", state.type)
+      console.log("machine is: ")
+      loopThroughJSON("", machine)
       if (state.payload !== undefined) {
         console.log("state payload is:", state.payload)
       }

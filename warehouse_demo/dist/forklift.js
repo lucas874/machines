@@ -86,6 +86,8 @@ function main() {
                 _d = false;
                 const state = _c;
                 console.log("forklift. state is:", state.type);
+                console.log("machine is: ");
+                (0, warehouse_protocol_1.loopThroughJSON)("", machine);
                 if (state.payload !== undefined) {
                     console.log("state payload is:", state.payload);
                 }

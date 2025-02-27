@@ -17,7 +17,7 @@ START_T1="echo 'Starting transporter'; npm run start-transporter1;exec bash"
 START_D="echo 'Starting door'; npm run start-door;exec bash"
 
 # Start a new tmux session with the first command
-tmux new-session -d -s tiled_shells "$START_T1"
+tmux new-session -d -s tiled_shells "$START_T"
 
 # Split the window into 2 vertical panes (left and right)
 tmux split-window -h "$START_FL"

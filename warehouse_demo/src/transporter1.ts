@@ -58,18 +58,23 @@ cMap.set(Events.part.type, (s: any, e: any) => {
 // Reaction map
 const rMap = new Map()
 const positionReaction : ProjMachine.ReactionEntry = {
-  genPayloadFun: (s, e) => {  console.log("e is",e ); console.log("s is: :", s); return { part: e.payload.part } }
+  genPayloadFun: (s, e) => {  console.log("e is", e); console.log("s is: :", s); return { part: e.payload.part } }
 }
 rMap.set(Events.position.type, positionReaction)
+
+const partIDReaction : ProjMachine.ReactionEntry = {
+  genPayloadFun: (s, e) => {  console.log("e is", e); console.log("s is: :", s); return {} }
+}
+rMap.set(Events.partID.type, partIDReaction)
 
 // hacky. we use the return type of this function to set the payload type of initial state and any other state enabling same commands as in initial
 const initialPayloadType : ProjMachine.ReactionEntry = {
   genPayloadFun: () => { return {part: ""} }
 }
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType}
-
+console.log(projection)
 // Extended machine
-const [m3, i3] = Composition.extendMachineBT("T", projection, Events.allEvents, fMap, [])
+const [m3, i3] = Composition.extendMachineBT("T", projection, Events.allEvents, fMap, new Set<string>([Events.partID.type, Events.time.type]))
 
 const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "T", m3.createJSONForAnalysis(i3))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
@@ -86,6 +91,7 @@ async function main() {
       if (state.payload !== undefined) {
         console.log("state payload is:", state.payload)
       }
+      console.log("transporter state is: ", state)
       console.log()
       const s = state.cast()
       for (var c in s.commands()) {

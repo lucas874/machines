@@ -34,7 +34,7 @@ export type SwarmProtocol<
     proj: ProjMachine.ProjectionType,
     events: readonly MachineEvent.Factory<any, any>[],
     fMap: ProjMachine.funMap,
-    specialEvents: string[],
+    specialEvents: Set<string>,
   ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
 }
 
@@ -586,6 +586,14 @@ export namespace ProjMachine {
     var initial = projStatesToStates.get(proj.initial)
     return [m, initial]
   }
+  // TODO computeBranches: for each state in projection,
+  // for each event type that has a transition in such state:
+  // compute branch(e) --> set of states, follow each branch
+  // add all event types encountered up to and including
+  // first branching or joining event type.
+
+  type BTStateEmpty = {lbj: string}
+  type BTState<Payload> = {lbj: string, payload: Payload}
 
   export const extendMachineBT = <
     SwarmProtocolName extends string,
@@ -596,7 +604,7 @@ export namespace ProjMachine {
     proj: ProjectionType,
     events: readonly MachineEvent.Factory<any, Record<never, never>>[],
     fMap: funMap,
-    specialEvents: string[]
+    specialEvents: Set<string>
   ): [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]  => {
     var projStatesToStates: Map<string, any> = new Map()
     var projStatesToExec: Map<string, Transition[]> = new Map()
@@ -667,7 +675,7 @@ export namespace ProjMachine {
 
           //var f = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => [{}]
           const payloadFun = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => {}
-          const f = (s: any, e: any) => {var payload = payloadFun(s, e); return [es[0]?.makeBT(payload, "5")]}
+          const f = (s: any, e: any) => {var payload = payloadFun(s, e); return [es[0]?.makeBT(payload, s.self.lbj)]}
           cmdTriples.push([transition.label.cmd, es, f])
 
         }
@@ -676,9 +684,9 @@ export namespace ProjMachine {
       const [statesWithSamePayloadType, f] = payloadStates(state, proj.initial, incomingMap, projStatesToStatePayload)
 
       if (f === undefined) {
-        projStatesToStates.set(state, m.designEmpty(state).commandFromList(cmdTriples).finish())
+        projStatesToStates.set(state, m.designState(state).withPayload<BTStateEmpty>().commandFromList(cmdTriples).finish())
       } else {
-        projStatesToStates.set(state, m.designState(state).withPayload<ReturnType<typeof f>>().commandFromList(cmdTriples).finish())
+        projStatesToStates.set(state, m.designState(state).withPayload<BTState<ReturnType<typeof f>>>().commandFromList(cmdTriples).finish())
         markedStates.add(state)
         for (const samePayloadState of statesWithSamePayloadType) {
           if (!projStatesToExec.has(samePayloadState) && !projStatesToStates.has(samePayloadState)) {
@@ -692,23 +700,25 @@ export namespace ProjMachine {
 
     projStatesToInput.forEach((value, key) => {
       if (!projStatesToStates.has(key)) {
-        projStatesToStates.set(key, m.designEmpty(key).finish())
+        projStatesToStates.set(key, m.designState(key).withPayload<BTStateEmpty>().finish())
       }
 
       value.forEach((transition) => {
         if (transition.label.tag === 'Input') {
           if (!projStatesToStates.has(transition.target)) {
-            projStatesToStates.set(transition.target, m.designEmpty(transition.target).finish())
+            projStatesToStates.set(transition.target, m.designState(transition.target).withPayload<BTStateEmpty>().finish())
           }
           var e = transition.label.eventType
           var es = eventTypeStringToEvent.get(e)
-          var f =
+
+          /* var f =
             fMap.reactions.has(e)
               ? (...args: any[]) => {const sPayload = fMap.reactions.get(e)!.genPayloadFun(...args); return projStatesToStates.get(transition.target).make(sPayload)}
               : (markedStates.has(transition.target)
                   ? (s: any, _: any) => { return projStatesToStates.get(transition.target).make(s.self)}
                   : (_: any) => projStatesToStates.get(transition.target).make()
-              )
+              ) */
+          const f = getReaction(e, fMap, projStatesToStates, markedStates, specialEvents, transition.target)
           projStatesToStates.get(key).react([es], projStatesToStates.get(transition.target), f)
         }
       })
@@ -716,5 +726,27 @@ export namespace ProjMachine {
 
     var initial = projStatesToStates.get(proj.initial)
     return [m, initial]
+  }
+  function getReaction(eventType: string, fMap: any, projStatesToStates: any, markedStates: any, specialEvents: Set<string>, targetState: any) {
+    if (fMap.reactions.has(eventType)) {
+      if (specialEvents.has(eventType)) {
+        return (s: any, e: any) => {const sPayload = fMap.reactions.get(eventType)!.genPayloadFun(s, e); return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: sPayload})}
+      } else {
+        return (s: any, e: any) => {const sPayload = fMap.reactions.get(eventType)!.genPayloadFun(s, e); return projStatesToStates.get(targetState).make({lbj: s.self.lbj, payload: sPayload})}
+      }
+    } else if (markedStates.has(targetState)) {
+      if (specialEvents.has(eventType)) {
+        return (s: any, e: any) => { return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: s.self.payload})}
+      } else {
+        return (s: any, _: any) => { return projStatesToStates.get(targetState).make(s.self)}
+      }
+    } else {
+      if (specialEvents.has(eventType)) {
+        return (_: any, e: any) => { return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: undefined})}
+      } else {
+        return (s: any, _: any) => { return projStatesToStates.get(targetState).make({lbj: s.self.lbj, payload: undefined})}
+      }
+    }
+
   }
 }
