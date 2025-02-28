@@ -508,7 +508,8 @@ fn overapprox_wwf_sub(proto_info: &mut ProtoInfo, subscription: &Subscriptions, 
     match granularity {
         Granularity::Fine => finer_overapprox_wwf_sub(proto_info, subscription, false),
         Granularity::Medium => finer_overapprox_wwf_sub(proto_info, subscription, true),
-        Granularity::Coarse => coarse_overapprox_wwf_sub(proto_info, subscription)
+        Granularity::Coarse => coarse_overapprox_wwf_sub(proto_info, subscription),
+        Granularity::TwoStep => two_step_overapprox_wwf_sub(proto_info, &mut subscription.clone())
     }
 }
 
@@ -630,6 +631,115 @@ fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mu
             }
         }
     }
+}
+
+// safe overapproximated subscription generation as described in article.
+fn two_step_overapprox_wwf_sub(proto_info: &mut ProtoInfo, subscription: &mut Subscriptions) -> Subscriptions {
+    proto_info.concurrent_events.append(&mut intra_concurrency_proto_info(proto_info));
+
+    // get concurrent event types preceding a join
+    let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
+        let pre = proto_info.immediately_pre.get(e).cloned().unwrap_or_default();
+        let product = pre.clone().into_iter().cartesian_product(&pre);
+        product.filter(|(e1, e2)| *e1 != **e2 && proto_info.concurrent_events.contains(&unord_event_pair(e1.clone(), (*e2).clone())))
+            .map(|(e1, e2)| [e1, e2.clone()])
+            .flatten()
+            .collect()
+    };
+
+    // add events to a subscription, return true of they were already in the subscription and false otherwise
+    let add_to_sub = |role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subscriptions| -> bool {
+        if subs.contains_key(&role) && event_types.iter().all(|e| subs[&role].contains(e)) {
+            return true;
+        }
+        subs
+            .entry(role)
+            .and_modify(|curr| {
+                curr.append(&mut event_types);
+            })
+            .or_insert(event_types);
+        false
+
+    };
+
+    // causal consistency
+    for (role, labels) in &proto_info.role_event_map {
+        let event_types: BTreeSet<_> = labels.iter().map(|label| label.get_event_type()).collect();
+        let preceding_event_types: BTreeSet<_> = event_types.iter().flat_map(|e| proto_info.immediately_pre.get(e).cloned().unwrap_or_default()).collect();
+        let mut events_to_add = event_types.into_iter().chain(preceding_event_types.into_iter()).collect();
+        subscription.entry(role.clone()).and_modify(|set| { set.append(&mut events_to_add); }).or_insert_with(|| events_to_add);
+    }
+
+    let mut is_stable = false;
+    while !is_stable {
+        is_stable = true;
+        // determinacy: branches
+        for branching_events in &proto_info.branching_events {
+            let interested_roles = branching_events.iter().flat_map(|e| roles_on_path(e.clone(), proto_info, &subscription)).collect::<BTreeSet<_>>();
+            for role in interested_roles {
+                is_stable = add_to_sub(role, branching_events.clone(), subscription) && is_stable;
+            }
+        }
+
+        // determinacy: joins. the joining_events field of proto_info really holds all interfacing events so filter them to get joins
+        for joining_event in &proto_info.joining_events {
+            let interested_roles = roles_on_path(joining_event.clone(), proto_info, &subscription);
+            let pre_join_events = get_pre_joins(&joining_event);
+            let join_and_prejoin = if !pre_join_events.is_empty() {
+                [joining_event.clone()].into_iter().chain(pre_join_events.into_iter()).collect()
+            } else {
+                BTreeSet::new()
+            };
+            for role in interested_roles {
+                is_stable = add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
+            }
+        }
+
+        // intefacing rule from algorithm in article
+        for joining_event in &proto_info.joining_events {
+            let interested_roles = roles_on_path(joining_event.clone(), proto_info, &subscription);
+            for role in interested_roles {
+                is_stable = add_to_sub(role, BTreeSet::from([joining_event.clone()]), subscription) && is_stable;
+            }
+        }
+    }
+
+    subscription.clone()
+}
+
+fn intra_concurrency(proto: &ProtoStruct) -> BTreeSet<UnordEventPair> {
+    let mut conc = BTreeSet::new();
+    let graph = &proto.graph;
+    let initial = if proto.initial.is_none() {
+        return conc;
+    } else {
+        proto.initial.unwrap()
+    };
+    for node in Dfs::new(&graph, initial).iter(&graph) {
+        let self_loop_events = graph
+            .edges_directed(node, Outgoing)
+            .filter(|e| e.target() == node)
+            .map(|e| e.weight().get_event_type())
+            .collect::<BTreeSet<EventType>>();
+        let mut pairs = self_loop_events
+            .clone()
+            .into_iter()
+            .cartesian_product(&self_loop_events)
+            .filter(|(e1, e2)| *e1 != **e2)
+            .map(|(e1, e2)| unord_event_pair(e1, e2.clone()))
+            .collect();
+        conc.append(&mut pairs);
+    }
+
+    conc
+}
+
+fn intra_concurrency_proto_info(proto_info1: &ProtoInfo) -> BTreeSet<UnordEventPair> {
+    let intra_conc_sets = proto_info1.protocols
+        .iter()
+        .map(|p| intra_concurrency(p))
+        .collect::<Vec<_>>();
+    intra_conc_sets.into_iter().flatten().collect()
 }
 
 fn combine_proto_infos<T: SwarmInterface>(
@@ -1545,6 +1655,22 @@ mod tests {
         )
         .unwrap()
     }
+
+    fn get_intra_conc_proto() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "0", "label": { "cmd": "a", "logType": ["a"], "role": "R2" } },
+                    { "source": "0", "target": "1", "label": { "cmd": "b", "logType": ["b"], "role": "R1" } },
+                    { "source": "1", "target": "1", "label": { "cmd": "c", "logType": ["c"], "role": "R1" } },
+                    { "source": "1", "target": "1", "label": { "cmd": "d", "logType": ["d"], "role": "R1" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "e", "logType": ["e"], "role": "R2" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
     fn get_interfacing_swarms_diff_example() -> InterfacingSwarms<Role> {
         InterfacingSwarms(
             vec![
@@ -1695,19 +1821,29 @@ mod tests {
         )
     }
     fn get_fail_1_swarms() -> InterfacingSwarms<Role> {
-            InterfacingSwarms(
-                vec![
-                    CompositionComponent {
-                        protocol: get_fail_1_component_1(),
-                        interface: None,
-                    },
-                    CompositionComponent {
-                        protocol: get_fail_1_component_2(),
-                        interface: Some(Role::new("R454")),
-                    }
-                ]
-            )
-        }
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_fail_1_component_1(),
+                    interface: None,
+                },
+                CompositionComponent {
+                    protocol: get_fail_1_component_2(),
+                    interface: Some(Role::new("R454")),
+                }
+            ]
+        )
+    }
+    fn get_intra_conc_proto_swarm() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_intra_conc_proto(),
+                    interface: None,
+                }
+            ]
+        )
+    }
 
     // QCR subscribes to car and part because report1 is concurrent with part and they lead to a joining event car/event is joining bc of this.
     fn get_subs_composition_2() -> Subscriptions {
@@ -2309,5 +2445,12 @@ mod tests {
 
         let result = check(protos.clone(), &subs_composition);
         println!("errors is empty: {}", result.is_empty());
+    }
+
+    #[test]
+    #[ignore]
+    fn test_intra_conc() {
+        let _ = overapprox_weak_well_formed_sub(get_interfacing_swarms_2(), &BTreeMap::new(), Granularity::Fine);
+        let _ = overapprox_weak_well_formed_sub(get_intra_conc_proto_swarm(), &BTreeMap::new(), Granularity::Fine);
     }
 }

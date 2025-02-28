@@ -28,6 +28,7 @@ export type Granularity =
   | 'Fine'
   | 'Medium'
   | 'Coarse'
+  | 'TwoStep'
 
 export function checkSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): Result {
   const p = JSON.stringify(proto)

@@ -187,7 +187,7 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
     group.finish();
 } */
 
-fn bench_composition_pattern_3_ir0_last(c: &mut Criterion) {
+/* fn bench_composition_pattern_3_ir0_last(c: &mut Criterion) {
     let mut group = c.benchmark_group("Composition pattern 3 ir0 last");
     group.sample_size(50);
     let mut interfacing_swarms_random =
@@ -215,7 +215,7 @@ fn bench_composition_pattern_3_ir0_last(c: &mut Criterion) {
         |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone())));
     }
     group.finish();
-}
+} */
 
 /* fn bench_projection(c: &mut Criterion) {
     let mut group = c.benchmark_group("Projection benchmarks");
@@ -274,5 +274,47 @@ fn bench_composition_pattern_3_ir0_last(c: &mut Criterion) {
     group.finish();
 } */
 
-criterion_group!(benches, bench_composition_pattern_3_ir0_last);
+/* fn bench_general_two_step(c: &mut Criterion) {
+    let mut group = c.benchmark_group("General pattern two step vs. exact");
+    group.sample_size(50);
+    let mut interfacing_swarms_random =
+        prepare_files_in_directory(String::from("./bench_and_results/benchmarks/general_pattern/"));
+    interfacing_swarms_random.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+    for (size, _) in interfacing_swarms_random.iter() {
+        println!("{}", size);
+    }
+
+    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let two_step_granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
+
+
+    for (i, (_, interfacing_swarms)) in interfacing_swarms_random.iter().enumerate() {
+        group.bench_with_input(BenchmarkId::new("overapproximated", i + 1), interfacing_swarms,
+        |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), two_step_granularity.clone())));
+
+        group.bench_with_input(BenchmarkId::new("exact", i + 1), interfacing_swarms,
+        |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone())));
+    }
+    group.finish();
+} */
+fn bench_general_two_step(c: &mut Criterion) {
+    let mut group = c.benchmark_group("General pattern two step vs. exact");
+    group.sample_size(50);
+    let mut interfacing_swarms_general =
+        prepare_files_in_directory(String::from("./bench_and_results/benchmarks/general_pattern/"));
+    interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+
+    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let two_step_granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
+
+    for (size, interfacing_swarms) in interfacing_swarms_general.iter() {
+        group.bench_with_input(BenchmarkId::new("overapproximated", size), interfacing_swarms,
+        |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), two_step_granularity.clone())));
+
+        group.bench_with_input(BenchmarkId::new("exact", size), interfacing_swarms,
+        |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone())));
+    }
+    group.finish();
+}
+criterion_group!(benches, bench_general_two_step);
 criterion_main!(benches);
