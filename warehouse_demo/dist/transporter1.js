@@ -58,25 +58,38 @@ cMap.set(warehouse_protocol_1.Events.partID.type, (s, e) => {
     s.self.id = s.self.id === undefined ? parts[Math.floor(Math.random() * parts.length)] : s.self.id;
     var id = s.self.id;
     console.log("requesting a", id);
-    return [warehouse_protocol_1.Events.partID.make({ id: id })];
+    console.log("in command, s is: ", s);
+    return { id: id };
 });
+//return [Events.partID.make({id: id})]})
 cMap.set(warehouse_protocol_1.Events.part.type, (s, e) => {
     console.log("delivering a", s.self.part);
-    return [warehouse_protocol_1.Events.part.make({ part: s.self.part })];
+    console.log("HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa");
+    return { part: s.self.part };
 });
+//return [Events.part.make({part: s.self.part})] })
 // Reaction map
 const rMap = new Map();
 const positionReaction = {
-    genPayloadFun: (_, e) => { console.log("e is", e); return { part: e.payload.part }; }
+    genPayloadFun: (s, e) => { console.log("e is", e); console.log("s is: :", s); return { part: e.payload.part }; }
 };
 rMap.set(warehouse_protocol_1.Events.position.type, positionReaction);
+const partIDReaction = {
+    genPayloadFun: (s, e) => { console.log("e is", e); console.log("s is: :", s); return {}; }
+};
+rMap.set(warehouse_protocol_1.Events.partID.type, partIDReaction);
+const partReaction = {
+    genPayloadFun: (s, e) => { console.log("part reaction"); console.log("e is", e); console.log("s is: :", s); }
+};
+rMap.set(warehouse_protocol_1.Events.part.type, partReaction);
 // hacky. we use the return type of this function to set the payload type of initial state and any other state enabling same commands as in initial
 const initialPayloadType = {
     genPayloadFun: () => { return { part: "" }; }
 };
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType };
+console.log(projection);
 // Extended machine
-const [m3, i3] = warehouse_protocol_1.Composition.extendMachine("T", projection, warehouse_protocol_1.Events.allEvents, fMap);
+const [m3, i3] = warehouse_protocol_1.Composition.extendMachineBT("T", projection, warehouse_protocol_1.Events.allEvents, fMap, new Set([warehouse_protocol_1.Events.partID.type, warehouse_protocol_1.Events.time.type]));
 const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "T", m3.createJSONForAnalysis(i3));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));
@@ -87,7 +100,7 @@ function main() {
         var _d, _e;
         const app = yield sdk_1.Actyx.of(warehouse_protocol_1.manifest);
         const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
-        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, exports.s0, { id: parts[Math.floor(Math.random() * parts.length)] });
+        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, { lbj: null, payload: { id: parts[Math.floor(Math.random() * parts.length)] } });
         try {
             for (var _f = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _f = true) {
                 _c = machine_1_1.value;
@@ -97,6 +110,7 @@ function main() {
                 if (state.payload !== undefined) {
                     console.log("state payload is:", state.payload);
                 }
+                console.log("transporter state is: ", state);
                 console.log();
                 const s = state.cast();
                 for (var c in s.commands()) {

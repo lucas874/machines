@@ -993,4 +993,21 @@ mod tests {
             project_combine(&proto_info.protocols, &subs, role.clone());
         println!("projection of {}: {}", role.to_string(), serde_json::to_string_pretty(&from_option_to_machine(proj, proj_initial.unwrap())).unwrap());
     }
+
+    #[test]
+    fn test_all_projs_whf() {
+        let composition = compose_protocols(get_interfacing_swarms_1());
+        assert!(composition.is_ok());
+        let (composed_graph, composed_initial) = composition.unwrap();
+        let subs = crate::composition::composition_swarm::exact_weak_well_formed_sub(get_interfacing_swarms_1(), &BTreeMap::new());
+        assert!(subs.is_ok());
+        let subs = subs.unwrap();
+        println!("subscription: {}", serde_json::to_string_pretty(&subs).unwrap());
+        let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D"), Role::new("F")];
+
+        for role in all_roles {
+            let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, role.clone());
+            println!("{}: {}", role.clone().to_string(), serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap());
+        }
+    }
 }

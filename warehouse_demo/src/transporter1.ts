@@ -45,27 +45,41 @@ cMap.set(Events.partID.type, (s: any, e: any) => {
   s.self.id = s.self.id === undefined ? parts[Math.floor(Math.random() * parts.length)] : s.self.id;
   var id = s.self.id;
   console.log("requesting a", id);
-  return [Events.partID.make({id: id})]})
+  console.log("in command, s is: ", s)
+  return {id: id}})
+  //return [Events.partID.make({id: id})]})
 
 cMap.set(Events.part.type, (s: any, e: any) => {
   console.log("delivering a", s.self.part)
-  return [Events.part.make({part: s.self.part})] })
+  console.log("HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa")
+  return {part: s.self.part}})
+  //return [Events.part.make({part: s.self.part})] })
 
 // Reaction map
 const rMap = new Map()
 const positionReaction : ProjMachine.ReactionEntry = {
-  genPayloadFun: (_, e) => {  console.log("e is",e ); return { part: e.payload.part } }
+  genPayloadFun: (s, e) => {  console.log("e is", e); console.log("s is: :", s); return { part: e.payload.part } }
 }
 rMap.set(Events.position.type, positionReaction)
+
+const partIDReaction : ProjMachine.ReactionEntry = {
+  genPayloadFun: (s, e) => {  console.log("e is", e); console.log("s is: :", s); return {} }
+}
+rMap.set(Events.partID.type, partIDReaction)
+
+const partReaction : ProjMachine.ReactionEntry = {
+  genPayloadFun: (s, e) => { console.log("part reaction"); console.log("e is", e); console.log("s is: :", s) }
+}
+rMap.set(Events.part.type, partReaction)
 
 // hacky. we use the return type of this function to set the payload type of initial state and any other state enabling same commands as in initial
 const initialPayloadType : ProjMachine.ReactionEntry = {
   genPayloadFun: () => { return {part: ""} }
 }
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType}
-
+console.log(projection)
 // Extended machine
-const [m3, i3] = Composition.extendMachine("T", projection, Events.allEvents, fMap)
+const [m3, i3] = Composition.extendMachineBT("T", projection, Events.allEvents, fMap, new Set<string>([Events.partID.type, Events.time.type]))
 
 const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "T", m3.createJSONForAnalysis(i3))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
@@ -75,13 +89,14 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const machine = createMachineRunner(app, tags, s0, {id: parts[Math.floor(Math.random() * parts.length)]})
+    const machine = createMachineRunner(app, tags, i3, {lbj: null, payload: {id: parts[Math.floor(Math.random() * parts.length)]}})
 
     for await (const state of machine) {
       console.log("transporter. state is:", state.type)
       if (state.payload !== undefined) {
         console.log("state payload is:", state.payload)
       }
+      console.log("transporter state is: ", state)
       console.log()
       const s = state.cast()
       for (var c in s.commands()) {

@@ -48,17 +48,20 @@ const result_projection = (0, machine_check_1.projectCombineMachines)(warehouse_
 if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
 const projection = result_projection.data;
+console.log(projection);
 // Command map
 const cMap = new Map();
 cMap.set(warehouse_protocol_1.Events.position.type, (state, _) => {
     console.log("retrieved a", state.self.id, "at position x");
-    return [warehouse_protocol_1.Events.position.make({ position: "x", part: state.self.id })];
+    console.log("s is: ", state);
+    return { position: "x", part: state.self.id };
 });
 // Reaction map
 const rMap = new Map();
 const partIDReaction = {
-    genPayloadFun: (_, e) => {
+    genPayloadFun: (s, e) => {
         console.log("e is: ", e);
+        console.log("s is: ", s);
         console.log("a", e.payload.id, "was requested");
         if ((0, warehouse_protocol_1.getRandomInt)(0, 10) >= 9) {
             return { id: "broken part" };
@@ -69,7 +72,7 @@ const partIDReaction = {
 rMap.set(warehouse_protocol_1.Events.partID.type, partIDReaction);
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
 // Extended machine
-const [m3, i3] = warehouse_protocol_1.Composition.extendMachine("FL", projection, warehouse_protocol_1.Events.allEvents, fMap);
+const [m3, i3] = warehouse_protocol_1.Composition.extendMachineBT("FL", projection, warehouse_protocol_1.Events.allEvents, fMap, new Set([warehouse_protocol_1.Events.partID.type, warehouse_protocol_1.Events.time.type]));
 const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "FL", m3.createJSONForAnalysis(i3));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));

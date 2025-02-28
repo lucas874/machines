@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.all_projections = exports.subs = exports.interfacing_swarms = exports.Gwarehouse = exports.Composition = exports.Events = exports.manifest = void 0;
 exports.getRandomInt = getRandomInt;
+exports.loopThroughJSON = loopThroughJSON;
 /* eslint-disable @typescript-eslint/no-namespace */
 const machine_runner_1 = require("@actyx/machine-runner");
 const machine_check_1 = require("@actyx/machine-check");
@@ -45,4 +46,25 @@ function getRandomInt(min, max) {
     const minCeiled = Math.ceil(min);
     const maxFloored = Math.floor(max);
     return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled); // The maximum is exclusive and the minimum is inclusive
+}
+// https://medium.com/@alaneicker/how-to-process-json-data-with-recursion-dc530dd3db09
+function loopThroughJSON(k, obj) {
+    for (let key in obj) {
+        if (typeof obj[key] === 'object') {
+            if (Array.isArray(obj[key])) {
+                // loop through array
+                for (let i = 0; i < obj[key].length; i++) {
+                    loopThroughJSON(k + " " + key, obj[key][i]);
+                }
+            }
+            else {
+                // call function recursively for object
+                loopThroughJSON(k + " " + key, obj[key]);
+            }
+        }
+        else {
+            // do something with value
+            console.log(k + " " + key + ': ', obj[key]);
+        }
+    }
 }

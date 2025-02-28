@@ -60,6 +60,7 @@ cMap.set(factory_protocol_1.Events.partID.type, (s, e) => {
     return [factory_protocol_1.Events.partID.make({ id: id })];
 });
 cMap.set(factory_protocol_1.Events.part.type, (s, e) => {
+    console.log("s is: ", s);
     console.log("delivering a", s.self.part);
     return [factory_protocol_1.Events.part.make({ part: s.self.part })];
 });

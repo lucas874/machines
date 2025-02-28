@@ -52,7 +52,7 @@ const cMap = new Map();
 cMap.set(warehouse_protocol_1.Events.time.type, () => {
     var dateString = new Date().toLocaleString();
     console.log("closed warehouse at:", dateString);
-    return [warehouse_protocol_1.Events.time.make({ timeOfDay: dateString })];
+    return { timeOfDay: dateString };
 });
 // Reaction map
 const rMap = new Map();
@@ -65,7 +65,7 @@ const partReaction = {
 rMap.set(warehouse_protocol_1.Events.part.type, partReaction);
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
 // Extended machine
-const [m3, i3] = warehouse_protocol_1.Composition.extendMachine("D", projection, warehouse_protocol_1.Events.allEvents, fMap);
+const [m3, i3] = warehouse_protocol_1.Composition.extendMachineBT("D", projection, warehouse_protocol_1.Events.allEvents, fMap, new Set([warehouse_protocol_1.Events.partID.type, warehouse_protocol_1.Events.time.type]));
 const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "D", m3.createJSONForAnalysis(i3));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));

@@ -53,7 +53,7 @@ cMap.set(Events.part.type, (s: any, e: any) => {
 // Reaction map
 const rMap = new Map()
 const positionReaction : ProjMachine.ReactionEntry = {
-  genPayloadFun: (_, e) => {  return { part: e.payload.part } }
+  genPayloadFun: (s, e) => {  console.log("e is: ", e); console.log("s is: ", s); return { part: e.payload.part } }
 }
 rMap.set(Events.position.type, positionReaction)
 

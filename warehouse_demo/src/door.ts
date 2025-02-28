@@ -36,7 +36,7 @@ const cMap = new Map()
 cMap.set(Events.time.type, () => {
     var dateString = new Date().toLocaleString();
     console.log("closed warehouse at:", dateString);
-    return [Events.time.make({timeOfDay: dateString})]})
+    return {timeOfDay: dateString}})
 
 // Reaction map
 const rMap = new Map()
@@ -50,7 +50,7 @@ rMap.set(Events.part.type, partReaction)
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
 
 // Extended machine
-const [m3, i3] = Composition.extendMachine("D", projection, Events.allEvents, fMap)
+const [m3, i3] = Composition.extendMachineBT("D", projection, Events.allEvents, fMap, new Set<string>([Events.partID.type, Events.time.type]))
 const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "D", m3.createJSONForAnalysis(i3))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 

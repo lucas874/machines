@@ -52,12 +52,14 @@ const projection = result_projection.data;
 const cMap = new Map();
 cMap.set(factory_protocol_1.Events.position.type, (state, _) => {
     console.log("retrieved a", state.self.id, "at position x");
+    console.log("s is: ", state);
     return [factory_protocol_1.Events.position.make({ position: "x", part: state.self.id })];
 });
 // Reaction map
 const rMap = new Map();
 const partIDReaction = {
-    genPayloadFun: (_, e) => {
+    genPayloadFun: (s, e) => {
+        console.log("s is: ", s);
         console.log("a", e.payload.id, "was requested");
         if ((0, factory_protocol_1.getRandomInt)(0, 10) >= 9) {
             return { id: "broken part" };
