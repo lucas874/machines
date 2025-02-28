@@ -874,6 +874,30 @@ proptest! {
 
 proptest! {
     #[test]
+    fn test_overapproximated_7(vec in generate_interfacing_swarms_refinement(5, 5, 5)) {
+        let protos = serde_json::to_string(&vec).unwrap();
+        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
+        let subscription: Option<Subscriptions> = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
+            DataResult::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::ERROR{ .. } => None,
+        };
+        assert!(subscription.is_some());
+        let subscription = subscription.unwrap();
+        let subscription = serde_json::to_string(&subscription).unwrap();
+        let errors = check_wwf_swarm(protos.clone(), subscription.clone());
+        let errors = serde_json::from_str::<CheckResult>(&errors).unwrap();
+        let ok = match errors {
+            CheckResult::OK => true,
+            CheckResult::ERROR { .. } => false
+
+        };
+        assert!(ok);
+    }
+}
+
+proptest! {
+    #[test]
     #[ignore]
     fn test_overapproximated_refinement_2_only_generate(vec in generate_interfacing_swarms_refinement_2(7, 7, 10)) {
         let protos = serde_json::to_string(&vec).unwrap();
