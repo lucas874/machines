@@ -1952,6 +1952,31 @@ fn bench_sub_sizes_random() {
 
 #[test]
 #[ignore]
+fn bench_sub_sizes_general() {
+    let mut interfacing_swarms_general =
+        prepare_files_in_directory(String::from("./bench_and_results/benchmarks/general_pattern/"));
+    interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let two_step_granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
+    for (_, bi) in &interfacing_swarms_general {
+        let swarms = serde_json::to_string(&bi.interfacing_swarms).unwrap();
+        let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), two_step_granularity.clone())).unwrap() {
+            DataResult::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::ERROR{ .. } => None,
+        };
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), two_step_granularity.replace("\"", ""), String::from("./subscription_size_benchmarks/general_pattern"));
+
+        let subscriptions = match serde_json::from_str(&exact_weak_well_formed_sub(swarms.clone(), subs.clone())).unwrap() {
+            DataResult::OK{data: subscriptions} => {
+                Some(subscriptions) },
+            DataResult::ERROR{ .. } => None,
+        };
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), String::from("./subscription_size_benchmarks/general_pattern"));
+    }
+}
+
+#[test]
+#[ignore]
 fn print_sub_sizes_refinement_2() {
     let mut interfacing_swarms_refinement_2 =
         prepare_files_in_directory(String::from("./benches/benchmark_data_selected/refinement_pattern_2/"));
