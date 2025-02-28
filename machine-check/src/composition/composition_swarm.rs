@@ -505,6 +505,7 @@ fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, su
 }
 
 fn overapprox_wwf_sub(proto_info: &mut ProtoInfo, subscription: &Subscriptions, granularity: Granularity) -> Subscriptions {
+    println!("intra conc: {:?}", intra_concurrency_proto_info(proto_info));
     match granularity {
         Granularity::Fine => finer_overapprox_wwf_sub(proto_info, subscription, false),
         Granularity::Medium => finer_overapprox_wwf_sub(proto_info, subscription, true),
@@ -630,6 +631,40 @@ fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mu
             }
         }
     }
+}
+fn intra_concurrency(proto: &ProtoStruct) -> BTreeSet<UnordEventPair> {
+    let mut conc = BTreeSet::new();
+    let graph = &proto.graph;
+    let initial = if proto.initial.is_none() {
+        return conc;
+    } else {
+        proto.initial.unwrap()
+    };
+    for node in Dfs::new(&graph, initial).iter(&graph) {
+        let self_loop_events = graph
+            .edges_directed(node, Outgoing)
+            .filter(|e| e.target() == node)
+            .map(|e| e.weight().get_event_type())
+            .collect::<BTreeSet<EventType>>();
+        let mut pairs = self_loop_events
+            .clone()
+            .into_iter()
+            .cartesian_product(&self_loop_events)
+            .filter(|(e1, e2)| *e1 != **e2)
+            .map(|(e1, e2)| unord_event_pair(e1, e2.clone()))
+            .collect();
+        conc.append(&mut pairs);
+    }
+
+    conc
+}
+
+fn intra_concurrency_proto_info(proto_info1: &ProtoInfo) -> BTreeSet<UnordEventPair> {
+    let intra_conc_sets = proto_info1.protocols
+        .iter()
+        .map(|p| intra_concurrency(p))
+        .collect::<Vec<_>>();
+    intra_conc_sets.into_iter().flatten().collect()
 }
 
 fn combine_proto_infos<T: SwarmInterface>(
@@ -1545,6 +1580,22 @@ mod tests {
         )
         .unwrap()
     }
+
+    fn get_intra_conc_proto() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "0", "label": { "cmd": "a", "logType": ["a"], "role": "R2" } },
+                    { "source": "0", "target": "1", "label": { "cmd": "b", "logType": ["b"], "role": "R1" } },
+                    { "source": "1", "target": "1", "label": { "cmd": "c", "logType": ["c"], "role": "R1" } },
+                    { "source": "1", "target": "1", "label": { "cmd": "d", "logType": ["d"], "role": "R1" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "e", "logType": ["e"], "role": "R2" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
     fn get_interfacing_swarms_diff_example() -> InterfacingSwarms<Role> {
         InterfacingSwarms(
             vec![
@@ -1695,19 +1746,29 @@ mod tests {
         )
     }
     fn get_fail_1_swarms() -> InterfacingSwarms<Role> {
-            InterfacingSwarms(
-                vec![
-                    CompositionComponent {
-                        protocol: get_fail_1_component_1(),
-                        interface: None,
-                    },
-                    CompositionComponent {
-                        protocol: get_fail_1_component_2(),
-                        interface: Some(Role::new("R454")),
-                    }
-                ]
-            )
-        }
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_fail_1_component_1(),
+                    interface: None,
+                },
+                CompositionComponent {
+                    protocol: get_fail_1_component_2(),
+                    interface: Some(Role::new("R454")),
+                }
+            ]
+        )
+    }
+    fn get_intra_conc_proto_swarm() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_intra_conc_proto(),
+                    interface: None,
+                }
+            ]
+        )
+    }
 
     // QCR subscribes to car and part because report1 is concurrent with part and they lead to a joining event car/event is joining bc of this.
     fn get_subs_composition_2() -> Subscriptions {
@@ -2309,5 +2370,12 @@ mod tests {
 
         let result = check(protos.clone(), &subs_composition);
         println!("errors is empty: {}", result.is_empty());
+    }
+
+    #[test]
+    #[ignore]
+    fn test_intra_conc() {
+        let _ = overapprox_weak_well_formed_sub(get_interfacing_swarms_2(), &BTreeMap::new(), Granularity::Fine);
+        let _ = overapprox_weak_well_formed_sub(get_intra_conc_proto_swarm(), &BTreeMap::new(), Granularity::Fine);
     }
 }
