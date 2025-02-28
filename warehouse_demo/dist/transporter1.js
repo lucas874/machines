@@ -64,6 +64,7 @@ cMap.set(warehouse_protocol_1.Events.partID.type, (s, e) => {
 //return [Events.partID.make({id: id})]})
 cMap.set(warehouse_protocol_1.Events.part.type, (s, e) => {
     console.log("delivering a", s.self.part);
+    console.log("HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa");
     return { part: s.self.part };
 });
 //return [Events.part.make({part: s.self.part})] })
@@ -77,6 +78,10 @@ const partIDReaction = {
     genPayloadFun: (s, e) => { console.log("e is", e); console.log("s is: :", s); return {}; }
 };
 rMap.set(warehouse_protocol_1.Events.partID.type, partIDReaction);
+const partReaction = {
+    genPayloadFun: (s, e) => { console.log("part reaction"); console.log("e is", e); console.log("s is: :", s); }
+};
+rMap.set(warehouse_protocol_1.Events.part.type, partReaction);
 // hacky. we use the return type of this function to set the payload type of initial state and any other state enabling same commands as in initial
 const initialPayloadType = {
     genPayloadFun: () => { return { part: "" }; }

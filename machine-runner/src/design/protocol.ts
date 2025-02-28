@@ -676,7 +676,7 @@ export namespace ProjMachine {
 
           //var f = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => [{}]
           const payloadFun = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => {}
-          const f = (s: any, e: any) => {var payload = payloadFun({...s, self: s.self.payload || s.self}, e); return [es[0]?.makeBT(payload, s.self.lbj)]}
+          const f = (s: any, e: any) => {var payload = payloadFun({...s, self: s.self?.payload ?? s.self}, e); return [es[0]?.makeBT(payload, s.self.lbj)]}
           cmdTriples.push([transition.label.cmd, es, f])
 
         }
@@ -727,14 +727,14 @@ export namespace ProjMachine {
         return (s: any, e: any) => {
           console.log("hej first");
           console.log("s is weird place: ", s);
-          const sPayload = fMap.reactions.get(eventType)!.genPayloadFun({...s, self: s.self?.payload ?? undefined}, e);
+          const sPayload = fMap.reactions.get(eventType)!.genPayloadFun({...s, self: s.self?.payload ?? s.self}, e);
           return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: sPayload})
         }
       } else {
         return (s: any, e: any) => {
 
           console.log("hej second");
-          const sPayload = fMap.reactions.get(eventType)!.genPayloadFun({...s, self: s.self.payload || s.self}, e);
+          const sPayload = fMap.reactions.get(eventType)!.genPayloadFun({...s, self: s.self?.payload ?? s.self}, e);
           return projStatesToStates.get(targetState).make({lbj: s.self.lbj, payload: sPayload})
         }
       }

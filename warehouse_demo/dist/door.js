@@ -52,7 +52,7 @@ const cMap = new Map();
 cMap.set(warehouse_protocol_1.Events.time.type, () => {
     var dateString = new Date().toLocaleString();
     console.log("closed warehouse at:", dateString);
-    return [warehouse_protocol_1.Events.time.make({ timeOfDay: dateString })];
+    return { timeOfDay: dateString };
 });
 // Reaction map
 const rMap = new Map();

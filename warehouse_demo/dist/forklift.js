@@ -54,7 +54,7 @@ const cMap = new Map();
 cMap.set(warehouse_protocol_1.Events.position.type, (state, _) => {
     console.log("retrieved a", state.self.id, "at position x");
     console.log("s is: ", state);
-    return [warehouse_protocol_1.Events.position.make({ position: "x", part: state.self.id })];
+    return { position: "x", part: state.self.id };
 });
 // Reaction map
 const rMap = new Map();

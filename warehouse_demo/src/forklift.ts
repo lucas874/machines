@@ -38,7 +38,7 @@ const cMap = new Map()
 cMap.set(Events.position.type, (state: any, _: any) => {
   console.log("retrieved a", state.self.id, "at position x");
   console.log("s is: ", state);
-  return [Events.position.make({position: "x", part: state.self.id})]})
+  return {position: "x", part: state.self.id}})
 
 // Reaction map
 const rMap = new Map()
