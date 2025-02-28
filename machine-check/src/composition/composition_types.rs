@@ -130,7 +130,8 @@ pub struct InterfacingSwarms<T: SwarmInterface>(pub Vec<CompositionComponent<T>>
 pub enum  Granularity {
     Fine,
     Medium,
-    Coarse
+    Coarse,
+    TwoStep
 }
 
 /* Used when combining machines and protocols */

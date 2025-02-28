@@ -505,11 +505,11 @@ fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, su
 }
 
 fn overapprox_wwf_sub(proto_info: &mut ProtoInfo, subscription: &Subscriptions, granularity: Granularity) -> Subscriptions {
-    println!("intra conc: {:?}", intra_concurrency_proto_info(proto_info));
     match granularity {
         Granularity::Fine => finer_overapprox_wwf_sub(proto_info, subscription, false),
         Granularity::Medium => finer_overapprox_wwf_sub(proto_info, subscription, true),
-        Granularity::Coarse => coarse_overapprox_wwf_sub(proto_info, subscription)
+        Granularity::Coarse => coarse_overapprox_wwf_sub(proto_info, subscription),
+        Granularity::TwoStep => two_step_overapprox_wwf_sub(proto_info, &mut subscription.clone())
     }
 }
 
@@ -632,6 +632,81 @@ fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mu
         }
     }
 }
+
+// safe overapproximated subscription generation as described in article.
+fn two_step_overapprox_wwf_sub(proto_info: &mut ProtoInfo, subscription: &mut Subscriptions) -> Subscriptions {
+    proto_info.concurrent_events.append(&mut intra_concurrency_proto_info(proto_info));
+
+    // get concurrent event types preceding a join
+    let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
+        let pre = proto_info.immediately_pre.get(e).cloned().unwrap_or_default();
+        let product = pre.clone().into_iter().cartesian_product(&pre);
+        product.filter(|(e1, e2)| *e1 != **e2 && proto_info.concurrent_events.contains(&unord_event_pair(e1.clone(), (*e2).clone())))
+            .map(|(e1, e2)| [e1, e2.clone()])
+            .flatten()
+            .collect()
+    };
+
+    // add events to a subscription, return true of they were already in the subscription and false otherwise
+    let add_to_sub = |role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subscriptions| -> bool {
+        if subs.contains_key(&role) && event_types.iter().all(|e| subs[&role].contains(e)) {
+            return true;
+        }
+        subs
+            .entry(role)
+            .and_modify(|curr| {
+                curr.append(&mut event_types);
+            })
+            .or_insert(event_types);
+        false
+
+    };
+
+    // causal consistency
+    for (role, labels) in &proto_info.role_event_map {
+        let event_types: BTreeSet<_> = labels.iter().map(|label| label.get_event_type()).collect();
+        let preceding_event_types: BTreeSet<_> = event_types.iter().flat_map(|e| proto_info.immediately_pre.get(e).cloned().unwrap_or_default()).collect();
+        let mut events_to_add = event_types.into_iter().chain(preceding_event_types.into_iter()).collect();
+        subscription.entry(role.clone()).and_modify(|set| { set.append(&mut events_to_add); }).or_insert_with(|| events_to_add);
+    }
+
+    let mut is_stable = false;
+    while !is_stable {
+        is_stable = true;
+        // determinacy: branches
+        for branching_events in &proto_info.branching_events {
+            let interested_roles = branching_events.iter().flat_map(|e| roles_on_path(e.clone(), proto_info, &subscription)).collect::<BTreeSet<_>>();
+            for role in interested_roles {
+                is_stable = add_to_sub(role, branching_events.clone(), subscription) && is_stable;
+            }
+        }
+
+        // determinacy: joins. the joining_events field of proto_info really holds all interfacing events so filter them to get joins
+        for joining_event in &proto_info.joining_events {
+            let interested_roles = roles_on_path(joining_event.clone(), proto_info, &subscription);
+            let pre_join_events = get_pre_joins(&joining_event);
+            let join_and_prejoin = if !pre_join_events.is_empty() {
+                [joining_event.clone()].into_iter().chain(pre_join_events.into_iter()).collect()
+            } else {
+                BTreeSet::new()
+            };
+            for role in interested_roles {
+                is_stable = add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
+            }
+        }
+
+        // intefacing rule from algorithm in article
+        for joining_event in &proto_info.joining_events {
+            let interested_roles = roles_on_path(joining_event.clone(), proto_info, &subscription);
+            for role in interested_roles {
+                is_stable = add_to_sub(role, BTreeSet::from([joining_event.clone()]), subscription) && is_stable;
+            }
+        }
+    }
+
+    subscription.clone()
+}
+
 fn intra_concurrency(proto: &ProtoStruct) -> BTreeSet<UnordEventPair> {
     let mut conc = BTreeSet::new();
     let graph = &proto.graph;
