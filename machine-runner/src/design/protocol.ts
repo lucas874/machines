@@ -727,6 +727,11 @@ export namespace ProjMachine {
         return (s: any, e: any) => {
           console.log("hej first");
           console.log("s is weird place: ", s);
+          console.log(e)
+          if(s.self !== undefined && e.payload.lbj === s.self.lbj) {
+            console.log("herehre")
+            return s;
+          }
           const sPayload = fMap.reactions.get(eventType)!.genPayloadFun({...s, self: s.self?.payload ?? s.self}, e);
           return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: sPayload})
         }
