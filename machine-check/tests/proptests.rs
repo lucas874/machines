@@ -971,7 +971,7 @@ proptest! {
     fn test_combine_machines_prop(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
-        let granularity = serde_json::to_string(&Granularity::Medium).unwrap();
+        let granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
         let subscriptions: Option<Subscriptions> = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
