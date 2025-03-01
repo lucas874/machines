@@ -71,17 +71,24 @@ cMap.set(warehouse_protocol_1.Events.part.type, (s, e) => {
 // Reaction map
 const rMap = new Map();
 const positionReaction = {
-    genPayloadFun: (s, e) => { console.log("e is", e); console.log("s is: :", s); return { part: e.payload.part }; }
+    genPayloadFun: (s, e) => {
+        //console.log("e is", e); console.log("s is: :", s);
+        return { part: e.payload.part };
+    }
 };
 rMap.set(warehouse_protocol_1.Events.position.type, positionReaction);
 const partIDReaction = {
-    genPayloadFun: (s, e) => { console.log("e is", e); console.log("s is: :", s); return {}; }
+    genPayloadFun: (s, e) => {
+        //console.log("e is", e); console.log("s is: :", s);
+        return {};
+    }
 };
 rMap.set(warehouse_protocol_1.Events.partID.type, partIDReaction);
-const partReaction = {
-    genPayloadFun: (s, e) => { console.log("part reaction"); console.log("e is", e); console.log("s is: :", s); }
-};
-rMap.set(warehouse_protocol_1.Events.part.type, partReaction);
+/* const partReaction : ProjMachine.ReactionEntry = {
+  genPayloadFun: (s, e) => {
+    console.log("part reaction"); console.log("e is", e); console.log("s is: :", s) }
+}
+rMap.set(Events.part.type, partReaction) */
 // hacky. we use the return type of this function to set the payload type of initial state and any other state enabling same commands as in initial
 const initialPayloadType = {
     genPayloadFun: () => { return { part: "" }; }
@@ -107,11 +114,11 @@ function main() {
                 _f = false;
                 const state = _c;
                 console.log("transporter. state is:", state.type);
-                if (state.payload !== undefined) {
-                    console.log("state payload is:", state.payload);
-                }
-                console.log("transporter state is: ", state);
-                console.log();
+                //if (state.payload !== undefined) {
+                //  console.log("state payload is:", state.payload)
+                //}
+                //console.log("transporter state is: ", state)
+                //console.log()
                 const s = state.cast();
                 for (var c in s.commands()) {
                     if (c === 'request') {

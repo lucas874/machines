@@ -676,7 +676,11 @@ export namespace ProjMachine {
 
           //var f = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => [{}]
           const payloadFun = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => {}
-          const f = (s: any, e: any) => {var payload = payloadFun({...s, self: s.self?.payload ?? s.self}, e); return [es[0]?.makeBT(payload, s.self.lbj)]}
+          const f = (s: any, e: any) => {
+            var payload = payloadFun({...s, self: s.self?.payload ?? s.self}, e);
+            var lbj = s.self?.lbj ?? null;
+            return [es[0]?.makeBT(payload, lbj)]
+          }
           cmdTriples.push([transition.label.cmd, es, f])
 
         }
@@ -728,32 +732,68 @@ export namespace ProjMachine {
           console.log("hej first");
           console.log("s is weird place: ", s);
           console.log(e)
-          if(s.self !== undefined && e.payload.lbj === s.self.lbj) {
+          //if((s.self === undefined && e.payload.lbj == null) || e.payload.lbj === s.self.lbj) {
+          if(1==1) {
             console.log("herehre")
-            return s;
+            console.log(s)
+            console.log("sdjaldeh")
+            return projStatesToStates.get(sourceState).make({lbj: e.payload.lbj, payload: s.self?.payload ?? s.self});
           }
           const sPayload = fMap.reactions.get(eventType)!.genPayloadFun({...s, self: s.self?.payload ?? s.self}, e);
           return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: sPayload})
         }
       } else {
         return (s: any, e: any) => {
+          //if(s.self !== undefined && e.payload.lbj === s.self.lbj) {
 
+          if (1==1) {
+            console.log("herehre 1")
+            return projStatesToStates.get(sourceState).make({lbj: e.payload.lbj, payload: s.self?.payload ?? s.self});
+          }
           console.log("hej second");
           const sPayload = fMap.reactions.get(eventType)!.genPayloadFun({...s, self: s.self?.payload ?? s.self}, e);
-          return projStatesToStates.get(targetState).make({lbj: s.self.lbj, payload: sPayload})
+          return projStatesToStates.get(targetState).make({lbj: e.payload.lbj, payload: sPayload})
         }
       }
     } else if (markedStates.has(targetState)) {
       if (specialEvents.has(eventType)) {
-        return (s: any, e: any) => { return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: s.self.payload})}
+        return (s: any, e: any) => {
+          //if(s.self !== undefined && e.payload.lbj === s.self.lbj) {
+          if (1==1) {
+            console.log("herehre 2")
+            return projStatesToStates.get(sourceState).make({lbj: e.payload.lbj, payload: s.self?.payload ?? s.self});
+          }
+          return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: s.self.payload})
+        }
       } else {
-        return (s: any, _: any) => { return projStatesToStates.get(targetState).make(s.self)}
+        return (s: any, e: any) => {
+          //if(s.self !== undefined && e.payload.lbj === s.self.lbj) {
+          if (1==1) {
+            console.log("herehre 3")
+            return projStatesToStates.get(sourceState).make({lbj: e.payload.lbj, payload: s.self?.payload ?? s.self});
+          }
+          return projStatesToStates.get(targetState).make(s.self)
+        }
       }
     } else {
       if (specialEvents.has(eventType)) {
-        return (_: any, e: any) => { return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: undefined})}
+        return (s: any, e: any) => {
+          //if(s.self !== undefined && e.payload.lbj === s.self.lbj) {
+          if (1==1) {
+            console.log("herehre 4")
+            return projStatesToStates.get(sourceState).make({lbj: e.payload.lbj, payload: s.self?.payload ?? s.self});
+          }
+          return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: undefined})
+        }
       } else {
-        return (s: any, _: any) => { return projStatesToStates.get(targetState).make({lbj: s.self.lbj, payload: undefined})}
+        return (s: any, e: any) => {
+          //if(s.self !== undefined && e.payload.lbj === s.self.lbj) {
+          if (1==1) {
+            console.log("herehre 5")
+            return projStatesToStates.get(sourceState).make({lbj: e.payload.lbj, payload: s.self?.payload ?? s.self});
+          }
+          return projStatesToStates.get(targetState).make({lbj: e.payload.lbj, payload: undefined})
+        }
       }
     }
 
