@@ -52,7 +52,8 @@ const cMap = new Map();
 cMap.set(warehouse_protocol_1.Events.time.type, () => {
     var dateString = new Date().toLocaleString();
     console.log("closed warehouse at:", dateString);
-    return { timeOfDay: dateString };
+    //return {timeOfDay: dateString}})
+    return [warehouse_protocol_1.Events.time.make({ timeOfDay: dateString })];
 });
 // Reaction map
 const rMap = new Map();
@@ -65,7 +66,7 @@ const partReaction = {
 rMap.set(warehouse_protocol_1.Events.part.type, partReaction);
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
 // Extended machine
-const [m3, i3] = warehouse_protocol_1.Composition.extendMachineBT("D", projection, warehouse_protocol_1.Events.allEvents, fMap, new Set([warehouse_protocol_1.Events.partID.type, warehouse_protocol_1.Events.time.type]));
+const [m3, i3] = warehouse_protocol_1.Composition.extendMachine("D", projection, warehouse_protocol_1.Events.allEvents, fMap);
 const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "D", m3.createJSONForAnalysis(i3));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));
@@ -75,7 +76,7 @@ function main() {
         var _a, e_1, _b, _c;
         const app = yield sdk_1.Actyx.of(warehouse_protocol_1.manifest);
         const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
-        const machine = (0, machine_runner_1.createMachineRunnerBT)(app, tags, i3, undefined);
+        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, undefined);
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
@@ -95,7 +96,7 @@ function main() {
                             if (Object.keys(s1 || {}).includes('close')) {
                                 s1.close();
                             }
-                        }, (0, warehouse_protocol_1.getRandomInt)(5000, 8000));
+                        }, 3000);
                         break;
                     }
                 }

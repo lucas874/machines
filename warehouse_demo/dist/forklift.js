@@ -20,6 +20,7 @@ const sdk_1 = require("@actyx/sdk");
 const machine_runner_1 = require("@actyx/machine-runner");
 const warehouse_protocol_1 = require("./warehouse_protocol");
 const machine_check_1 = require("@actyx/machine-check");
+//import { createMachineRunnerBT } from '@actyx/machine-runner/lib/esm/runner/runner'
 /*
 
 Using the machine runner DSL an implmentation of forklift in Gwarehouse is:
@@ -82,7 +83,7 @@ function main() {
         var _a, e_1, _b, _c;
         const app = yield sdk_1.Actyx.of(warehouse_protocol_1.manifest);
         const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
-        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, undefined);
+        const machine = (0, machine_runner_1.createMachineRunnerBT)(app, tags, i3, undefined);
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;

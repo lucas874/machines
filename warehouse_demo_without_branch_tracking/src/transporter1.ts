@@ -1,5 +1,5 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunner, ProjMachine, createMachineRunnerBT } from '@actyx/machine-runner'
+import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, all_projections, getRandomInt  } from './warehouse_protocol'
 import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
 
@@ -46,13 +46,13 @@ cMap.set(Events.partID.type, (s: any, e: any) => {
   var id = s.self.id;
   console.log("requesting a", id);
   console.log("in command, s is: ", s)
-  return {id: id}})
-  //return [Events.partID.make({id: id})]})
+  //return {id: id}})
+  return [Events.partID.make({id: id})]})
 
 cMap.set(Events.part.type, (s: any, e: any) => {
   console.log("delivering a", s.self.part)
-  return {part: s.self.part}})
-  //return [Events.part.make({part: s.self.part})] })
+  //return {part: s.self.part}})
+  return [Events.part.make({part: s.self.part})] })
 
 // Reaction map
 const rMap = new Map()
@@ -62,13 +62,6 @@ const positionReaction : ProjMachine.ReactionEntry = {
     return { part: e.payload.part } }
 }
 rMap.set(Events.position.type, positionReaction)
-
-const partIDReaction : ProjMachine.ReactionEntry = {
-  genPayloadFun: (s, e) => {
-    //console.log("e is", e); console.log("s is: :", s);
-    return {} }
-}
-rMap.set(Events.partID.type, partIDReaction)
 
 /* const partReaction : ProjMachine.ReactionEntry = {
   genPayloadFun: (s, e) => {
@@ -83,7 +76,7 @@ const initialPayloadType : ProjMachine.ReactionEntry = {
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType}
 console.log(projection)
 // Extended machine
-const [m3, i3] = Composition.extendMachineBT("T", projection, Events.allEvents, fMap, new Set<string>([Events.partID.type, Events.time.type]))
+const [m3, i3] = Composition.extendMachine("T", projection, Events.allEvents, fMap)
 
 const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "T", m3.createJSONForAnalysis(i3))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
@@ -93,7 +86,7 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const machine = createMachineRunnerBT(app, tags, i3, {id: parts[Math.floor(Math.random() * parts.length)]})
+    const machine = createMachineRunner(app, tags, i3, {id: parts[Math.floor(Math.random() * parts.length)]})
 
     for await (const state of machine) {
       console.log("transporter. state is:", state.type)
@@ -110,7 +103,7 @@ async function main() {
                 if (Object.keys(s1 || {}).includes('request')) {
                     s1.request()
                 }
-            }, getRandomInt(500, 5000))
+            }, 1500)
             break
           }
           if (c === 'deliver') {
@@ -119,7 +112,7 @@ async function main() {
                 if (Object.keys(s1 || {}).includes('deliver')) {
                     s1.deliver()
                 }
-            }, getRandomInt(500, 5000))
+            }, 1000)
             break
           }
       }

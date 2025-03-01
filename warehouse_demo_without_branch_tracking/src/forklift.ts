@@ -1,8 +1,7 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunner, ProjMachine, createMachineRunnerBT } from '@actyx/machine-runner'
+import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt, loopThroughJSON } from './warehouse_protocol'
 import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
-//import { createMachineRunnerBT } from '@actyx/machine-runner/lib/esm/runner/runner'
 
 /*
 
@@ -39,7 +38,8 @@ const cMap = new Map()
 cMap.set(Events.position.type, (state: any, _: any) => {
   console.log("retrieved a", state.self.id, "at position x");
   console.log("s is: ", state);
-  return {position: "x", part: state.self.id}})
+  //return {position: "x", part: state.self.id}})
+  return [Events.position.make({position: "x", part: state.self.id})]})
 
 // Reaction map
 const rMap = new Map()
@@ -55,7 +55,7 @@ rMap.set(Events.partID.type, partIDReaction)
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
 
 // Extended machine
-const [m3, i3] = Composition.extendMachineBT("FL", projection, Events.allEvents, fMap, new Set<string>([Events.partID.type, Events.time.type]))
+const [m3, i3] = Composition.extendMachine("FL", projection, Events.allEvents, fMap)
 const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "FL", m3.createJSONForAnalysis(i3))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
@@ -63,7 +63,7 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const machine = createMachineRunnerBT(app, tags, i3, undefined)
+    const machine = createMachineRunner(app, tags, i3, undefined)
 
     for await (const state of machine) {
       console.log("forklift. state is:", state.type)
@@ -79,7 +79,7 @@ async function main() {
               if (Object.keys(s1 || {}).includes('get')) {
                 s1.get()
               }
-            }, getRandomInt(500, 8000))
+            }, 1000)
             break
           }
       }

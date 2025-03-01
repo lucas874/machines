@@ -59,14 +59,14 @@ cMap.set(warehouse_protocol_1.Events.partID.type, (s, e) => {
     var id = s.self.id;
     console.log("requesting a", id);
     console.log("in command, s is: ", s);
-    return { id: id };
+    //return {id: id}})
+    return [warehouse_protocol_1.Events.partID.make({ id: id })];
 });
-//return [Events.partID.make({id: id})]})
 cMap.set(warehouse_protocol_1.Events.part.type, (s, e) => {
     console.log("delivering a", s.self.part);
-    return { part: s.self.part };
+    //return {part: s.self.part}})
+    return [warehouse_protocol_1.Events.part.make({ part: s.self.part })];
 });
-//return [Events.part.make({part: s.self.part})] })
 // Reaction map
 const rMap = new Map();
 const positionReaction = {
@@ -76,13 +76,6 @@ const positionReaction = {
     }
 };
 rMap.set(warehouse_protocol_1.Events.position.type, positionReaction);
-const partIDReaction = {
-    genPayloadFun: (s, e) => {
-        //console.log("e is", e); console.log("s is: :", s);
-        return {};
-    }
-};
-rMap.set(warehouse_protocol_1.Events.partID.type, partIDReaction);
 /* const partReaction : ProjMachine.ReactionEntry = {
   genPayloadFun: (s, e) => {
     console.log("part reaction"); console.log("e is", e); console.log("s is: :", s) }
@@ -95,7 +88,7 @@ const initialPayloadType = {
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType };
 console.log(projection);
 // Extended machine
-const [m3, i3] = warehouse_protocol_1.Composition.extendMachineBT("T", projection, warehouse_protocol_1.Events.allEvents, fMap, new Set([warehouse_protocol_1.Events.partID.type, warehouse_protocol_1.Events.time.type]));
+const [m3, i3] = warehouse_protocol_1.Composition.extendMachine("T", projection, warehouse_protocol_1.Events.allEvents, fMap);
 const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "T", m3.createJSONForAnalysis(i3));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));
@@ -105,7 +98,7 @@ function main() {
         var _a, e_1, _b, _c;
         const app = yield sdk_1.Actyx.of(warehouse_protocol_1.manifest);
         const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
-        const machine = (0, machine_runner_1.createMachineRunnerBT)(app, tags, i3, { id: parts[Math.floor(Math.random() * parts.length)] });
+        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, { id: parts[Math.floor(Math.random() * parts.length)] });
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
@@ -126,7 +119,7 @@ function main() {
                             if (Object.keys(s1 || {}).includes('request')) {
                                 s1.request();
                             }
-                        }, (0, warehouse_protocol_1.getRandomInt)(500, 5000));
+                        }, 1500);
                         break;
                     }
                     if (c === 'deliver') {
@@ -136,7 +129,7 @@ function main() {
                             if (Object.keys(s1 || {}).includes('deliver')) {
                                 s1.deliver();
                             }
-                        }, (0, warehouse_protocol_1.getRandomInt)(500, 5000));
+                        }, 1000);
                         break;
                     }
                 }
