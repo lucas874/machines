@@ -4,9 +4,9 @@ import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt, 
 import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
 //import { createMachineRunnerBT } from '@actyx/machine-runner/lib/esm/runner/runner'
 
-/*
 
-Using the machine runner DSL an implmentation of forklift in Gwarehouse is:
+
+// Using the machine runner DSL an implmentation of forklift in Gwarehouse is:
 
 const forklift = Composition.makeMachine('FL')
 export const s0 = forklift.designEmpty('s0') .finish()
@@ -23,7 +23,7 @@ s0.react([Events.partID], s1, (_, e) => {
     return s1.make({id: e.payload.id}) })
 s1.react([Events.position], s0, (_) => s0.make())
 s0.react([Events.time], s2, (_) => s2.make())
-*/
+
 
 // With our extension of the library we create a map from events to reactions
 // and commands instead and use the projection of the composition over
@@ -61,7 +61,7 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const machine = createMachineRunner(app, tags, i3, undefined)
+    const machine = createMachineRunner(app, tags, s0, undefined)
 
     for await (const state of machine) {
       console.log("forklift. state is:", state.type)

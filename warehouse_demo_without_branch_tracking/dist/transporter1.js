@@ -26,7 +26,7 @@ const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler'];
 const transporter = warehouse_protocol_1.Composition.makeMachine('T');
 exports.s0 = transporter.designState('s0').withPayload()
     .command('request', [warehouse_protocol_1.Events.partID], (s, e) => {
-    var id = s.self.id;
+    var id = parts[Math.floor(Math.random() * parts.length)];
     console.log("requesting a", id);
     return [warehouse_protocol_1.Events.partID.make({ id: id })];
 })
@@ -91,7 +91,7 @@ function main() {
         var _a, e_1, _b, _c;
         const app = yield sdk_1.Actyx.of(warehouse_protocol_1.manifest);
         const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
-        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, { id: parts[Math.floor(Math.random() * parts.length)] });
+        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, exports.s0, { id: parts[Math.floor(Math.random() * parts.length)] });
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
