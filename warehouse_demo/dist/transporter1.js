@@ -64,7 +64,6 @@ cMap.set(warehouse_protocol_1.Events.partID.type, (s, e) => {
 //return [Events.partID.make({id: id})]})
 cMap.set(warehouse_protocol_1.Events.part.type, (s, e) => {
     console.log("delivering a", s.self.part);
-    console.log("HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa");
     return { part: s.self.part };
 });
 //return [Events.part.make({part: s.self.part})] })

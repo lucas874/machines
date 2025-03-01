@@ -729,28 +729,11 @@ export namespace ProjMachine {
     if (fMap.reactions.has(eventType)) {
       if (specialEvents.has(eventType)) {
         return (s: any, e: any) => {
-          console.log("hej first");
-          console.log("s is weird place: ", s);
-          console.log(e)
-          //if((s.self === undefined && e.payload.lbj == null) || e.payload.lbj === s.self.lbj) {
-          if(1==1) {
-            console.log("herehre")
-            console.log(s)
-            console.log("sdjaldeh")
-            return projStatesToStates.get(sourceState).make({lbj: e.payload.lbj, payload: s.self?.payload ?? s.self});
-          }
           const sPayload = fMap.reactions.get(eventType)!.genPayloadFun({...s, self: s.self?.payload ?? s.self}, e);
           return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: sPayload})
         }
       } else {
         return (s: any, e: any) => {
-          //if(s.self !== undefined && e.payload.lbj === s.self.lbj) {
-
-          if (1==1) {
-            console.log("herehre 1")
-            return projStatesToStates.get(sourceState).make({lbj: e.payload.lbj, payload: s.self?.payload ?? s.self});
-          }
-          console.log("hej second");
           const sPayload = fMap.reactions.get(eventType)!.genPayloadFun({...s, self: s.self?.payload ?? s.self}, e);
           return projStatesToStates.get(targetState).make({lbj: e.payload.lbj, payload: sPayload})
         }
@@ -758,40 +741,20 @@ export namespace ProjMachine {
     } else if (markedStates.has(targetState)) {
       if (specialEvents.has(eventType)) {
         return (s: any, e: any) => {
-          //if(s.self !== undefined && e.payload.lbj === s.self.lbj) {
-          if (1==1) {
-            console.log("herehre 2")
-            return projStatesToStates.get(sourceState).make({lbj: e.payload.lbj, payload: s.self?.payload ?? s.self});
-          }
           return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: s.self.payload})
         }
       } else {
         return (s: any, e: any) => {
-          //if(s.self !== undefined && e.payload.lbj === s.self.lbj) {
-          if (1==1) {
-            console.log("herehre 3")
-            return projStatesToStates.get(sourceState).make({lbj: e.payload.lbj, payload: s.self?.payload ?? s.self});
-          }
           return projStatesToStates.get(targetState).make(s.self)
         }
       }
     } else {
       if (specialEvents.has(eventType)) {
         return (s: any, e: any) => {
-          //if(s.self !== undefined && e.payload.lbj === s.self.lbj) {
-          if (1==1) {
-            console.log("herehre 4")
-            return projStatesToStates.get(sourceState).make({lbj: e.payload.lbj, payload: s.self?.payload ?? s.self});
-          }
           return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: undefined})
         }
       } else {
         return (s: any, e: any) => {
-          //if(s.self !== undefined && e.payload.lbj === s.self.lbj) {
-          if (1==1) {
-            console.log("herehre 5")
-            return projStatesToStates.get(sourceState).make({lbj: e.payload.lbj, payload: s.self?.payload ?? s.self});
-          }
           return projStatesToStates.get(targetState).make({lbj: e.payload.lbj, payload: undefined})
         }
       }

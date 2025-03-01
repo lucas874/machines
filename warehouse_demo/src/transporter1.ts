@@ -51,7 +51,6 @@ cMap.set(Events.partID.type, (s: any, e: any) => {
 
 cMap.set(Events.part.type, (s: any, e: any) => {
   console.log("delivering a", s.self.part)
-  console.log("HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa")
   return {part: s.self.part}})
   //return [Events.part.make({part: s.self.part})] })
 
