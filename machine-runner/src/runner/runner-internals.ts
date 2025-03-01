@@ -133,7 +133,8 @@ export namespace RunnerInternals {
   const shouldEventBeEnqueued = <Self>(
     reactions: ReactionMapPerMechanism<Self>,
     queue: ReadonlyArray<ActyxEvent<MachineEvent.Any>>,
-    newEvent: ActyxEvent<MachineEvent.Any>,
+    newEvent: any,//ActyxEvent<MachineEvent.Any>,
+    lbj: string,
   ):
     | {
         shouldQueue: false
@@ -147,7 +148,10 @@ export namespace RunnerInternals {
     const matchingReaction = reactions.get(firstEvent.payload.type)
 
     if (!matchingReaction) return { shouldQueue: false }
-
+    console.log("in shouldevent event is: ", newEvent)
+    console.log("in should event: ", (newEvent.payload?.lbj ?? undefined))
+    if ((newEvent.payload?.lbj ?? undefined) != lbj ) { return { shouldQueue: false } }
+    //if (1==1) { console.log("in shouldEventBeEnqueued event is: ", newEvent); return { shouldQueue: false } }
     // Asserted as non-nullish because it is impossible for `queue`'s length to
     // exceeed `matchingReaction.eventChainTrigger`'s length
     //
@@ -192,11 +196,14 @@ export namespace RunnerInternals {
     const mechanism = internals.current.factory.mechanism
     const protocol = mechanism.protocol
     const reactions = protocol.reactionMap.get(mechanism)
-
+    console.log("----\nstate ", internals.current.data.type)
+    console.log("state payload ", internals.current.data.payload)
+    console.log("before calling should event: ", internals.current.data.payload?.lbj ?? undefined, "\n----")
     const queueDeterminationResult = shouldEventBeEnqueued<StatePayload>(
       reactions,
       internals.queue,
       event,
+      internals.current.data.payload?.lbj ?? undefined
     )
 
     if (!queueDeterminationResult.shouldQueue) {
