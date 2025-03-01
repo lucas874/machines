@@ -304,7 +304,7 @@ export const createMachineRunnerBT = <
   const subscribe: SubscribeFn<MachineEvents> = (callback, onCompleteOrErr) =>
     sdk.subscribeMonotonic<MachineEvents>(subscribeMonotonicQuery, callback, onCompleteOrErr)
   const intialPayloadWrapped: any = {lbj: null, payload: initialPayload}
-  return createMachineRunnerInternalBT(subscribe, persist, tags, initialFactory, intialPayloadWrapped, true)
+  return createMachineRunnerInternalBT(subscribe, persist, tags, initialFactory, intialPayloadWrapped)
 }
 export const createMachineRunnerInternal = <
   SwarmProtocolName extends string,
@@ -686,7 +686,6 @@ export const createMachineRunnerInternalBT = <
     any
   >,
   initialPayload: Payload,
-  isBranchTracking: boolean,
 ): MachineRunner<SwarmProtocolName, MachineName, StateUnion> => {
   type ThisStateOpaque = StateOpaque<SwarmProtocolName, MachineName, string, StateUnion>
   type ThisMachineRunner = MachineRunner<SwarmProtocolName, MachineName, StateUnion>

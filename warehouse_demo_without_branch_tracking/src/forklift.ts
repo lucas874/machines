@@ -1,7 +1,8 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
+import { createMachineRunner, ProjMachine, createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt, loopThroughJSON } from './warehouse_protocol'
 import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
+//import { createMachineRunnerBT } from '@actyx/machine-runner/lib/esm/runner/runner'
 
 /*
 
@@ -37,7 +38,6 @@ console.log(projection)
 const cMap = new Map()
 cMap.set(Events.position.type, (state: any, _: any) => {
   console.log("retrieved a", state.self.id, "at position x");
-  console.log("s is: ", state);
   //return {position: "x", part: state.self.id}})
   return [Events.position.make({position: "x", part: state.self.id})]})
 
@@ -45,8 +45,6 @@ cMap.set(Events.position.type, (state: any, _: any) => {
 const rMap = new Map()
 const partIDReaction : ProjMachine.ReactionEntry = {
   genPayloadFun: (s, e) => {
-    console.log("e is: ", e);
-    console.log("s is: ", s);
     console.log("a", e.payload.id, "was requested");
     if (getRandomInt(0, 10) >= 9) { return { id: "broken part" } }
     return {id: e.payload.id} }
@@ -79,7 +77,7 @@ async function main() {
               if (Object.keys(s1 || {}).includes('get')) {
                 s1.get()
               }
-            }, 1000)
+            }, 1500)
             break
           }
       }

@@ -38,15 +38,12 @@ console.log(projection)
 const cMap = new Map()
 cMap.set(Events.position.type, (state: any, _: any) => {
   console.log("retrieved a", state.self.id, "at position x");
-  console.log("s is: ", state);
   return {position: "x", part: state.self.id}})
 
 // Reaction map
 const rMap = new Map()
 const partIDReaction : ProjMachine.ReactionEntry = {
   genPayloadFun: (s, e) => {
-    console.log("e is: ", e);
-    console.log("s is: ", s);
     console.log("a", e.payload.id, "was requested");
     if (getRandomInt(0, 10) >= 9) { return { id: "broken part" } }
     return {id: e.payload.id} }
@@ -79,7 +76,7 @@ async function main() {
               if (Object.keys(s1 || {}).includes('get')) {
                 s1.get()
               }
-            }, getRandomInt(500, 8000))
+            }, 1500)
             break
           }
       }

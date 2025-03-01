@@ -191,11 +191,11 @@ export namespace RunnerInternals {
     const matchingReaction = reactions.get(firstEvent.payload.type)
 
     if (!matchingReaction) return { shouldQueue: false }
-    console.log("in shouldevent event is: ", newEvent)
-    console.log("in should event: ", (newEvent.payload?.lbj ?? undefined))
-    console.log("in should event state lbj is: ", lbj)
-    if (newEvent.payload.lbj != lbj ) { console.log("event not enqueued");return { shouldQueue: false } }
-
+    console.log("in shouldEventBeEnqueued event type and event lbj: ", newEvent.payload.type, newEvent.payload.lbj)
+    console.log("in shouldEventBeEnqueued state lbj: ", lbj)
+    if (newEvent.payload.lbj != lbj ) { console.log("event not enqueued\n"); return { shouldQueue: false } }
+    console.log("event enqueued")
+    console.log()
     // Asserted as non-nullish because it is impossible for `queue`'s length to
     // exceeed `matchingReaction.eventChainTrigger`'s length
     //
@@ -240,9 +240,7 @@ export namespace RunnerInternals {
     const mechanism = internals.current.factory.mechanism
     const protocol = mechanism.protocol
     const reactions = protocol.reactionMap.get(mechanism)
-    console.log("----\nstate ", internals.current.data.type)
-    console.log("state payload ", internals.current.data.payload)
-    console.log("before calling should event: ", internals.current.data.payload?.lbj ?? undefined, "\n----")
+
     const queueDeterminationResult = isBranchTracking ?
       shouldEventBeEnqueuedBT<StatePayload>(
         reactions,

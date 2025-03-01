@@ -54,15 +54,12 @@ console.log(projection);
 const cMap = new Map();
 cMap.set(warehouse_protocol_1.Events.position.type, (state, _) => {
     console.log("retrieved a", state.self.id, "at position x");
-    console.log("s is: ", state);
     return { position: "x", part: state.self.id };
 });
 // Reaction map
 const rMap = new Map();
 const partIDReaction = {
     genPayloadFun: (s, e) => {
-        console.log("e is: ", e);
-        console.log("s is: ", s);
         console.log("a", e.payload.id, "was requested");
         if ((0, warehouse_protocol_1.getRandomInt)(0, 10) >= 9) {
             return { id: "broken part" };
@@ -103,7 +100,7 @@ function main() {
                             if (Object.keys(s1 || {}).includes('get')) {
                                 s1.get();
                             }
-                        }, (0, warehouse_protocol_1.getRandomInt)(500, 8000));
+                        }, 1500);
                         break;
                     }
                 }

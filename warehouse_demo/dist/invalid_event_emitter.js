@@ -19,7 +19,7 @@ function main() {
             //await new Promise(f => setTimeout(f, 2000));
             //await app.publish(tags.apply(Events.partID.makeBT({id: "tire"}, "invalidPointer")))
             //console.log('Publishing partID event with invalid lbj pointer')
-            yield new Promise(f => setTimeout(f, 3000));
+            yield new Promise(f => setTimeout(f, 5000));
             yield app.publish(tags.apply(warehouse_protocol_1.Events.time.makeBT({ timeOfDay: new Date().toLocaleString() }, "invalidPointer")));
             console.log('Publishing time event with invalid lbj pointer');
         }

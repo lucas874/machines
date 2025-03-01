@@ -20,6 +20,7 @@ const sdk_1 = require("@actyx/sdk");
 const machine_runner_1 = require("@actyx/machine-runner");
 const warehouse_protocol_1 = require("./warehouse_protocol");
 const machine_check_1 = require("@actyx/machine-check");
+//import { createMachineRunnerBT } from '@actyx/machine-runner/lib/esm/runner/runner'
 /*
 
 Using the machine runner DSL an implmentation of forklift in Gwarehouse is:
@@ -53,7 +54,6 @@ console.log(projection);
 const cMap = new Map();
 cMap.set(warehouse_protocol_1.Events.position.type, (state, _) => {
     console.log("retrieved a", state.self.id, "at position x");
-    console.log("s is: ", state);
     //return {position: "x", part: state.self.id}})
     return [warehouse_protocol_1.Events.position.make({ position: "x", part: state.self.id })];
 });
@@ -61,8 +61,6 @@ cMap.set(warehouse_protocol_1.Events.position.type, (state, _) => {
 const rMap = new Map();
 const partIDReaction = {
     genPayloadFun: (s, e) => {
-        console.log("e is: ", e);
-        console.log("s is: ", s);
         console.log("a", e.payload.id, "was requested");
         if ((0, warehouse_protocol_1.getRandomInt)(0, 10) >= 9) {
             return { id: "broken part" };
@@ -103,7 +101,7 @@ function main() {
                             if (Object.keys(s1 || {}).includes('get')) {
                                 s1.get();
                             }
-                        }, 1000);
+                        }, 1500);
                         break;
                     }
                 }

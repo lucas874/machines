@@ -58,7 +58,6 @@ cMap.set(warehouse_protocol_1.Events.partID.type, (s, e) => {
     s.self.id = s.self.id === undefined ? parts[Math.floor(Math.random() * parts.length)] : s.self.id;
     var id = s.self.id;
     console.log("requesting a", id);
-    console.log("in command, s is: ", s);
     return { id: id };
 });
 //return [Events.partID.make({id: id})]})
@@ -71,23 +70,10 @@ cMap.set(warehouse_protocol_1.Events.part.type, (s, e) => {
 const rMap = new Map();
 const positionReaction = {
     genPayloadFun: (s, e) => {
-        //console.log("e is", e); console.log("s is: :", s);
         return { part: e.payload.part };
     }
 };
 rMap.set(warehouse_protocol_1.Events.position.type, positionReaction);
-const partIDReaction = {
-    genPayloadFun: (s, e) => {
-        //console.log("e is", e); console.log("s is: :", s);
-        return {};
-    }
-};
-rMap.set(warehouse_protocol_1.Events.partID.type, partIDReaction);
-/* const partReaction : ProjMachine.ReactionEntry = {
-  genPayloadFun: (s, e) => {
-    console.log("part reaction"); console.log("e is", e); console.log("s is: :", s) }
-}
-rMap.set(Events.part.type, partReaction) */
 // hacky. we use the return type of this function to set the payload type of initial state and any other state enabling same commands as in initial
 const initialPayloadType = {
     genPayloadFun: () => { return { part: "" }; }
@@ -112,11 +98,10 @@ function main() {
                 _d = false;
                 const state = _c;
                 console.log("transporter. state is:", state.type);
-                //if (state.payload !== undefined) {
-                //  console.log("state payload is:", state.payload)
-                //}
-                //console.log("transporter state is: ", state)
-                //console.log()
+                if (state.payload !== undefined) {
+                    console.log("state payload is:", state.payload);
+                }
+                console.log();
                 const s = state.cast();
                 for (var c in s.commands()) {
                     if (c === 'request') {
@@ -126,7 +111,7 @@ function main() {
                             if (Object.keys(s1 || {}).includes('request')) {
                                 s1.request();
                             }
-                        }, (0, warehouse_protocol_1.getRandomInt)(500, 5000));
+                        }, 1500);
                         break;
                     }
                     if (c === 'deliver') {
@@ -136,7 +121,7 @@ function main() {
                             if (Object.keys(s1 || {}).includes('deliver')) {
                                 s1.deliver();
                             }
-                        }, (0, warehouse_protocol_1.getRandomInt)(500, 5000));
+                        }, 1500);
                         break;
                     }
                 }

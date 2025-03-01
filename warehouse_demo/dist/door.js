@@ -21,7 +21,6 @@ const machine_runner_1 = require("@actyx/machine-runner");
 const warehouse_protocol_1 = require("./warehouse_protocol");
 const machine_check_1 = require("@actyx/machine-check");
 /*
-
 Using the machine runner DSL an implmentation of door in Gwarehouse is:
 
 const door = Composition.makeMachine('D')
@@ -38,10 +37,6 @@ s0.react([Events.partID], s1, (_) => s1.make())
 s1.react([Events.part], s0, (_) => s0.make())
 s0.react([Events.time], s2, (_) => s2.make())
 */
-/* for (var p of all_projections) {
-    console.log(JSON.stringify(p))
-    console.log("$$$$")
-} */
 // Projection of Gwarehouse || Gfactory || Gquality over D
 const result_projection = (0, machine_check_1.projectCombineMachines)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "D");
 if (result_projection.type == 'ERROR')
@@ -56,13 +51,6 @@ cMap.set(warehouse_protocol_1.Events.time.type, () => {
 });
 // Reaction map
 const rMap = new Map();
-const partReaction = {
-    genPayloadFun: (_, e) => {
-        console.log("e is: ", e);
-        return {};
-    }
-};
-rMap.set(warehouse_protocol_1.Events.part.type, partReaction);
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
 // Extended machine
 const [m3, i3] = warehouse_protocol_1.Composition.extendMachineBT("D", projection, warehouse_protocol_1.Events.allEvents, fMap, new Set([warehouse_protocol_1.Events.partID.type, warehouse_protocol_1.Events.time.type]));

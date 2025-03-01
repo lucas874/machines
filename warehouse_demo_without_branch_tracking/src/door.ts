@@ -1,10 +1,9 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunner, ProjMachine} from '@actyx/machine-runner'
+import { createMachineRunner, ProjMachine, createMachineRunnerBT} from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt, all_projections } from './warehouse_protocol'
 import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
 
 /*
-
 Using the machine runner DSL an implmentation of door in Gwarehouse is:
 
 const door = Composition.makeMachine('D')
@@ -21,10 +20,6 @@ s0.react([Events.partID], s1, (_) => s1.make())
 s1.react([Events.part], s0, (_) => s0.make())
 s0.react([Events.time], s2, (_) => s2.make())
 */
-/* for (var p of all_projections) {
-    console.log(JSON.stringify(p))
-    console.log("$$$$")
-} */
 
 // Projection of Gwarehouse || Gfactory || Gquality over D
 const result_projection = projectCombineMachines(interfacing_swarms, subs, "D")
@@ -41,12 +36,6 @@ cMap.set(Events.time.type, () => {
 
 // Reaction map
 const rMap = new Map()
-const partReaction : ProjMachine.ReactionEntry = {
-  genPayloadFun: (_, e) => {
-    console.log("e is: ", e);
-    return {} }
-}
-rMap.set(Events.part.type, partReaction)
 
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
 
@@ -59,7 +48,7 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const machine = createMachineRunner(app, tags, i3, undefined)
+    const machine = createMachineRunnerBT(app, tags, i3, undefined)
 
     for await (const state of machine) {
       console.log("door. state is:", state.type)
@@ -75,7 +64,7 @@ async function main() {
                 if (Object.keys(s1 || {}).includes('close')) {
                     s1.close()
                 }
-            }, 3000)
+            }, getRandomInt(5000, 8000))
             break
           }
       }

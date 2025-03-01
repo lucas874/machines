@@ -21,7 +21,6 @@ const machine_runner_1 = require("@actyx/machine-runner");
 const warehouse_protocol_1 = require("./warehouse_protocol");
 const machine_check_1 = require("@actyx/machine-check");
 /*
-
 Using the machine runner DSL an implmentation of door in Gwarehouse is:
 
 const door = Composition.makeMachine('D')
@@ -38,10 +37,6 @@ s0.react([Events.partID], s1, (_) => s1.make())
 s1.react([Events.part], s0, (_) => s0.make())
 s0.react([Events.time], s2, (_) => s2.make())
 */
-/* for (var p of all_projections) {
-    console.log(JSON.stringify(p))
-    console.log("$$$$")
-} */
 // Projection of Gwarehouse || Gfactory || Gquality over D
 const result_projection = (0, machine_check_1.projectCombineMachines)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "D");
 if (result_projection.type == 'ERROR')
@@ -57,13 +52,6 @@ cMap.set(warehouse_protocol_1.Events.time.type, () => {
 });
 // Reaction map
 const rMap = new Map();
-const partReaction = {
-    genPayloadFun: (_, e) => {
-        console.log("e is: ", e);
-        return {};
-    }
-};
-rMap.set(warehouse_protocol_1.Events.part.type, partReaction);
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
 // Extended machine
 const [m3, i3] = warehouse_protocol_1.Composition.extendMachine("D", projection, warehouse_protocol_1.Events.allEvents, fMap);
@@ -76,7 +64,7 @@ function main() {
         var _a, e_1, _b, _c;
         const app = yield sdk_1.Actyx.of(warehouse_protocol_1.manifest);
         const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
-        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, undefined);
+        const machine = (0, machine_runner_1.createMachineRunnerBT)(app, tags, i3, undefined);
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
@@ -96,7 +84,7 @@ function main() {
                             if (Object.keys(s1 || {}).includes('close')) {
                                 s1.close();
                             }
-                        }, 3000);
+                        }, (0, warehouse_protocol_1.getRandomInt)(5000, 8000));
                         break;
                     }
                 }

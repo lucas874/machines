@@ -11,7 +11,7 @@ async function main() {
         //await app.publish(tags.apply(Events.partID.makeBT({id: "tire"}, "invalidPointer")))
         //console.log('Publishing partID event with invalid lbj pointer')
 
-        await new Promise(f => setTimeout(f, 3000));
+        await new Promise(f => setTimeout(f, 5000));
         await app.publish(tags.apply(Events.time.makeBT({timeOfDay: new Date().toLocaleString()}, "invalidPointer")))
         console.log('Publishing time event with invalid lbj pointer')
     }
