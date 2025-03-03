@@ -597,7 +597,8 @@ export namespace ProjMachine {
     succeeding_non_branching_joining: SucceedingNonBranchingJoining,
     branching_joining: Set<string>,
   }
-  type BTState<Payload> = {lbj: string, payload: Payload}
+  type LastJB = Map<string, string>
+  type BTState<Payload> = {jbLast: LastJB, payload: Payload}
   type BTStateEmpty = BTState<undefined>
 
   export const extendMachineBT = <
@@ -619,7 +620,7 @@ export namespace ProjMachine {
     const specialEvents = projectionInfo.branching_joining
     var incomingMap = incomingEdgesOfStatesMap(proj)
     var markedStates: Set<string> = new Set()
-    console.log("does have? ", specialEvents.has("djaskldja"))
+
     proj.transitions.forEach((transition) => {
       if (transition.label.tag === 'Execute') {
         if (!projStatesToExec.has(transition.source)) {
@@ -683,7 +684,8 @@ export namespace ProjMachine {
           const payloadFun = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => {}
           const f = (s: any, e: any) => {
             var payload = payloadFun({...s, self: s.self?.payload ?? s.self}, e);
-            var lbj = s.self?.lbj ?? null;
+            //var lbj = s.self?.lbj ?? null;
+            var lbj = s.self.jbLast.get(etypes[0])
             return [es[0]?.makeBT(payload, lbj)]
           }
           cmdTriples.push([transition.label.cmd, es, f])
@@ -721,7 +723,7 @@ export namespace ProjMachine {
           var e = transition.label.eventType
           var es = eventTypeStringToEvent.get(e)
 
-          const f = getReaction(e, fMap, projStatesToStates, markedStates, specialEvents, transition.source, transition.target)
+          const f = getReaction(e, fMap, projStatesToStates, markedStates, specialEvents, projectionInfo.succeeding_non_branching_joining, transition.target)
           projStatesToStates.get(key).react([es], projStatesToStates.get(transition.target), f)
         }
       })
@@ -730,24 +732,34 @@ export namespace ProjMachine {
     var initial = projStatesToStates.get(proj.initial)
     return [m, initial]
   }
-  function getReaction(eventType: string, fMap: any, projStatesToStates: any, markedStates: any, specialEvents: Set<string>, sourceState: any, targetState: any) {
-    console.log(typeof(specialEvents))
+
+  function updateJBLast(t: string, eventId: string, jbLast: Map<string, string>, succeeding_non_branching_joining: Record<string, Set<string>>): Map<string, string> {
+    const branchFromT = succeeding_non_branching_joining[t]
+    var jbLastUpdated = structuredClone(jbLast)
+    for (var et of branchFromT) {
+      jbLastUpdated.set(et, eventId)
+    }
+
+    return jbLastUpdated
+  }
+
+  function getReaction(eventType: string, fMap: any, projStatesToStates: any, markedStates: any, specialEvents: Set<string>, succeeding_non_branching_joining: Record<string, Set<string>>, targetState: any) {
     if (fMap.reactions.has(eventType)) {
       if (specialEvents.has(eventType)) {
         return (s: any, e: any) => {
           const sPayload = fMap.reactions.get(eventType)!.genPayloadFun({...s, self: s.self?.payload ?? s.self}, e);
-          return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: sPayload})
+          return projStatesToStates.get(targetState).make({jbLast: updateJBLast(e.payload.type, e.meta.eventId, s.self.jbLast, succeeding_non_branching_joining), payload: sPayload})
         }
       } else {
         return (s: any, e: any) => {
           const sPayload = fMap.reactions.get(eventType)!.genPayloadFun({...s, self: s.self?.payload ?? s.self}, e);
-          return projStatesToStates.get(targetState).make({lbj: e.payload.lbj, payload: sPayload})
+          return projStatesToStates.get(targetState).make({jbLast: s.self.jbLast, payload: sPayload})
         }
       }
     } else if (markedStates.has(targetState)) {
       if (specialEvents.has(eventType)) {
         return (s: any, e: any) => {
-          return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: s.self.payload})
+          return projStatesToStates.get(targetState).make({jbLast: updateJBLast(e.payload.type, e.meta.eventId, s.self.jbLast, succeeding_non_branching_joining), payload: s.self.payload})
         }
       } else {
         return (s: any, e: any) => {
@@ -757,11 +769,11 @@ export namespace ProjMachine {
     } else {
       if (specialEvents.has(eventType)) {
         return (s: any, e: any) => {
-          return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: undefined})
+          return projStatesToStates.get(targetState).make({jbLast: updateJBLast(e.payload.type, e.meta.eventId, s.self.jbLast, succeeding_non_branching_joining), payload: undefined})
         }
       } else {
         return (s: any, e: any) => {
-          return projStatesToStates.get(targetState).make({lbj: e.payload.lbj, payload: undefined})
+          return projStatesToStates.get(targetState).make({jbLast: s.self.jbLast, payload: undefined})
         }
       }
     }

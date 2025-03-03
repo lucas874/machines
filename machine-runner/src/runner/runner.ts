@@ -303,7 +303,11 @@ export const createMachineRunnerBT = <
 
   const subscribe: SubscribeFn<MachineEvents> = (callback, onCompleteOrErr) =>
     sdk.subscribeMonotonic<MachineEvents>(subscribeMonotonicQuery, callback, onCompleteOrErr)
-  const intialPayloadWrapped: any = {lbj: null, payload: initialPayload}
+  var jbLastInitial: Map<string, string> = new Map()
+  for (var e of initialFactory.mechanism.protocol.registeredEvents) {
+    jbLastInitial.set(e.type, 'null')
+  }
+  const intialPayloadWrapped: any = {jbLast: jbLastInitial, payload: initialPayload}
   return createMachineRunnerInternalBT(subscribe, persist, tags, initialFactory, intialPayloadWrapped)
 }
 export const createMachineRunnerInternal = <

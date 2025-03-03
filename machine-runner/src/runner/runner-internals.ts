@@ -177,7 +177,7 @@ export namespace RunnerInternals {
     reactions: ReactionMapPerMechanism<Self>,
     queue: ReadonlyArray<ActyxEvent<MachineEvent.Any>>,
     newEvent: any,
-    lbj: string,
+    jbLast: Map<string, string>,
   ):
     | {
         shouldQueue: false
@@ -192,8 +192,8 @@ export namespace RunnerInternals {
 
     if (!matchingReaction) return { shouldQueue: false }
     console.log("in shouldEventBeEnqueued event type and event lbj: ", newEvent.payload.type, newEvent.payload.lbj)
-    console.log("in shouldEventBeEnqueued state lbj: ", lbj)
-    if (newEvent.payload.lbj != lbj ) { console.log("event not enqueued\n"); return { shouldQueue: false } }
+    console.log("in shouldEventBeEnqueued state lbj: ", jbLast)
+    if (newEvent.payload.lbj != jbLast.get(newEvent.payload.type) ) { console.log("event not enqueued\n"); return { shouldQueue: false } }
     console.log("event enqueued")
     console.log()
     // Asserted as non-nullish because it is impossible for `queue`'s length to
@@ -246,7 +246,7 @@ export namespace RunnerInternals {
         reactions,
         internals.queue,
         event,
-        internals.current.data.payload.lbj
+        internals.current.data.payload.jbLast
       ) :
       shouldEventBeEnqueued<StatePayload>(
         reactions,

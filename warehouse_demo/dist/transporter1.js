@@ -53,10 +53,6 @@ if (result_projection_info.type == 'ERROR')
     throw new Error('error getting projection');
 const projection_info = result_projection_info.data;
 console.log("projection info: ", projection_info);
-console.log("special events: ", projection_info.branching_joining);
-console.log("type of special events: ", typeof (projection_info.branching_joining));
-var thing = new Set();
-console.log("typeof thing: ", typeof (thing));
 // Command map
 const cMap = new Map();
 cMap.set(warehouse_protocol_1.Events.partID.type, (s, e) => {

@@ -34,12 +34,9 @@ s2.react([Events.part], s0, (_, e) => { console.log("e is: ", e); return s0.make
 // Projection of Gwarehouse || Gfactory || Gquality over T
 const result_projection_info: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(interfacing_swarms, subs, "T")
 if (result_projection_info.type == 'ERROR') throw new Error('error getting projection')
-const projection_info: ProjectionAndSucceedingMap = result_projection_info.data
+const projection_info = result_projection_info.data
 console.log("projection info: ", projection_info)
-console.log("special events: ", projection_info.branching_joining)
-console.log("type of special events: ", typeof(projection_info.branching_joining))
-var thing = new Set<string>()
-console.log("typeof thing: ", typeof(thing))
+
 // Command map
 const cMap = new Map()
 cMap.set(Events.partID.type, (s: any, e: any) => {
