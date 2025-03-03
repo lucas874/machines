@@ -1,7 +1,7 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, ProjMachine, createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt, loopThroughJSON } from './warehouse_protocol'
-import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
+import { projectCombineMachines, checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 //import { createMachineRunnerBT } from '@actyx/machine-runner/lib/esm/runner/runner'
 
 /*
@@ -30,10 +30,11 @@ s0.react([Events.time], s2, (_) => s2.make())
 // the role to create the extended machine
 
 // Projection of Gwarehouse || Gfactory || Gquality over FL
-const result_projection = projectCombineMachines(interfacing_swarms, subs, "FL")
-if (result_projection.type == 'ERROR') throw new Error('error getting projection')
-const projection = result_projection.data
-console.log(projection)
+//const result_projection = projectCombineMachines(interfacing_swarms, subs, "FL")
+const result_projection_info = projectionAndInformation(interfacing_swarms, subs, "FL")
+if (result_projection_info.type == 'ERROR') throw new Error('error getting projection')
+const projection_info = result_projection_info.data
+console.log(projection_info)
 // Command map
 const cMap = new Map()
 cMap.set(Events.position.type, (state: any, _: any) => {
@@ -52,7 +53,7 @@ rMap.set(Events.partID.type, partIDReaction)
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
 
 // Extended machine
-const [m3, i3] = Composition.extendMachineBT("FL", projection, Events.allEvents, fMap, new Set<string>([Events.partID.type, Events.time.type]))
+const [m3, i3] = Composition.extendMachineBT("FL", projection_info, Events.allEvents, fMap)
 const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "FL", m3.createJSONForAnalysis(i3))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 

@@ -1,7 +1,7 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, ProjMachine, createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, all_projections, getRandomInt  } from './warehouse_protocol'
-import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
+import { projectCombineMachines, checkComposedProjection, projectionAndInformation, ProjectionAndSucceedingMap, ResultData } from '@actyx/machine-check'
 
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 
@@ -31,11 +31,15 @@ s1.react([Events.position], s2, (_, e) => {
 s2.react([Events.part], s0, (_, e) => { console.log("e is: ", e); return s0.make({id: ""}) })
 
 
-// Projection of Gwarehouse || Gfactory || Gquality over D
-const result_projection = projectCombineMachines(interfacing_swarms, subs, "T")
-if (result_projection.type == 'ERROR') throw new Error('error getting projection')
-const projection = result_projection.data
-
+// Projection of Gwarehouse || Gfactory || Gquality over T
+const result_projection_info: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(interfacing_swarms, subs, "T")
+if (result_projection_info.type == 'ERROR') throw new Error('error getting projection')
+const projection_info: ProjectionAndSucceedingMap = result_projection_info.data
+console.log("projection info: ", projection_info)
+console.log("special events: ", projection_info.branching_joining)
+console.log("type of special events: ", typeof(projection_info.branching_joining))
+var thing = new Set<string>()
+console.log("typeof thing: ", typeof(thing))
 // Command map
 const cMap = new Map()
 cMap.set(Events.partID.type, (s: any, e: any) => {
@@ -63,9 +67,9 @@ const initialPayloadType : ProjMachine.ReactionEntry = {
   genPayloadFun: () => { return {part: ""} }
 }
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType}
-console.log(projection)
+console.log(projection_info)
 // Extended machine
-const [m3, i3] = Composition.extendMachineBT("T", projection, Events.allEvents, fMap, new Set<string>([Events.partID.type, Events.time.type]))
+const [m3, i3] = Composition.extendMachineBT("T", projection_info, Events.allEvents, fMap)
 
 const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "T", m3.createJSONForAnalysis(i3))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))

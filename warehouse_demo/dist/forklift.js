@@ -45,11 +45,12 @@ s0.react([Events.time], s2, (_) => s2.make())
 // and commands instead and use the projection of the composition over
 // the role to create the extended machine
 // Projection of Gwarehouse || Gfactory || Gquality over FL
-const result_projection = (0, machine_check_1.projectCombineMachines)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "FL");
-if (result_projection.type == 'ERROR')
+//const result_projection = projectCombineMachines(interfacing_swarms, subs, "FL")
+const result_projection_info = (0, machine_check_1.projectionAndInformation)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "FL");
+if (result_projection_info.type == 'ERROR')
     throw new Error('error getting projection');
-const projection = result_projection.data;
-console.log(projection);
+const projection_info = result_projection_info.data;
+console.log(projection_info);
 // Command map
 const cMap = new Map();
 cMap.set(warehouse_protocol_1.Events.position.type, (state, _) => {
@@ -70,7 +71,7 @@ const partIDReaction = {
 rMap.set(warehouse_protocol_1.Events.partID.type, partIDReaction);
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
 // Extended machine
-const [m3, i3] = warehouse_protocol_1.Composition.extendMachineBT("FL", projection, warehouse_protocol_1.Events.allEvents, fMap, new Set([warehouse_protocol_1.Events.partID.type, warehouse_protocol_1.Events.time.type]));
+const [m3, i3] = warehouse_protocol_1.Composition.extendMachineBT("FL", projection_info, warehouse_protocol_1.Events.allEvents, fMap);
 const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "FL", m3.createJSONForAnalysis(i3));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));

@@ -31,10 +31,9 @@ export type SwarmProtocol<
   ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
   extendMachineBT: <MachineName extends string>(
     machineName: MachineName,
-    proj: ProjMachine.ProjectionType,
+    proj: ProjMachine.ProjectionAndSucceedingMap,
     events: readonly MachineEvent.Factory<any, any>[],
     fMap: ProjMachine.funMap,
-    specialEvents: Set<string>,
   ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
 }
 
@@ -83,7 +82,7 @@ export namespace SwarmProtocol {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
       extendMachine: (machineName, proj, events, fMap) => ProjMachine.extendMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, fMap),
-      extendMachineBT: (machineName, proj, events, fMap, specialEvents) => ProjMachine.extendMachineBT(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, fMap, specialEvents)
+      extendMachineBT: (machineName, projectionInfo, events, fMap) => ProjMachine.extendMachineBT(ImplMachine.make(swarmName, machineName, eventFactories), projectionInfo, events, fMap)
     }
   }
 }
@@ -591,8 +590,13 @@ export namespace ProjMachine {
   // compute branch(e) --> set of states, follow each branch
   // add all event types encountered up to and including
   // first branching or joining event type.
-
-
+  //function getEventTypesOnPaths(proj: )
+  export type SucceedingNonBranchingJoining = Record<string, Set<string>>;
+  export type ProjectionAndSucceedingMap = {
+    projection: ProjectionType,
+    succeeding_non_branching_joining: SucceedingNonBranchingJoining,
+    branching_joining: Set<string>,
+  }
   type BTState<Payload> = {lbj: string, payload: Payload}
   type BTStateEmpty = BTState<undefined>
 
@@ -602,19 +606,20 @@ export namespace ProjMachine {
     MachineEventFactories extends MachineEvent.Factory.Any,
   >(
     m: Machine<SwarmProtocolName, MachineName, MachineEventFactories>,
-    proj: ProjectionType,
+    projectionInfo: ProjectionAndSucceedingMap,
     events: readonly MachineEvent.Factory<any, Record<never, never>>[],
     fMap: funMap,
-    specialEvents: Set<string>
   ): [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]  => {
     var projStatesToStates: Map<string, any> = new Map()
     var projStatesToExec: Map<string, Transition[]> = new Map()
     var projStatesToInput: Map<string, Transition[]> = new Map()
     var eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> = new Map()
     var projStatesToStatePayload: Map<string, (...args : any[]) => any> = new Map()
+    const proj = projectionInfo.projection
+    const specialEvents = projectionInfo.branching_joining
     var incomingMap = incomingEdgesOfStatesMap(proj)
     var markedStates: Set<string> = new Set()
-
+    console.log("does have? ", specialEvents.has("djaskldja"))
     proj.transitions.forEach((transition) => {
       if (transition.label.tag === 'Execute') {
         if (!projStatesToExec.has(transition.source)) {
@@ -726,6 +731,7 @@ export namespace ProjMachine {
     return [m, initial]
   }
   function getReaction(eventType: string, fMap: any, projStatesToStates: any, markedStates: any, specialEvents: Set<string>, sourceState: any, targetState: any) {
+    console.log(typeof(specialEvents))
     if (fMap.reactions.has(eventType)) {
       if (specialEvents.has(eventType)) {
         return (s: any, e: any) => {

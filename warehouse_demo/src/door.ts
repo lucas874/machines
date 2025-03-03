@@ -1,7 +1,7 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, ProjMachine, createMachineRunnerBT} from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt, all_projections } from './warehouse_protocol'
-import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
+import { projectCombineMachines, checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 
 /*
 Using the machine runner DSL an implmentation of door in Gwarehouse is:
@@ -22,10 +22,10 @@ s0.react([Events.time], s2, (_) => s2.make())
 */
 
 // Projection of Gwarehouse || Gfactory || Gquality over D
-const result_projection = projectCombineMachines(interfacing_swarms, subs, "D")
-if (result_projection.type == 'ERROR') throw new Error('error getting projection')
-const projection = result_projection.data
-
+const result_projection_info = projectionAndInformation(interfacing_swarms, subs, "D")
+if (result_projection_info.type == 'ERROR') throw new Error('error getting projection')
+const projection_info = result_projection_info.data
+console.log(projection_info)
 // Command map
 const cMap = new Map()
 cMap.set(Events.time.type, () => {
@@ -39,7 +39,7 @@ const rMap = new Map()
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
 
 // Extended machine
-const [m3, i3] = Composition.extendMachineBT("D", projection, Events.allEvents, fMap, new Set<string>([Events.partID.type, Events.time.type]))
+const [m3, i3] = Composition.extendMachineBT("D", projection_info, Events.allEvents, fMap)
 const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "D", m3.createJSONForAnalysis(i3))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 

@@ -47,11 +47,16 @@ exports.s1.react([warehouse_protocol_1.Events.position], exports.s2, (_, e) => {
     return { part: e.payload.part };
 });
 exports.s2.react([warehouse_protocol_1.Events.part], exports.s0, (_, e) => { console.log("e is: ", e); return exports.s0.make({ id: "" }); });
-// Projection of Gwarehouse || Gfactory || Gquality over D
-const result_projection = (0, machine_check_1.projectCombineMachines)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "T");
-if (result_projection.type == 'ERROR')
+// Projection of Gwarehouse || Gfactory || Gquality over T
+const result_projection_info = (0, machine_check_1.projectionAndInformation)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "T");
+if (result_projection_info.type == 'ERROR')
     throw new Error('error getting projection');
-const projection = result_projection.data;
+const projection_info = result_projection_info.data;
+console.log("projection info: ", projection_info);
+console.log("special events: ", projection_info.branching_joining);
+console.log("type of special events: ", typeof (projection_info.branching_joining));
+var thing = new Set();
+console.log("typeof thing: ", typeof (thing));
 // Command map
 const cMap = new Map();
 cMap.set(warehouse_protocol_1.Events.partID.type, (s, e) => {
@@ -79,9 +84,9 @@ const initialPayloadType = {
     genPayloadFun: () => { return { part: "" }; }
 };
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType };
-console.log(projection);
+console.log(projection_info);
 // Extended machine
-const [m3, i3] = warehouse_protocol_1.Composition.extendMachineBT("T", projection, warehouse_protocol_1.Events.allEvents, fMap, new Set([warehouse_protocol_1.Events.partID.type, warehouse_protocol_1.Events.time.type]));
+const [m3, i3] = warehouse_protocol_1.Composition.extendMachineBT("T", projection_info, warehouse_protocol_1.Events.allEvents, fMap);
 const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "T", m3.createJSONForAnalysis(i3));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));
