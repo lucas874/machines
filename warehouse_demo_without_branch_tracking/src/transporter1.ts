@@ -74,7 +74,7 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const machine = createMachineRunner(app, tags, s0, {id: parts[Math.floor(Math.random() * parts.length)]})
+    const machine = createMachineRunner(app, tags, i3, {id: parts[Math.floor(Math.random() * parts.length)]})
 
     for await (const state of machine) {
       console.log("transporter. state is:", state.type)

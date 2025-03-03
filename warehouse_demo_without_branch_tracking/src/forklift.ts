@@ -61,7 +61,7 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const machine = createMachineRunner(app, tags, s0, undefined)
+    const machine = createMachineRunner(app, tags, i3, undefined)
 
     for await (const state of machine) {
       console.log("forklift. state is:", state.type)
