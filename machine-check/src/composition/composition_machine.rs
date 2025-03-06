@@ -102,8 +102,9 @@ pub fn project(
         }
     }
     //nfa_to_dfa(machine, m_nodes[initial.index()])
-    let (dfa, dfa_initial) = nfa_to_dfa(machine, m_nodes[initial.index()]); // make deterministic. slight deviation from projection operation formally.
-    minimal_machine(&dfa, dfa_initial) // when minimizing we get a machine that is a little different but equivalent to the one prescribed by the projection operator formally
+    //let (dfa, dfa_initial) = nfa_to_dfa(machine, m_nodes[initial.index()]); // make deterministic. slight deviation from projection operation formally.
+    //minimal_machine(&dfa, dfa_initial) // when minimizing we get a machine that is a little different but equivalent to the one prescribed by the projection operator formally
+    (machine, m_nodes[initial.index()])
 }
 
 // precondition: the protocols interfaces on the supplied interfaces.
@@ -137,7 +138,7 @@ pub fn project_combine(
         (acc_machine, acc_initial),
         |(acc, acc_i), (m, i, interface)| compose(acc, acc_i, m, i, interface),
     );
-    let (combined_projection, combined_initial) = minimal_machine(&combined_projection, combined_initial);
+    //let (combined_projection, combined_initial) = minimal_machine(&combined_projection, combined_initial);
     // why option here COME BACK
     (
         to_option_machine(&combined_projection),
@@ -687,6 +688,17 @@ mod tests {
         )
     }
 
+    fn get_interfacing_swarms_whhhh() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_proto1(),
+                    interface: None,
+                },
+            ]
+        )
+    }
+
     #[test]
     fn test_projection_1() {
         // From Combining Swarm Protocols, example 5.
@@ -1154,6 +1166,29 @@ mod tests {
             println!("role: {}\n branch thing: {}", role.to_string(), serde_json::to_string_pretty(&branch_thing).unwrap());
             let thing = from_option_to_machine(proj, proj_initial.unwrap());
             println!("proj: {}", serde_json::to_string_pretty(&thing).unwrap())
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_all_projs_wh_only() {
+        let input_sub = BTreeMap::new();
+        let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_whhhh(), &input_sub, Granularity::Medium).unwrap();
+        let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D")];
+        println!("subs: {}", serde_json::to_string_pretty(&subs).unwrap());
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_whhhh(), &subs);
+            assert!(proto_info.no_errors());
+        //println!("conc: {:?}", proto_info.concurrent_events);
+
+        for role in all_roles {
+            let (proj, proj_initial) =
+                project_combine(&proto_info.protocols, &subs, role.clone());
+            //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
+            let branch_thing = paths_from_event_types(&proj, &proto_info);
+            //println!("role: {}\n branch thing: {}", role.to_string(), serde_json::to_string_pretty(&branch_thing).unwrap());
+            let thing = from_option_to_machine(proj, proj_initial.unwrap());
+            println!("{}\n$$$$", serde_json::to_string_pretty(&thing).unwrap())
+            //let thing = project(&proto_info.protocols.)
         }
     }
 }
