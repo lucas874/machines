@@ -26,7 +26,7 @@ const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler'];
 const transporter = warehouse_protocol_1.Composition.makeMachine('T');
 exports.s0 = transporter.designState('s0').withPayload()
     .command('request', [warehouse_protocol_1.Events.partID], (s, e) => {
-    var id = s.self.id;
+    var id = parts[Math.floor(Math.random() * parts.length)];
     console.log("requesting a", id);
     return [warehouse_protocol_1.Events.partID.make({ id: id })];
 })
@@ -47,26 +47,25 @@ exports.s1.react([warehouse_protocol_1.Events.position], exports.s2, (_, e) => {
     return { part: e.payload.part };
 });
 exports.s2.react([warehouse_protocol_1.Events.part], exports.s0, (_, e) => { console.log("e is: ", e); return exports.s0.make({ id: "" }); });
-// Projection of Gwarehouse || Gfactory || Gquality over T
-const result_projection_info = (0, machine_check_1.projectionAndInformation)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "T");
-if (result_projection_info.type == 'ERROR')
+// Projection of Gwarehouse || Gfactory || Gquality over D
+const result_projection = (0, machine_check_1.projectCombineMachines)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "T");
+if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
-const projection_info = result_projection_info.data;
-console.log("projection info: ", projection_info);
+const projection = result_projection.data;
 // Command map
 const cMap = new Map();
 cMap.set(warehouse_protocol_1.Events.partID.type, (s, e) => {
     s.self.id = s.self.id === undefined ? parts[Math.floor(Math.random() * parts.length)] : s.self.id;
     var id = s.self.id;
     console.log("requesting a", id);
-    return { id: id };
+    //return {id: id}})
+    return [warehouse_protocol_1.Events.partID.make({ id: id })];
 });
-//return [Events.partID.make({id: id})]})
 cMap.set(warehouse_protocol_1.Events.part.type, (s, e) => {
     console.log("delivering a", s.self.part);
-    return { part: s.self.part };
+    //return {part: s.self.part}})
+    return [warehouse_protocol_1.Events.part.make({ part: s.self.part })];
 });
-//return [Events.part.make({part: s.self.part})] })
 // Reaction map
 const rMap = new Map();
 const positionReaction = {
@@ -80,9 +79,9 @@ const initialPayloadType = {
     genPayloadFun: () => { return { part: "" }; }
 };
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType };
-console.log(projection_info);
+console.log(projection);
 // Extended machine
-const [m3, i3] = warehouse_protocol_1.Composition.extendMachineBT("T", projection_info, warehouse_protocol_1.Events.allEvents, fMap);
+const [m3, i3] = warehouse_protocol_1.Composition.extendMachine("T", projection, warehouse_protocol_1.Events.allEvents, fMap);
 const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "T", m3.createJSONForAnalysis(i3));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));
@@ -92,7 +91,7 @@ function main() {
         var _a, e_1, _b, _c;
         const app = yield sdk_1.Actyx.of(warehouse_protocol_1.manifest);
         const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
-        const machine = (0, machine_runner_1.createMachineRunnerBT)(app, tags, i3, { id: parts[Math.floor(Math.random() * parts.length)] });
+        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, { id: parts[Math.floor(Math.random() * parts.length)] });
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;

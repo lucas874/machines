@@ -1,7 +1,7 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, ProjMachine, createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, all_projections, getRandomInt  } from './warehouse_protocol'
-import { projectCombineMachines, checkComposedProjection, projectionAndInformation, ProjectionAndSucceedingMap, ResultData } from '@actyx/machine-check'
+import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
 
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 
@@ -9,7 +9,7 @@ const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 const transporter = Composition.makeMachine('T')
 export const s0 = transporter.designState('s0').withPayload<{id: string}>()
     .command('request', [Events.partID], (s: any, e: any) => {
-      var id = s.self.id;
+      var id = parts[Math.floor(Math.random() * parts.length)];
       console.log("requesting a", id);
       return [Events.partID.make({id: id})]})
     .finish()
@@ -31,11 +31,10 @@ s1.react([Events.position], s2, (_, e) => {
 s2.react([Events.part], s0, (_, e) => { console.log("e is: ", e); return s0.make({id: ""}) })
 
 
-// Projection of Gwarehouse || Gfactory || Gquality over T
-const result_projection_info: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(interfacing_swarms, subs, "T")
-if (result_projection_info.type == 'ERROR') throw new Error('error getting projection')
-const projection_info = result_projection_info.data
-console.log("projection info: ", projection_info)
+// Projection of Gwarehouse || Gfactory || Gquality over D
+const result_projection = projectCombineMachines(interfacing_swarms, subs, "T")
+if (result_projection.type == 'ERROR') throw new Error('error getting projection')
+const projection = result_projection.data
 
 // Command map
 const cMap = new Map()
@@ -43,13 +42,13 @@ cMap.set(Events.partID.type, (s: any, e: any) => {
   s.self.id = s.self.id === undefined ? parts[Math.floor(Math.random() * parts.length)] : s.self.id;
   var id = s.self.id;
   console.log("requesting a", id);
-  return {id: id}})
-  //return [Events.partID.make({id: id})]})
+  //return {id: id}})
+  return [Events.partID.make({id: id})]})
 
 cMap.set(Events.part.type, (s: any, e: any) => {
   console.log("delivering a", s.self.part)
-  return {part: s.self.part}})
-  //return [Events.part.make({part: s.self.part})] })
+  //return {part: s.self.part}})
+  return [Events.part.make({part: s.self.part})] })
 
 // Reaction map
 const rMap = new Map()
@@ -64,9 +63,9 @@ const initialPayloadType : ProjMachine.ReactionEntry = {
   genPayloadFun: () => { return {part: ""} }
 }
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType}
-console.log(projection_info)
+console.log(projection)
 // Extended machine
-const [m3, i3] = Composition.extendMachineBT("T", projection_info, Events.allEvents, fMap)
+const [m3, i3] = Composition.extendMachine("T", projection, Events.allEvents, fMap)
 
 const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "T", m3.createJSONForAnalysis(i3))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
@@ -75,7 +74,7 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const machine = createMachineRunnerBT(app, tags, i3, {id: parts[Math.floor(Math.random() * parts.length)]})
+    const machine = createMachineRunner(app, tags, i3, {id: parts[Math.floor(Math.random() * parts.length)]})
 
     for await (const state of machine) {
       console.log("transporter. state is:", state.type)

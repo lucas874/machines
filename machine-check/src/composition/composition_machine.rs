@@ -7,8 +7,10 @@ use petgraph::{
     Direction::{Incoming, Outgoing},
 };
 
+use crate::composition::composition_swarm::transitive_closure_succeeding;
+
 use super::{
-    composition_types::{EventLabel, ProtoStruct}, types::{StateName, Transition}, EventType, Machine, MachineLabel, NodeId, Role, State, Subscriptions, SwarmLabel
+    composition_types::{unord_event_pair, EventLabel, ProtoInfo, ProtoStruct, SucceedingNonBranchingJoining, UnordEventPair}, types::{StateName, Transition}, EventType, Machine, MachineLabel, NodeId, Role, State, Subscriptions, SwarmLabel
 };
 
 // types more or less copied from machine.rs.
@@ -100,8 +102,9 @@ pub fn project(
         }
     }
     //nfa_to_dfa(machine, m_nodes[initial.index()])
-    let (dfa, dfa_initial) = nfa_to_dfa(machine, m_nodes[initial.index()]); // make deterministic. slight deviation from projection operation formally.
-    minimal_machine(&dfa, dfa_initial) // when minimizing we get a machine that is a little different but equivalent to the one prescribed by the projection operator formally
+    //let (dfa, dfa_initial) = nfa_to_dfa(machine, m_nodes[initial.index()]); // make deterministic. slight deviation from projection operation formally.
+    //minimal_machine(&dfa, dfa_initial) // when minimizing we get a machine that is a little different but equivalent to the one prescribed by the projection operator formally
+    (machine, m_nodes[initial.index()])
 }
 
 // precondition: the protocols interfaces on the supplied interfaces.
@@ -135,7 +138,7 @@ pub fn project_combine(
         (acc_machine, acc_initial),
         |(acc, acc_i), (m, i, interface)| compose(acc, acc_i, m, i, interface),
     );
-    let (combined_projection, combined_initial) = minimal_machine(&combined_projection, combined_initial);
+    //let (combined_projection, combined_initial) = minimal_machine(&combined_projection, combined_initial);
     // why option here COME BACK
     (
         to_option_machine(&combined_projection),
@@ -284,6 +287,77 @@ fn refine_block(graph: &Graph, block: &BTreeSet<NodeId>, superblock: &BTreeSet<N
         .partition(|n| predicate(n));
 
     BTreeSet::from([tmp.0, tmp.1]).into_iter().filter(|s| !s.is_empty()).collect()
+}
+
+fn visit_successors_stop_on_branch(proj: &OptionGraph, machine_state: NodeId, et: &EventType, special_events: &BTreeSet<EventType>, concurrent_events: &BTreeSet<UnordEventPair>) -> BTreeSet<EventType> {
+    let mut visited = BTreeSet::new();
+    let mut to_visit = Vec::from([machine_state]);
+    let mut event_types = BTreeSet::new();
+    event_types.insert(et.clone());
+    while let Some(node) = to_visit.pop() {
+        visited.insert(node);
+        for e in proj.edges_directed(node, Outgoing) {
+            if !concurrent_events.contains(&unord_event_pair(e.weight().get_event_type(), et.clone())) {
+                event_types.insert(e.weight().get_event_type());
+            }
+            if !special_events.contains(&e.weight().get_event_type())
+                && !visited.contains(&e.target()) {
+                    to_visit.push(e.target());
+            }
+        }
+    }
+    event_types
+}
+
+// return map state * event type --> set event type
+// map(s, t) = is the set containing t and every non-branching event type that follows it
+// and is not concurrent with it and there is no branching event between them.
+/* pub fn paths_from_projection_states(proj: &Graph, special_events: &BTreeSet<EventType>, concurrent_events: &BTreeSet<UnordEventPair>) -> BTreeMap<(State, EventType), BTreeSet<EventType>> {
+    let mut m: BTreeMap<(State, EventType), BTreeSet<EventType>> = BTreeMap::new();
+    for node in proj.node_indices() {
+        for edge in proj.edges_directed(node, Outgoing) {
+            let paths_this_edge = visit_successors_stop_on_branch(proj, edge.target(), &edge.weight().get_event_type(), special_events, concurrent_events);
+            m.insert((proj[node].clone(), edge.weight().get_event_type()), paths_this_edge);
+        }
+    }
+    m
+} */
+
+pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> SucceedingNonBranchingJoining {
+    let mut m: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
+    let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
+        let pre = proto_info.immediately_pre.get(e).cloned().unwrap_or_default();
+        let product = pre.clone().into_iter().cartesian_product(&pre);
+        product.filter(|(e1, e2)| *e1 != **e2 && proto_info.concurrent_events.contains(&unord_event_pair(e1.clone(), (*e2).clone())))
+            .map(|(e1, e2)| [e1, e2.clone()])
+            .flatten()
+            .collect()
+    };
+
+    let special_events = proto_info.branching_events.clone().into_iter()
+        .flatten()
+        .chain(proto_info.joining_events.clone().into_iter()
+            .filter(|e| !get_pre_joins(e).is_empty()))
+        .collect();
+    //println!("special events computed:  {:?}", special_events);
+
+    let after_pairs: BTreeSet<UnordEventPair> = transitive_closure_succeeding(proto_info.succeeding_events.clone())
+        .into_iter()
+        .map(|(e, es)| [e].into_iter()
+            .cartesian_product(&es)
+            .map(|(e1, e2)| unord_event_pair(e1, e2.clone()))
+            .collect::<BTreeSet<UnordEventPair>>())
+        .flatten()
+        .collect();
+    let concurrent_events: BTreeSet<UnordEventPair> = proto_info.concurrent_events.difference(&after_pairs).cloned().collect();
+    //println!("conc2: {:?}", concurrent_events);
+    for node in proj.node_indices() {
+        for edge in proj.edges_directed(node, Outgoing) {
+            let mut paths_this_edge = visit_successors_stop_on_branch(proj, edge.target(), &edge.weight().get_event_type(), &special_events, &concurrent_events);
+            m.entry(edge.weight().get_event_type()).and_modify(|s| s.append(&mut paths_this_edge)).or_insert_with(|| paths_this_edge);
+        }
+    }
+    m
 }
 
 // precondition: both machines are projected from wwf protocols?
@@ -493,7 +567,21 @@ mod tests {
         )
         .unwrap()
     }
-
+    fn get_proto333() -> SwarmProtocol {
+        serde_json::from_str::<SwarmProtocol>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "test", "logType": ["report"], "role": "TR" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "accept", "logType": ["ok"], "role": "QCR" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "reject", "logType": ["notOk"], "role": "QCR" } },
+                    { "source": "3", "target": "4", "label": { "cmd": "reject1", "logType": ["notOk1"], "role": "QCR" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
     fn get_interfacing_swarms_1() -> InterfacingSwarms<Role> {
         InterfacingSwarms(
             vec![
@@ -576,6 +664,36 @@ mod tests {
                 CompositionComponent {
                     protocol: get_proto32(),
                     interface: Some(Role::new("F")),
+                },
+            ]
+        )
+    }
+
+    fn get_interfacing_swarms_333() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_proto1(),
+                    interface: None,
+                },
+                CompositionComponent {
+                    protocol: get_proto2(),
+                    interface: Some(Role::new("T")),
+                },
+                CompositionComponent {
+                    protocol: get_proto333(),
+                    interface: Some(Role::new("F")),
+                },
+            ]
+        )
+    }
+
+    fn get_interfacing_swarms_whhhh() -> InterfacingSwarms<Role> {
+        InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_proto1(),
+                    interface: None,
                 },
             ]
         )
@@ -1008,6 +1126,69 @@ mod tests {
         for role in all_roles {
             let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, role.clone());
             println!("{}: {}", role.clone().to_string(), serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap());
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_all_projs_whfqcr() {
+        let mut input_sub = BTreeMap::new();
+        input_sub.insert(Role::new("T"), BTreeSet::from([EventType::new("notOk1")]));
+        let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_333(), &input_sub, Granularity::Medium).unwrap();
+        let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D"), Role::new("F"), Role::new("QCR")];
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_333(), &subs);
+            assert!(proto_info.no_errors());
+        //println!("conc: {:?}", proto_info.concurrent_events);
+        for role in all_roles {
+            let (proj, proj_initial) =
+                project_combine(&proto_info.protocols, &subs, role.clone());
+            //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
+            let branch_thing = paths_from_event_types(&proj, &proto_info);
+            println!("role: {}\n branch thing: {}", role.to_string(), serde_json::to_string_pretty(&branch_thing).unwrap());
+            let thing = from_option_to_machine(proj, proj_initial.unwrap());
+            println!("proj: {}", serde_json::to_string_pretty(&thing).unwrap())
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_all_projs_whfqcr1() {
+        let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_3(), &BTreeMap::new(), Granularity::Medium).unwrap();
+        let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D"), Role::new("F"), Role::new("QCR")];
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_3(), &subs);
+            assert!(proto_info.no_errors());
+        //println!("conc: {:?}", proto_info.concurrent_events);
+        for role in all_roles {
+            let (proj, proj_initial) =
+                project_combine(&proto_info.protocols, &subs, role.clone());
+            //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
+            let branch_thing = paths_from_event_types(&proj, &proto_info);
+            println!("role: {}\n branch thing: {}", role.to_string(), serde_json::to_string_pretty(&branch_thing).unwrap());
+            let thing = from_option_to_machine(proj, proj_initial.unwrap());
+            println!("proj: {}", serde_json::to_string_pretty(&thing).unwrap())
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_all_projs_wh_only() {
+        let input_sub = BTreeMap::new();
+        let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_whhhh(), &input_sub, Granularity::Medium).unwrap();
+        let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D")];
+        println!("subs: {}", serde_json::to_string_pretty(&subs).unwrap());
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_whhhh(), &subs);
+            assert!(proto_info.no_errors());
+        //println!("conc: {:?}", proto_info.concurrent_events);
+
+        for role in all_roles {
+            let (proj, proj_initial) =
+                project_combine(&proto_info.protocols, &subs, role.clone());
+            //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
+            let branch_thing = paths_from_event_types(&proj, &proto_info);
+            //println!("role: {}\n branch thing: {}", role.to_string(), serde_json::to_string_pretty(&branch_thing).unwrap());
+            let thing = from_option_to_machine(proj, proj_initial.unwrap());
+            println!("{}\n$$$$", serde_json::to_string_pretty(&thing).unwrap())
+            //let thing = project(&proto_info.protocols.)
         }
     }
 }

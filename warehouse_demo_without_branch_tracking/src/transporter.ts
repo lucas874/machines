@@ -1,11 +1,14 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunner, ProjMachine, createMachineRunnerBT } from '@actyx/machine-runner'
+import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, all_projections, getRandomInt  } from './warehouse_protocol'
-import { projectCombineMachines, checkComposedProjection, projectionAndInformation, ProjectionAndSucceedingMap, ResultData } from '@actyx/machine-check'
+import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
 
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 
-// Using the machine runner DSL an implmentation of transporter in Gwarehouse is:
+/*
+
+Using the machine runner DSL an implmentation of transporter in Gwarehouse is:
+
 const transporter = Composition.makeMachine('T')
 export const s0 = transporter.designState('s0').withPayload<{id: string}>()
     .command('request', [Events.partID], (s: any, e: any) => {
@@ -24,18 +27,16 @@ export const s3 = transporter.designEmpty('s3').finish()
 s0.react([Events.partID], s1, (_) => s1.make())
 s0.react([Events.time], s3, (_) => s3.make())
 s1.react([Events.position], s2, (_, e) => {
-    console.log("e is: ", e)
     console.log("got a ", e.payload.part);
     return { part: e.payload.part } })
 
-s2.react([Events.part], s0, (_, e) => { console.log("e is: ", e); return s0.make({id: ""}) })
+s2.react([Events.part], s0, (_, e) => { return s0.make({id: ""}) })
+*/
 
-
-// Projection of Gwarehouse || Gfactory || Gquality over T
-const result_projection_info: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(interfacing_swarms, subs, "T")
-if (result_projection_info.type == 'ERROR') throw new Error('error getting projection')
-const projection_info = result_projection_info.data
-console.log("projection info: ", projection_info)
+// Projection of Gwarehouse || Gfactory || Gquality over D
+const result_projection = projectCombineMachines(interfacing_swarms, subs, "T")
+if (result_projection.type == 'ERROR') throw new Error('error getting projection')
+const projection = result_projection.data
 
 // Command map
 const cMap = new Map()
@@ -43,19 +44,16 @@ cMap.set(Events.partID.type, (s: any, e: any) => {
   s.self.id = s.self.id === undefined ? parts[Math.floor(Math.random() * parts.length)] : s.self.id;
   var id = s.self.id;
   console.log("requesting a", id);
-  return {id: id}})
-  //return [Events.partID.make({id: id})]})
+  return [Events.partID.make({id: id})]})
 
 cMap.set(Events.part.type, (s: any, e: any) => {
   console.log("delivering a", s.self.part)
-  return {part: s.self.part}})
-  //return [Events.part.make({part: s.self.part})] })
+  return [Events.part.make({part: s.self.part})] })
 
 // Reaction map
 const rMap = new Map()
 const positionReaction : ProjMachine.ReactionEntry = {
-  genPayloadFun: (s, e) => {
-    return { part: e.payload.part } }
+  genPayloadFun: (s, e) => {  console.log("e is: ", e); console.log("s is: ", s); return { part: e.payload.part } }
 }
 rMap.set(Events.position.type, positionReaction)
 
@@ -64,18 +62,19 @@ const initialPayloadType : ProjMachine.ReactionEntry = {
   genPayloadFun: () => { return {part: ""} }
 }
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType}
-console.log(projection_info)
+
 // Extended machine
-const [m3, i3] = Composition.extendMachineBT("T", projection_info, Events.allEvents, fMap)
+const [m3, i3] = Composition.extendMachine("T", projection, Events.allEvents, fMap)
 
 const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "T", m3.createJSONForAnalysis(i3))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
+
 
 // Run the extended machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const machine = createMachineRunnerBT(app, tags, i3, {id: parts[Math.floor(Math.random() * parts.length)]})
+    const machine = createMachineRunner(app, tags, i3, {id: parts[Math.floor(Math.random() * parts.length)]})
 
     for await (const state of machine) {
       console.log("transporter. state is:", state.type)
@@ -91,7 +90,7 @@ async function main() {
                 if (Object.keys(s1 || {}).includes('request')) {
                     s1.request()
                 }
-            }, 1500)
+            }, getRandomInt(500, 5000))
             break
           }
           if (c === 'deliver') {
@@ -100,7 +99,7 @@ async function main() {
                 if (Object.keys(s1 || {}).includes('deliver')) {
                     s1.deliver()
                 }
-            }, 1500)
+            }, getRandomInt(500, 8000))
             break
           }
       }

@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
-
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     composition::composition_swarm::Error,
     types::{Command, EventType, MachineLabel, Role, SwarmLabel},
-    Graph,
+    Graph, Machine,
 };
 
 use super::{NodeId, SwarmProtocol};
@@ -49,7 +49,11 @@ impl ProtoStruct {
     }
 
     pub fn get_triple(&self) -> (Graph, Option<NodeId>, Vec<Error>) {
-        (self.graph.clone(), self.initial.clone(), self.errors.clone())
+        (
+            self.graph.clone(),
+            self.initial.clone(),
+            self.errors.clone(),
+        )
     }
 
     pub fn no_errors(&self) -> bool {
@@ -59,7 +63,7 @@ impl ProtoStruct {
 
 #[derive(Debug, Clone)]
 pub struct ProtoInfo {
-    pub protocols: Vec<ProtoStruct>,// maybe weird to have an interface as if it was related to one protocol. but convenient. "a graph interfaces with rest on if"
+    pub protocols: Vec<ProtoStruct>, // maybe weird to have an interface as if it was related to one protocol. but convenient. "a graph interfaces with rest on if"
     pub role_event_map: RoleEventMap,
     pub concurrent_events: BTreeSet<UnordEventPair>, // consider to make a more specific type. unordered pair.
     pub branching_events: Vec<BTreeSet<EventType>>,
@@ -89,9 +93,7 @@ impl ProtoInfo {
         }
     }
 
-    pub fn new_only_proto(
-        protocols: Vec<ProtoStruct>
-    ) -> Self {
+    pub fn new_only_proto(protocols: Vec<ProtoStruct>) -> Self {
         Self {
             protocols,
             role_event_map: BTreeMap::new(),
@@ -103,7 +105,7 @@ impl ProtoInfo {
         }
     }
 
-    pub fn get_ith_proto(&self, i: usize) -> Option<ProtoStruct>{
+    pub fn get_ith_proto(&self, i: usize) -> Option<ProtoStruct> {
         if i >= self.protocols.len() {
             None
         } else {
@@ -113,8 +115,23 @@ impl ProtoInfo {
 
     pub fn no_errors(&self) -> bool {
         self.protocols.iter().all(|p| p.no_errors())
-
     }
+}
+
+pub fn get_branching_joining_proto_info(proto_info: &ProtoInfo) -> BTreeSet<EventType> {
+    let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
+        let pre = proto_info.immediately_pre.get(e).cloned().unwrap_or_default();
+        let product = pre.clone().into_iter().cartesian_product(&pre);
+        product.filter(|(e1, e2)| *e1 != **e2 && proto_info.concurrent_events.contains(&unord_event_pair(e1.clone(), (*e2).clone())))
+            .map(|(e1, e2)| [e1, e2.clone()])
+            .flatten()
+            .collect()
+    };
+    proto_info.branching_events.clone().into_iter()
+        .flatten()
+        .chain(proto_info.joining_events.clone().into_iter()
+            .filter(|e| !get_pre_joins(e).is_empty()))
+        .collect()
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -127,11 +144,20 @@ pub struct CompositionComponent<T: SwarmInterface> {
 pub struct InterfacingSwarms<T: SwarmInterface>(pub Vec<CompositionComponent<T>>);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum  Granularity {
+pub enum Granularity {
     Fine,
     Medium,
     Coarse,
-    TwoStep
+    TwoStep,
+}
+
+pub type SucceedingNonBranchingJoining = BTreeMap<EventType, BTreeSet<EventType>>;
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ProjectionAndSucceedingMap {
+    pub projection: Machine,
+    pub succeeding_non_branching_joining: SucceedingNonBranchingJoining,
+    pub branching_joining: BTreeSet<EventType>,
 }
 
 /* Used when combining machines and protocols */

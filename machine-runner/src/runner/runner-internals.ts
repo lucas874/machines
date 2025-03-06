@@ -173,6 +173,53 @@ export namespace RunnerInternals {
     }
   }
 
+  const shouldEventBeEnqueuedBT = <Self>(
+    reactions: ReactionMapPerMechanism<Self>,
+    queue: ReadonlyArray<ActyxEvent<MachineEvent.Any>>,
+    newEvent: any,
+    jbLast: Map<string, string>,
+  ):
+    | {
+        shouldQueue: false
+      }
+    | {
+        shouldQueue: true
+        matchingReaction: Reaction<ReactionContext<Self>>
+      } => {
+    const nextIndex = queue.length
+    const firstEvent = queue.at(0) || newEvent
+    const matchingReaction = reactions.get(firstEvent.payload.type)
+
+    if (!matchingReaction) return { shouldQueue: false }
+    console.log("in shouldEventBeEnqueued event type and event lbj: ", newEvent.payload.type, newEvent.payload.lbj)
+    console.log("in shouldEventBeEnqueued state lbj: ", jbLast)
+    if (newEvent.payload.lbj != jbLast.get(newEvent.payload.type) ) { console.log("event not enqueued\n"); return { shouldQueue: false } }
+    console.log("event enqueued")
+    console.log()
+    // Asserted as non-nullish because it is impossible for `queue`'s length to
+    // exceeed `matchingReaction.eventChainTrigger`'s length
+    //
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const factoryAtNextIndex = matchingReaction.eventChainTrigger[nextIndex]!
+    const zodDefinition = factoryAtNextIndex[MachineEvent.FactoryInternalsAccessor].zodDefinition
+
+    const typeMatches = () => newEvent.payload.type === factoryAtNextIndex.type
+
+    const payloadSchemaMatchesOrZodIsUnavailable = () => {
+      if (!zodDefinition) return true
+      const { type, ...rest } = newEvent.payload
+      return zodDefinition.safeParse(rest).success
+    }
+
+    if (!typeMatches() || !payloadSchemaMatchesOrZodIsUnavailable()) {
+      return { shouldQueue: false }
+    }
+
+    return {
+      shouldQueue: true,
+      matchingReaction,
+    }
+  }
   export const reset = (internals: RunnerInternals.Any) => {
     const initial = internals.initial
     internals.current = {
@@ -188,16 +235,24 @@ export namespace RunnerInternals {
   export const pushEvent = <StatePayload>(
     internals: RunnerInternals.Any,
     event: ActyxEvent<MachineEvent.Any>,
+    isBranchTracking: boolean,
   ): PushEventResult => {
     const mechanism = internals.current.factory.mechanism
     const protocol = mechanism.protocol
     const reactions = protocol.reactionMap.get(mechanism)
 
-    const queueDeterminationResult = shouldEventBeEnqueued<StatePayload>(
-      reactions,
-      internals.queue,
-      event,
-    )
+    const queueDeterminationResult = isBranchTracking ?
+      shouldEventBeEnqueuedBT<StatePayload>(
+        reactions,
+        internals.queue,
+        event,
+        internals.current.data.payload.jbLast
+      ) :
+      shouldEventBeEnqueued<StatePayload>(
+        reactions,
+        internals.queue,
+        event,
+      )
 
     if (!queueDeterminationResult.shouldQueue) {
       return { type: PushEventTypes.Discard, discarded: event }

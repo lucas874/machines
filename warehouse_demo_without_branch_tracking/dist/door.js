@@ -16,45 +16,43 @@ var __asyncValues = (this && this.__asyncValues) || function (o) {
     function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.s2 = exports.s1 = exports.s0 = void 0;
 const sdk_1 = require("@actyx/sdk");
 const machine_runner_1 = require("@actyx/machine-runner");
 const warehouse_protocol_1 = require("./warehouse_protocol");
 const machine_check_1 = require("@actyx/machine-check");
-/*
-Using the machine runner DSL an implmentation of door in Gwarehouse is:
-
-const door = Composition.makeMachine('D')
-export const s0 = door.designEmpty('s0')
-    .command('close', [Events.time], () => {
-        var dateString = new Date().toLocaleString();
-        console.log("closed warehouse at:", dateString);
-        return [Events.time.make({timeOfDay: dateString})]})
-    .finish()
-export const s1 = door.designEmpty('s1').finish()
-export const s2 = door.designEmpty('s2').finish()
-
-s0.react([Events.partID], s1, (_) => s1.make())
-s1.react([Events.part], s0, (_) => s0.make())
-s0.react([Events.time], s2, (_) => s2.make())
-*/
+//Using the machine runner DSL an implmentation of door in Gwarehouse is:
+const door = warehouse_protocol_1.Composition.makeMachine('D');
+exports.s0 = door.designEmpty('s0')
+    .command('close', [warehouse_protocol_1.Events.time], () => {
+    var dateString = new Date().toLocaleString();
+    console.log("closed warehouse at:", dateString);
+    return [warehouse_protocol_1.Events.time.make({ timeOfDay: dateString })];
+})
+    .finish();
+exports.s1 = door.designEmpty('s1').finish();
+exports.s2 = door.designEmpty('s2').finish();
+exports.s0.react([warehouse_protocol_1.Events.partID], exports.s1, (_) => exports.s1.make());
+exports.s1.react([warehouse_protocol_1.Events.part], exports.s0, (_) => exports.s0.make());
+exports.s0.react([warehouse_protocol_1.Events.time], exports.s2, (_) => exports.s2.make());
 // Projection of Gwarehouse || Gfactory || Gquality over D
-const result_projection_info = (0, machine_check_1.projectionAndInformation)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "D");
-if (result_projection_info.type == 'ERROR')
+const result_projection = (0, machine_check_1.projectCombineMachines)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "D");
+if (result_projection.type == 'ERROR')
     throw new Error('error getting projection');
-const projection_info = result_projection_info.data;
-console.log(projection_info);
+const projection = result_projection.data;
 // Command map
 const cMap = new Map();
 cMap.set(warehouse_protocol_1.Events.time.type, () => {
     var dateString = new Date().toLocaleString();
     console.log("closed warehouse at:", dateString);
-    return { timeOfDay: dateString };
+    //return {timeOfDay: dateString}})
+    return [warehouse_protocol_1.Events.time.make({ timeOfDay: dateString })];
 });
 // Reaction map
 const rMap = new Map();
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
 // Extended machine
-const [m3, i3] = warehouse_protocol_1.Composition.extendMachineBT("D", projection_info, warehouse_protocol_1.Events.allEvents, fMap);
+const [m3, i3] = warehouse_protocol_1.Composition.extendMachine("D", projection, warehouse_protocol_1.Events.allEvents, fMap);
 const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "D", m3.createJSONForAnalysis(i3));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));
@@ -64,7 +62,7 @@ function main() {
         var _a, e_1, _b, _c;
         const app = yield sdk_1.Actyx.of(warehouse_protocol_1.manifest);
         const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
-        const machine = (0, machine_runner_1.createMachineRunnerBT)(app, tags, i3, undefined);
+        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, exports.s0, undefined);
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;

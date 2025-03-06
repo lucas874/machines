@@ -31,10 +31,9 @@ export type SwarmProtocol<
   ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
   extendMachineBT: <MachineName extends string>(
     machineName: MachineName,
-    proj: ProjMachine.ProjectionType,
+    proj: ProjMachine.ProjectionAndSucceedingMap,
     events: readonly MachineEvent.Factory<any, any>[],
     fMap: ProjMachine.funMap,
-    specialEvents: Set<string>,
   ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
 }
 
@@ -83,7 +82,7 @@ export namespace SwarmProtocol {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
       extendMachine: (machineName, proj, events, fMap) => ProjMachine.extendMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, fMap),
-      extendMachineBT: (machineName, proj, events, fMap, specialEvents) => ProjMachine.extendMachineBT(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, fMap, specialEvents)
+      extendMachineBT: (machineName, projectionInfo, events, fMap) => ProjMachine.extendMachineBT(ImplMachine.make(swarmName, machineName, eventFactories), projectionInfo, events, fMap)
     }
   }
 }
@@ -591,9 +590,15 @@ export namespace ProjMachine {
   // compute branch(e) --> set of states, follow each branch
   // add all event types encountered up to and including
   // first branching or joining event type.
-
-
-  type BTState<Payload> = {lbj: string, payload: Payload}
+  //function getEventTypesOnPaths(proj: )
+  export type SucceedingNonBranchingJoining = Record<string, Set<string>>;
+  export type ProjectionAndSucceedingMap = {
+    projection: ProjectionType,
+    succeeding_non_branching_joining: SucceedingNonBranchingJoining,
+    branching_joining: Set<string>,
+  }
+  type LastJB = Map<string, string>
+  type BTState<Payload> = {jbLast: LastJB, payload: Payload}
   type BTStateEmpty = BTState<undefined>
 
   export const extendMachineBT = <
@@ -602,16 +607,17 @@ export namespace ProjMachine {
     MachineEventFactories extends MachineEvent.Factory.Any,
   >(
     m: Machine<SwarmProtocolName, MachineName, MachineEventFactories>,
-    proj: ProjectionType,
+    projectionInfo: ProjectionAndSucceedingMap,
     events: readonly MachineEvent.Factory<any, Record<never, never>>[],
     fMap: funMap,
-    specialEvents: Set<string>
   ): [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]  => {
     var projStatesToStates: Map<string, any> = new Map()
     var projStatesToExec: Map<string, Transition[]> = new Map()
     var projStatesToInput: Map<string, Transition[]> = new Map()
     var eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> = new Map()
     var projStatesToStatePayload: Map<string, (...args : any[]) => any> = new Map()
+    const proj = projectionInfo.projection
+    const specialEvents = projectionInfo.branching_joining
     var incomingMap = incomingEdgesOfStatesMap(proj)
     var markedStates: Set<string> = new Set()
 
@@ -676,7 +682,12 @@ export namespace ProjMachine {
 
           //var f = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => [{}]
           const payloadFun = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => {}
-          const f = (s: any, e: any) => {var payload = payloadFun({...s, self: s.self?.payload ?? s.self}, e); return [es[0]?.makeBT(payload, s.self.lbj)]}
+          const f = (s: any, e: any) => {
+            var payload = payloadFun({...s, self: s.self?.payload ?? s.self}, e);
+            //var lbj = s.self?.lbj ?? null;
+            var lbj = s.self.jbLast.get(etypes[0])
+            return [es[0]?.makeBT(payload, lbj)]
+          }
           cmdTriples.push([transition.label.cmd, es, f])
 
         }
@@ -712,7 +723,7 @@ export namespace ProjMachine {
           var e = transition.label.eventType
           var es = eventTypeStringToEvent.get(e)
 
-          const f = getReaction(e, fMap, projStatesToStates, markedStates, specialEvents, transition.source, transition.target)
+          const f = getReaction(e, fMap, projStatesToStates, markedStates, specialEvents, projectionInfo.succeeding_non_branching_joining, transition.target)
           projStatesToStates.get(key).react([es], projStatesToStates.get(transition.target), f)
         }
       })
@@ -721,39 +732,49 @@ export namespace ProjMachine {
     var initial = projStatesToStates.get(proj.initial)
     return [m, initial]
   }
-  function getReaction(eventType: string, fMap: any, projStatesToStates: any, markedStates: any, specialEvents: Set<string>, sourceState: any, targetState: any) {
+
+  function updateJBLast(t: string, eventId: string, jbLast: Map<string, string>, succeeding_non_branching_joining: Record<string, Set<string>>): Map<string, string> {
+    const branchFromT = succeeding_non_branching_joining[t]
+    var jbLastUpdated = structuredClone(jbLast)
+    for (var et of branchFromT) {
+      jbLastUpdated.set(et, eventId)
+    }
+
+    return jbLastUpdated
+  }
+
+  function getReaction(eventType: string, fMap: any, projStatesToStates: any, markedStates: any, specialEvents: Set<string>, succeeding_non_branching_joining: Record<string, Set<string>>, targetState: any) {
     if (fMap.reactions.has(eventType)) {
       if (specialEvents.has(eventType)) {
         return (s: any, e: any) => {
-          console.log("hej first");
-          console.log("s is weird place: ", s);
-          console.log(e)
-          if(s.self !== undefined && e.payload.lbj === s.self.lbj) {
-            console.log("herehre")
-            return s;
-          }
           const sPayload = fMap.reactions.get(eventType)!.genPayloadFun({...s, self: s.self?.payload ?? s.self}, e);
-          return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: sPayload})
+          return projStatesToStates.get(targetState).make({jbLast: updateJBLast(e.payload.type, e.meta.eventId, s.self.jbLast, succeeding_non_branching_joining), payload: sPayload})
         }
       } else {
         return (s: any, e: any) => {
-
-          console.log("hej second");
           const sPayload = fMap.reactions.get(eventType)!.genPayloadFun({...s, self: s.self?.payload ?? s.self}, e);
-          return projStatesToStates.get(targetState).make({lbj: s.self.lbj, payload: sPayload})
+          return projStatesToStates.get(targetState).make({jbLast: s.self.jbLast, payload: sPayload})
         }
       }
     } else if (markedStates.has(targetState)) {
       if (specialEvents.has(eventType)) {
-        return (s: any, e: any) => { return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: s.self.payload})}
+        return (s: any, e: any) => {
+          return projStatesToStates.get(targetState).make({jbLast: updateJBLast(e.payload.type, e.meta.eventId, s.self.jbLast, succeeding_non_branching_joining), payload: s.self.payload})
+        }
       } else {
-        return (s: any, _: any) => { return projStatesToStates.get(targetState).make(s.self)}
+        return (s: any, e: any) => {
+          return projStatesToStates.get(targetState).make(s.self)
+        }
       }
     } else {
       if (specialEvents.has(eventType)) {
-        return (_: any, e: any) => { return projStatesToStates.get(targetState).make({lbj: e.meta.eventId, payload: undefined})}
+        return (s: any, e: any) => {
+          return projStatesToStates.get(targetState).make({jbLast: updateJBLast(e.payload.type, e.meta.eventId, s.self.jbLast, succeeding_non_branching_joining), payload: undefined})
+        }
       } else {
-        return (s: any, _: any) => { return projStatesToStates.get(targetState).make({lbj: s.self.lbj, payload: undefined})}
+        return (s: any, e: any) => {
+          return projStatesToStates.get(targetState).make({jbLast: s.self.jbLast, payload: undefined})
+        }
       }
     }
 

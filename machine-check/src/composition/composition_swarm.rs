@@ -914,7 +914,7 @@ fn after_not_concurrent_step(
     is_stable
 }
 
-fn transitive_closure_succeeding(succ_map: BTreeMap<EventType, BTreeSet<EventType>>) -> BTreeMap<EventType, BTreeSet<EventType>> {
+pub fn transitive_closure_succeeding(succ_map: BTreeMap<EventType, BTreeSet<EventType>>) -> BTreeMap<EventType, BTreeSet<EventType>> {
     let mut graph: petgraph::Graph::<EventType, (), Directed> = petgraph::Graph::new();
     let mut node_map = BTreeMap::new();
     for (event, succeeding) in &succ_map {

@@ -1,4 +1,4 @@
-import { check_swarm, check_projection, check_wwf_swarm, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, check_composed_projection, revised_projection, project_combine, compose_protocols, project_combine_all } from '../pkg/machine_check.js'
+import { check_swarm, check_projection, check_wwf_swarm, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, check_composed_projection, revised_projection, project_combine, compose_protocols, project_combine_all, projection_information } from '../pkg/machine_check.js'
 
 export type Protocol<Label> = {
   initial: string
@@ -29,7 +29,12 @@ export type Granularity =
   | 'Medium'
   | 'Coarse'
   | 'TwoStep'
-
+export type SucceedingNonBranchingJoining = Record<string, Set<string>>;
+export type ProjectionAndSucceedingMap = {
+    projection: MachineType,
+    succeeding_non_branching_joining: SucceedingNonBranchingJoining,
+    branching_joining: Set<string>,
+}
 export function checkSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): Result {
   const p = JSON.stringify(proto)
   const s = JSON.stringify(subscriptions)
@@ -114,4 +119,17 @@ export function projectAll(protos: InterfacingSwarms, subscriptions: Subscriptio
   const s = JSON.stringify(subscriptions)
   const result = project_combine_all(ps, s)
   return JSON.parse(result)
+}
+
+export function projectionAndInformation(protos: InterfacingSwarms, subscriptions: Subscriptions, role: string): ResultData<ProjectionAndSucceedingMap> {
+  const ps = JSON.stringify(protos)
+  const s = JSON.stringify(subscriptions)
+  const result = JSON.parse(projection_information(ps, s, role));
+  if (result.type === "ERROR") {
+    return result
+  } else {
+    const data = {...result.data, branching_joining: new Set<string>(result.data.branching_joining) }
+    return {type: "OK", data: data}
+  }
+
 }

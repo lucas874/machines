@@ -265,6 +265,51 @@ export const createMachineRunner = <
   return createMachineRunnerInternal(subscribe, persist, tags, initialFactory, initialPayload)
 }
 
+/**
+ * @param sdk - An instance of Actyx.
+ * @param tags - List of tags to be subscribed. These tags will also be added to
+ * events published to Actyx.
+ * @param initialFactory - initial state factory of the machine.
+ * @param initialPayload - initial state payload of the machine.
+ * @returns a MachineRunner instance.
+ */
+export const createMachineRunnerBT = <
+  SwarmProtocolName extends string,
+  MachineName extends string,
+  MachineEventFactories extends MachineEvent.Factory.Any,
+  Payload,
+  MachineEvents extends MachineEvent.Any = MachineEvent.Of<MachineEventFactories>,
+  StateUnion extends unknown = unknown,
+>(
+  sdk: Actyx,
+  tags: Tags<MachineEvents>,
+  initialFactory: StateFactory<
+    SwarmProtocolName,
+    MachineName,
+    MachineEventFactories,
+    any,
+    Payload,
+    any
+  >,
+  initialPayload: any,
+): MachineRunner<SwarmProtocolName, MachineName, StateUnion> => {
+  const subscribeMonotonicQuery = {
+    query: tags,
+    sessionId: 'dummy',
+    attemptStartFrom: { from: {}, latestEventKey: EventKey.zero },
+  }
+
+  const persist: PublishFn = (e) => sdk.publish(e)
+
+  const subscribe: SubscribeFn<MachineEvents> = (callback, onCompleteOrErr) =>
+    sdk.subscribeMonotonic<MachineEvents>(subscribeMonotonicQuery, callback, onCompleteOrErr)
+  var jbLastInitial: Map<string, string> = new Map()
+  for (var e of initialFactory.mechanism.protocol.registeredEvents) {
+    jbLastInitial.set(e.type, 'null')
+  }
+  const intialPayloadWrapped: any = {jbLast: jbLastInitial, payload: initialPayload}
+  return createMachineRunnerInternalBT(subscribe, persist, tags, initialFactory, intialPayloadWrapped)
+}
 export const createMachineRunnerInternal = <
   SwarmProtocolName extends string,
   MachineName extends string,
@@ -425,7 +470,367 @@ export const createMachineRunnerInternal = <
               bootTimeLogger.incrementEventCount()
               emitter.emit('debug.eventHandlingPrevState', internals.current.data)
 
-              const pushEventResult = RunnerInternals.pushEvent(internals, event)
+              const pushEventResult = RunnerInternals.pushEvent(internals, event, false)
+
+              emitter.emit('debug.eventHandling', {
+                event,
+                handlingReport: pushEventResult,
+                mechanism: internals.current.factory.mechanism,
+                factory: internals.current.factory,
+                nextState: internals.current.data,
+              })
+
+              // Effects of handlingReport on emitters
+              if (pushEventResult.type === PushEventTypes.React) {
+                if (emitter.listenerCount('audit.state') > 0) {
+                  emitter.emit('audit.state', {
+                    state: ImplStateOpaque.make<SwarmProtocolName, MachineName, StateUnion>(
+                      internals,
+                      internals.current,
+                    ),
+                    events: pushEventResult.triggeringEvents,
+                  })
+                }
+              } else if (pushEventResult.type === PushEventTypes.Discard) {
+                emitter.emit('audit.dropped', {
+                  state: internals.current.data,
+                  event: pushEventResult.discarded,
+                })
+              } else if (pushEventResult.type === PushEventTypes.Failure) {
+                const nameOf = ({ mechanism }: StateFactory.Any) =>
+                  `${mechanism.protocol.swarmName}/${mechanism.protocol.name}/${mechanism.name}`
+
+                return fail(
+                  new MachineRunnerFailure(
+                    `Exception thrown while transitioning from ${nameOf(
+                      pushEventResult.failure.current,
+                    )} to ${nameOf(pushEventResult.failure.next)}`,
+                    pushEventResult.failure.error,
+                  ),
+                )
+              }
+            }
+
+            if (d.caughtUp) {
+              // the SDK translates an OffsetMap response into MsgType.events
+              // with caughtUp=true
+              if (!internals.caughtUpFirstTime) {
+                bootTimeLogger.emit()
+              }
+
+              internals.caughtUp = true
+              internals.caughtUpFirstTime = true
+              emitter.emit('log', 'Caught up')
+
+              const stateOpaqueToBeEmitted = ImplStateOpaque.make<
+                SwarmProtocolName,
+                MachineName,
+                StateUnion
+              >(internals, internals.current)
+              emitter.emit('change', stateOpaqueToBeEmitted)
+
+              if (
+                !internals.previouslyEmittedToNext ||
+                !ImplStateOpaque.eqInternal(internals.current, internals.previouslyEmittedToNext)
+              ) {
+                internals.previouslyEmittedToNext = {
+                  factory: internals.current.factory,
+                  data: deepCopy(internals.current.data),
+                }
+                emitter.emit('next', stateOpaqueToBeEmitted)
+              }
+            }
+          }
+        } catch (error) {
+          return fail(new MachineRunnerFailure(`Unknown Error`, error))
+        }
+      },
+      (err) => {
+        RunnerInternals.reset(internals)
+        emitter.emit('audit.reset')
+        emitter.emit('change', ImplStateOpaque.make(internals, internals.current))
+
+        emitter.emit('log', 'Restarting in 1sec due to error')
+        unsubscribeFromActyx()
+        setTimeout(() => restartActyxSubscription, 10000)
+      },
+    )
+  }
+
+  // First run of the subscription
+  restartActyxSubscription()
+
+  // AsyncIterator part
+  // ==================
+
+  type S = StateOpaque<SwarmProtocolName, MachineName, string, StateUnion>
+  const nextValueAwaiter = (
+    currentLevelDestruction: Destruction,
+    state?: { state: S } | undefined,
+  ) => {
+    const nva = NextValueAwaiter.make<S>({
+      topLevelDestruction: internals.destruction,
+      currentLevelDestruction,
+      failure: () => internals.failure,
+      cloneFrom: state,
+    })
+
+    const purgeWhenMatching = ({ sourceState }: { sourceState: S }) =>
+      nva.purgeWhenMatching(sourceState)
+
+    emitter.on('next', nva.push)
+    emitter.on('failure', nva.fail)
+    emitter.on('commandPersisted', purgeWhenMatching)
+    internals.destruction.addDestroyHook(() => {
+      nva.kill()
+      emitter.off('next', nva.push)
+      emitter.off('failure', nva.fail)
+      emitter.off('commandPersisted', purgeWhenMatching)
+    })
+
+    return nva
+  }
+
+  const defaultNextValueAwaiter = nextValueAwaiter(internals.destruction)
+
+  // Self API construction
+
+  const getSnapshot = (): ThisStateOpaque | null =>
+    internals.caughtUpFirstTime ? ImplStateOpaque.make(internals, internals.current) : null
+
+  const api = {
+    id: Symbol(),
+    events: emitter,
+    get: getSnapshot,
+    initial: (): ThisStateOpaque => ImplStateOpaque.make(internals, internals.initial),
+    destroy: internals.destruction.destroy,
+    isDestroyed: internals.destruction.isDestroyed,
+    noAutoDestroy: () => {
+      const childDestruction = (() => {
+        const childDestruction = Destruction.make()
+
+        internals.destruction.addDestroyHook(() => childDestruction.destroy())
+
+        if (internals.destruction.isDestroyed()) {
+          childDestruction.destroy()
+        }
+
+        return childDestruction
+      })()
+
+      return MachineRunnerIterableIterator.make({
+        emitter,
+        internals,
+        nextValueAwaiter: nextValueAwaiter(childDestruction, defaultNextValueAwaiter.state()),
+        destruction: childDestruction,
+      })
+    },
+  }
+
+  const defaultIterator: MachineRunnerIterableIterator<SwarmProtocolName, MachineName, StateUnion> =
+    MachineRunnerIterableIterator.make({
+      emitter,
+      internals,
+      nextValueAwaiter: defaultNextValueAwaiter,
+      destruction: internals.destruction,
+    })
+
+  const refineStateType = <
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+    Factories extends Readonly<StateFactory<SwarmProtocolName, MachineName, any, any, any, any>[]>,
+  >(
+    factories: Factories,
+  ) => {
+    const allStateNames = new Set(initialFactory.mechanism.protocol.states.registeredNames)
+    factories.forEach((factory) => allStateNames.delete(factory.mechanism.name))
+    if (allStateNames.size > 0) {
+      throw new Error(
+        'Call to refineStateType fails, some possible states are not passed into the parameter. Pass all states as arguments.',
+      )
+    }
+
+    return self as MachineRunner<
+      SwarmProtocolName,
+      MachineName,
+      StateFactory.ReduceIntoPayload<Factories>
+    >
+  }
+
+  const self: ThisMachineRunner = {
+    ...api,
+    ...defaultIterator,
+    refineStateType,
+  }
+
+  globals.activeRunners[ActiveRunnerRegistryRegisterSymbol](self, {
+    initialFactory,
+    tags,
+  })
+
+  return self
+}
+
+export const createMachineRunnerInternalBT = <
+  SwarmProtocolName extends string,
+  MachineName extends string,
+  MachineEventFactories extends MachineEvent.Factory.Any,
+  Payload,
+  MachineEvents extends MachineEvent.Any = MachineEvent.Of<MachineEventFactories>,
+  StateUnion extends unknown = unknown,
+>(
+  subscribe: SubscribeFn<MachineEvents>,
+  publish: PublishFn,
+  tags: Tags,
+  initialFactory: StateFactory<
+    SwarmProtocolName,
+    MachineName,
+    MachineEventFactories,
+    any,
+    Payload,
+    any
+  >,
+  initialPayload: Payload,
+): MachineRunner<SwarmProtocolName, MachineName, StateUnion> => {
+  type ThisStateOpaque = StateOpaque<SwarmProtocolName, MachineName, string, StateUnion>
+  type ThisMachineRunner = MachineRunner<SwarmProtocolName, MachineName, StateUnion>
+
+  const emitter = makeEmitter<SwarmProtocolName, MachineName, StateUnion>()
+
+  const emitErrorIfSubscribed: MachineEmitterEventMap<
+    SwarmProtocolName,
+    MachineName,
+    StateUnion
+  >['error'] = (error) => {
+    const listeningEmitters = [emitter, globals.emitter].filter(
+      (emitter) => emitter.listenerCount('error') > 0,
+    )
+
+    // Listener count must be check in order to not trigger ERR_UNHANDLED_ERROR
+    // https://nodejs.org/api/errors.html#err_unhandled_error
+    if (listeningEmitters.length > 0) {
+      listeningEmitters.forEach((emitter) => emitter.emit('error', error))
+    } else {
+      // Preserve old behavior where errors are printed
+      console.warn(error.stack)
+    }
+  }
+
+  const persist: PersistFn<MachineEvents> = (containedEvents) => {
+    const taggedEvents = containedEvents.map((containedEvent) =>
+      MachineRunner.tagContainedEvent(tags as Tags<MachineEvents>, containedEvent),
+    )
+    return publish(taggedEvents)
+  }
+
+  const internals = RunnerInternals.make(initialFactory, initialPayload, (props) => {
+    const error = CommandGeneratorCriteria.produceError(props.commandGeneratorCriteria, () =>
+      makeIdentityStringForCommandError(
+        initialFactory.mechanism.protocol.swarmName,
+        initialFactory.mechanism.protocol.name,
+        tags.toString(),
+        props.commandKey,
+      ),
+    )
+
+    if (error) {
+      emitErrorIfSubscribed(error)
+      return Promise.reject(error)
+    }
+
+    const currentCommandLock = Symbol(Math.random())
+    const sourceState = ImplStateOpaque.make<SwarmProtocolName, MachineName, StateUnion>(
+      internals,
+      internals.current,
+    )
+
+    internals.commandLock = currentCommandLock
+
+    const events = props.generateEvents()
+
+    const unlockAndLogOnPersistFailure = (err: unknown) => {
+      emitter.emit(
+        'log',
+        `error publishing ${err} ${events.map((e) => JSON.stringify(e)).join(', ')}`,
+      )
+      /**
+       * Guards against cases where command's events cannot be persisted but the
+       * state has changed.
+       */
+      if (currentCommandLock !== internals.commandLock) return
+      internals.commandLock = null
+      emitter.emit('change', ImplStateOpaque.make(internals, internals.current))
+    }
+
+    // Aftermath
+    const persistResult = persist(events)
+      .then((res) => {
+        emitter.emit('commandPersisted', { sourceState })
+        return res
+      })
+      .catch((err) => {
+        unlockAndLogOnPersistFailure(err)
+        return Promise.reject(err)
+      })
+
+    // Change is triggered because commandLock status changed
+    emitter.emit('change', ImplStateOpaque.make(internals, internals.current))
+    return persistResult
+  })
+
+  // Actyx Subscription management
+  internals.destruction.addDestroyHook(() => emitter.emit('destroyed', undefined))
+
+  const fail = (cause: MachineRunnerFailure) => {
+    // order of execution is very important here
+    // if changing causes issue in test, revert
+    internals.failure = cause
+    emitter.emit('failure', cause)
+    emitErrorIfSubscribed(cause)
+    internals.destruction.destroy()
+  }
+
+  let refToUnsubFunction = null as null | (() => void)
+
+  const unsubscribeFromActyx = () => {
+    refToUnsubFunction?.()
+    refToUnsubFunction = null
+  }
+  internals.destruction.addDestroyHook(unsubscribeFromActyx)
+
+  const restartActyxSubscription = () => {
+    unsubscribeFromActyx()
+
+    if (internals.destruction.isDestroyed()) return
+
+    const bootTimeLogger = makeBootTimeLogger(
+      {
+        machineName: initialFactory.mechanism.protocol.name,
+        swarmProtocolName: initialFactory.mechanism.protocol.swarmName,
+        tags: tags,
+      },
+      [emitter, globals.emitter],
+    )
+
+    refToUnsubFunction = subscribe(
+      async (d) => {
+        try {
+          if (d.type === MsgType.timetravel) {
+            emitter.emit('log', 'Time travel')
+            RunnerInternals.reset(internals)
+            emitter.emit('audit.reset')
+
+            restartActyxSubscription()
+          } else if (d.type === MsgType.events) {
+            //
+            internals.caughtUp = false
+
+            for (const event of d.events) {
+              // TODO: Runtime typeguard for event
+              // https://github.com/Actyx/machines/issues/9
+              bootTimeLogger.incrementEventCount()
+              emitter.emit('debug.eventHandlingPrevState', internals.current.data)
+
+              const pushEventResult = RunnerInternals.pushEvent(internals, event, true)
 
               emitter.emit('debug.eventHandling', {
                 event,
