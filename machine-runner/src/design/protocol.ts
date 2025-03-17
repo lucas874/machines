@@ -34,6 +34,7 @@ export type SwarmProtocol<
     proj: ProjMachine.ProjectionAndSucceedingMap,
     events: readonly MachineEvent.Factory<any, any>[],
     fMap: ProjMachine.funMap,
+    mOrig: any,
   ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
 }
 
@@ -82,7 +83,7 @@ export namespace SwarmProtocol {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
       extendMachine: (machineName, proj, events, fMap) => ProjMachine.extendMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, fMap),
-      extendMachineBT: (machineName, projectionInfo, events, fMap) => ProjMachine.extendMachineBT(ImplMachine.make(swarmName, machineName, eventFactories), projectionInfo, events, fMap)
+      extendMachineBT: (machineName, projectionInfo, events, fMap, mOrig) => ProjMachine.extendMachineBT(ImplMachine.make(swarmName, machineName, eventFactories), projectionInfo, events, fMap, mOrig)
     }
   }
 }
@@ -585,6 +586,30 @@ export namespace ProjMachine {
     var initial = projStatesToStates.get(proj.initial)
     return [m, initial]
   }
+  // https://medium.com/@alaneicker/how-to-process-json-data-with-recursion-dc530dd3db09
+  export function loopThroughJSON(k: string, obj: any) {
+    for (let key in obj) {
+      if (typeof obj[key] === 'object') {
+        if (Array.isArray(obj[key])) {
+          // loop through array
+          for (let i = 0; i < obj[key].length; i++) {
+            loopThroughJSON(k + " " + key, obj[key][i]);
+          }
+        } else {
+          // call function recursively for object
+          loopThroughJSON(k + " " + key, obj[key]);
+        }
+      } else {
+        // do something with value
+        console.log(k + " " + key + ': ', obj[key]);
+      }
+    }
+  }
+
+  function isEmptyObject(value: unknown): boolean {
+    return typeof(value) === "object" && value !== null && Object.keys(value).length === 0;
+  }
+
   // TODO computeBranches: for each state in projection,
   // for each event type that has a transition in such state:
   // compute branch(e) --> set of states, follow each branch
@@ -610,6 +635,7 @@ export namespace ProjMachine {
     projectionInfo: ProjectionAndSucceedingMap,
     events: readonly MachineEvent.Factory<any, Record<never, never>>[],
     fMap: funMap,
+    mOrig: any,
   ): [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]  => {
     var projStatesToStates: Map<string, any> = new Map()
     var projStatesToExec: Map<string, Transition[]> = new Map()
@@ -620,7 +646,32 @@ export namespace ProjMachine {
     const specialEvents = projectionInfo.branching_joining
     var incomingMap = incomingEdgesOfStatesMap(proj)
     var markedStates: Set<string> = new Set()
-
+    /* for (var eee of events) {
+      console.log("eee: ", loopThroughJSON("", eee))
+    } */
+    console.log("-------------")
+    loopThroughJSON("", mOrig)
+    console.log("-------------")
+    console.log(mOrig.mechanism.protocol.reactionMap.getAll())
+    console.log("-------------")
+    //console.log(mOrig.mechanism.protocol.reactionMap.getAll().keys())
+    //console.log("-------------")
+    mOrig.mechanism.protocol.reactionMap.getAll().forEach((value: any, key: any) => {
+      console.log("key: ", key)
+      console.log("value: ", value)
+      value.forEach((value_: any, key_: any) => {
+        console.log("event type: ", key_)
+        console.log("handler: ", value_.handler.toString())
+      });
+      for (const p in key.commands) {
+        console.log("command name: ", p)
+        console.log("command: ", key.commands[p].toString())
+      }
+      console.log("-------------------");
+  });
+  for (var c of mOrig.mechanism.protocol.commands) {
+    console.log("ccc: ", loopThroughJSON("", c))
+  }
     proj.transitions.forEach((transition) => {
       if (transition.label.tag === 'Execute') {
         if (!projStatesToExec.has(transition.source)) {
@@ -685,7 +736,19 @@ export namespace ProjMachine {
           const f = (s: any, e: any) => {
             var payload = payloadFun({...s, self: s.self?.payload ?? s.self}, e);
             //var lbj = s.self?.lbj ?? null;
+            console.log("HELLLOOOO ", s)
             var lbj = s.self.jbLast.get(etypes[0])
+            console.log("HELLLOOOO ", lbj)
+            console.log("HELLLOO ", es[0]?.makeBT(payload, lbj))
+            console.log("HELLOO ", fMap.commands.has(etypes[0]))
+            console.log("heeelo es[0]", es[0])
+            console.log("typeof payload == {}?", typeof(payload) === typeof({}))
+            console.log("typeof typeof: ", typeof(typeof(payload)))
+            console.log("is empty object? ", isEmptyObject(payload))
+            console.log("makeBT length: ", es[0]?.makeBT.length)
+            if (es[0]?.makeBT.length == 1) {
+              return [es[0]?.makeBT(payload, lbj)]
+            }
             return [es[0]?.makeBT(payload, lbj)]
           }
           cmdTriples.push([transition.label.cmd, es, f])
@@ -748,11 +811,15 @@ export namespace ProjMachine {
       if (specialEvents.has(eventType)) {
         return (s: any, e: any) => {
           const sPayload = fMap.reactions.get(eventType)!.genPayloadFun({...s, self: s.self?.payload ?? s.self}, e);
+          console.log("ABOUT TO CRASH payload is: ", sPayload)
+          console.log(typeof(sPayload))
           return projStatesToStates.get(targetState).make({jbLast: updateJBLast(e.payload.type, e.meta.eventId, s.self.jbLast, succeeding_non_branching_joining), payload: sPayload})
         }
       } else {
         return (s: any, e: any) => {
           const sPayload = fMap.reactions.get(eventType)!.genPayloadFun({...s, self: s.self?.payload ?? s.self}, e);
+          console.log("ABOUT TO CRASH payload is: ", sPayload)
+          console.log(typeof(sPayload))
           return projStatesToStates.get(targetState).make({jbLast: s.self.jbLast, payload: sPayload})
         }
       }

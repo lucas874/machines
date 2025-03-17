@@ -285,7 +285,7 @@ export namespace StateMechanism {
             return [factory.make(payload), extraData]
           },
         )
-
+        console.log("in stateeeee: ", events)
         return events
       }
 
