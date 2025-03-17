@@ -102,9 +102,9 @@ pub fn project(
         }
     }
     //nfa_to_dfa(machine, m_nodes[initial.index()])
-    //let (dfa, dfa_initial) = nfa_to_dfa(machine, m_nodes[initial.index()]); // make deterministic. slight deviation from projection operation formally.
-    //minimal_machine(&dfa, dfa_initial) // when minimizing we get a machine that is a little different but equivalent to the one prescribed by the projection operator formally
-    (machine, m_nodes[initial.index()])
+    let (dfa, dfa_initial) = nfa_to_dfa(machine, m_nodes[initial.index()]); // make deterministic. slight deviation from projection operation formally.
+    minimal_machine(&dfa, dfa_initial) // when minimizing we get a machine that is a little different but equivalent to the one prescribed by the projection operator formally
+    //(machine, m_nodes[initial.index()])
 }
 
 // precondition: the protocols interfaces on the supplied interfaces.
@@ -138,7 +138,7 @@ pub fn project_combine(
         (acc_machine, acc_initial),
         |(acc, acc_i), (m, i, interface)| compose(acc, acc_i, m, i, interface),
     );
-    //let (combined_projection, combined_initial) = minimal_machine(&combined_projection, combined_initial);
+    let (combined_projection, combined_initial) = minimal_machine(&combined_projection, combined_initial);
     // why option here COME BACK
     (
         to_option_machine(&combined_projection),
