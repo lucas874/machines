@@ -6,10 +6,12 @@ import { projectCombineMachines, checkComposedProjection, projectionAndInformati
 
 
 // Using the machine runner DSL an implmentation of transporter in Gwarehouse is:
-
+const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 const transporter = Composition.makeMachine('T')
 export const s0 = transporter.designState('s0').withPayload<{id: string}>()
-    .command('request', [Events.partID], (s: any, e: any) => {
+    .command('request', [Events.partID], (s: any, e: any, t: any) => {
+      console.log("whole s in request is: ", s)
+      console.log("e and t: ", e, " ", t) // 1 and 2 when called with request(1, 2, 3, 4), meaning ok that more paramters than specified, but event is not passed as default, which event would this be anyway. only CONTEXT which is called s here
       var id = s.self.id;
       console.log("requesting a", id);
       return [Events.partID.make({id: id})]})
@@ -17,29 +19,31 @@ export const s0 = transporter.designState('s0').withPayload<{id: string}>()
 export const s1 = transporter.designEmpty('s1').finish()
 export const s2 = transporter.designState('s2').withPayload<{part: string}>()
     .command('deliver', [Events.part], (s: any, e: any) => {
+      console.log("whole s in deliver is: ", s)
       console.log("delivering a", s.self.part)
       return [Events.part.make({part: s.self.part})] })
     .finish()
 export const s3 = transporter.designEmpty('s3').finish()
 
-s0.react([Events.partID], s1, (_) => s1.make())
+s0.react([Events.partID], s1, (s, e) => {console.log("event is: ", e); return s1.make()})
 s0.react([Events.time], s3, (_) => s3.make())
 s1.react([Events.position], s2, (_, e) => {
+    console.log("event is: ", e);
     console.log("got a ", e.payload.part);
     return { part: e.payload.part } })
 
-s2.react([Events.part], s0, (_, e) => { return s0.make({id: ""}) })
+s2.react([Events.part], s0, (_, e) => { return s0.make({id: parts[Math.floor(Math.random() * parts.length)]}) })
 
 
 // Projection of Gwarehouse || Gfactory || Gquality over D
-const result_projection_info = projectionAndInformation(interfacing_swarms, subs, "T")
+ const result_projection_info = projectionAndInformation(interfacing_swarms, subs, "T")
 if (result_projection_info.type == 'ERROR') throw new Error('error getting projection')
 const projection_info = result_projection_info.data
-console.log(projection_info)
+//console.log(projection_info)
 
 
 // Command map
-const cMap = new Map()
+/*const cMap = new Map()
 cMap.set(Events.partID.type, (s: any, e: any) => {
   var id = s.self.id;
   console.log("requesting a", id);
@@ -69,18 +73,19 @@ const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: initial
 const [m3, i3] = Composition.extendMachineBT("T", projection_info, Events.allEvents, fMap, s0)
 
 const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "T", m3.createJSONForAnalysis(i3))
-if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
+if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", ")) */
 
 
 // Run the extended machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
-    const machine = createMachineRunnerBT(app, tags, s0, {id: parts[Math.floor(Math.random() * parts.length)]})
+    //const machine = createMachineRunner(app, tags, s0, {id: parts[Math.floor(Math.random() * parts.length)]})
+    const machine = createMachineRunnerBT(app, tags, s0, {id: parts[Math.floor(Math.random() * parts.length)]}, projection_info.succeeding_non_branching_joining, projection_info.branching_joining)
 
     for await (const state of machine) {
       console.log("transporter. state is:", state.type)
+      console.log("transporter whole state: ", state)
       if (state.payload !== undefined) {
         console.log("state payload is:", state.payload)
       }
@@ -91,7 +96,7 @@ async function main() {
             setTimeout(() => {
                 var s1 = machine.get()?.cast()?.commands() as any
                 if (Object.keys(s1 || {}).includes('request')) {
-                    s1.request()
+                    s1.request(1, 2, 3, 4)
                 }
             }, getRandomInt(2000, 5000))
             break

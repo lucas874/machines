@@ -8,6 +8,7 @@ import {
   ReactionContext,
   ReactionMapPerMechanism,
   StateRaw,
+  StateRawBT,
   StateFactory,
 } from '../design/state.js'
 import { Destruction } from '../utils/destruction.js'
@@ -173,53 +174,6 @@ export namespace RunnerInternals {
     }
   }
 
-  const shouldEventBeEnqueuedBT = <Self>(
-    reactions: ReactionMapPerMechanism<Self>,
-    queue: ReadonlyArray<ActyxEvent<MachineEvent.Any>>,
-    newEvent: any,
-    jbLast: Map<string, string>,
-  ):
-    | {
-        shouldQueue: false
-      }
-    | {
-        shouldQueue: true
-        matchingReaction: Reaction<ReactionContext<Self>>
-      } => {
-    const nextIndex = queue.length
-    const firstEvent = queue.at(0) || newEvent
-    const matchingReaction = reactions.get(firstEvent.payload.type)
-
-    if (!matchingReaction) return { shouldQueue: false }
-    console.log("in shouldEventBeEnqueued event type and event lbj: ", newEvent.payload.type, newEvent.payload.lbj)
-    console.log("in shouldEventBeEnqueued state lbj: ", jbLast)
-    if (newEvent.payload.lbj != jbLast.get(newEvent.payload.type) ) { console.log("event not enqueued\n"); return { shouldQueue: false } }
-    console.log("event enqueued")
-    console.log()
-    // Asserted as non-nullish because it is impossible for `queue`'s length to
-    // exceeed `matchingReaction.eventChainTrigger`'s length
-    //
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const factoryAtNextIndex = matchingReaction.eventChainTrigger[nextIndex]!
-    const zodDefinition = factoryAtNextIndex[MachineEvent.FactoryInternalsAccessor].zodDefinition
-
-    const typeMatches = () => newEvent.payload.type === factoryAtNextIndex.type
-
-    const payloadSchemaMatchesOrZodIsUnavailable = () => {
-      if (!zodDefinition) return true
-      const { type, ...rest } = newEvent.payload
-      return zodDefinition.safeParse(rest).success
-    }
-
-    if (!typeMatches() || !payloadSchemaMatchesOrZodIsUnavailable()) {
-      return { shouldQueue: false }
-    }
-
-    return {
-      shouldQueue: true,
-      matchingReaction,
-    }
-  }
   export const reset = (internals: RunnerInternals.Any) => {
     const initial = internals.initial
     internals.current = {
@@ -235,24 +189,16 @@ export namespace RunnerInternals {
   export const pushEvent = <StatePayload>(
     internals: RunnerInternals.Any,
     event: ActyxEvent<MachineEvent.Any>,
-    isBranchTracking: boolean,
   ): PushEventResult => {
     const mechanism = internals.current.factory.mechanism
     const protocol = mechanism.protocol
     const reactions = protocol.reactionMap.get(mechanism)
 
-    const queueDeterminationResult = isBranchTracking ?
-      shouldEventBeEnqueuedBT<StatePayload>(
-        reactions,
-        internals.queue,
-        event,
-        internals.current.data.payload.jbLast
-      ) :
-      shouldEventBeEnqueued<StatePayload>(
-        reactions,
-        internals.queue,
-        event,
-      )
+    const queueDeterminationResult = shouldEventBeEnqueued<StatePayload>(
+      reactions,
+      internals.queue,
+      event,
+    )
 
     if (!queueDeterminationResult.shouldQueue) {
       return { type: PushEventTypes.Discard, discarded: event }
@@ -324,7 +270,7 @@ export type StateAndFactory<
     StatePayload,
     Commands
   >
-  data: StateRaw<any, any>
+  data: StateRaw<any, any> | StateRawBT<any, any>
 }
 
 export namespace StateAndFactory {
@@ -357,3 +303,281 @@ export type PushEventResult =
         next: StateFactory.Any
       }
     }
+/**
+   * Branch-tracking version of RunnerInternals.
+   * Difference between this and original:
+   *  - RunnerInternalsBT has an additional jbLast field, which is a Map<string, string>. We use it to map event types to events.
+   *  - RunnerInternalsBT uses the jbLast field to determine if an event should be enqueued: events are enqueued if they have the correct pointer
+   *
+   */
+export type RunnerInternalsBT<
+  SwarmProtocolName extends string,
+  MachineName extends string,
+  MachineEventFactories extends MachineEvent.Factory.Any,
+  StateName extends string,
+  StatePayload,
+  Commands extends CommandDefinerMap<any, any, Contained.ContainedEvent<MachineEvent.Any>[]>,
+> = {
+  destruction: Destruction
+  caughtUpFirstTime: boolean
+  caughtUp: boolean
+  readonly initial: StateAndFactory<
+    SwarmProtocolName,
+    MachineName,
+    MachineEventFactories,
+    any,
+    any,
+    any
+  >
+  commandEmitFn: CommandCallback<MachineEventFactories>
+  queue: ActyxEvent<MachineEvent.Any>[]
+  current: StateAndFactory<
+    SwarmProtocolName,
+    MachineName,
+    MachineEventFactories,
+    StateName,
+    StatePayload,
+    Commands
+  >
+
+  previouslyEmittedToNext: null | StateAndFactory<
+    SwarmProtocolName,
+    MachineName,
+    MachineEventFactories,
+    StateName,
+    StatePayload,
+    Commands
+  >
+
+  // TODO: document how it behaves
+  commandLock: null | symbol
+
+  /**
+   * When not null: indicates that the machine is failing from a miscalculation
+   * inside a reaction
+   */
+  failure: null | MachineRunnerFailure
+
+  //jbLast: Map<string, string>
+  branchTracker: RunnerInternalsBT.BranchTracker
+}
+export namespace RunnerInternalsBT {
+  export type Any = RunnerInternalsBT<any, any, any, any, any, any>
+  export type BranchTracker = {
+    jbLast: Map<string, string>
+    specialEventTypes: Set<string>
+    branches: Record<string, Set<string>>
+
+  }
+  // if event is branching or joining update jbLast accordingly otherwise return old
+  const updateJBLast = (branchTracker: BranchTracker, event: ActyxEvent<MachineEvent.Any>): BranchTracker => {
+    if (branchTracker.specialEventTypes.has(event.payload.type)) {
+      const branchFromT = branchTracker.branches[event.payload.type]
+      var jbLastUpdated = structuredClone(branchTracker.jbLast)
+      for (var et of branchFromT) {
+        jbLastUpdated.set(et, event.meta.eventId)
+      }
+      return {...branchTracker, jbLast: jbLastUpdated}
+    } else {
+      return branchTracker
+    }
+  }
+
+  export const make = <
+    SwarmProtocolName extends string,
+    MachineName extends string,
+    MachineEventFactories extends MachineEvent.Factory.Any,
+    StateName extends string,
+    StatePayload extends any,
+    Commands extends CommandDefinerMap<any, any, Contained.ContainedEvent<MachineEvent.Any>[]>,
+  >(
+    factory: StateFactory<
+      SwarmProtocolName,
+      MachineName,
+      MachineEventFactories,
+      StateName,
+      StatePayload,
+      Commands
+    >,
+    payload: StatePayload,
+    specialEventTypes: Set<string>,
+    branches: Record<string, Set<string>>,
+    commandCallback: CommandCallback<MachineEventFactories>,
+  ) => {
+    const initial: StateAndFactory<
+      SwarmProtocolName,
+      MachineName,
+      MachineEventFactories,
+      StateName,
+      StatePayload,
+      Commands
+    > = {
+      factory,
+      data: {
+        payload,
+        type: factory.mechanism.name,
+        jbLast: new Map<string, string>(factory.mechanism.protocol.registeredEvents.map(e => [e.type, 'null']))
+      },
+    }
+
+    const internals: RunnerInternalsBT<
+      SwarmProtocolName,
+      MachineName,
+      MachineEventFactories,
+      StateName,
+      StatePayload,
+      Commands
+    > = {
+      destruction: Destruction.make(),
+      initial,
+      current: {
+        factory,
+        data: deepCopy(initial.data),
+      },
+      queue: [],
+      commandEmitFn: commandCallback,
+      caughtUp: false,
+      caughtUpFirstTime: false,
+      commandLock: null,
+      previouslyEmittedToNext: null,
+      failure: null,
+      //jbLast: new Map<string, string>(factory.mechanism.protocol.registeredEvents.map(e => [e.type, 'null']))
+      branchTracker: {jbLast: new Map<string, string>(factory.mechanism.protocol.registeredEvents.map(e => [e.type, 'null'])), specialEventTypes: specialEventTypes, branches: branches}
+    }
+
+    return internals
+  }
+
+  const shouldEventBeEnqueued = <Self>(
+    reactions: ReactionMapPerMechanism<Self>,
+    queue: ReadonlyArray<ActyxEvent<MachineEvent.Any>>,
+    newEvent: any,
+    //jbLast: Map<string, string>,
+    branchTracker: BranchTracker
+  ):
+    | {
+        shouldQueue: false
+      }
+    | {
+        shouldQueue: true
+        matchingReaction: Reaction<ReactionContext<Self>>
+      } => {
+    const nextIndex = queue.length
+    const firstEvent = queue.at(0) || newEvent
+    const matchingReaction = reactions.get(firstEvent.payload.type)
+
+    if (!matchingReaction) return { shouldQueue: false }
+    console.log("in shouldEventBeEnqueued newEvent is: ", newEvent)
+    console.log("in shouldEventBeEnqueued event type and event lbj: ", newEvent.payload.type, newEvent.payload.lbj)
+    console.log("in shouldEventBeEnqueued state lbj: ", branchTracker.jbLast)
+    if (newEvent.payload.lbj != branchTracker.jbLast.get(newEvent.payload.type) ) { console.log("event not enqueued\n"); return { shouldQueue: false } }
+    console.log("event enqueued")
+    console.log()
+    // Asserted as non-nullish because it is impossible for `queue`'s length to
+    // exceeed `matchingReaction.eventChainTrigger`'s length
+    //
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const factoryAtNextIndex = matchingReaction.eventChainTrigger[nextIndex]!
+    const zodDefinition = factoryAtNextIndex[MachineEvent.FactoryInternalsAccessor].zodDefinition
+
+    const typeMatches = () => newEvent.payload.type === factoryAtNextIndex.type
+
+    const payloadSchemaMatchesOrZodIsUnavailable = () => {
+      if (!zodDefinition) return true
+      const { type, ...rest } = newEvent.payload
+      return zodDefinition.safeParse(rest).success
+    }
+
+    if (!typeMatches() || !payloadSchemaMatchesOrZodIsUnavailable()) {
+      return { shouldQueue: false }
+    }
+
+    return {
+      shouldQueue: true,
+      matchingReaction,
+    }
+  }
+  export const reset = (internals: RunnerInternalsBT.Any) => {
+    const initial = internals.initial
+    internals.current = {
+      factory: initial.factory,
+      data: deepCopy(initial.data),
+    }
+    internals.queue.length = 0
+    internals.caughtUp = false
+    internals.caughtUpFirstTime = false
+    internals.commandLock = null
+  }
+
+  export const pushEvent = <StatePayload>(
+    internals: RunnerInternalsBT.Any,
+    event: ActyxEvent<MachineEvent.Any>,
+  ): PushEventResult => {
+    const mechanism = internals.current.factory.mechanism
+    const protocol = mechanism.protocol
+    const reactions = protocol.reactionMap.get(mechanism)
+
+    const queueDeterminationResult =
+      shouldEventBeEnqueued<StatePayload>(
+        reactions,
+        internals.queue,
+        event,
+        //internals.jbLast,
+        internals.branchTracker
+      )
+
+    if (!queueDeterminationResult.shouldQueue) {
+      return { type: PushEventTypes.Discard, discarded: event }
+    } else {
+      internals.queue.push(event)
+
+      const matchingReaction = queueDeterminationResult.matchingReaction
+
+      if (matchingReaction.eventChainTrigger.length !== internals.queue.length) {
+        return { type: PushEventTypes.Push }
+      } else {
+        const nextFactory = matchingReaction.next
+
+        // Internals.queue needs to be emptied
+        // but the event queue that's being executed
+        // is required for audit
+        // Swapping instead of copying + emptying
+        const triggeringEvents = internals.queue
+        internals.queue = []
+
+        try {
+          const nextPayload = matchingReaction.handler(
+            {
+              self: internals.current.data.payload,
+            },
+            ...triggeringEvents,
+          )
+          // Update branch tracker and transfer the possibly updated jbLast to the next state
+          internals.branchTracker = updateJBLast(internals.branchTracker, event)
+          internals.current = {
+            data: {
+              type: nextFactory.mechanism.name,
+              payload: nextPayload,
+              jbLast: internals.branchTracker.jbLast
+            },
+            factory: nextFactory,
+          }
+
+          internals.commandLock = null
+
+          return { type: PushEventTypes.React, triggeringEvents }
+        } catch (error) {
+          const failure = {
+            error,
+            current: internals.current.factory,
+            next: internals.current.factory,
+          }
+          return {
+            type: PushEventTypes.Failure,
+            failure,
+          }
+        }
+      }
+    }
+  }
+}

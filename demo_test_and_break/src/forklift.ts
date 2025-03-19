@@ -32,7 +32,7 @@ s0.react([Events.time], s2, (_) => s2.make())
 const result_projection_info = projectionAndInformation(interfacing_swarms, subs, "FL")
 if (result_projection_info.type == 'ERROR') throw new Error('error getting projection')
 const projection_info = result_projection_info.data
-console.log(projection_info)
+/*console.log(projection_info)
 
 
 // Command map
@@ -56,16 +56,17 @@ rMap.set(Events.partID.type, partIDReaction)
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
 
 // Extended machine
-const [m3, i3] = Composition.extendMachineBT("FL", projection_info, Events.allEvents, fMap, forklift)
+const [m3, i3] = Composition.extendMachineBT("FL", projection_info, Events.allEvents, fMap, s0)
 const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "FL", m3.createJSONForAnalysis(i3))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
-
+ */
   // Run the extended machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const machine = createMachineRunnerBT(app, tags, i3, undefined)
-
+    //const machine = createMachineRunner(app, tags, s0, undefined)
+    const machine = createMachineRunnerBT(app, tags, s0, undefined, projection_info.succeeding_non_branching_joining, projection_info.branching_joining)
+    console.log("HEJ")
     for await (const state of machine) {
       console.log("forklift. state is:", state.type)
       if (state.payload !== undefined) {

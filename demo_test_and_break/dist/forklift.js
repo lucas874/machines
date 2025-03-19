@@ -48,41 +48,43 @@ const result_projection_info = (0, machine_check_1.projectionAndInformation)(fac
 if (result_projection_info.type == 'ERROR')
     throw new Error('error getting projection');
 const projection_info = result_projection_info.data;
-console.log(projection_info);
+/*console.log(projection_info)
+
+
 // Command map
-const cMap = new Map();
-cMap.set(factory_protocol_1.Events.position.type, (state, _) => {
-    console.log("retrieved a", state.self.id, "at position x");
-    console.log("s is: ", state);
-    return { position: "x", part: state.self.id };
-});
-//return [Events.position.make({position: "x", part: state.self.id})]})
+const cMap = new Map()
+cMap.set(Events.position.type, (state: any, _: any) => {
+  console.log("retrieved a", state.self.id, "at position x");
+  console.log("s is: ", state);
+  return {position: "x", part: state.self.id} })
+  //return [Events.position.make({position: "x", part: state.self.id})]})
+
 // Reaction map
-const rMap = new Map();
-const partIDReaction = {
-    genPayloadFun: (s, e) => {
-        console.log("s is: ", s);
-        console.log("a", e.payload.id, "was requested");
-        if ((0, factory_protocol_1.getRandomInt)(0, 10) >= 9) {
-            return { id: "broken part" };
-        }
-        return { id: e.payload.id };
-    }
-};
-rMap.set(factory_protocol_1.Events.partID.type, partIDReaction);
-const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
+const rMap = new Map()
+const partIDReaction : ProjMachine.ReactionEntry = {
+  genPayloadFun: (s, e) => {
+    console.log("s is: ", s);
+    console.log("a", e.payload.id, "was requested");
+    if (getRandomInt(0, 10) >= 9) { return { id: "broken part" } }
+    return {id: e.payload.id} }
+}
+rMap.set(Events.partID.type, partIDReaction)
+const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
+
 // Extended machine
-const [m3, i3] = factory_protocol_1.Composition.extendMachineBT("FL", projection_info, factory_protocol_1.Events.allEvents, fMap, forklift);
-const checkProjResult = (0, machine_check_1.checkComposedProjection)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "FL", m3.createJSONForAnalysis(i3));
-if (checkProjResult.type == 'ERROR')
-    throw new Error(checkProjResult.errors.join(", "));
+const [m3, i3] = Composition.extendMachineBT("FL", projection_info, Events.allEvents, fMap, s0)
+const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "FL", m3.createJSONForAnalysis(i3))
+if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
+ */
 // Run the extended machine
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
         const app = yield sdk_1.Actyx.of(factory_protocol_1.manifest);
         const tags = factory_protocol_1.Composition.tagWithEntityId('factory-1');
-        const machine = (0, machine_runner_1.createMachineRunnerBT)(app, tags, i3, undefined);
+        //const machine = createMachineRunner(app, tags, s0, undefined)
+        const machine = (0, machine_runner_1.createMachineRunnerBT)(app, tags, exports.s0, undefined, projection_info.succeeding_non_branching_joining, projection_info.branching_joining);
+        console.log("HEJ");
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
