@@ -29,6 +29,13 @@ export type SwarmProtocol<
     events: readonly MachineEvent.Factory<any, any>[],
     fMap: ProjMachine.funMap
   ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
+  extendMachine1: <MachineName extends string>(
+    machineName: MachineName,
+    proj: ProjMachine.ProjectionAndSucceedingMap,
+    events: readonly MachineEvent.Factory<any, any>[],
+    fMap: ProjMachine.funMap,
+    mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>
+  ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
   extendMachineBT: <MachineName extends string>(
     machineName: MachineName,
     proj: ProjMachine.ProjectionAndSucceedingMap,
@@ -83,6 +90,7 @@ export namespace SwarmProtocol {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
       extendMachine: (machineName, proj, events, fMap) => ProjMachine.extendMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, fMap),
+      extendMachine1: (machineName, proj, events, fMap, mOldInitial) => ProjMachine.extendMachine1(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, fMap, mOldInitial),
       extendMachineBT: (machineName, projectionInfo, events, fMap, mOrig) => ProjMachine.extendMachineBT(ImplMachine.make(swarmName, machineName, eventFactories), projectionInfo, events, fMap, mOrig)
     }
   }
@@ -385,6 +393,11 @@ export namespace ProjMachine {
     initialPayloadType: ReactionEntry | undefined // awkward but used to indicate that initial state has some payload type
   }
 
+  export type funMap2 = {
+    commands: Map<string, (...args : any[]) => any>,
+    reactions: Map<string, (...args : any[]) => any>
+  }
+
   export type ProjectionType = {
     initial: string;
     transitions: {
@@ -418,7 +431,12 @@ export namespace ProjMachine {
     return m
   }
 
-  // states with same payload types as s and a function whose return type is this payload type
+  // States with same payload types as s and a function whose return type is this payload type
+  // starting from some state move backwards in projection until we reach a state with a command
+  // enabled or the initial state. If we reach a state with a reaction generating non void payload
+  // add this state and all states between this state and s to the returned set of strings. f is the
+  // reaction. should be the same for each base case since any intermediate states are due to
+  // concurrency and subscribing to event types from other protocols.
   function payloadStates(
     s: string,
     initial: string,
@@ -851,180 +869,109 @@ export namespace ProjMachine {
 
   }
 
-  export const extendMachineBT1 = <
-    SwarmProtocolName extends string,
-    MachineName extends string,
-    MachineEventFactories extends MachineEvent.Factory.Any,
-  >(
-    mNew: Machine<SwarmProtocolName, MachineName, MachineEventFactories>,
-    projectionInfo: ProjectionAndSucceedingMap,
-    events: readonly MachineEvent.Factory<any, Record<never, never>>[],
-    fMap: funMap,
-    mOldInitial: any,
-  ): [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]  => {
-    var projStatesToStates: Map<string, any> = new Map()
-    var projStatesToExec: Map<string, Transition[]> = new Map()
-    var projStatesToInput: Map<string, Transition[]> = new Map()
-    var eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> = new Map()
-    var projStatesToStatePayload: Map<string, (...args : any[]) => any> = new Map()
-    const proj = projectionInfo.projection
-    const specialEvents = projectionInfo.branching_joining
-    var incomingMap = incomingEdgesOfStatesMap(proj)
-    var markedStates: Set<string> = new Set()
-    var fMap1 = new Map()
-    /* for (var eee of events) {
-      console.log("eee: ", loopThroughJSON("", eee))
-    } */
-    console.log("-------------")
-    loopThroughJSON("", mOldInitial)
-    console.log("-------------")
-    console.log(mOldInitial.mechanism.protocol.reactionMap.getAll())
-    console.log("-------------")
-    //console.log(mOrig.mechanism.protocol.reactionMap.getAll().keys())
-    //console.log("-------------")
-    mOldInitial.mechanism.protocol.reactionMap.getAll().forEach((value: any, key: any) => {
-      console.log("key: ", key)
-      console.log("value: ", value)
-      value.forEach((value_: any, key_: any) => {
-        console.log("event type: ", key_)
-        console.log("handler: ", value_.handler.toString())
-        var tmp1: ReturnType<typeof value_.handler>
-        var tmp2: Parameters<typeof value_.handler>
-        //console.log("argument types of handler: ", typeof(tmp2))
-        console.log("return type of handler: ", typeof(tmp1))
-        fMap1.set(key_, value_.handler)
-      });
-      for (const p in key.commands) {
-        console.log("command name: ", p)
-        console.log("command: ", key.commands[p].toString())
-      }
-      console.log("-------------------");
+  export const extendMachine1 = <
+  SwarmProtocolName extends string,
+  MachineName extends string,
+  MachineEventFactories extends MachineEvent.Factory.Any,
+>(
+  mNew: Machine<SwarmProtocolName, MachineName, MachineEventFactories>,
+  projectionInfo: ProjectionAndSucceedingMap,
+  events: readonly MachineEvent.Factory<any, Record<never, never>>[],
+  fMap: funMap,
+  mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
+): [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]  => {
+  var projStatesToStates: Map<string, any> = new Map()
+  var projStatesToExec: Map<string, Transition[]> = new Map()
+  var projStatesToInput: Map<string, Transition[]> = new Map()
+  // map event type string to Event
+  const eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> =
+    new Map<string, MachineEvent.Factory<any, Record<never, never>>>(events.map(e => [e.type, e]))
+  var projStatesToStatePayload: Map<string, (...args : any[]) => any> = new Map()
+  const proj = projectionInfo.projection
+  const specialEvents = projectionInfo.branching_joining
+  var incomingMap = incomingEdgesOfStatesMap(proj)
+  var markedStates: Set<string> = new Set()
+  var fMap2: funMap2 = {commands: new Map(), reactions: new Map()}
+  var allProjStates: Set<string> = new Set()
+
+  mOldInitial.mechanism.protocol.reactionMap.getAll().forEach((reactionMapPerMechanism: any, stateMechanism: any) => {
+    reactionMapPerMechanism.forEach((eventTypeEntry: any, eventType: any) => {
+      fMap2.reactions.set(eventType, eventTypeEntry.handler)
+    });
+    for (const command in stateMechanism.commands) {
+      fMap2.commands.set(command, stateMechanism.commandDefinitions[command])
+    }
   });
-  for (var c of mOldInitial.mechanism.protocol.commands) {
-    console.log("ccc: ", loopThroughJSON("", c))
-  }
-    proj.transitions.forEach((transition) => {
-      if (transition.label.tag === 'Execute') {
-        if (!projStatesToExec.has(transition.source)) {
-          projStatesToExec.set(transition.source, new Array())
-        }
-        projStatesToExec.get(transition.source)?.push(transition)
 
-        // map event type string to Event
-        for (let eventType of transition.label.logType) {
-          for (let event of events) {
-              if (eventType === event.type) {
-              eventTypeStringToEvent.set(eventType, event)
-              break
-            }
-          }
-        }
-      } else if (transition.label.tag === 'Input') {
-        if (!projStatesToInput.has(transition.source)) {
-          projStatesToInput.set(transition.source, new Array())
-        }
-        projStatesToInput.get(transition.source)?.push(transition)
+  proj.transitions.forEach((transition) => {
+    if (transition.label.tag === 'Execute') {
+      if (!projStatesToExec.has(transition.source)) {
+        projStatesToExec.set(transition.source, new Array())
+      }
+      projStatesToExec.get(transition.source)?.push(transition)
 
-        // add target to projStatesToInput as well. in case no outgoing transitions.
-        if (!projStatesToInput.has(transition.target)) {
-          projStatesToInput.set(transition.target, new Array())
-        }
+    } else if (transition.label.tag === 'Input') {
+      if (!projStatesToInput.has(transition.source)) {
+        projStatesToInput.set(transition.source, new Array())
+      }
+      projStatesToInput.get(transition.source)?.push(transition)
 
-        // map event type string to Event
-        for (let event of events) {
-          if (transition.label.eventType === event.type) {
-            eventTypeStringToEvent.set(transition.label.eventType, event)
-            break
-          }
-        }
-
-        var e = transition.label.eventType
-        if (fMap.reactions.has(e)) {
-          projStatesToStatePayload.set(transition.target, fMap.reactions.get(e)!.genPayloadFun)
-        }
+      // add target to projStatesToInput as well. in case no outgoing transitions.
+      if (!projStatesToInput.has(transition.target)) {
+        projStatesToInput.set(transition.target, new Array())
       }
 
-      if (transition.source === proj.initial
-        && !projStatesToStatePayload.has(transition.source)
-        && fMap.initialPayloadType !== undefined) {
-          projStatesToStatePayload.set(transition.source, fMap.initialPayloadType!.genPayloadFun)
+      var e = transition.label.eventType
+      if (fMap2.reactions.has(e)) {
+        projStatesToStatePayload.set(transition.target, fMap2.reactions.get(e)!)
       }
-    })
-    projStatesToExec.forEach((transitions, state) => {
-      var cmdTriples = new Array()
-      // add self loops
-      transitions.forEach((transition) => {
-        if (transition.label.tag === 'Execute') {
-          var es = transition.label.logType.map((et: string) => {
-            return eventTypeStringToEvent.get(et)
-          })
-          var etypes = transition.label.logType.map((et: string) => {
-            return eventTypeStringToEvent.get(et)?.type
-          })
+    }
+    allProjStates.add(transition.source)
+    allProjStates.add(transition.target)
+  })
 
-          //var f = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => [{}]
-          const payloadFun = fMap.commands.has(etypes[0]) ? fMap.commands.get(etypes[0]) : () => {}
-          const f = (s: any, e: any) => {
-            var payload = payloadFun({...s, self: s.self?.payload ?? s.self}, e);
-            //var lbj = s.self?.lbj ?? null;
-            console.log("HELLLOOOO ", s)
-            var lbj = s.self.jbLast.get(etypes[0])
-            console.log("HELLLOOOO ", lbj)
-            console.log("HELLLOO ", es[0]?.makeBT(payload, lbj))
-            console.log("HELLOO ", fMap.commands.has(etypes[0]))
-            console.log("heeelo es[0]", es[0])
-            console.log("typeof payload == {}?", typeof(payload) === typeof({}))
-            console.log("typeof typeof: ", typeof(typeof(payload)))
-            console.log("is empty object? ", isEmptyObject(payload))
-            console.log("makeBT length: ", es[0]?.makeBT.length)
-            if (es[0]?.makeBT.length == 1) {
-              return [es[0]?.makeBT(payload, lbj)]
-            }
-            return [es[0]?.makeBT(payload, lbj)]
-          }
-          cmdTriples.push([transition.label.cmd, es, f])
-
-        }
-      })
-
-      const [statesWithSamePayloadType, f] = payloadStates(state, proj.initial, incomingMap, projStatesToStatePayload)
-
-      if (f === undefined) {
-        projStatesToStates.set(state, mNew.designState(state).withPayload<BTStateEmpty>().commandFromList(cmdTriples).finish())
-      } else {
-        projStatesToStates.set(state, mNew.designState(state).withPayload<BTState<ReturnType<typeof f>>>().commandFromList(cmdTriples).finish())
-        markedStates.add(state)
-        for (const samePayloadState of statesWithSamePayloadType) {
-          if (!projStatesToExec.has(samePayloadState) && !projStatesToStates.has(samePayloadState)) {
-            projStatesToStates.set(samePayloadState, mNew.designState(samePayloadState).withPayload<ReturnType<typeof f>>().finish())
-          }
-
-          markedStates.add(samePayloadState)
-        }
-      }
-    })
-
-    projStatesToInput.forEach((value, key) => {
-      if (!projStatesToStates.has(key)) {
-        projStatesToStates.set(key, mNew.designState(key).withPayload<BTStateEmpty>().finish())
-      }
-
-      value.forEach((transition) => {
-        if (transition.label.tag === 'Input') {
-          if (!projStatesToStates.has(transition.target)) {
-            projStatesToStates.set(transition.target, mNew.designState(transition.target).withPayload<BTStateEmpty>().finish())
-          }
-          var e = transition.label.eventType
-          var es = eventTypeStringToEvent.get(e)
-
-          const f = getReaction(e, fMap, projStatesToStates, markedStates, specialEvents, projectionInfo.succeeding_non_branching_joining, transition.target)
-          projStatesToStates.get(key).react([es], projStatesToStates.get(transition.target), f)
-        }
-      })
-    })
-
-    var initial = projStatesToStates.get(proj.initial)
-    return [mNew, initial]
+  const transitionToTriple = (transition: Transition) => {
+    return transition.label.tag === 'Execute' ? [transition.label.cmd, transition.label.logType.map((et: string) => eventTypeStringToEvent.get(et)), fMap2.commands.get(transition.label.cmd)!] : []
   }
 
+  // add all states from projection as states to machine
+  // give them all payload type 'any'. Seems unsafe
+  // but the way it was done previously was more complicated, while not being safer.
+  for (var projState of allProjStates) {
+    // commands from this state
+    var cmdTriples: any[] = projStatesToExec.has(projState) ?
+      projStatesToExec.get(projState)!.map(transitionToTriple).filter(triple => triple.length === 3) : []
+
+    // get states to which we have to add a reaction propagating state payload
+    const [statesWithSamePayloadType, _] = payloadStates(projState, proj.initial, incomingMap, projStatesToStatePayload)
+    for (var samePayloadTypeState of statesWithSamePayloadType) {
+      markedStates.add(samePayloadTypeState)
+    }
+    // works because non-zero numbers are truthy
+    if (cmdTriples.length) {
+      projStatesToStates.set(projState, mNew.designState(projState).withPayload<any>().commandFromList(cmdTriples).finish())
+    } else {
+      projStatesToStates.set(projState, mNew.designState(projState).withPayload<any>().finish())
+    }
+  }
+  for (var transition of proj.transitions) {
+    if (transition.label.tag === 'Input') {
+      const eventType = transition.label.eventType
+      const event = eventTypeStringToEvent.get(eventType)!
+      // a reaction like (s, e) => s3.make() does not create s3, it just creates the state payload. So calling it should be fine?
+      var f =
+          fMap2.reactions.has(eventType)
+            ? fMap2.reactions.get(eventType)!
+            : (markedStates.has(transition.target)
+                ? (s: any, _: any) => { return projStatesToStates.get(transition.target).make(s.self)} // propagate state payload
+                : (_: any[]) => projStatesToStates.get(transition.target).make({}))
+      projStatesToStates.get(transition.source).react([event], projStatesToStates.get(transition.target), f)
+
+    }
+
+  }
+
+  var initial = projStatesToStates.get(proj.initial)
+  return [mNew, initial]
+}
 }

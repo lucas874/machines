@@ -243,7 +243,7 @@ export namespace MachineEvent {
     [FactoryInternalsAccessor]: FactoryInternals<Payload>
 
     /**
-     * Machines extended with extendMachine use makeBT to generate events.
+     * Machines extended with extendMachine use makeBT to generate events. FIX THIS COMMENT
      * Similar to make, but includes lbj in event payload.
      */
     makeBT: (payload: Payload, lbj: string) => MachineEvent<Key, Payload>

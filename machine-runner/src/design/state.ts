@@ -238,6 +238,11 @@ export type StateMechanism<
       >
     }
   >
+  // come back to this remove any! come back to all uses of any regarding commandDefinitions
+  readonly commandDefinitions:  Map<string, CommandDefiner<
+    CommandContext<StatePayload, MachineEvent.Factory.Reduce<any>> | CommandContextBT<StatePayload, MachineEvent.Factory.Reduce<any>>,
+    any,
+    MachineEvent.Factory.MapToPayloadOrContainedPayload<any>>>
 
   /**
    * Finalize state design process.
@@ -268,6 +273,7 @@ export namespace StateMechanism {
     props?: {
       commands?: Commands
       commandDataForAnalytics: { commandName: string; events: string[] }[]
+      commandDefinitions?: any
     },
   ): StateMechanism<
     SwarmProtocolName,
@@ -287,6 +293,7 @@ export namespace StateMechanism {
     >
 
     const commands: Self['commands'] = props?.commands || ({} as Commands)
+    const commandDefinitions: Self['commandDefinitions'] = props?.commandDefinitions || {}
 
     const command: Self['command'] = (name, factories, commandDefinition) => {
       // TODO: make this more sturdy
@@ -344,6 +351,7 @@ export namespace StateMechanism {
             commandName: name,
           },
         ],
+        commandDefinitions: {... commandDefinitions, [name]: commandDefinition }
       })
     }
 
@@ -381,6 +389,7 @@ export namespace StateMechanism {
       commands,
       command,
       commandFromList,
+      commandDefinitions,
       finish,
     }
 

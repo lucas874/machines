@@ -20,6 +20,7 @@ exports.s2 = exports.s1 = exports.s0 = void 0;
 const sdk_1 = require("@actyx/sdk");
 const machine_runner_1 = require("@actyx/machine-runner");
 const factory_protocol_1 = require("./factory_protocol");
+const machine_check_1 = require("@actyx/machine-check");
 // Using the machine runner DSL an implmentation of door in Gwarehouse is:
 const door = factory_protocol_1.Composition.makeMachine('D');
 exports.s0 = door.designEmpty('s0')
@@ -39,35 +40,36 @@ exports.s0.react([factory_protocol_1.Events.time], exports.s2, (_) => exports.s2
     console.log("$$$$")
 } */
 // Projection of Gwarehouse || Gfactory || Gquality over D
-/* const result_projection_info = projectionAndInformation(interfacing_swarms, subs, "D")
-if (result_projection_info.type == 'ERROR') throw new Error('error getting projection')
-const projection_info = result_projection_info.data
-console.log(projection_info)
-
-
+const result_projection_info = (0, machine_check_1.projectionAndInformation)(factory_protocol_1.interfacing_swarmswh, factory_protocol_1.subswh, "D");
+if (result_projection_info.type == 'ERROR')
+    throw new Error('error getting projection');
+const projection_info = result_projection_info.data;
+//console.log(projection_info)
 // Command map
-const cMap = new Map()
-cMap.set(Events.time.type, () => {
+const cMap = new Map();
+cMap.set(factory_protocol_1.Events.time.type, () => {
     var dateString = new Date().toLocaleString();
     console.log("closed warehouse at:", dateString);
-    {timeOfDay: dateString}})
-    //return [Events.time.make({timeOfDay: dateString})]})
-
+    {
+        timeOfDay: dateString;
+    }
+});
+//return [Events.time.make({timeOfDay: dateString})]})
 // Reaction map
-const rMap = new Map()
-const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
-
+const rMap = new Map();
+const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
 // Extended machine
-const [m3, i3] = Composition.extendMachineBT("D", projection_info, Events.allEvents, fMap, door)
-const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "D", m3.createJSONForAnalysis(i3))
-if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", ")) */
+const [m3, i3] = factory_protocol_1.Composition.extendMachine1("D", projection_info, factory_protocol_1.Events.allEvents, fMap, exports.s0);
+//const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "D", m3.createJSONForAnalysis(i3))
+//if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", ")) */
 // Run the extended machine
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
         const app = yield sdk_1.Actyx.of(factory_protocol_1.manifest);
         const tags = factory_protocol_1.Composition.tagWithEntityId('factory-1');
-        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, exports.s0, undefined);
+        //const machine = createMachineRunner(app, tags, s0, undefined)
+        const machine = (0, machine_runner_1.createMachineRunnerBT)(app, tags, i3, undefined, projection_info.succeeding_non_branching_joining, projection_info.branching_joining);
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
@@ -87,7 +89,7 @@ function main() {
                             if (Object.keys(s1 || {}).includes('close')) {
                                 s1.close();
                             }
-                        }, (0, factory_protocol_1.getRandomInt)(5500, 8000));
+                        }, (0, factory_protocol_1.getRandomInt)(2000, 3000));
                         break;
                     }
                 }
