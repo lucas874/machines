@@ -636,8 +636,8 @@ export namespace ProjMachine {
   export type SucceedingNonBranchingJoining = Record<string, Set<string>>;
   export type ProjectionAndSucceedingMap = {
     projection: ProjectionType,
-    succeeding_non_branching_joining: SucceedingNonBranchingJoining,
-    branching_joining: Set<string>,
+    branches: SucceedingNonBranchingJoining,
+    specialEventTypes: Set<string>,
   }
   type LastJB = Map<string, string>
   type BTState<Payload> = {jbLast: LastJB, payload: Payload}
@@ -660,7 +660,7 @@ export namespace ProjMachine {
     var eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> = new Map()
     var projStatesToStatePayload: Map<string, (...args : any[]) => any> = new Map()
     const proj = projectionInfo.projection
-    const specialEvents = projectionInfo.branching_joining
+    const specialEvents = projectionInfo.specialEventTypes
     var incomingMap = incomingEdgesOfStatesMap(proj)
     var markedStates: Set<string> = new Set()
     /* for (var eee of events) {
@@ -807,7 +807,7 @@ export namespace ProjMachine {
           var e = transition.label.eventType
           var es = eventTypeStringToEvent.get(e)
 
-          const f = getReaction(e, fMap, projStatesToStates, markedStates, specialEvents, projectionInfo.succeeding_non_branching_joining, transition.target)
+          const f = getReaction(e, fMap, projStatesToStates, markedStates, specialEvents, projectionInfo.branches, transition.target)
           projStatesToStates.get(key).react([es], projStatesToStates.get(transition.target), f)
         }
       })

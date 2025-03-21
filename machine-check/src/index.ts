@@ -32,8 +32,8 @@ export type Granularity =
 export type SucceedingNonBranchingJoining = Record<string, Set<string>>;
 export type ProjectionAndSucceedingMap = {
     projection: MachineType,
-    succeeding_non_branching_joining: SucceedingNonBranchingJoining,
-    branching_joining: Set<string>,
+    branches: SucceedingNonBranchingJoining,
+    specialEventTypes: Set<string>,
 }
 export function checkSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): Result {
   const p = JSON.stringify(proto)
@@ -128,7 +128,7 @@ export function projectionAndInformation(protos: InterfacingSwarms, subscription
   if (result.type === "ERROR") {
     return result
   } else {
-    const data = {...result.data, branching_joining: new Set<string>(result.data.branching_joining) }
+    const data = {...result.data, specialEventTypes: new Set<string>(result.data.specialEventTypes) }
     return {type: "OK", data: data}
   }
 

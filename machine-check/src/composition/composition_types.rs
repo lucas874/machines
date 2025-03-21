@@ -154,10 +154,11 @@ pub enum Granularity {
 pub type SucceedingNonBranchingJoining = BTreeMap<EventType, BTreeSet<EventType>>;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectionAndSucceedingMap {
     pub projection: Machine,
-    pub succeeding_non_branching_joining: SucceedingNonBranchingJoining,
-    pub branching_joining: BTreeSet<EventType>,
+    pub branches: SucceedingNonBranchingJoining,
+    pub special_event_types: BTreeSet<EventType>,
 }
 
 /* Used when combining machines and protocols */
