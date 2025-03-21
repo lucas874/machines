@@ -358,7 +358,6 @@ export type RunnerInternalsBT<
    */
   failure: null | MachineRunnerFailure
 
-  //jbLast: Map<string, string>
   branchTracker: RunnerInternalsBT.BranchTracker
 }
 export namespace RunnerInternalsBT {
@@ -441,7 +440,6 @@ export namespace RunnerInternalsBT {
       commandLock: null,
       previouslyEmittedToNext: null,
       failure: null,
-      //jbLast: new Map<string, string>(factory.mechanism.protocol.registeredEvents.map(e => [e.type, 'null']))
       branchTracker: {jbLast: new Map<string, string>(factory.mechanism.protocol.registeredEvents.map(e => [e.type, 'null'])), specialEventTypes: specialEventTypes, branches: branches}
     }
 
@@ -452,7 +450,6 @@ export namespace RunnerInternalsBT {
     reactions: ReactionMapPerMechanism<Self>,
     queue: ReadonlyArray<ActyxEvent<MachineEvent.Any>>,
     newEvent: any,
-    //jbLast: Map<string, string>,
     branchTracker: BranchTracker
   ):
     | {
@@ -467,12 +464,12 @@ export namespace RunnerInternalsBT {
     const matchingReaction = reactions.get(firstEvent.payload.type)
 
     if (!matchingReaction) return { shouldQueue: false }
-    console.log("in shouldEventBeEnqueued newEvent is: ", newEvent)
-    console.log("in shouldEventBeEnqueued event type and event lbj: ", newEvent.payload.type, newEvent.payload.lbj)
-    console.log("in shouldEventBeEnqueued state lbj: ", branchTracker.jbLast)
+    //console.log("in shouldEventBeEnqueued newEvent is: ", newEvent)
+    //console.log("in shouldEventBeEnqueued event type and event lbj: ", newEvent.payload.type, newEvent.payload.lbj)
+    //console.log("in shouldEventBeEnqueued state lbj: ", branchTracker.jbLast)
     if (newEvent.payload.lbj != branchTracker.jbLast.get(newEvent.payload.type) ) { console.log("event not enqueued\n"); return { shouldQueue: false } }
-    console.log("event enqueued")
-    console.log()
+    //console.log("event enqueued")
+    //console.log()
     // Asserted as non-nullish because it is impossible for `queue`'s length to
     // exceeed `matchingReaction.eventChainTrigger`'s length
     //
@@ -522,7 +519,6 @@ export namespace RunnerInternalsBT {
         reactions,
         internals.queue,
         event,
-        //internals.jbLast,
         internals.branchTracker
       )
 

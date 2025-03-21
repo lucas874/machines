@@ -156,7 +156,7 @@ export namespace MachineEvent {
       type: key,
       make: () => ({ type: key }),
       parse: mkParse(key),
-      makeBT: (lbj) => ({ type: key, lbj: lbj })
+      makeBT: (_, lbj) => ({ type: key, lbj: lbj })
     }),
   })
 

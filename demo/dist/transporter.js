@@ -16,78 +16,55 @@ var __asyncValues = (this && this.__asyncValues) || function (o) {
     function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.s3 = exports.s2 = exports.s1 = exports.s0 = void 0;
 const sdk_1 = require("@actyx/sdk");
 const machine_runner_1 = require("@actyx/machine-runner");
 const factory_protocol_1 = require("./factory_protocol");
 const machine_check_1 = require("@actyx/machine-check");
-/*
-
-Using the machine runner DSL an implmentation of transporter in Gwarehouse is:
-
-const transporter = Composition.makeMachine('T')
-export const s0 = transporter.designState('s0').withPayload<{id: string}>()
-    .command('request', [Events.partID], (s: any, e: any) => {
-      var id = s.self.id;
-      console.log("requesting a", id);
-      return [Events.partID.make({id: id})]})
-    .finish()
-export const s1 = transporter.designEmpty('s1').finish()
-export const s2 = transporter.designState('s2').withPayload<{part: string}>()
-    .command('deliver', [Events.part], (s: any, e: any) => {
-      console.log("delivering a", s.self.part)
-      return [Events.part.make({part: s.self.part})] })
-    .finish()
-export const s3 = transporter.designEmpty('s3').finish()
-
-s0.react([Events.partID], s1, (_) => s1.make())
-s0.react([Events.time], s3, (_) => s3.make())
-s1.react([Events.position], s2, (_, e) => {
-    console.log("got a ", e.payload.part);
-    return { part: e.payload.part } })
-
-s2.react([Events.part], s0, (_, e) => { return s0.make({id: ""}) })
-*/
-// Projection of Gwarehouse || Gfactory || Gquality over D
-const result_projection = (0, machine_check_1.projectCombineMachines)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "T");
-if (result_projection.type == 'ERROR')
-    throw new Error('error getting projection');
-const projection = result_projection.data;
-// Command map
-const cMap = new Map();
-cMap.set(factory_protocol_1.Events.partID.type, (s, e) => {
-    var id = s.self.id;
+const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler'];
+// Using the machine runner DSL an implmentation of transporter in Gwarehouse is:
+const transporter = factory_protocol_1.Composition.makeMachine('T');
+exports.s0 = transporter.designEmpty('s0')
+    .command('request', [factory_protocol_1.Events.partID], (s, e) => {
+    var id = parts[Math.floor(Math.random() * parts.length)];
     console.log("requesting a", id);
     return [factory_protocol_1.Events.partID.make({ id: id })];
-});
-cMap.set(factory_protocol_1.Events.part.type, (s, e) => {
-    console.log("s is: ", s);
+})
+    .finish();
+exports.s1 = transporter.designEmpty('s1').finish();
+exports.s2 = transporter.designState('s2').withPayload()
+    .command('deliver', [factory_protocol_1.Events.part], (s, e) => {
     console.log("delivering a", s.self.part);
     return [factory_protocol_1.Events.part.make({ part: s.self.part })];
+})
+    .finish();
+exports.s3 = transporter.designEmpty('s3').finish();
+exports.s0.react([factory_protocol_1.Events.partID], exports.s1, (_) => exports.s1.make());
+exports.s0.react([factory_protocol_1.Events.time], exports.s3, (_) => exports.s3.make());
+exports.s1.react([factory_protocol_1.Events.position], exports.s2, (_, e) => {
+    console.log("got a ", e.payload.part);
+    return { part: e.payload.part };
 });
-// Reaction map
-const rMap = new Map();
-const positionReaction = {
-    genPayloadFun: (_, e) => { return { part: e.payload.part }; }
-};
-rMap.set(factory_protocol_1.Events.position.type, positionReaction);
-// hacky. we use the return type of this function to set the payload type of initial state and any other state enabling same commands as in initial
-const initialPayloadType = {
-    genPayloadFun: () => { return { part: "" }; }
-};
-const fMap = { commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType };
-// Extended machine
-const [m3, i3] = factory_protocol_1.Composition.extendMachine("T", projection, factory_protocol_1.Events.allEvents, fMap);
-const checkProjResult = (0, machine_check_1.checkComposedProjection)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "T", m3.createJSONForAnalysis(i3));
+exports.s2.react([factory_protocol_1.Events.part], exports.s0, (_, e) => { return exports.s0.make(); });
+// Projection of Gwarehouse || Gfactory || Gquality over T
+const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "T");
+if (projectionInfoResult.type == 'ERROR')
+    throw new Error('error getting projection');
+const projectionInfo = projectionInfoResult.data;
+//console.log("projection info: ", projectionInfo)
+// Adapted machine
+const [transporterAdapted, s0_] = factory_protocol_1.Composition.adaptMachine("T", projectionInfo, factory_protocol_1.Events.allEvents, exports.s0);
+const checkProjResult = (0, machine_check_1.checkComposedProjection)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "T", transporterAdapted.createJSONForAnalysis(s0_));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));
-// Run the extended machine
+// Run the adapted machine
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
         const app = yield sdk_1.Actyx.of(factory_protocol_1.manifest);
         const tags = factory_protocol_1.Composition.tagWithEntityId('factory-1');
-        const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler'];
-        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, { id: parts[Math.floor(Math.random() * parts.length)] });
+        //const machine = createMachineRunner(app, tags, s0, undefined)
+        const machine = (0, machine_runner_1.createMachineRunnerBT)(app, tags, s0_, undefined, projectionInfo.succeeding_non_branching_joining, projectionInfo.branching_joining);
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;

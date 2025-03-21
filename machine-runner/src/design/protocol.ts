@@ -895,11 +895,12 @@ export namespace ProjMachine {
     reactionMapPerMechanism.forEach((eventTypeEntry: any, eventType: any) => {
       fMap2.reactions.set(eventType, eventTypeEntry.handler)
     });
-    for (const command in stateMechanism.commands) {
-      fMap2.commands.set(command, stateMechanism.commandDefinitions[command])
-    }
   });
-
+  for (const factory of mOldInitial.mechanism.protocol.states.allFactories) {
+    for (let [cmd, cmdDef] of Object.entries(factory.mechanism.commandDefinitions)) {
+      fMap2.commands.set(cmd, cmdDef)
+    };
+  }
   proj.transitions.forEach((transition) => {
     if (transition.label.tag === 'Execute') {
       if (!projStatesToExec.has(transition.source)) {

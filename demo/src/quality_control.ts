@@ -1,13 +1,9 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
+import { createMachineRunner, ProjMachine, createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt  } from './factory_protocol'
-import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
+import { projectCombineMachines, checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 
-
-/*
-
-Using the machine runner DSL an implmentation of quality control robot in Gquality is:
-
+// Using the machine runner DSL an implmentation of quality control robot in Gquality is:
 const qcr = Composition.makeMachine('QCR')
 export const s0 = qcr.designEmpty('s0')
     .command("observe", [Events.observing], (s, _) => {
@@ -27,44 +23,24 @@ s1.react([Events.car], s2, (_, e) => {
     console.log("received a ", e.payload.modelName);
     if (e.payload.part !== 'broken part') { return s2.make({modelName: e.payload.modelName, decision: "ok"}) }
     else { return s2.make({ modelName: e.payload.modelName, decision: "notOk"}) }})
-*/
+//s2.react([Events.time], s0, () => s0.make())
 
 // Projection of Gwarehouse || Gfactory || Gquality over QCR
-const result_projection = projectCombineMachines(interfacing_swarms, subs, "QCR")
-if (result_projection.type == 'ERROR') throw new Error('error getting projection')
-const projection = result_projection.data
-
-// Command map
-const cMap = new Map()
-cMap.set(Events.report.type, (s: any, _: any) => {
-    console.log("the newly built", s.self.modelName, " is", s.self.decision);
-    return [Events.report.make({modelName: s.self.modelName, decision: s.self.decision})]})
-cMap.set(Events.observing.type, (s: any, _: any) => {
-    console.log("began observing");
-    return [Events.observing.make({})]})
-
-// Reaction map
-const rMap = new Map()
-const carReaction : ProjMachine.ReactionEntry = {
-  genPayloadFun: (_, e) => {
-    console.log("received a ", e.payload.modelName);
-    if (e.payload.part !== 'broken part') { return {modelName: e.payload.modelName, decision: "ok"} }
-    else { return {modelName: e.payload.modelName, decision: "notOk"} }}
-}
-
-rMap.set(Events.car.type, carReaction)
-const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: undefined}
+const projectionInfoResult = projectionAndInformation(interfacing_swarms, subs, "QCR")
+if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
+const projectionInfo = projectionInfoResult.data
+//console.log(projectionInfo)
 
 // Extended machine
-const [m3, i3] = Composition.extendMachine("QCR", projection, Events.allEvents, fMap)
-const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "QCR", m3.createJSONForAnalysis(i3))
-if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
+const [qcrAdapted, s0_] = Composition.adaptMachine("QCR", projectionInfo, Events.allEvents, s0)
+const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "QCR", qcrAdapted.createJSONForAnalysis(s0_))
+//if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
 // Run the extended machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const machine = createMachineRunner(app, tags, i3, undefined)
+    const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.succeeding_non_branching_joining, projectionInfo.branching_joining)
 
     for await (const state of machine) {
       console.log("quality control robot. state is:", state.type)

@@ -20,7 +20,7 @@ var Events;
     Events.position = machine_runner_1.MachineEvent.design('position').withPayload();
     Events.time = machine_runner_1.MachineEvent.design('time').withPayload();
     Events.car = machine_runner_1.MachineEvent.design('car').withPayload();
-    Events.observing = machine_runner_1.MachineEvent.design('ok').withoutPayload();
+    Events.observing = machine_runner_1.MachineEvent.design('obs').withoutPayload();
     Events.report = machine_runner_1.MachineEvent.design('report').withPayload();
     Events.allEvents = [Events.partID, Events.part, Events.position, Events.time, Events.car, Events.observing, Events.report];
 })(Events || (exports.Events = Events = {}));

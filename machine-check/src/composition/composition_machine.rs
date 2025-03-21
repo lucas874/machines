@@ -1184,7 +1184,7 @@ mod tests {
             let (proj, proj_initial) =
                 project_combine(&proto_info.protocols, &subs, role.clone());
             //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
-            let branch_thing = paths_from_event_types(&proj, &proto_info);
+            let _branch_thing = paths_from_event_types(&proj, &proto_info);
             //println!("role: {}\n branch thing: {}", role.to_string(), serde_json::to_string_pretty(&branch_thing).unwrap());
             let thing = from_option_to_machine(proj, proj_initial.unwrap());
             println!("{}\n$$$$", serde_json::to_string_pretty(&thing).unwrap())
