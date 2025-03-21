@@ -21,7 +21,7 @@ const sdk_1 = require("@actyx/sdk");
 const machine_runner_1 = require("@actyx/machine-runner");
 const warehouse_protocol_1 = require("./warehouse_protocol");
 const machine_check_1 = require("@actyx/machine-check");
-//Using the machine runner DSL an implmentation of door in Gwarehouse is:
+// Using the machine runner DSL an implmentation of door in Gwarehouse is:
 const door = warehouse_protocol_1.Composition.makeMachine('D');
 exports.s0 = door.designEmpty('s0')
     .command('close', [warehouse_protocol_1.Events.time], () => {
@@ -36,27 +36,17 @@ exports.s0.react([warehouse_protocol_1.Events.partID], exports.s1, (_) => export
 exports.s1.react([warehouse_protocol_1.Events.part], exports.s0, (_) => exports.s0.make());
 exports.s0.react([warehouse_protocol_1.Events.time], exports.s2, (_) => exports.s2.make());
 // Projection of Gwarehouse || Gfactory || Gquality over D
-const result_projection = (0, machine_check_1.projectCombineMachines)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "D");
-if (result_projection.type == 'ERROR')
+const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "D");
+if (projectionInfoResult.type == 'ERROR')
     throw new Error('error getting projection');
-const projection = result_projection.data;
-// Command map
-const cMap = new Map();
-cMap.set(warehouse_protocol_1.Events.time.type, () => {
-    var dateString = new Date().toLocaleString();
-    console.log("closed warehouse at:", dateString);
-    //return {timeOfDay: dateString}})
-    return [warehouse_protocol_1.Events.time.make({ timeOfDay: dateString })];
-});
-// Reaction map
-const rMap = new Map();
-const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
-// Extended machine
-const [m3, i3] = warehouse_protocol_1.Composition.extendMachine("D", projection, warehouse_protocol_1.Events.allEvents, fMap);
-const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "D", m3.createJSONForAnalysis(i3));
+const projectionInfo = projectionInfoResult.data;
+//console.log("projection info: ", projectionInfo)
+// Adapted machine
+const [doorAdapted, s0_] = warehouse_protocol_1.Composition.adaptMachine("D", projectionInfo, warehouse_protocol_1.Events.allEvents, exports.s0);
+const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "D", doorAdapted.createJSONForAnalysis(s0_));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));
-// Run the extended machine
+// Run the adapted machine
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
@@ -64,6 +54,7 @@ function main() {
         const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
         const machine = (0, machine_runner_1.createMachineRunner)(app, tags, exports.s0, undefined);
         try {
+            //const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.succeeding_non_branching_joining, projectionInfo.branching_joining)
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
                 _d = false;
