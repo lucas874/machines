@@ -88,7 +88,7 @@ const initialPayloadType = {
 };
 const fMap = { commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType };
 // Extended machine
-const [m3, i3] = factory_protocol_1.Composition.extendMachine1("T", projection_info, factory_protocol_1.Events.allEvents, fMap, exports.s0);
+const [m3, i3] = factory_protocol_1.Composition.adaptMachine("T", projection_info, factory_protocol_1.Events.allEvents, exports.s0);
 const checkProjResult = (0, machine_check_1.checkComposedProjection)(factory_protocol_1.interfacing_swarmswh, factory_protocol_1.subswh, "T", m3.createJSONForAnalysis(i3));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));

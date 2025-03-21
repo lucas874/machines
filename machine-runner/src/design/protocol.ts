@@ -29,11 +29,10 @@ export type SwarmProtocol<
     events: readonly MachineEvent.Factory<any, any>[],
     fMap: ProjMachine.funMap
   ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
-  extendMachine1: <MachineName extends string>(
+  adaptMachine: <MachineName extends string>(
     machineName: MachineName,
     proj: ProjMachine.ProjectionAndSucceedingMap,
     events: readonly MachineEvent.Factory<any, any>[],
-    fMap: ProjMachine.funMap,
     mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>
   ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
   extendMachineBT: <MachineName extends string>(
@@ -90,7 +89,7 @@ export namespace SwarmProtocol {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
       extendMachine: (machineName, proj, events, fMap) => ProjMachine.extendMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, fMap),
-      extendMachine1: (machineName, proj, events, fMap, mOldInitial) => ProjMachine.extendMachine1(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, fMap, mOldInitial),
+      adaptMachine: (machineName, proj, events, mOldInitial) => ProjMachine.adaptMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, mOldInitial),
       extendMachineBT: (machineName, projectionInfo, events, fMap, mOrig) => ProjMachine.extendMachineBT(ImplMachine.make(swarmName, machineName, eventFactories), projectionInfo, events, fMap, mOrig)
     }
   }
@@ -869,7 +868,7 @@ export namespace ProjMachine {
 
   }
 
-  export const extendMachine1 = <
+  export const adaptMachine = <
   SwarmProtocolName extends string,
   MachineName extends string,
   MachineEventFactories extends MachineEvent.Factory.Any,
@@ -877,7 +876,6 @@ export namespace ProjMachine {
   mNew: Machine<SwarmProtocolName, MachineName, MachineEventFactories>,
   projectionInfo: ProjectionAndSucceedingMap,
   events: readonly MachineEvent.Factory<any, Record<never, never>>[],
-  fMap: funMap,
   mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
 ): [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]  => {
   var projStatesToStates: Map<string, any> = new Map()
@@ -888,7 +886,6 @@ export namespace ProjMachine {
     new Map<string, MachineEvent.Factory<any, Record<never, never>>>(events.map(e => [e.type, e]))
   var projStatesToStatePayload: Map<string, (...args : any[]) => any> = new Map()
   const proj = projectionInfo.projection
-  const specialEvents = projectionInfo.branching_joining
   var incomingMap = incomingEdgesOfStatesMap(proj)
   var markedStates: Set<string> = new Set()
   var fMap2: funMap2 = {commands: new Map(), reactions: new Map()}
@@ -947,7 +944,7 @@ export namespace ProjMachine {
     for (var samePayloadTypeState of statesWithSamePayloadType) {
       markedStates.add(samePayloadTypeState)
     }
-    // works because non-zero numbers are truthy
+    // works because non-zero numbers are truthy. design all states as carrying payload.
     if (cmdTriples.length) {
       projStatesToStates.set(projState, mNew.designState(projState).withPayload<any>().commandFromList(cmdTriples).finish())
     } else {

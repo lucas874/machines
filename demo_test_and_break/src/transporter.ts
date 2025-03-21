@@ -76,7 +76,7 @@ const initialPayloadType : ProjMachine.ReactionEntry = {
 const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType}
 
 // Extended machine
-const [m3, i3] = Composition.extendMachine1("T", projection_info, Events.allEvents, fMap, s0)
+const [m3, i3] = Composition.adaptMachine("T", projection_info, Events.allEvents, s0)
 
 const checkProjResult = checkComposedProjection(interfacing_swarmswh, subswh, "T", m3.createJSONForAnalysis(i3))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
