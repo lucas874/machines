@@ -1,5 +1,5 @@
 #!/bin/bash
-# generated mostly by chatGPT
+# this script is generated mostly by chatGPT
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --clean)

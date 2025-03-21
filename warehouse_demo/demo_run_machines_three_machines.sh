@@ -3,9 +3,9 @@
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --clean)
-      pkill actyx
-      rm -rf actyx-data
-      gnome-terminal -- bash -c "~/Actyx/actyx"
+      pkill ax
+      rm -rf ax-data
+      gnome-terminal -- bash -c "~/Actyx/./ax run"
       shift
       ;;
   esac
