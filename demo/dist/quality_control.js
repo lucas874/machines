@@ -16,76 +16,54 @@ var __asyncValues = (this && this.__asyncValues) || function (o) {
     function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.s2 = exports.s1 = exports.s0 = void 0;
 const sdk_1 = require("@actyx/sdk");
 const machine_runner_1 = require("@actyx/machine-runner");
 const factory_protocol_1 = require("./factory_protocol");
 const machine_check_1 = require("@actyx/machine-check");
-/*
-
-Using the machine runner DSL an implmentation of quality control robot in Gquality is:
-
-const qcr = Composition.makeMachine('QCR')
-export const s0 = qcr.designEmpty('s0')
-    .command("observe", [Events.observing], (s, _) => {
-        console.log("began observing");
-        return [Events.observing.make({})]
-    })
-    .finish()
-export const s1 = qcr.designEmpty('s1').finish()
-export const s2 = qcr.designState('s2').withPayload<{modelName: string, decision: string}>()
-    .command("test", [Events.report], (s: any, _: any) => {
-        console.log("the newly built", s.self.modelName, " is", s.self.decision);
-        return [Events.report.make({modelName: s.self.modelName, decision: s.self.decision})]})
-    .finish()
-
-s0.react([Events.observing], s1, (_) => s1.make())
-s1.react([Events.car], s2, (_, e) => {
-    console.log("received a ", e.payload.modelName);
-    if (e.payload.part !== 'broken part') { return s2.make({modelName: e.payload.modelName, decision: "ok"}) }
-    else { return s2.make({ modelName: e.payload.modelName, decision: "notOk"}) }})
-*/
-// Projection of Gwarehouse || Gfactory || Gquality over QCR
-const result_projection = (0, machine_check_1.projectCombineMachines)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "QCR");
-if (result_projection.type == 'ERROR')
-    throw new Error('error getting projection');
-const projection = result_projection.data;
-// Command map
-const cMap = new Map();
-cMap.set(factory_protocol_1.Events.report.type, (s, _) => {
-    console.log("the newly built", s.self.modelName, " is", s.self.decision);
-    return [factory_protocol_1.Events.report.make({ modelName: s.self.modelName, decision: s.self.decision })];
-});
-cMap.set(factory_protocol_1.Events.observing.type, (s, _) => {
+// Using the machine runner DSL an implmentation of quality control robot in Gquality is:
+const qcr = factory_protocol_1.Composition.makeMachine('QCR');
+exports.s0 = qcr.designEmpty('s0')
+    .command("observe", [factory_protocol_1.Events.observing], (s, _) => {
     console.log("began observing");
     return [factory_protocol_1.Events.observing.make({})];
-});
-// Reaction map
-const rMap = new Map();
-const carReaction = {
-    genPayloadFun: (_, e) => {
-        console.log("received a ", e.payload.modelName);
-        if (e.payload.part !== 'broken part') {
-            return { modelName: e.payload.modelName, decision: "ok" };
-        }
-        else {
-            return { modelName: e.payload.modelName, decision: "notOk" };
-        }
+})
+    .finish();
+exports.s1 = qcr.designEmpty('s1').finish();
+exports.s2 = qcr.designState('s2').withPayload()
+    .command("test", [factory_protocol_1.Events.report], (s, _) => {
+    console.log("the newly built", s.self.modelName, " is", s.self.decision);
+    return [factory_protocol_1.Events.report.make({ modelName: s.self.modelName, decision: s.self.decision })];
+})
+    .finish();
+exports.s0.react([factory_protocol_1.Events.observing], exports.s1, (_) => exports.s1.make());
+exports.s1.react([factory_protocol_1.Events.car], exports.s2, (_, e) => {
+    console.log("received a ", e.payload.modelName);
+    if (e.payload.part !== 'broken part') {
+        return exports.s2.make({ modelName: e.payload.modelName, decision: "ok" });
     }
-};
-rMap.set(factory_protocol_1.Events.car.type, carReaction);
-const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
+    else {
+        return exports.s2.make({ modelName: e.payload.modelName, decision: "notOk" });
+    }
+});
+//s2.react([Events.time], s0, () => s0.make())
+// Projection of Gwarehouse || Gfactory || Gquality over QCR
+const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "QCR");
+if (projectionInfoResult.type == 'ERROR')
+    throw new Error('error getting projection');
+const projectionInfo = projectionInfoResult.data;
+//console.log(projectionInfo)
 // Extended machine
-const [m3, i3] = factory_protocol_1.Composition.extendMachine("QCR", projection, factory_protocol_1.Events.allEvents, fMap);
-const checkProjResult = (0, machine_check_1.checkComposedProjection)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "QCR", m3.createJSONForAnalysis(i3));
-if (checkProjResult.type == 'ERROR')
-    throw new Error(checkProjResult.errors.join(", "));
+const [qcrAdapted, s0_] = factory_protocol_1.Composition.adaptMachine("QCR", projectionInfo, factory_protocol_1.Events.allEvents, exports.s0);
+const checkProjResult = (0, machine_check_1.checkComposedProjection)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "QCR", qcrAdapted.createJSONForAnalysis(s0_));
+//if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 // Run the extended machine
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
         const app = yield sdk_1.Actyx.of(factory_protocol_1.manifest);
         const tags = factory_protocol_1.Composition.tagWithEntityId('factory-1');
-        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, i3, undefined);
+        const machine = (0, machine_runner_1.createMachineRunnerBT)(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes);
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;

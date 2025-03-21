@@ -13,12 +13,14 @@ import {
 import {
   MachineEvent,
   StateRaw,
+  StateRawBT,
   StateFactory,
   CommandDefinerMap,
   ToCommandSignatureMap,
   convertCommandMapToCommandSignatureMap,
   Contained,
   CommandContext,
+  CommandContextBT,
   CommandGeneratorCriteria,
 } from '../design/state.js'
 import { Destruction } from '../utils/destruction.js'
@@ -27,6 +29,7 @@ import {
   PushEventTypes,
   RunnerInternals,
   StateAndFactory,
+  RunnerInternalsBT,
 } from './runner-internals.js'
 import {
   CommonEmitterEventMap,
@@ -292,6 +295,8 @@ export const createMachineRunnerBT = <
     any
   >,
   initialPayload: any,
+  succeedingNonBranchingJoining: Record<string, Set<string>>,
+  specialEvents: Set<string>
 ): MachineRunner<SwarmProtocolName, MachineName, StateUnion> => {
   const subscribeMonotonicQuery = {
     query: tags,
@@ -303,12 +308,8 @@ export const createMachineRunnerBT = <
 
   const subscribe: SubscribeFn<MachineEvents> = (callback, onCompleteOrErr) =>
     sdk.subscribeMonotonic<MachineEvents>(subscribeMonotonicQuery, callback, onCompleteOrErr)
-  var jbLastInitial: Map<string, string> = new Map()
-  for (var e of initialFactory.mechanism.protocol.registeredEvents) {
-    jbLastInitial.set(e.type, 'null')
-  }
-  const intialPayloadWrapped: any = {jbLast: jbLastInitial, payload: initialPayload}
-  return createMachineRunnerInternalBT(subscribe, persist, tags, initialFactory, intialPayloadWrapped)
+
+  return createMachineRunnerInternalBT(subscribe, persist, tags, initialFactory, initialPayload, succeedingNonBranchingJoining, specialEvents)
 }
 export const createMachineRunnerInternal = <
   SwarmProtocolName extends string,
@@ -470,7 +471,7 @@ export const createMachineRunnerInternal = <
               bootTimeLogger.incrementEventCount()
               emitter.emit('debug.eventHandlingPrevState', internals.current.data)
 
-              const pushEventResult = RunnerInternals.pushEvent(internals, event, false)
+              const pushEventResult = RunnerInternals.pushEvent(internals, event)
 
               emitter.emit('debug.eventHandling', {
                 event,
@@ -690,6 +691,8 @@ export const createMachineRunnerInternalBT = <
     any
   >,
   initialPayload: Payload,
+  succeedingNonBranchingJoining: Record<string, Set<string>>,
+  specialEvents: Set<string>,
 ): MachineRunner<SwarmProtocolName, MachineName, StateUnion> => {
   type ThisStateOpaque = StateOpaque<SwarmProtocolName, MachineName, string, StateUnion>
   type ThisMachineRunner = MachineRunner<SwarmProtocolName, MachineName, StateUnion>
@@ -722,7 +725,7 @@ export const createMachineRunnerInternalBT = <
     return publish(taggedEvents)
   }
 
-  const internals = RunnerInternals.make(initialFactory, initialPayload, (props) => {
+  const internals = RunnerInternalsBT.make(initialFactory, initialPayload, specialEvents, succeedingNonBranchingJoining, (props) => {
     const error = CommandGeneratorCriteria.produceError(props.commandGeneratorCriteria, () =>
       makeIdentityStringForCommandError(
         initialFactory.mechanism.protocol.swarmName,
@@ -830,7 +833,7 @@ export const createMachineRunnerInternalBT = <
               bootTimeLogger.incrementEventCount()
               emitter.emit('debug.eventHandlingPrevState', internals.current.data)
 
-              const pushEventResult = RunnerInternals.pushEvent(internals, event, true)
+              const pushEventResult = RunnerInternalsBT.pushEvent(internals, event)
 
               emitter.emit('debug.eventHandling', {
                 event,
@@ -845,7 +848,7 @@ export const createMachineRunnerInternalBT = <
                 if (emitter.listenerCount('audit.state') > 0) {
                   emitter.emit('audit.state', {
                     state: ImplStateOpaque.make<SwarmProtocolName, MachineName, StateUnion>(
-                      internals,
+                      internals, // Should work because RunnerInternalsBT.Any is a subtype of RunnerInternals.Any?
                       internals.current,
                     ),
                     events: pushEventResult.triggeringEvents,
@@ -1717,7 +1720,7 @@ namespace ImplState {
     commandGeneratorCriteria: CommandGeneratorCriteria
     commandEnabledAtSnapshot: boolean
     commandEmitFn: CommandCallback<MachineEventFactories>
-    stateAtSnapshot: StateRaw<StateName, StatePayload>
+    stateAtSnapshot: StateRaw<StateName, StatePayload> | StateRawBT<StateName, StatePayload>
   }): State<StateName, StatePayload, Commands> => {
     const mechanism = factory.mechanism
     const commands = () =>
@@ -1729,12 +1732,16 @@ namespace ImplState {
             commandEmitFn,
           })
         : undefined
-
-    const snapshot = {
-      type: stateAtSnapshot.type,
-      payload: stateAtSnapshot.payload,
-      commands,
-    }
+    const snapshot = "jbLast" in stateAtSnapshot ? {
+        type: stateAtSnapshot.type,
+        payload: stateAtSnapshot.payload,
+        jbLast: stateAtSnapshot.jbLast,
+        commands,
+      } : {
+        type: stateAtSnapshot.type,
+        payload: stateAtSnapshot.payload,
+        commands,
+      }
 
     return snapshot
   }
@@ -1751,7 +1758,7 @@ namespace ImplState {
     stateAtSnapshot,
   }: {
     mechanismCommands: Commands
-    stateAtSnapshot: StateRaw<StateName, StatePayload>
+    stateAtSnapshot: StateRaw<StateName, StatePayload> | StateRawBT<StateName, StatePayload>
     commandGeneratorCriteria: CommandGeneratorCriteria
     commandEmitFn: CommandCallback<MachineEventFactories>
   }): CommandsOfState<Commands> => {
@@ -1772,9 +1779,25 @@ namespace ImplState {
     return commandCalls
   }
 
-  const makeContextGetter = <StateName extends string, StatePayload extends any>(
+  /* const makeContextGetter = <StateName extends string, StatePayload extends any>(
     stateAtSnapshot: StateRaw<StateName, StatePayload>,
   ): Readonly<CommandContext<StatePayload, MachineEvent.Factory.Any>> => ({
+    self: stateAtSnapshot.payload,
+    withTags: (additionalTags, payload) =>
+      Contained.ContainedPayload.wrap(payload, {
+        additionalTags,
+      }),
+  }) */
+  const makeContextGetter = <StateName extends string, StatePayload extends any>(
+    stateAtSnapshot: StateRaw<StateName, StatePayload> | StateRawBT<StateName, StatePayload>,
+  ): Readonly<CommandContext<StatePayload, MachineEvent.Factory.Any>> | Readonly<CommandContextBT<StatePayload, MachineEvent.Factory.Any>> => ("jbLast" in stateAtSnapshot ? {
+    self: stateAtSnapshot.payload,
+    withTags: (additionalTags, payload) =>
+      Contained.ContainedPayload.wrap(payload, {
+        additionalTags,
+      }),
+    jbLast: stateAtSnapshot.jbLast
+  } : {
     self: stateAtSnapshot.payload,
     withTags: (additionalTags, payload) =>
       Contained.ContainedPayload.wrap(payload, {

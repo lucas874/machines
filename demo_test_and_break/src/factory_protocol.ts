@@ -24,7 +24,7 @@ export namespace Events {
   export const position = MachineEvent.design('position').withPayload<PositionPayload>()
   export const time = MachineEvent.design('time').withPayload<TimePayload>()
   export const car = MachineEvent.design('car').withPayload<CarPayload>()
-  export const observing = MachineEvent.design('obs').withoutPayload()
+  export const observing = MachineEvent.design('ok').withoutPayload()
   export const report = MachineEvent.design('report').withPayload<ReportPayload>()
 
   export const allEvents = [partID, part, position, time, car, observing, report] as const

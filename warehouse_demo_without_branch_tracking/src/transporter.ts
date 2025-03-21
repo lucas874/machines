@@ -1,18 +1,15 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunner, ProjMachine } from '@actyx/machine-runner'
+import { createMachineRunner, ProjMachine, createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, all_projections, getRandomInt  } from './warehouse_protocol'
-import { projectCombineMachines, checkComposedProjection } from '@actyx/machine-check'
+import { projectCombineMachines, checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation } from '@actyx/machine-check'
 
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 
-/*
-
-Using the machine runner DSL an implmentation of transporter in Gwarehouse is:
-
+// Using the machine runner DSL an implmentation of transporter in Gwarehouse is:
 const transporter = Composition.makeMachine('T')
-export const s0 = transporter.designState('s0').withPayload<{id: string}>()
+export const s0 = transporter.designEmpty('s0')
     .command('request', [Events.partID], (s: any, e: any) => {
-      var id = s.self.id;
+      var id = parts[Math.floor(Math.random() * parts.length)];
       console.log("requesting a", id);
       return [Events.partID.make({id: id})]})
     .finish()
@@ -30,51 +27,27 @@ s1.react([Events.position], s2, (_, e) => {
     console.log("got a ", e.payload.part);
     return { part: e.payload.part } })
 
-s2.react([Events.part], s0, (_, e) => { return s0.make({id: ""}) })
-*/
+s2.react([Events.part], s0, (_, e) => { return s0.make() })
 
-// Projection of Gwarehouse || Gfactory || Gquality over D
-const result_projection = projectCombineMachines(interfacing_swarms, subs, "T")
-if (result_projection.type == 'ERROR') throw new Error('error getting projection')
-const projection = result_projection.data
+// Projection of Gwarehouse || Gfactory || Gquality over T
+const projectionInfoResult: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(interfacing_swarms, subs, "T")
+if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
+const projectionInfo = projectionInfoResult.data
+//console.log("projection info: ", projectionInfo)
 
-// Command map
-const cMap = new Map()
-cMap.set(Events.partID.type, (s: any, e: any) => {
-  s.self.id = s.self.id === undefined ? parts[Math.floor(Math.random() * parts.length)] : s.self.id;
-  var id = s.self.id;
-  console.log("requesting a", id);
-  return [Events.partID.make({id: id})]})
+// Adapted machine
+const [transporterAdapted, s0_] = Composition.adaptMachine("T", projectionInfo, Events.allEvents, s0)
 
-cMap.set(Events.part.type, (s: any, e: any) => {
-  console.log("delivering a", s.self.part)
-  return [Events.part.make({part: s.self.part})] })
-
-// Reaction map
-const rMap = new Map()
-const positionReaction : ProjMachine.ReactionEntry = {
-  genPayloadFun: (s, e) => {  console.log("e is: ", e); console.log("s is: ", s); return { part: e.payload.part } }
-}
-rMap.set(Events.position.type, positionReaction)
-
-// hacky. we use the return type of this function to set the payload type of initial state and any other state enabling same commands as in initial
-const initialPayloadType : ProjMachine.ReactionEntry = {
-  genPayloadFun: () => { return {part: ""} }
-}
-const fMap : any = {commands: cMap, reactions: rMap, initialPayloadType: initialPayloadType}
-
-// Extended machine
-const [m3, i3] = Composition.extendMachine("T", projection, Events.allEvents, fMap)
-
-const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "T", m3.createJSONForAnalysis(i3))
+const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "T", transporterAdapted.createJSONForAnalysis(s0_))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
 
-// Run the extended machine
+// Run the adapted machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    const machine = createMachineRunner(app, tags, i3, {id: parts[Math.floor(Math.random() * parts.length)]})
+    const machine = createMachineRunner(app, tags, s0, undefined)
+    //const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
 
     for await (const state of machine) {
       console.log("transporter. state is:", state.type)

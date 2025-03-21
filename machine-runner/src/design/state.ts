@@ -34,6 +34,35 @@ export namespace StateRaw {
   export type Any = StateRaw<string, unknown>
 }
 
+export type CommandContextBT<Self, EmittedEventFactories extends MachineEvent.Factory.Any> = {
+  self: Self
+  jbLast: Map<string, string>,
+  /**
+   * Attach tags to MachineEvents associated to this command
+   * @param tags the tags that will be attached to the MachineEvents
+   */
+  withTags: <InputPayload extends MachineEvent.Payload.Of<EmittedEventFactories>>(
+    tags: string[],
+    payload: InputPayload,
+  ) => Contained.ContainedPayload<InputPayload>
+}
+
+/**
+ * @private not intended for use outside of actyx packages.
+ */
+export type StateRawBT<Name extends string, Payload> = {
+  type: Name
+  payload: Payload
+  jbLast: Map<string, string>
+}
+
+/**
+ * @private not intended for use outside of actyx packages.
+ */
+export namespace StateRawBT {
+  export type Any = StateRawBT<string, unknown>
+}
+
 export type ReactionHandler<EventChain extends ActyxEvent<MachineEvent.Any>[], Context, RetVal> = (
   context: Context,
   ...events: EventChain
@@ -165,7 +194,7 @@ export type StateMechanism<
     name: CommandName extends `_${string}` ? never : CommandName,
     events: EmittedEventFactories,
     handler: CommandDefiner<
-      CommandContext<StatePayload, MachineEvent.Factory.Reduce<EmittedEventFactories>>,
+      CommandContext<StatePayload, MachineEvent.Factory.Reduce<EmittedEventFactories>> | CommandContextBT<StatePayload, MachineEvent.Factory.Reduce<EmittedEventFactories>>,
       CommandArgs,
       MachineEvent.Factory.MapToPayloadOrContainedPayload<EmittedEventFactories>
     >,
@@ -177,7 +206,7 @@ export type StateMechanism<
     StatePayload,
     Commands & {
       [key in CommandName]: CommandDefiner<
-        CommandContext<StatePayload, MachineEvent.Factory.Reduce<EmittedEventFactories>>,
+        CommandContext<StatePayload, MachineEvent.Factory.Reduce<EmittedEventFactories>> | CommandContextBT<StatePayload, MachineEvent.Factory.Reduce<EmittedEventFactories>>,
         CommandArgs,
         MachineEvent.Factory.MapToPayloadOrContainedPayload<EmittedEventFactories>
       >
@@ -192,7 +221,7 @@ export type StateMechanism<
     cmds: [(CommandName extends `_${string}` ? never : CommandName),
             (EmittedEventFactories),
             (CommandDefiner<
-              CommandContext<StatePayload, MachineEvent.Factory.Reduce<EmittedEventFactories>>,
+              CommandContext<StatePayload, MachineEvent.Factory.Reduce<EmittedEventFactories>> | CommandContextBT<StatePayload, MachineEvent.Factory.Reduce<EmittedEventFactories>>,
               CommandArgs,
               MachineEvent.Factory.MapToPayloadOrContainedPayload<EmittedEventFactories>>)][]
   ) => StateMechanism<
@@ -203,12 +232,17 @@ export type StateMechanism<
     StatePayload,
     Commands & {
       [key in CommandName]: CommandDefiner<
-        CommandContext<StatePayload, MachineEvent.Factory.Reduce<EmittedEventFactories>>,
+        CommandContext<StatePayload, MachineEvent.Factory.Reduce<EmittedEventFactories>> | CommandContextBT<StatePayload, MachineEvent.Factory.Reduce<EmittedEventFactories>>,
         CommandArgs,
         MachineEvent.Factory.MapToPayloadOrContainedPayload<EmittedEventFactories>
       >
     }
   >
+  // come back to this remove any! come back to all uses of any regarding commandDefinitions
+  readonly commandDefinitions:  Map<string, CommandDefiner<
+    CommandContext<StatePayload, MachineEvent.Factory.Reduce<any>> | CommandContextBT<StatePayload, MachineEvent.Factory.Reduce<any>>,
+    any,
+    MachineEvent.Factory.MapToPayloadOrContainedPayload<any>>>
 
   /**
    * Finalize state design process.
@@ -239,6 +273,7 @@ export namespace StateMechanism {
     props?: {
       commands?: Commands
       commandDataForAnalytics: { commandName: string; events: string[] }[]
+      commandDefinitions?: any
     },
   ): StateMechanism<
     SwarmProtocolName,
@@ -258,6 +293,7 @@ export namespace StateMechanism {
     >
 
     const commands: Self['commands'] = props?.commands || ({} as Commands)
+    const commandDefinitions: Self['commandDefinitions'] = props?.commandDefinitions || {}
 
     const command: Self['command'] = (name, factories, commandDefinition) => {
       // TODO: make this more sturdy
@@ -272,6 +308,7 @@ export namespace StateMechanism {
       type Params = Parameters<typeof commandDefinition>
 
       const patchedCommandDefinition = (...params: Params) => {
+
         // Payload is either 0 or factories.length. Therefore converting
         // payload to event this way is safe-ish
         const payloads = commandDefinition(...params)
@@ -282,7 +319,8 @@ export namespace StateMechanism {
             const [payload, extraData] =
               Contained.ContainedPayload.extract(payloadOrContainedPayload)
 
-            return [factory.make(payload), extraData]
+            // Params[0] is the current state of the machine, should always be there. Do something about ! in get(factory.type)!
+            return "jbLast" in params[0] ? [factory.makeBT(payload, params[0].jbLast.get(factory.type)!), extraData] : [factory.make(payload), extraData]
           },
         )
 
@@ -313,6 +351,7 @@ export namespace StateMechanism {
             commandName: name,
           },
         ],
+        commandDefinitions: {... commandDefinitions, [name]: commandDefinition }
       })
     }
 
@@ -350,6 +389,7 @@ export namespace StateMechanism {
       commands,
       command,
       commandFromList,
+      commandDefinitions,
       finish,
     }
 

@@ -47,15 +47,36 @@ exports.s0.react([factory_protocol_1.Events.part], exports.s1, (_, e) => {
 });
 exports.s1.react([factory_protocol_1.Events.car], exports.s2, (_) => exports.s2.make());
 // Projection of Gwarehouse || Gfactory || Gquality over R
-const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(factory_protocol_1.interfacing_swarms, exports.sub, "R");
-if (projectionInfoResult.type == 'ERROR')
+//const result_projection = projectCombineMachines(interfacing_swarms, sub, "R")
+//if (result_projection.type == 'ERROR') throw new Error('error getting projection')
+//const projection = result_projection.data
+const result_projection_info = (0, machine_check_1.projectionAndInformation)(factory_protocol_1.interfacing_swarms, exports.sub, "R");
+if (result_projection_info.type == 'ERROR')
     throw new Error('error getting projection');
-const projectionInfo = projectionInfoResult.data;
-//console.log("projection info: ", projectionInfo)
+const projection_info = result_projection_info.data;
+console.log(projection_info);
+// Command map
+const cMap = new Map();
+cMap.set(factory_protocol_1.Events.car.type, (s, _) => {
+    var modelName = s.self.part === "spoiler" ? "sports car" : "sedan";
+    console.log("using the ", s.self.part, " to build a ", modelName);
+    return { part: s.self.part, modelName: modelName };
+});
+//return [Events.car.make({part: s.self.part, modelName: modelName})]})
+// Reaction map
+const rMap = new Map();
+const partReaction = {
+    genPayloadFun: (_, e) => {
+        console.log("received a ", e.payload.part);
+        return { part: e.payload.part };
+    }
+};
+rMap.set(factory_protocol_1.Events.part.type, partReaction);
+const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
 // Extend machine
-const [factoryRobotAdapted, s0_] = factory_protocol_1.Composition.adaptMachine("R", projectionInfo, factory_protocol_1.Events.allEvents, exports.s0);
+const [m3, i3] = factory_protocol_1.Composition.extendMachineBT("R", projection_info, factory_protocol_1.Events.allEvents, fMap, exports.s0);
 // Check machine (for demonstration purposes)
-const checkProjResult = (0, machine_check_1.checkComposedProjection)(factory_protocol_1.interfacing_swarms, exports.sub, "R", factoryRobotAdapted.createJSONForAnalysis(s0_));
+const checkProjResult = (0, machine_check_1.checkComposedProjection)(factory_protocol_1.interfacing_swarms, exports.sub, "R", m3.createJSONForAnalysis(i3));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));
 // Run the extended machine
@@ -64,7 +85,7 @@ function main() {
         var _a, e_1, _b, _c;
         const app = yield sdk_1.Actyx.of(factory_protocol_1.manifest);
         const tags = factory_protocol_1.Composition.tagWithEntityId('factory-1');
-        const machine = (0, machine_runner_1.createMachineRunnerBT)(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes);
+        const machine = (0, machine_runner_1.createMachineRunnerBT)(app, tags, i3, undefined);
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;

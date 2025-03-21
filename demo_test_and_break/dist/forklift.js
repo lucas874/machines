@@ -19,47 +19,73 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.s2 = exports.s1 = exports.s0 = void 0;
 const sdk_1 = require("@actyx/sdk");
 const machine_runner_1 = require("@actyx/machine-runner");
-const warehouse_protocol_1 = require("./warehouse_protocol");
+const factory_protocol_1 = require("./factory_protocol");
 const machine_check_1 = require("@actyx/machine-check");
 // Using the machine runner DSL an implmentation of forklift in Gwarehouse is:
-const forklift = warehouse_protocol_1.Composition.makeMachine('FL');
+const forklift = factory_protocol_1.Composition.makeMachine('FL');
 exports.s0 = forklift.designEmpty('s0').finish();
 exports.s1 = forklift.designState('s1').withPayload()
-    .command('get', [warehouse_protocol_1.Events.position], (state, _) => {
+    .command('get', [factory_protocol_1.Events.position], (state, _) => {
     console.log("retrieved a", state.self.id, "at position x");
-    return [warehouse_protocol_1.Events.position.make({ position: "x", part: state.self.id })];
+    return [factory_protocol_1.Events.position.make({ position: "x", part: state.self.id })];
 })
     .finish();
 exports.s2 = forklift.designEmpty('s2').finish();
-exports.s0.react([warehouse_protocol_1.Events.partID], exports.s1, (_, e) => {
+exports.s0.react([factory_protocol_1.Events.partID], exports.s1, (_, e) => {
     console.log("a", e.payload.id, "was requested");
-    if ((0, warehouse_protocol_1.getRandomInt)(0, 10) >= 9) {
+    if ((0, factory_protocol_1.getRandomInt)(0, 10) >= 9) {
         return { id: "broken part" };
     }
     return exports.s1.make({ id: e.payload.id });
 });
-exports.s1.react([warehouse_protocol_1.Events.position], exports.s0, (_) => exports.s0.make());
-exports.s0.react([warehouse_protocol_1.Events.time], exports.s2, (_) => exports.s2.make());
+exports.s1.react([factory_protocol_1.Events.position], exports.s0, (_) => exports.s0.make());
+exports.s0.react([factory_protocol_1.Events.time], exports.s2, (_) => exports.s2.make());
+// With our extension of the library we create a map from events to reactions
+// and commands instead and use the projection of the composition over
+// the role to create the extended machine
 // Projection of Gwarehouse || Gfactory || Gquality over FL
-const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "FL");
-if (projectionInfoResult.type == 'ERROR')
+const result_projection_info = (0, machine_check_1.projectionAndInformation)(factory_protocol_1.interfacing_swarmswh, factory_protocol_1.subswh, "FL");
+if (result_projection_info.type == 'ERROR')
     throw new Error('error getting projection');
-const projectionInfo = projectionInfoResult.data;
-// console.log(projectionInfo)
-// Adapted machine
-const [forkliftAdapted, s0_] = warehouse_protocol_1.Composition.adaptMachine("FL", projectionInfo, warehouse_protocol_1.Events.allEvents, exports.s0);
-const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "FL", forkliftAdapted.createJSONForAnalysis(s0_));
-if (checkProjResult.type == 'ERROR')
-    throw new Error(checkProjResult.errors.join(", "));
-// Run the adapted machine
+const projection_info = result_projection_info.data;
+// console.log(projection_info)
+// Command map
+const cMap = new Map();
+cMap.set(factory_protocol_1.Events.position.type, (state, _) => {
+    console.log("retrieved a", state.self.id, "at position x");
+    console.log("s is: ", state);
+    //return {position: "x", part: state.self.id} })
+    return [factory_protocol_1.Events.position.make({ position: "x", part: state.self.id })];
+});
+// Reaction map
+const rMap = new Map();
+const partIDReaction = {
+    genPayloadFun: (s, e) => {
+        console.log("s is: ", s);
+        console.log("a", e.payload.id, "was requested");
+        if ((0, factory_protocol_1.getRandomInt)(0, 10) >= 9) {
+            return { id: "broken part" };
+        }
+        return { id: e.payload.id };
+    }
+};
+rMap.set(factory_protocol_1.Events.partID.type, partIDReaction);
+const fMap = { commands: cMap, reactions: rMap, initialPayloadType: undefined };
+// Extended machine
+const [m3, i3] = factory_protocol_1.Composition.adaptMachine("FL", projection_info, factory_protocol_1.Events.allEvents, exports.s0);
+/*const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "FL", m3.createJSONForAnalysis(i3))
+if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
+ */
+// Run the extended machine
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
-        const app = yield sdk_1.Actyx.of(warehouse_protocol_1.manifest);
-        const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
-        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, exports.s0, undefined);
+        const app = yield sdk_1.Actyx.of(factory_protocol_1.manifest);
+        const tags = factory_protocol_1.Composition.tagWithEntityId('factory-1');
+        //const machine = createMachineRunner(app, tags, s0, undefined)
+        const machine = (0, machine_runner_1.createMachineRunnerBT)(app, tags, i3, undefined, projection_info.succeeding_non_branching_joining, projection_info.branching_joining);
+        console.log("HEJ");
         try {
-            //const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
                 _d = false;
@@ -78,7 +104,7 @@ function main() {
                             if (Object.keys(s1 || {}).includes('get')) {
                                 s1.get();
                             }
-                        }, 1500);
+                        }, (0, factory_protocol_1.getRandomInt)(4000, 8000));
                         break;
                     }
                 }

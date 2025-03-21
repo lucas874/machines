@@ -163,10 +163,10 @@ pub fn projection_information(protos: String, subs: String, role: String) -> Str
 
     let role = Role::new(&role);
     let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role);
-    let succeeding_non_branching_joining = composition_machine::paths_from_event_types(&proj, &proto_info);
-    let branching_joining = get_branching_joining_proto_info(&proto_info);
+    let branches = composition_machine::paths_from_event_types(&proj, &proto_info);
+    let special_event_types = get_branching_joining_proto_info(&proto_info);
 
-    dok(ProjectionAndSucceedingMap {projection: composition::composition_machine::from_option_to_machine(proj, proj_initial.unwrap()), succeeding_non_branching_joining, branching_joining})
+    dok(ProjectionAndSucceedingMap {projection: composition::composition_machine::from_option_to_machine(proj, proj_initial.unwrap()), branches, special_event_types})
 }
 
 // check an implementation against the combined projection of swarms over role.
