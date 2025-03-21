@@ -308,11 +308,7 @@ export const createMachineRunnerBT = <
 
   const subscribe: SubscribeFn<MachineEvents> = (callback, onCompleteOrErr) =>
     sdk.subscribeMonotonic<MachineEvents>(subscribeMonotonicQuery, callback, onCompleteOrErr)
-  //var jbLastInitial: Map<string, string> = new Map()
-  /* for (var e of initialFactory.mechanism.protocol.registeredEvents) {
-    jbLastInitial.set(e.type, 'null')
-  } */
-  //const initialPayloadWrapped: any = {jbLast: jbLastInitial, payload: initialPayload}
+
   return createMachineRunnerInternalBT(subscribe, persist, tags, initialFactory, initialPayload, succeedingNonBranchingJoining, specialEvents)
 }
 export const createMachineRunnerInternal = <
@@ -818,21 +814,6 @@ export const createMachineRunnerInternalBT = <
       [emitter, globals.emitter],
     )
 
-    // if event is branching or joining update jbLast accordingly otherwise return old
-    /* const updateJBLast = (event: ActyxEvent<MachineEvents>): Map<string, string> => {
-      if (specialEvents.has(event.payload.type)) {
-        const branchFromT = succeedingNonBranchingJoining[event.payload.type]
-        var jbLastUpdated = structuredClone(internals.jbLast)
-        for (var et of branchFromT) {
-          jbLastUpdated.set(et, event.meta.eventId)
-        }
-
-        return jbLastUpdated
-      } else {
-        return internals.jbLast
-      }
-    } */
-
     refToUnsubFunction = subscribe(
       async (d) => {
         try {
@@ -865,7 +846,6 @@ export const createMachineRunnerInternalBT = <
               // Effects of handlingReport on emitters
               if (pushEventResult.type === PushEventTypes.React) {
                 if (emitter.listenerCount('audit.state') > 0) {
-                  //internals.jbLast = updateJBLast(event) // update jbLast map
                   emitter.emit('audit.state', {
                     state: ImplStateOpaque.make<SwarmProtocolName, MachineName, StateUnion>(
                       internals, // Should work because RunnerInternalsBT.Any is a subtype of RunnerInternals.Any?

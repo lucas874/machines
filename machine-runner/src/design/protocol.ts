@@ -460,11 +460,11 @@ export namespace ProjMachine {
       for (var t of incomingEdgesMap.get(s)!) {
         if (!visited.has(t.source)) {
           visited.add(t.source)
-          const [pre_states, pre_fs] = inner(t.source, initial, incomingEdgesMap, projStatesToStatePayload, visited)
-          if (pre_states.size != 0) {
-            pre_states.forEach(states.add, states)
+          const [preStates, preFs] = inner(t.source, initial, incomingEdgesMap, projStatesToStatePayload, visited)
+          if (preStates.size != 0) {
+            preStates.forEach(states.add, states)
             states.add(s)
-            pre_fs.forEach(fs.add, fs)
+            preFs.forEach(fs.add, fs)
           }
         }
 
