@@ -70,7 +70,7 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
 
 fn bench_general_two_step(c: &mut Criterion) {
     let mut group = c.benchmark_group("General pattern algorithm 1 vs. exact");
-    group.sample_size(50);
+    group.sample_size(10);
     let mut interfacing_swarms_general =
         prepare_files_in_directory(String::from("./bench_and_results/benchmarks/general_pattern/"));
     interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
