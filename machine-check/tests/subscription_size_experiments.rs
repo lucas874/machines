@@ -41,6 +41,34 @@ fn bench_sub_sizes_general() {
     }
 }
 
+#[test]
+#[ignore]
+fn short_run_bench_sub_sizes_general() {
+    let parent_path = "bench_and_results".to_string();
+    let dir_name = format!("short_subscription_size_benchmarks/general_pattern");
+    create_directory(&parent_path, &dir_name);
+    let mut interfacing_swarms_general =
+        prepare_files_in_directory(String::from("./bench_and_results/benchmarks/general_pattern/"));
+    interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let two_step_granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
+    for (_, bi) in interfacing_swarms_general.iter().step_by(20) {
+        let swarms = serde_json::to_string(&bi.interfacing_swarms).unwrap();
+        let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), two_step_granularity.clone())).unwrap() {
+            DataResult::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::ERROR{ .. } => None,
+        };
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), two_step_granularity.replace("\"", ""), String::from("./bench_and_results/short_subscription_size_benchmarks/general_pattern"));
+
+        let subscriptions = match serde_json::from_str(&exact_weak_well_formed_sub(swarms.clone(), subs.clone())).unwrap() {
+            DataResult::OK{data: subscriptions} => {
+                Some(subscriptions) },
+            DataResult::ERROR{ .. } => None,
+        };
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), String::from("./bench_and_results/short_subscription_size_benchmarks/general_pattern"));
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BenchMarkInput  {
     pub state_space_size: usize,

@@ -68,7 +68,7 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
     inputs
 }
 
-fn bench_general_two_step(c: &mut Criterion) {
+fn bench_general(c: &mut Criterion) {
     let mut group = c.benchmark_group("General pattern algorithm 1 vs. exact");
     group.sample_size(10);
     let mut interfacing_swarms_general =
@@ -87,5 +87,26 @@ fn bench_general_two_step(c: &mut Criterion) {
     }
     group.finish();
 }
-criterion_group!(benches, bench_general_two_step);
+
+fn short_run_bench_general(c: &mut Criterion) {
+    let mut group = c.benchmark_group("General pattern algorithm 1 vs. exact short run");
+    group.sample_size(10);
+    let mut interfacing_swarms_general =
+        prepare_files_in_directory(String::from("./bench_and_results/benchmarks/general_pattern/"));
+    interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+
+    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let two_step_granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
+
+    for (size, interfacing_swarms) in interfacing_swarms_general.iter().step_by(20) {
+        group.bench_with_input(BenchmarkId::new("Algorithm 1", size), interfacing_swarms,
+        |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), two_step_granularity.clone())));
+
+        group.bench_with_input(BenchmarkId::new("Exact", size), interfacing_swarms,
+        |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone())));
+    }
+    group.finish();
+}
+
+criterion_group!(benches, bench_general, short_run_bench_general);
 criterion_main!(benches);
