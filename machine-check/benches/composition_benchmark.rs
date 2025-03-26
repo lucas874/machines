@@ -34,7 +34,7 @@ fn prepare_input(file_name: String) -> (usize, String) {
     let mut protos = String::new();
     match file.read_to_string(&mut protos) {
         Err(why) => panic!("couldn't read {}: {}", display, why),
-        Ok(_) => (), //print!("{} contains:\n{}", display, protos),
+        Ok(_) => (),
     }
     let (state_space_size, interfacing_swarms) =
         match serde_json::from_str::<BenchMarkInput>(&protos) {
@@ -55,7 +55,6 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
         match entry {
             Ok(entry) => {
                 if entry.file_type().is_file() {
-                    println!("file: {}", entry.path().as_os_str().to_str().unwrap().to_string());
                     inputs.push(prepare_input(
                         entry.path().as_os_str().to_str().unwrap().to_string(),
                     ));
@@ -97,13 +96,16 @@ fn short_bench_general(c: &mut Criterion) {
 
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
     let two_step_granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
+    let step: usize = 40;
+    let number_of_inputs = interfacing_swarms_general.iter().step_by(step).len();
 
-    for (size, interfacing_swarms) in interfacing_swarms_general.iter().step_by(20) {
+    for (i, (size, interfacing_swarms)) in interfacing_swarms_general.iter().step_by(step).enumerate() {
         group.bench_with_input(BenchmarkId::new("Algorithm 1", size), interfacing_swarms,
         |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), two_step_granularity.clone())));
 
         group.bench_with_input(BenchmarkId::new("Exact", size), interfacing_swarms,
         |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone())));
+        println!("progress: {} / {} samples processed",  i+1, number_of_inputs);
     }
     group.finish();
 }
