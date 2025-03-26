@@ -68,7 +68,7 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
     inputs
 }
 
-fn bench_general(c: &mut Criterion) {
+fn full_bench_general(c: &mut Criterion) {
     let mut group = c.benchmark_group("General pattern algorithm 1 vs. exact");
     group.sample_size(10);
     let mut interfacing_swarms_general =
@@ -88,7 +88,7 @@ fn bench_general(c: &mut Criterion) {
     group.finish();
 }
 
-fn short_run_bench_general(c: &mut Criterion) {
+fn short_bench_general(c: &mut Criterion) {
     let mut group = c.benchmark_group("General pattern algorithm 1 vs. exact short run");
     group.sample_size(10);
     let mut interfacing_swarms_general =
@@ -108,5 +108,5 @@ fn short_run_bench_general(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_general, short_run_bench_general);
+criterion_group!(benches, full_bench_general, short_bench_general);
 criterion_main!(benches);
