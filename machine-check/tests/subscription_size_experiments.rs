@@ -18,9 +18,10 @@ fn bench_sub_sizes_general() {
     let mut interfacing_swarms_general =
         prepare_files_in_directory(String::from("./bench_and_results/benchmarks/general_pattern/"));
     interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
-    let number_of_samples = interfacing_swarms_general.len();
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
     let two_step_granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
+    let number_of_inputs = interfacing_swarms_general.len();
+    println!("Running the subscription size experiment with the full benchmark suite.");
     for (i, (_, bi)) in interfacing_swarms_general.iter().enumerate() {
         let swarms = serde_json::to_string(&bi.interfacing_swarms).unwrap();
         let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), two_step_granularity.clone())).unwrap() {
@@ -35,9 +36,7 @@ fn bench_sub_sizes_general() {
             DataResult::ERROR{ .. } => None,
         };
         wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), String::from("./bench_and_results/subscription_size_benchmarks/general_pattern"));
-        if (i+1) % 10 == 0 || (i+1) == number_of_samples {
-            println!("{} / {number_of_samples} samples processed", i+1);
-        }
+        println!("progress: {} / {} samples processed",  i+1, number_of_inputs);
     }
 }
 
@@ -52,7 +51,10 @@ fn short_run_bench_sub_sizes_general() {
     interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
     let two_step_granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
-    for (_, bi) in interfacing_swarms_general.iter().step_by(20) {
+    let number_of_inputs = interfacing_swarms_general.len();
+    let step: usize = 40;
+    println!("Running the execution time experiment with a subset of the samples in benchmark suite.");
+    for (i, (_, bi)) in interfacing_swarms_general.iter().step_by(step).enumerate() {
         let swarms = serde_json::to_string(&bi.interfacing_swarms).unwrap();
         let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), two_step_granularity.clone())).unwrap() {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
@@ -66,6 +68,7 @@ fn short_run_bench_sub_sizes_general() {
             DataResult::ERROR{ .. } => None,
         };
         wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), String::from("./bench_and_results/short_subscription_size_benchmarks/general_pattern"));
+        println!("progress: {} / {} samples processed",  i+1, number_of_inputs);
     }
 }
 
