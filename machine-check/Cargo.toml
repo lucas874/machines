@@ -30,5 +30,11 @@ walkdir = "2.5.0"
 wasm-opt = ["-Os"]
 
 [[bench]]
-name = "composition_benchmark"
+name = "composition_benchmark_full"
 harness = false
+
+[[bench]]
+name = "composition_benchmark_short"
+harness = false
+
+
