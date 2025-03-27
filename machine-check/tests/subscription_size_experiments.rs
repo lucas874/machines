@@ -9,14 +9,16 @@ use std::{
 
 use walkdir::WalkDir;
 
+const BENCHMARK_DIR: &str = "./bench_and_results";
+
 #[test]
 #[ignore]
 fn full_run_bench_sub_sizes_general() {
-    let parent_path = "bench_and_results".to_string();
-    let dir_name = format!("subscription_size_benchmarks/general_pattern");
-    create_directory(&parent_path, &dir_name);
+    let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
+    let output_dir = format!("{BENCHMARK_DIR}/subscription_size_benchmarks/general_pattern");
+    create_directory(&output_dir);
     let mut interfacing_swarms_general =
-        prepare_files_in_directory(String::from("./bench_and_results/benchmarks/general_pattern/"));
+        prepare_files_in_directory(input_dir);
     interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
     let two_step_granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
@@ -28,14 +30,14 @@ fn full_run_bench_sub_sizes_general() {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
-        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), two_step_granularity.replace("\"", ""), String::from("./bench_and_results/subscription_size_benchmarks/general_pattern"));
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), two_step_granularity.replace("\"", ""), &output_dir);
 
         let subscriptions = match serde_json::from_str(&exact_weak_well_formed_sub(swarms.clone(), subs.clone())).unwrap() {
             DataResult::OK{data: subscriptions} => {
                 Some(subscriptions) },
             DataResult::ERROR{ .. } => None,
         };
-        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), String::from("./bench_and_results/subscription_size_benchmarks/general_pattern"));
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), &output_dir);
         println!("progress: {} / {} samples processed",  i+1, number_of_inputs);
     }
 }
@@ -43,11 +45,11 @@ fn full_run_bench_sub_sizes_general() {
 #[test]
 #[ignore]
 fn short_run_bench_sub_sizes_general() {
-    let parent_path = "bench_and_results".to_string();
-    let dir_name = format!("short_subscription_size_benchmarks/general_pattern");
-    create_directory(&parent_path, &dir_name);
+    let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
+    let output_dir = format!("{BENCHMARK_DIR}/short_subscription_size_benchmarks/general_pattern");
+    create_directory(&output_dir);
     let mut interfacing_swarms_general =
-        prepare_files_in_directory(String::from("./bench_and_results/benchmarks/general_pattern/"));
+        prepare_files_in_directory(input_dir);
     interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
     let two_step_granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
@@ -60,14 +62,14 @@ fn short_run_bench_sub_sizes_general() {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
-        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), two_step_granularity.replace("\"", ""), String::from("./bench_and_results/short_subscription_size_benchmarks/general_pattern"));
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), two_step_granularity.replace("\"", ""), &output_dir);
 
         let subscriptions = match serde_json::from_str(&exact_weak_well_formed_sub(swarms.clone(), subs.clone())).unwrap() {
             DataResult::OK{data: subscriptions} => {
                 Some(subscriptions) },
             DataResult::ERROR{ .. } => None,
         };
-        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), String::from("./bench_and_results/short_subscription_size_benchmarks/general_pattern"));
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), &output_dir);
         println!("progress: {} / {} samples processed",  i+1, number_of_inputs);
     }
 }
@@ -133,11 +135,11 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, BenchMarkInput)>
     inputs
 }
 
-fn create_directory(parent: &String, dir_name: &String) -> () {
-    match create_dir_all(format!("{parent}/{dir_name}")) {
+fn create_directory(dir_name: &String) -> () {
+    match create_dir_all(dir_name) {
         Ok(_) => (),
         Err(ref e) if e.kind() == std::io::ErrorKind::AlreadyExists => (),
-        Err(e) => panic!("couldn't create directory {}/{}: {}", parent, dir_name, e),
+        Err(e) => panic!("couldn't create directory {}: {}", dir_name, e),
     }
 }
 
@@ -158,7 +160,7 @@ fn write_file(file_name: &String, content: String) -> () {
 }
 
 
-fn wrap_and_write_sub_out(bench_input: &BenchMarkInput, subscriptions: Subscriptions, granularity: String, parent_path: String) {
+fn wrap_and_write_sub_out(bench_input: &BenchMarkInput, subscriptions: Subscriptions, granularity: String, parent_path: &String) {
     let out = BenchmarkSubSizeOutput { state_space_size: bench_input.state_space_size, number_of_edges: bench_input.number_of_edges, subscriptions: subscriptions};
     let file_name = format!("{parent_path}/{:010}_{}.json", bench_input.state_space_size, granularity);
     let out = serde_json::to_string(&out).unwrap();
