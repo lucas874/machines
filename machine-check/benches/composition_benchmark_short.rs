@@ -71,7 +71,7 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
 }
 
 fn short_bench_general(c: &mut Criterion) {
-    let mut group = c.benchmark_group("General pattern algorithm 1 vs. exact short run");
+    let mut group = c.benchmark_group("General-pattern-algorithm1-vs.-exact-short-run");
     group.sample_size(10);
     let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
     let mut interfacing_swarms_general =
