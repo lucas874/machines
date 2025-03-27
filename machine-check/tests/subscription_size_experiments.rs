@@ -11,7 +11,7 @@ use walkdir::WalkDir;
 
 #[test]
 #[ignore]
-fn bench_sub_sizes_general() {
+fn full_run_bench_sub_sizes_general() {
     let parent_path = "bench_and_results".to_string();
     let dir_name = format!("subscription_size_benchmarks/general_pattern");
     create_directory(&parent_path, &dir_name);
