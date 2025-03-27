@@ -68,7 +68,7 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
 }
 
 fn full_bench_general(c: &mut Criterion) {
-    let mut group = c.benchmark_group("General pattern algorithm 1 vs. exact. Full.");
+    let mut group = c.benchmark_group("General pattern algorithm 1 vs. exact full run");
     group.sample_size(10);
     let mut interfacing_swarms_general =
         prepare_files_in_directory(String::from("./bench_and_results/benchmarks/general_pattern/"));
