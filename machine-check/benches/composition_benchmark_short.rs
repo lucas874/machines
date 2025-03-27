@@ -12,6 +12,9 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 use walkdir::WalkDir;
+
+const BENCHMARK_DIR: &str = "./bench_and_results";
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BenchMarkInput {
     pub state_space_size: usize,
@@ -70,8 +73,9 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
 fn short_bench_general(c: &mut Criterion) {
     let mut group = c.benchmark_group("General pattern algorithm 1 vs. exact short run");
     group.sample_size(10);
+    let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
     let mut interfacing_swarms_general =
-        prepare_files_in_directory(String::from("./bench_and_results/benchmarks/general_pattern/"));
+        prepare_files_in_directory(input_dir);
     interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
 
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
