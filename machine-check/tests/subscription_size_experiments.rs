@@ -51,8 +51,8 @@ fn short_run_bench_sub_sizes_general() {
     interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
     let two_step_granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
-    let number_of_inputs = interfacing_swarms_general.len();
-    let step: usize = 40;
+    let step: usize = 50;
+    let number_of_inputs = interfacing_swarms_general.iter().step_by(step).len();
     println!("Running the execution time experiment with a subset of the samples in benchmark suite.");
     for (i, (_, bi)) in interfacing_swarms_general.iter().step_by(step).enumerate() {
         let swarms = serde_json::to_string(&bi.interfacing_swarms).unwrap();
