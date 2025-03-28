@@ -80,7 +80,7 @@ fn short_bench_general(c: &mut Criterion) {
 
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
     let two_step_granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
-    let step: usize = 100;
+    let step: usize = 150;
     let number_of_inputs = interfacing_swarms_general.iter().step_by(step).len();
     println!("Running the execution time experiment with a subset of the samples in benchmark suite.");
     for (i, (size, interfacing_swarms)) in interfacing_swarms_general.iter().step_by(step).enumerate() {
