@@ -32,7 +32,7 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    //const machine = createMachineRunner(app, tags, s0, undefined)
+    //const machine = createMachineRunner(app, tags, s0, undefined) // Uncomment this line and outcomment line below to run without branch tracking
     const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
 
     for await (const state of machine) {
