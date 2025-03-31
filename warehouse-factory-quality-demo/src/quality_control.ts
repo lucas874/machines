@@ -1,7 +1,7 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunner, ProjMachine, createMachineRunnerBT } from '@actyx/machine-runner'
+import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt  } from './protocol'
-import { projectCombineMachines, checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
+import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 
 // Using the machine runner DSL an implmentation of quality control robot in Gquality is:
 const qcr = Composition.makeMachine('QCR')
@@ -23,18 +23,16 @@ s1.react([Events.car], s2, (_, e) => {
     console.log("received a ", e.payload.modelName);
     if (e.payload.part !== 'broken part') { return s2.make({modelName: e.payload.modelName, decision: "ok"}) }
     else { return s2.make({ modelName: e.payload.modelName, decision: "notOk"}) }})
-//s2.react([Events.time], s0, () => s0.make())
 
 // Projection of Gwarehouse || Gfactory || Gquality over QCR
 const projectionInfoResult = projectionAndInformation(interfacing_swarms, subs, "QCR")
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
-//console.log(projectionInfo)
 
 // Extended machine
 const [qcrAdapted, s0_] = Composition.adaptMachine("QCR", projectionInfo, Events.allEvents, s0)
 const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "QCR", qcrAdapted.createJSONForAnalysis(s0_))
-//if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
+if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
 // Run the extended machine
 async function main() {

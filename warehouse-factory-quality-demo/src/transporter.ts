@@ -1,7 +1,7 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunner, ProjMachine, createMachineRunnerBT } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, all_projections, getRandomInt  } from './protocol'
-import { projectCombineMachines, checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation } from '@actyx/machine-check'
+import { createMachineRunnerBT } from '@actyx/machine-runner'
+import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt  } from './protocol'
+import { checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation } from '@actyx/machine-check'
 
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 
@@ -33,7 +33,6 @@ s2.react([Events.partOK], s0, (_, e) => { return s0.make() })
 const projectionInfoResult: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(interfacing_swarms, subs, "T")
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
-//console.log("projection info: ", projectionInfo)
 
 // Adapted machine
 const [transporterAdapted, s0_] = Composition.adaptMachine("T", projectionInfo, Events.allEvents, s0)
@@ -45,7 +44,6 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
-    //const machine = createMachineRunner(app, tags, s0, undefined)
     const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
 
     for await (const state of machine) {

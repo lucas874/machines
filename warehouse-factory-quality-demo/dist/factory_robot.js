@@ -26,7 +26,7 @@ const result_sub = (0, machine_check_1.overapproxWWFSubscriptions)(protocol_1.in
 if (result_sub.type === 'ERROR')
     throw new Error(result_sub.errors.join(', '));
 exports.sub = result_sub.data;
-// Check well-formedness (only here for demonstration purposes)
+// Check well-formedness (should be WF since we generated subscription using overapproxWWFSubscriptions(...), only here for demonstration purposes)
 const checkResult = (0, machine_check_1.checkWWFSwarmProtocol)(protocol_1.interfacing_swarms, exports.sub);
 if (checkResult.type == 'ERROR')
     throw new Error(checkResult.errors.join(", "));
@@ -51,7 +51,6 @@ const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(proto
 if (projectionInfoResult.type == 'ERROR')
     throw new Error('error getting projection');
 const projectionInfo = projectionInfoResult.data;
-//console.log("projection info: ", projectionInfo)
 // Extend machine
 const [factoryRobotAdapted, s0_] = protocol_1.Composition.adaptMachine("R", projectionInfo, protocol_1.Events.allEvents, exports.s0);
 // Check machine (for demonstration purposes)

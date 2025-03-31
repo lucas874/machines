@@ -46,17 +46,16 @@ exports.s1.react([protocol_1.Events.car], exports.s2, (_, e) => {
         return exports.s2.make({ modelName: e.payload.modelName, decision: "notOk" });
     }
 });
-//s2.react([Events.time], s0, () => s0.make())
 // Projection of Gwarehouse || Gfactory || Gquality over QCR
 const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(protocol_1.interfacing_swarms, protocol_1.subs, "QCR");
 if (projectionInfoResult.type == 'ERROR')
     throw new Error('error getting projection');
 const projectionInfo = projectionInfoResult.data;
-//console.log(projectionInfo)
 // Extended machine
 const [qcrAdapted, s0_] = protocol_1.Composition.adaptMachine("QCR", projectionInfo, protocol_1.Events.allEvents, exports.s0);
 const checkProjResult = (0, machine_check_1.checkComposedProjection)(protocol_1.interfacing_swarms, protocol_1.subs, "QCR", qcrAdapted.createJSONForAnalysis(s0_));
-//if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
+if (checkProjResult.type == 'ERROR')
+    throw new Error(checkProjResult.errors.join(", "));
 // Run the extended machine
 function main() {
     return __awaiter(this, void 0, void 0, function* () {

@@ -40,7 +40,6 @@ const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(proto
 if (projectionInfoResult.type == 'ERROR')
     throw new Error('error getting projection');
 const projectionInfo = projectionInfoResult.data;
-//console.log("projection info: ", projectionInfo)
 // Adapted machine
 const [doorAdapted, s0_] = protocol_1.Composition.adaptMachine("D", projectionInfo, protocol_1.Events.allEvents, exports.s0);
 const checkProjResult = (0, machine_check_1.checkComposedProjection)(protocol_1.interfacing_swarms, protocol_1.subs, "D", doorAdapted.createJSONForAnalysis(s0_));
@@ -52,7 +51,6 @@ function main() {
         var _a, e_1, _b, _c;
         const app = yield sdk_1.Actyx.of(protocol_1.manifest);
         const tags = protocol_1.Composition.tagWithEntityId('factory-1');
-        //const machine = createMachineRunner(app, tags, s0, undefined)
         const machine = (0, machine_runner_1.createMachineRunnerBT)(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes);
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {

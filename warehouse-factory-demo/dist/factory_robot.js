@@ -19,51 +19,51 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.s2 = exports.s1 = exports.s0 = exports.sub = void 0;
 const sdk_1 = require("@actyx/sdk");
 const machine_runner_1 = require("@actyx/machine-runner");
-const factory_protocol_1 = require("./factory_protocol");
+const protocol_1 = require("./protocol");
 const machine_check_1 = require("@actyx/machine-check");
 // Generate a subscription w.r.t. which Gwarehouse || Gfactory || Gquality is well-formed
-const result_sub = (0, machine_check_1.overapproxWWFSubscriptions)(factory_protocol_1.interfacing_swarms, {}, 'Medium');
+const result_sub = (0, machine_check_1.overapproxWWFSubscriptions)(protocol_1.interfacing_swarms, {}, 'Medium');
 if (result_sub.type === 'ERROR')
     throw new Error(result_sub.errors.join(', '));
 exports.sub = result_sub.data;
 // Check well-formedness (only here for demonstration purposes)
-const checkResult = (0, machine_check_1.checkWWFSwarmProtocol)(factory_protocol_1.interfacing_swarms, exports.sub);
+const checkResult = (0, machine_check_1.checkWWFSwarmProtocol)(protocol_1.interfacing_swarms, exports.sub);
 if (checkResult.type == 'ERROR')
     throw new Error(checkResult.errors.join(", "));
 // Using the machine runner DSL an implmentation of robot in Gfactory is:
-const robot = factory_protocol_1.Composition.makeMachine('R');
+const robot = protocol_1.Composition.makeMachine('R');
 exports.s0 = robot.designEmpty('s0').finish();
 exports.s1 = robot.designState('s1').withPayload()
-    .command("build", [factory_protocol_1.Events.car], (s, _) => {
+    .command("build", [protocol_1.Events.car], (s, _) => {
     var modelName = s.self.part === 'spoiler' ? "sports car" : "sedan";
     console.log("using the ", s.self.part, " to build a ", modelName);
-    return [factory_protocol_1.Events.car.make({ part: s.self.part, modelName: modelName })];
+    return [protocol_1.Events.car.make({ part: s.self.part, modelName: modelName })];
 })
     .finish();
 exports.s2 = robot.designEmpty('s2').finish();
-exports.s0.react([factory_protocol_1.Events.partOK], exports.s1, (_, e) => {
+exports.s0.react([protocol_1.Events.partOK], exports.s1, (_, e) => {
     console.log("received a ", e.payload.part);
     return exports.s1.make({ part: e.payload.part });
 });
-exports.s1.react([factory_protocol_1.Events.car], exports.s2, (_) => exports.s2.make());
+exports.s1.react([protocol_1.Events.car], exports.s2, (_) => exports.s2.make());
 // Projection of Gwarehouse || Gfactory || Gquality over R
-const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(factory_protocol_1.interfacing_swarms, exports.sub, "R");
+const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(protocol_1.interfacing_swarms, exports.sub, "R");
 if (projectionInfoResult.type == 'ERROR')
     throw new Error('error getting projection');
 const projectionInfo = projectionInfoResult.data;
 //console.log("projection info: ", projectionInfo)
 // Extend machine
-const [factoryRobotAdapted, s0_] = factory_protocol_1.Composition.adaptMachine("R", projectionInfo, factory_protocol_1.Events.allEvents, exports.s0);
+const [factoryRobotAdapted, s0_] = protocol_1.Composition.adaptMachine("R", projectionInfo, protocol_1.Events.allEvents, exports.s0);
 // Check machine (for demonstration purposes)
-const checkProjResult = (0, machine_check_1.checkComposedProjection)(factory_protocol_1.interfacing_swarms, exports.sub, "R", factoryRobotAdapted.createJSONForAnalysis(s0_));
+const checkProjResult = (0, machine_check_1.checkComposedProjection)(protocol_1.interfacing_swarms, exports.sub, "R", factoryRobotAdapted.createJSONForAnalysis(s0_));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));
 // Run the extended machine
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
-        const app = yield sdk_1.Actyx.of(factory_protocol_1.manifest);
-        const tags = factory_protocol_1.Composition.tagWithEntityId('factory-1');
+        const app = yield sdk_1.Actyx.of(protocol_1.manifest);
+        const tags = protocol_1.Composition.tagWithEntityId('factory-1');
         const machine = (0, machine_runner_1.createMachineRunnerBT)(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes);
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
@@ -84,7 +84,7 @@ function main() {
                             if (Object.keys(s1 || {}).includes('build')) {
                                 s1.build();
                             }
-                        }, (0, factory_protocol_1.getRandomInt)(4000, 8000));
+                        }, (0, protocol_1.getRandomInt)(4000, 8000));
                         break;
                     }
                 }
