@@ -19,44 +19,44 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.s2 = exports.s1 = exports.s0 = void 0;
 const sdk_1 = require("@actyx/sdk");
 const machine_runner_1 = require("@actyx/machine-runner");
-const factory_protocol_1 = require("./factory_protocol");
+const protocol_1 = require("./protocol");
 const machine_check_1 = require("@actyx/machine-check");
 // Using the machine runner DSL an implmentation of forklift in Gwarehouse is:
-const forklift = factory_protocol_1.Composition.makeMachine('FL');
+const forklift = protocol_1.Composition.makeMachine('FL');
 exports.s0 = forklift.designEmpty('s0').finish();
 exports.s1 = forklift.designState('s1').withPayload()
-    .command('get', [factory_protocol_1.Events.position], (state, _) => {
+    .command('get', [protocol_1.Events.pos], (state, _) => {
     console.log("retrieved a", state.self.id, "at position x");
-    return [factory_protocol_1.Events.position.make({ position: "x", part: state.self.id })];
+    return [protocol_1.Events.pos.make({ position: "x", part: state.self.id })];
 })
     .finish();
 exports.s2 = forklift.designEmpty('s2').finish();
-exports.s0.react([factory_protocol_1.Events.partID], exports.s1, (_, e) => {
+exports.s0.react([protocol_1.Events.partReq], exports.s1, (_, e) => {
     console.log("a", e.payload.id, "was requested");
-    if ((0, factory_protocol_1.getRandomInt)(0, 10) >= 9) {
+    if ((0, protocol_1.getRandomInt)(0, 10) >= 9) {
         return { id: "broken part" };
     }
     return exports.s1.make({ id: e.payload.id });
 });
-exports.s1.react([factory_protocol_1.Events.position], exports.s0, (_) => exports.s0.make());
-exports.s0.react([factory_protocol_1.Events.time], exports.s2, (_) => exports.s2.make());
+exports.s1.react([protocol_1.Events.pos], exports.s0, (_) => exports.s0.make());
+exports.s0.react([protocol_1.Events.closingTime], exports.s2, (_) => exports.s2.make());
 // Projection of Gwarehouse || Gfactory || Gquality over FL
-const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "FL");
+const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(protocol_1.interfacing_swarms, protocol_1.subs, "FL");
 if (projectionInfoResult.type == 'ERROR')
     throw new Error('error getting projection');
 const projectionInfo = projectionInfoResult.data;
 //console.log(projectionInfo)
 // Adapted machine
-const [forkliftAdapted, s0_] = factory_protocol_1.Composition.adaptMachine("FL", projectionInfo, factory_protocol_1.Events.allEvents, exports.s0);
-const checkProjResult = (0, machine_check_1.checkComposedProjection)(factory_protocol_1.interfacing_swarms, factory_protocol_1.subs, "FL", forkliftAdapted.createJSONForAnalysis(s0_));
+const [forkliftAdapted, s0_] = protocol_1.Composition.adaptMachine("FL", projectionInfo, protocol_1.Events.allEvents, exports.s0);
+const checkProjResult = (0, machine_check_1.checkComposedProjection)(protocol_1.interfacing_swarms, protocol_1.subs, "FL", forkliftAdapted.createJSONForAnalysis(s0_));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));
 // Run the adapted machine
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
-        const app = yield sdk_1.Actyx.of(factory_protocol_1.manifest);
-        const tags = factory_protocol_1.Composition.tagWithEntityId('factory-1');
+        const app = yield sdk_1.Actyx.of(protocol_1.manifest);
+        const tags = protocol_1.Composition.tagWithEntityId('factory-1');
         //const machine = createMachineRunner(app, tags, s0, undefined)
         const machine = (0, machine_runner_1.createMachineRunnerBT)(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes);
         try {

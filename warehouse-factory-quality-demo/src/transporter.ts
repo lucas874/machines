@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, ProjMachine, createMachineRunnerBT } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, all_projections, getRandomInt  } from './factory_protocol'
+import { Events, manifest, Composition, interfacing_swarms, subs, all_projections, getRandomInt  } from './protocol'
 import { projectCombineMachines, checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation } from '@actyx/machine-check'
 
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']

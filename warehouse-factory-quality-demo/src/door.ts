@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, ProjMachine, createMachineRunnerBT} from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt, all_projections } from './factory_protocol'
+import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt, all_projections } from './protocol'
 import { projectCombineMachines, checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 
 // Using the machine runner DSL an implmentation of door in Gwarehouse is:

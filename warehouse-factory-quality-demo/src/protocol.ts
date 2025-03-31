@@ -60,17 +60,17 @@ export const interfacing_swarmswh: InterfacingSwarms = [{protocol: Gwarehouse, i
 export const interfacing_swarmsf: InterfacingSwarms = [{protocol: Gfactory, interface: null}]
 
 const result_subs: ResultData<Subscriptions>
-  = overapproxWWFSubscriptions(interfacing_swarms, {}, 'Medium')
+  = overapproxWWFSubscriptions(interfacing_swarms, {}, 'TwoStep')
 if (result_subs.type === 'ERROR') throw new Error(result_subs.errors.join(', '))
 export const subs: Subscriptions = result_subs.data
 
 const result_subswh: ResultData<Subscriptions>
-  = overapproxWWFSubscriptions(interfacing_swarmswh, {}, 'Medium')
+  = overapproxWWFSubscriptions(interfacing_swarmswh, {}, 'TwoStep')
 if (result_subswh.type === 'ERROR') throw new Error(result_subswh.errors.join(', '))
 export const subswh: Subscriptions = result_subswh.data
 
 const result_subsf: ResultData<Subscriptions>
-  = overapproxWWFSubscriptions(interfacing_swarmsf, {}, 'Medium')
+  = overapproxWWFSubscriptions(interfacing_swarmsf, {}, 'TwoStep')
 if (result_subsf.type === 'ERROR') throw new Error(result_subsf.errors.join(', '))
 export const subsf: Subscriptions = result_subsf.data
 

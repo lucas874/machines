@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, ProjMachine, createMachineRunnerBT } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms,getRandomInt  } from './factory_protocol'
+import { Events, manifest, Composition, interfacing_swarms,getRandomInt  } from './protocol'
 import { projectCombineMachines, checkWWFSwarmProtocol, checkComposedProjection, Subscriptions, ResultData, InterfacingSwarms, overapproxWWFSubscriptions, projectionAndInformation } from '@actyx/machine-check'
 
 // Generate a subscription w.r.t. which Gwarehouse || Gfactory || Gquality is well-formed

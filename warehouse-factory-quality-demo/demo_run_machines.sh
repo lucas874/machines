@@ -5,7 +5,7 @@ START_FL="echo 'Starting forklift'; npm run start-forklift;exec bash"
 START_T="echo 'Starting transporter'; npm run start-transporter;exec bash"
 START_QCR="echo 'Starting quality control robot'; npm run start-quality-robot;exec bash"
 START_D="echo 'Starting door'; npm run start-door;exec bash"
-START_AX="rm -rf ax-data; echo 'Silently running Actyx middleware in this window. Press Ctrl + C to exit'.; ~/Actyx/./ax run 2> /dev/null"
+START_AX="rm -rf ax-data; echo 'Silently running Actyx middleware in this window. Press Ctrl + C to exit'.; ax run 2> /dev/null"
 
 # Start a new tmux session with the first command
 tmux new-session -d -s demo "$START_AX"
