@@ -14,11 +14,8 @@ const warehouse_protocol_1 = require("./warehouse_protocol");
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         const app = yield sdk_1.Actyx.of(warehouse_protocol_1.manifest);
-        const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
+        const tags = warehouse_protocol_1.Composition.tagWithEntityId('warehouse-1');
         while (true) {
-            //await new Promise(f => setTimeout(f, 2000));
-            //await app.publish(tags.apply(Events.partID.makeBT({id: "tire"}, "invalidPointer")))
-            //console.log('Publishing partID event with invalid lbj pointer')
             yield new Promise(f => setTimeout(f, 5000));
             yield app.publish(tags.apply(warehouse_protocol_1.Events.closingTime.makeBT({ timeOfDay: new Date().toLocaleString() }, "invalidPointer")));
             console.log('Publishing time event with invalid lbj pointer');

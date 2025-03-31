@@ -23,16 +23,13 @@ const projectionInfoResult = projectionAndInformation(interfacing_swarms, subs, 
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
 
-// Adapted machine
-const [doorAdapted, s0_] = Composition.adaptMachine("D", projectionInfo, Events.allEvents, s0)
-const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "D", doorAdapted.createJSONForAnalysis(s0_))
-if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
+const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "D", door.createJSONForAnalysis(s0))
 
 // Run the adapted machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('warehouse-1')
-    const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
+    const machine = createMachineRunnerBT(app, tags, s0, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
 
     for await (const state of machine) {
       console.log("door. state is:", state.type)
