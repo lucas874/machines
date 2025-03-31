@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.all_projections = exports.subsf = exports.subswh = exports.subs = exports.interfacing_swarmsf = exports.interfacing_swarmswh = exports.interfacing_swarms = exports.Gquality = exports.Gfactory = exports.Gwarehouse = exports.Composition = exports.Events = exports.manifest = void 0;
+exports.all_projections = exports.subs = exports.interfacing_swarms = exports.Gquality = exports.Gfactory = exports.Gwarehouse = exports.Composition = exports.Events = exports.manifest = void 0;
 exports.getRandomInt = getRandomInt;
 /* eslint-disable @typescript-eslint/no-namespace */
 const machine_runner_1 = require("@actyx/machine-runner");
@@ -48,21 +48,10 @@ exports.Gquality = {
     ]
 };
 exports.interfacing_swarms = [{ protocol: exports.Gwarehouse, interface: null }, { protocol: exports.Gfactory, interface: 'T' }, { protocol: exports.Gquality, interface: 'R' }];
-//export const interfacing_swarms: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}]
-exports.interfacing_swarmswh = [{ protocol: exports.Gwarehouse, interface: null }];
-exports.interfacing_swarmsf = [{ protocol: exports.Gfactory, interface: null }];
 const result_subs = (0, machine_check_1.overapproxWWFSubscriptions)(exports.interfacing_swarms, {}, 'TwoStep');
 if (result_subs.type === 'ERROR')
     throw new Error(result_subs.errors.join(', '));
 exports.subs = result_subs.data;
-const result_subswh = (0, machine_check_1.overapproxWWFSubscriptions)(exports.interfacing_swarmswh, {}, 'TwoStep');
-if (result_subswh.type === 'ERROR')
-    throw new Error(result_subswh.errors.join(', '));
-exports.subswh = result_subswh.data;
-const result_subsf = (0, machine_check_1.overapproxWWFSubscriptions)(exports.interfacing_swarmsf, {}, 'TwoStep');
-if (result_subsf.type === 'ERROR')
-    throw new Error(result_subsf.errors.join(', '));
-exports.subsf = result_subsf.data;
 const result_project_all = (0, machine_check_1.projectAll)(exports.interfacing_swarms, exports.subs);
 if (result_project_all.type === 'ERROR')
     throw new Error('error getting subscription');

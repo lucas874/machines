@@ -13,7 +13,6 @@ type PartReqPayload = {id: string}
 type PosPayload = {position: string, part: string}
 type PartOKPayload = {part: string}
 type CarPayload = {part: string, modelName: string}
-type ReportPayload = {modelName: string, decision: string}
 
 export namespace Events {
   export const partReq = MachineEvent.design('partReq').withPayload<PartReqPayload>()
@@ -21,10 +20,8 @@ export namespace Events {
   export const pos = MachineEvent.design('pos').withPayload<PosPayload>()
   export const closingTime = MachineEvent.design('closingTime').withPayload<ClosingTimePayload>()
   export const car = MachineEvent.design('car').withPayload<CarPayload>()
-  export const observing = MachineEvent.design('obs').withoutPayload()
-  export const report = MachineEvent.design('report').withPayload<ReportPayload>()
 
-  export const allEvents = [partReq, partOK, pos, closingTime, car, observing, report] as const
+  export const allEvents = [partReq, partOK, pos, closingTime, car] as const
 }
 
 export const Composition = SwarmProtocol.make('Composition', Events.allEvents)
@@ -46,33 +43,12 @@ export const Gfactory: SwarmProtocolType = {
     {source: '2', target: '3', label: { cmd: 'build', role: 'R', logType: [Events.car.type] }},
   ]}
 
-export const Gquality: SwarmProtocolType = {
-  initial: '0',
-  transitions: [
-    {source: '0', target: '1', label: { cmd: 'observe', role: 'QCR', logType: [Events.observing.type]}},
-    {source: '1', target: '2', label: { cmd: 'build', role: 'R', logType: [Events.car.type] }},
-    {source: '2', target: '3', label: { cmd: 'test', role: 'QCR', logType: [Events.report.type] }},
-  ]}
-
-export const interfacing_swarms: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}, {protocol: Gquality, interface: 'R'}]
-//export const interfacing_swarms: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}]
-export const interfacing_swarmswh: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}]
-export const interfacing_swarmsf: InterfacingSwarms = [{protocol: Gfactory, interface: null}]
+export const interfacing_swarms: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}]
 
 const result_subs: ResultData<Subscriptions>
   = overapproxWWFSubscriptions(interfacing_swarms, {}, 'TwoStep')
 if (result_subs.type === 'ERROR') throw new Error(result_subs.errors.join(', '))
 export const subs: Subscriptions = result_subs.data
-
-const result_subswh: ResultData<Subscriptions>
-  = overapproxWWFSubscriptions(interfacing_swarmswh, {}, 'TwoStep')
-if (result_subswh.type === 'ERROR') throw new Error(result_subswh.errors.join(', '))
-export const subswh: Subscriptions = result_subswh.data
-
-const result_subsf: ResultData<Subscriptions>
-  = overapproxWWFSubscriptions(interfacing_swarmsf, {}, 'TwoStep')
-if (result_subsf.type === 'ERROR') throw new Error(result_subsf.errors.join(', '))
-export const subsf: Subscriptions = result_subsf.data
 
 const result_project_all = projectAll(interfacing_swarms, subs)
 
