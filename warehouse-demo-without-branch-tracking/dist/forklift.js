@@ -40,15 +40,7 @@ exports.s0.react([warehouse_protocol_1.Events.partReq], exports.s1, (_, e) => {
 });
 exports.s1.react([warehouse_protocol_1.Events.pos], exports.s0, (_) => exports.s0.make());
 exports.s0.react([warehouse_protocol_1.Events.closingTime], exports.s2, (_) => exports.s2.make());
-// Projection of Gwarehouse || Gfactory over FL
-const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "FL");
-if (projectionInfoResult.type == 'ERROR')
-    throw new Error('error getting projection');
-const projectionInfo = projectionInfoResult.data;
-console.log(projectionInfo);
-// Adapted machine
-const [forkliftAdapted, s0_] = warehouse_protocol_1.Composition.adaptMachine("FL", projectionInfo, warehouse_protocol_1.Events.allEvents, exports.s0);
-const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "FL", forkliftAdapted.createJSONForAnalysis(s0_));
+const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "FL", forklift.createJSONForAnalysis(exports.s0));
 if (checkProjResult.type == 'ERROR')
     throw new Error(checkProjResult.errors.join(", "));
 // Run the adapted machine
@@ -56,7 +48,7 @@ function main() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, e_1, _b, _c;
         const app = yield sdk_1.Actyx.of(warehouse_protocol_1.manifest);
-        const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
+        const tags = warehouse_protocol_1.Composition.tagWithEntityId('warehouse-1');
         const machine = (0, machine_runner_1.createMachineRunner)(app, tags, exports.s0, undefined);
         try {
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {

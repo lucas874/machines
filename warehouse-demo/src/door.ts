@@ -1,5 +1,5 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunnerBT} from '@actyx/machine-runner'
+import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt } from './warehouse_protocol'
 import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 
@@ -18,7 +18,7 @@ s0.react([Events.partReq], s1, (_) => s1.make())
 s1.react([Events.partOK], s0, (_) => s0.make())
 s0.react([Events.closingTime], s2, (_) => s2.make())
 
-// Projection of Gwarehouse || Gfactory over D
+// Projection of Gwarehouse over D
 const projectionInfoResult = projectionAndInformation(interfacing_swarms, subs, "D")
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data

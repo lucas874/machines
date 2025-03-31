@@ -1,7 +1,7 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt  } from './warehouse_protocol'
-import { checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation } from '@actyx/machine-check'
+import { checkComposedProjection } from '@actyx/machine-check'
 
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 
@@ -29,21 +29,13 @@ s1.react([Events.pos], s2, (_, e) => {
 
 s2.react([Events.partOK], s0, (_, e) => { return s0.make() })
 
-// Projection of Gwarehouse || Gfactory over T
-const projectionInfoResult: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(interfacing_swarms, subs, "T")
-if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
-const projectionInfo = projectionInfoResult.data
-
-// Adapted machine
-const [transporterAdapted, s0_] = Composition.adaptMachine("T", projectionInfo, Events.allEvents, s0)
-
-const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "T", transporterAdapted.createJSONForAnalysis(s0_))
+const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "T", transporter.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
 // Run the adapted machine
 async function main() {
     const app = await Actyx.of(manifest)
-    const tags = Composition.tagWithEntityId('factory-1')
+    const tags = Composition.tagWithEntityId('warehouse-1')
     const machine = createMachineRunner(app, tags, s0, undefined)
 
     for await (const state of machine) {
