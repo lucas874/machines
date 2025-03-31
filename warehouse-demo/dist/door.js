@@ -35,7 +35,7 @@ exports.s2 = door.designEmpty('s2').finish();
 exports.s0.react([warehouse_protocol_1.Events.partReq], exports.s1, (_) => exports.s1.make());
 exports.s1.react([warehouse_protocol_1.Events.partOK], exports.s0, (_) => exports.s0.make());
 exports.s0.react([warehouse_protocol_1.Events.closingTime], exports.s2, (_) => exports.s2.make());
-// Projection of Gwarehouse || Gfactory over D
+// Projection of Gwarehouse over D
 const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "D");
 if (projectionInfoResult.type == 'ERROR')
     throw new Error('error getting projection');

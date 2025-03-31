@@ -40,7 +40,7 @@ exports.s0.react([warehouse_protocol_1.Events.partReq], exports.s1, (_, e) => {
 });
 exports.s1.react([warehouse_protocol_1.Events.pos], exports.s0, (_) => exports.s0.make());
 exports.s0.react([warehouse_protocol_1.Events.closingTime], exports.s2, (_) => exports.s2.make());
-// Projection of Gwarehouse || Gfactory over FL
+// Projection of Gwarehouse over FL
 const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "FL");
 if (projectionInfoResult.type == 'ERROR')
     throw new Error('error getting projection');

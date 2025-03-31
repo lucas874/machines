@@ -46,7 +46,7 @@ exports.s1.react([warehouse_protocol_1.Events.pos], exports.s2, (_, e) => {
     return { part: e.payload.part };
 });
 exports.s2.react([warehouse_protocol_1.Events.partOK], exports.s0, (_, e) => { return exports.s0.make(); });
-// Projection of Gwarehouse || Gfactory over T
+// Projection of Gwarehouse over T
 const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "T");
 if (projectionInfoResult.type == 'ERROR')
     throw new Error('error getting projection');
