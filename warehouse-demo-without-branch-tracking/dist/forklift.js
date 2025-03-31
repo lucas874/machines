@@ -25,27 +25,27 @@ const machine_check_1 = require("@actyx/machine-check");
 const forklift = warehouse_protocol_1.Composition.makeMachine('FL');
 exports.s0 = forklift.designEmpty('s0').finish();
 exports.s1 = forklift.designState('s1').withPayload()
-    .command('get', [warehouse_protocol_1.Events.position], (state, _) => {
+    .command('get', [warehouse_protocol_1.Events.pos], (state, _) => {
     console.log("retrieved a", state.self.id, "at position x");
-    return [warehouse_protocol_1.Events.position.make({ position: "x", part: state.self.id })];
+    return [warehouse_protocol_1.Events.pos.make({ position: "x", part: state.self.id })];
 })
     .finish();
 exports.s2 = forklift.designEmpty('s2').finish();
-exports.s0.react([warehouse_protocol_1.Events.partID], exports.s1, (_, e) => {
+exports.s0.react([warehouse_protocol_1.Events.partReq], exports.s1, (_, e) => {
     console.log("a", e.payload.id, "was requested");
     if ((0, warehouse_protocol_1.getRandomInt)(0, 10) >= 9) {
         return { id: "broken part" };
     }
     return exports.s1.make({ id: e.payload.id });
 });
-exports.s1.react([warehouse_protocol_1.Events.position], exports.s0, (_) => exports.s0.make());
-exports.s0.react([warehouse_protocol_1.Events.time], exports.s2, (_) => exports.s2.make());
-// Projection of Gwarehouse || Gfactory || Gquality over FL
+exports.s1.react([warehouse_protocol_1.Events.pos], exports.s0, (_) => exports.s0.make());
+exports.s0.react([warehouse_protocol_1.Events.closingTime], exports.s2, (_) => exports.s2.make());
+// Projection of Gwarehouse || Gfactory over FL
 const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "FL");
 if (projectionInfoResult.type == 'ERROR')
     throw new Error('error getting projection');
 const projectionInfo = projectionInfoResult.data;
-// console.log(projectionInfo)
+console.log(projectionInfo);
 // Adapted machine
 const [forkliftAdapted, s0_] = warehouse_protocol_1.Composition.adaptMachine("FL", projectionInfo, warehouse_protocol_1.Events.allEvents, exports.s0);
 const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "FL", forkliftAdapted.createJSONForAnalysis(s0_));
@@ -59,7 +59,6 @@ function main() {
         const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
         const machine = (0, machine_runner_1.createMachineRunner)(app, tags, exports.s0, undefined);
         try {
-            //const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
                 _d = false;

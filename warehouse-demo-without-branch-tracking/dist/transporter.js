@@ -25,33 +25,32 @@ const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler'];
 // Using the machine runner DSL an implmentation of transporter in Gwarehouse is:
 const transporter = warehouse_protocol_1.Composition.makeMachine('T');
 exports.s0 = transporter.designEmpty('s0')
-    .command('request', [warehouse_protocol_1.Events.partID], (s, e) => {
+    .command('request', [warehouse_protocol_1.Events.partReq], (s, e) => {
     var id = parts[Math.floor(Math.random() * parts.length)];
     console.log("requesting a", id);
-    return [warehouse_protocol_1.Events.partID.make({ id: id })];
+    return [warehouse_protocol_1.Events.partReq.make({ id: id })];
 })
     .finish();
 exports.s1 = transporter.designEmpty('s1').finish();
 exports.s2 = transporter.designState('s2').withPayload()
-    .command('deliver', [warehouse_protocol_1.Events.part], (s, e) => {
+    .command('deliver', [warehouse_protocol_1.Events.partOK], (s, e) => {
     console.log("delivering a", s.self.part);
-    return [warehouse_protocol_1.Events.part.make({ part: s.self.part })];
+    return [warehouse_protocol_1.Events.partOK.make({ part: s.self.part })];
 })
     .finish();
 exports.s3 = transporter.designEmpty('s3').finish();
-exports.s0.react([warehouse_protocol_1.Events.partID], exports.s1, (_) => exports.s1.make());
-exports.s0.react([warehouse_protocol_1.Events.time], exports.s3, (_) => exports.s3.make());
-exports.s1.react([warehouse_protocol_1.Events.position], exports.s2, (_, e) => {
+exports.s0.react([warehouse_protocol_1.Events.partReq], exports.s1, (_) => exports.s1.make());
+exports.s0.react([warehouse_protocol_1.Events.closingTime], exports.s3, (_) => exports.s3.make());
+exports.s1.react([warehouse_protocol_1.Events.pos], exports.s2, (_, e) => {
     console.log("got a ", e.payload.part);
     return { part: e.payload.part };
 });
-exports.s2.react([warehouse_protocol_1.Events.part], exports.s0, (_, e) => { return exports.s0.make(); });
-// Projection of Gwarehouse || Gfactory || Gquality over T
+exports.s2.react([warehouse_protocol_1.Events.partOK], exports.s0, (_, e) => { return exports.s0.make(); });
+// Projection of Gwarehouse || Gfactory over T
 const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "T");
 if (projectionInfoResult.type == 'ERROR')
     throw new Error('error getting projection');
 const projectionInfo = projectionInfoResult.data;
-//console.log("projection info: ", projectionInfo)
 // Adapted machine
 const [transporterAdapted, s0_] = warehouse_protocol_1.Composition.adaptMachine("T", projectionInfo, warehouse_protocol_1.Events.allEvents, exports.s0);
 const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "T", transporterAdapted.createJSONForAnalysis(s0_));
@@ -65,7 +64,6 @@ function main() {
         const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
         const machine = (0, machine_runner_1.createMachineRunner)(app, tags, exports.s0, undefined);
         try {
-            //const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
                 _d = false;

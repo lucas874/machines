@@ -1,39 +1,38 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunner, ProjMachine, createMachineRunnerBT } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, all_projections, getRandomInt  } from './warehouse_protocol'
-import { projectCombineMachines, checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation } from '@actyx/machine-check'
+import { createMachineRunner } from '@actyx/machine-runner'
+import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt  } from './warehouse_protocol'
+import { checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation } from '@actyx/machine-check'
 
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 
 // Using the machine runner DSL an implmentation of transporter in Gwarehouse is:
 const transporter = Composition.makeMachine('T')
 export const s0 = transporter.designEmpty('s0')
-    .command('request', [Events.partID], (s: any, e: any) => {
+    .command('request', [Events.partReq], (s: any, e: any) => {
       var id = parts[Math.floor(Math.random() * parts.length)];
       console.log("requesting a", id);
-      return [Events.partID.make({id: id})]})
+      return [Events.partReq.make({id: id})]})
     .finish()
 export const s1 = transporter.designEmpty('s1').finish()
 export const s2 = transporter.designState('s2').withPayload<{part: string}>()
-    .command('deliver', [Events.part], (s: any, e: any) => {
+    .command('deliver', [Events.partOK], (s: any, e: any) => {
       console.log("delivering a", s.self.part)
-      return [Events.part.make({part: s.self.part})] })
+      return [Events.partOK.make({part: s.self.part})] })
     .finish()
 export const s3 = transporter.designEmpty('s3').finish()
 
-s0.react([Events.partID], s1, (_) => s1.make())
-s0.react([Events.time], s3, (_) => s3.make())
-s1.react([Events.position], s2, (_, e) => {
+s0.react([Events.partReq], s1, (_) => s1.make())
+s0.react([Events.closingTime], s3, (_) => s3.make())
+s1.react([Events.pos], s2, (_, e) => {
     console.log("got a ", e.payload.part);
     return { part: e.payload.part } })
 
-s2.react([Events.part], s0, (_, e) => { return s0.make() })
+s2.react([Events.partOK], s0, (_, e) => { return s0.make() })
 
-// Projection of Gwarehouse || Gfactory || Gquality over T
+// Projection of Gwarehouse || Gfactory over T
 const projectionInfoResult: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(interfacing_swarms, subs, "T")
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
-//console.log("projection info: ", projectionInfo)
 
 // Adapted machine
 const [transporterAdapted, s0_] = Composition.adaptMachine("T", projectionInfo, Events.allEvents, s0)
@@ -41,13 +40,11 @@ const [transporterAdapted, s0_] = Composition.adaptMachine("T", projectionInfo, 
 const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "T", transporterAdapted.createJSONForAnalysis(s0_))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
-
 // Run the adapted machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('factory-1')
     const machine = createMachineRunner(app, tags, s0, undefined)
-    //const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
 
     for await (const state of machine) {
       console.log("transporter. state is:", state.type)

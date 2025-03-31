@@ -24,23 +24,22 @@ const machine_check_1 = require("@actyx/machine-check");
 // Using the machine runner DSL an implmentation of door in Gwarehouse is:
 const door = warehouse_protocol_1.Composition.makeMachine('D');
 exports.s0 = door.designEmpty('s0')
-    .command('close', [warehouse_protocol_1.Events.time], () => {
+    .command('close', [warehouse_protocol_1.Events.closingTime], () => {
     var dateString = new Date().toLocaleString();
     console.log("closed warehouse at:", dateString);
-    return [warehouse_protocol_1.Events.time.make({ timeOfDay: dateString })];
+    return [warehouse_protocol_1.Events.closingTime.make({ timeOfDay: dateString })];
 })
     .finish();
 exports.s1 = door.designEmpty('s1').finish();
 exports.s2 = door.designEmpty('s2').finish();
-exports.s0.react([warehouse_protocol_1.Events.partID], exports.s1, (_) => exports.s1.make());
-exports.s1.react([warehouse_protocol_1.Events.part], exports.s0, (_) => exports.s0.make());
-exports.s0.react([warehouse_protocol_1.Events.time], exports.s2, (_) => exports.s2.make());
-// Projection of Gwarehouse || Gfactory || Gquality over D
+exports.s0.react([warehouse_protocol_1.Events.partReq], exports.s1, (_) => exports.s1.make());
+exports.s1.react([warehouse_protocol_1.Events.partOK], exports.s0, (_) => exports.s0.make());
+exports.s0.react([warehouse_protocol_1.Events.closingTime], exports.s2, (_) => exports.s2.make());
+// Projection of Gwarehouse || Gfactory over D
 const projectionInfoResult = (0, machine_check_1.projectionAndInformation)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "D");
 if (projectionInfoResult.type == 'ERROR')
     throw new Error('error getting projection');
 const projectionInfo = projectionInfoResult.data;
-//console.log("projection info: ", projectionInfo)
 // Adapted machine
 const [doorAdapted, s0_] = warehouse_protocol_1.Composition.adaptMachine("D", projectionInfo, warehouse_protocol_1.Events.allEvents, exports.s0);
 const checkProjResult = (0, machine_check_1.checkComposedProjection)(warehouse_protocol_1.interfacing_swarms, warehouse_protocol_1.subs, "D", doorAdapted.createJSONForAnalysis(s0_));
@@ -52,9 +51,8 @@ function main() {
         var _a, e_1, _b, _c;
         const app = yield sdk_1.Actyx.of(warehouse_protocol_1.manifest);
         const tags = warehouse_protocol_1.Composition.tagWithEntityId('factory-1');
-        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, exports.s0, undefined);
+        const machine = (0, machine_runner_1.createMachineRunner)(app, tags, exports.s0, undefined); // Uncomment this line and outcomment line below to run without branch tracking
         try {
-            //const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
             for (var _d = true, machine_1 = __asyncValues(machine), machine_1_1; machine_1_1 = yield machine_1.next(), _a = machine_1_1.done, !_a; _d = true) {
                 _c = machine_1_1.value;
                 _d = false;

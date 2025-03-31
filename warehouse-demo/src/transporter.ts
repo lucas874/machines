@@ -43,8 +43,7 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 // Run the adapted machine
 async function main() {
     const app = await Actyx.of(manifest)
-    const tags = Composition.tagWithEntityId('factory-1')
-    //const machine = createMachineRunner(app, tags, s0, undefined)
+    const tags = Composition.tagWithEntityId('warehouse-1')
     const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
 
     for await (const state of machine) {
