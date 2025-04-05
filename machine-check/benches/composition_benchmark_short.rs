@@ -81,15 +81,15 @@ fn short_bench_general(c: &mut Criterion) {
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
     let two_step_granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
     let step: usize = 120;
-    let number_of_inputs = interfacing_swarms_general.iter().step_by(step).len();
-    println!("Running the execution time experiment with a subset of the samples in benchmark suite.");
-    for (i, (size, interfacing_swarms)) in interfacing_swarms_general.iter().step_by(step).enumerate() {
+    //let number_of_inputs = interfacing_swarms_general.iter().step_by(step).len();
+    //println!("Running the execution time experiment with a subset of the samples in benchmark suite.");
+    for (_, (size, interfacing_swarms)) in interfacing_swarms_general.iter().step_by(step).enumerate() {
         group.bench_with_input(BenchmarkId::new("Algorithm 1", size), interfacing_swarms,
         |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), two_step_granularity.clone())));
 
         group.bench_with_input(BenchmarkId::new("Exact", size), interfacing_swarms,
         |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone())));
-        println!("progress: {} / {} samples processed",  i+1, number_of_inputs);
+        //println!("progress: {} / {} samples processed",  i+1, number_of_inputs);
     }
     group.finish();
 }
