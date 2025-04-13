@@ -500,8 +500,6 @@ pub fn equivalent(left: &OptionGraph, li: NodeId, right: &OptionGraph, ri: NodeI
     let _span = tracing::debug_span!("equivalent").entered();
 
     let mut errors = Vec::new();
-    let mut l2r = vec![NodeId::end(); left.node_count()];
-    let mut r2l = vec![NodeId::end(); right.node_count()];
 
     // dfs traversal stack
     // must hold index pairs because node mappings might be m:n
@@ -529,9 +527,7 @@ pub fn equivalent(left: &OptionGraph, li: NodeId, right: &OptionGraph, ri: NodeI
         }
         // keep note of stack so we can undo additions if !same
         let stack_len = stack.len();
-        // note that we have visited these nodes (to avoid putting self-loops onto the stack in the loop below)
-        l2r[li.index()] = ri;
-        r2l[ri.index()] = li;
+
         // compare both sets; iteration must be in order of weights (hence the BTreeMap above)
         let mut same = true;
         let mut l_edges = l_out.into_values().peekable();
@@ -568,10 +564,7 @@ pub fn equivalent(left: &OptionGraph, li: NodeId, right: &OptionGraph, ri: NodeI
                             tracing::debug!(?lt, ?rt, "pushing targets");
                             stack.push((lt, rt));
                         }
-                        /* if l2r[lt.index()] == NodeId::end() || r2l[rt.index()] == NodeId::end() {
-                            tracing::debug!(?lt, ?rt, "pushing targets");
-                            stack.push((lt, rt));
-                        } */
+
                         l_edges.next();
                         r_edges.next();
                     }
