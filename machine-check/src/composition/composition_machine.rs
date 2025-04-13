@@ -1,4 +1,4 @@
-use std::{collections::{BTreeMap, BTreeSet}, fmt, cmp::Ordering};
+use std::{collections::{BTreeMap, BTreeSet}, cmp::Ordering};
 
 
 use itertools::Itertools;
@@ -449,35 +449,6 @@ pub(in crate::composition) fn compose<N: StateName + From<String>, E: EventLabel
     (machine, combined_initial)
 }
 
-struct StatePrinter<'a>(Option<&'a State>, u32);
-
-impl<'a> fmt::Display for StatePrinter<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.0.map(|s| s.as_ref()).unwrap_or("[invalid]"))?;
-        if self.1 > 0 {
-            write!(f, "(+{})", self.1)?;
-        }
-        Ok(())
-    }
-}
-
-fn state_name(g: &OptionGraph, mut n: NodeId) -> StatePrinter<'_> {
-    let mut offset = 0;
-    loop {
-        match g.node_weight(n) {
-            Some(Some(state)) => return StatePrinter(Some(state), offset),
-            None => return StatePrinter(None, offset),
-            _ => {}
-        }
-        tracing::debug!(?n, "tracking back");
-        n = g
-            .neighbors_directed(n, Incoming)
-            .next()
-            .expect("unnamed state must track back to named state");
-        offset += 1;
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
 enum DeterministicLabel {
     Command(Command),
@@ -492,7 +463,12 @@ impl From<&MachineLabel> for DeterministicLabel {
         }
     }
 }
-
+fn state_name(graph: &OptionGraph, index: NodeId) -> String {
+    match &graph[index] {
+        None => "".to_string(),
+        Some(s) => s.to_string()
+    }
+}
 /// error messages are designed assuming that `left` is the reference and `right` the tested
 pub fn equivalent(left: &OptionGraph, li: NodeId, right: &OptionGraph, ri: NodeId) -> Vec<Error> {
     use Side::*;
@@ -591,10 +567,6 @@ pub(in crate::composition) fn to_option_machine(graph: &Graph) -> OptionGraph {
     graph.map(|_, n| Some(n.state_name().clone()), |_, x| x.clone())
 }
 
-pub(in crate::composition) fn from_option_machine(graph: &OptionGraph) -> Graph {
-    graph.map(|_, n| n.clone().unwrap().state_name().clone(), |_, x| x.clone())
-}
-
 pub fn to_json_machine(graph: Graph, initial: NodeId) -> Machine {
     let machine_label_mapper = |m: &Graph, eref: EdgeReference<'_, MachineLabel>| {
         let label = eref.weight().clone();
@@ -656,6 +628,9 @@ mod tests {
         }, types::{Command, EventType, Role, Transition}, Machine, Subscriptions, SwarmProtocol
     };
 
+    pub(in crate::composition) fn from_option_machine(graph: &OptionGraph) -> Graph {
+        graph.map(|_, n| n.clone().unwrap().state_name().clone(), |_, x| x.clone())
+    }
     // Example from coplaws slides
     fn get_proto1() -> SwarmProtocol {
         serde_json::from_str::<SwarmProtocol>(
@@ -908,8 +883,8 @@ mod tests {
         let (expected, expected_initial, errors) = crate::machine::from_json(expected_m);
         assert!(errors.is_empty());
         assert!(expected_initial.is_some());
-        // from machine::equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
-        assert!(crate::machine::equivalent(
+        // from equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
+        assert!(equivalent(
             &expected,
             expected_initial.unwrap(),
             &to_option_machine(&proj),
@@ -1033,8 +1008,8 @@ mod tests {
 
         assert!(errors.is_empty());
         assert!(expected_initial.is_some());
-        // from machine::equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
-        assert!(crate::machine::equivalent(
+        // from equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
+        assert!(equivalent(
             &expected,
             expected_initial.unwrap(),
             &to_option_machine(&proj),
@@ -1135,8 +1110,8 @@ mod tests {
 
         assert!(errors.is_empty());
         assert!(expected_initial.is_some());
-        // from machine::equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
-        assert!(crate::machine::equivalent(
+        // from equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
+        assert!(equivalent(
             &expected,
             expected_initial.unwrap(),
             &to_option_machine(&proj),
@@ -1466,7 +1441,7 @@ mod tests {
 
         // compose(a, b) should be equal to compose(b, a)
         assert_eq!(subs1, subs2);
-        assert!(crate::machine::equivalent(
+        assert!(equivalent(
             &proj_combined1,
             proj_combined_initial1.unwrap(),
             &proj_combined2,
@@ -1478,7 +1453,7 @@ mod tests {
         assert!(composition.is_ok());
         let (composed_graph, composed_initial) = composition.unwrap();
         let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs1, role.clone());
-        assert!(crate::machine::equivalent(
+        assert!(equivalent(
             &proj_combined2,
             proj_combined_initial2.unwrap(),
             &to_option_machine(&proj),
@@ -1520,7 +1495,7 @@ mod tests {
 
             // compose(a, b) should be equal to compose(b, a)
             assert_eq!(subs1, subs2);
-            assert!(crate::machine::equivalent(
+            assert!(equivalent(
                 &proj_combined1,
                 proj_combined_initial1.unwrap(),
                 &proj_combined2,
@@ -1530,7 +1505,7 @@ mod tests {
             assert_eq!(subs2, subs);
 
             let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, role.clone());
-            let errors =  crate::machine::equivalent(
+            let errors =  equivalent(
                 &proj_combined2,
                 proj_combined_initial2.unwrap(),
                 &to_option_machine(&proj),

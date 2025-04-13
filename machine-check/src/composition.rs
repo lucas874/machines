@@ -210,7 +210,7 @@ pub fn check_composed_projection(
     }
 
     errors.extend(
-        machine::equivalent(&proj, proj_initial.unwrap(), &machine, json_initial)
+        composition_machine::equivalent(&proj, proj_initial.unwrap(), &machine, json_initial)
             .into_iter()
             .map(machine::Error::convert(&proj, &machine)),
     );
