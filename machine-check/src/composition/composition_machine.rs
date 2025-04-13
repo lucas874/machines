@@ -102,11 +102,26 @@ pub fn project(
             );
         }
     }
+    println!("In project number of nodes is: {}", machine.node_count());
+    print_info(&machine);
+
     //nfa_to_dfa(machine, m_nodes[initial.index()])
     let (dfa, dfa_initial) = nfa_to_dfa(machine, m_nodes[initial.index()]); // make deterministic. slight deviation from projection operation formally.
+    println!("In project dfa number of nodes is: {}", dfa.node_count());
+    print_info(&dfa);
     minimal_machine(&dfa, dfa_initial) // when minimizing we get a machine that is a little different but equivalent to the one prescribed by the projection operator formally
     //(machine, m_nodes[initial.index()])
     //(dfa, dfa_initial)
+}
+
+fn print_info(g: &Graph) {
+
+    for n in g.node_indices() {
+        println!("node: {} and index: {:?}", g[n], n);
+    }
+    for e in g.edge_references() {
+        println!("edge: {:?} -{}-> {:?}", e.source(), e.weight(), e.target());
+    }
 }
 
 // precondition: the protocols interfaces on the supplied interfaces.
@@ -117,6 +132,7 @@ pub fn project_combine(
     subs: &Subscriptions,
     role: Role,
 ) -> (OptionGraph, Option<NodeId>) {
+    println!("In project combine !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     // check this anyway
     if swarms.is_empty()
         || !swarms[0].interface.is_empty()
@@ -185,7 +201,7 @@ fn nfa_to_dfa(nfa: Graph, i: NodeId) -> (Graph, NodeId) {
             .fold(BTreeMap::new(), |mut m, (edge_label, target)| {
                 m.entry(edge_label)
                     .and_modify(|v: &mut BTreeSet<NodeId>| { v.insert(target); })
-                    .or_insert(BTreeSet::from([target]));
+                    .or_insert_with(|| BTreeSet::from([target]));
                 m
             })
     };
@@ -197,23 +213,32 @@ fn nfa_to_dfa(nfa: Graph, i: NodeId) -> (Graph, NodeId) {
 
     while let Some(states) = stack.pop() {
         let map = outgoing_map(&states);
-
+        println!("--------------------");
+        println!("states are: {:?}", states);
+        println!("map is: {:?}", map);
+        println!("dfa number of states: {}", dfa.node_count());
         for edge in map.keys() {
             if !dfa_nodes.contains_key(&map[edge]) {
                 stack.push(map[edge].clone());
             }
             let target: NodeId = *dfa_nodes
                 .entry(map[edge].clone())
-                .or_insert(dfa.add_node(state_name(&map[edge])));
+                .or_insert_with(|| dfa.add_node(state_name(&map[edge])));
+                //.or_insert(dfa.add_node(state_name(&map[edge])));
             let src: NodeId = *dfa_nodes.get(&states).unwrap();
             dfa.add_edge(src, target, edge.clone());
         }
+        println!("dfa number of states: {}", dfa.node_count());
+        println!("--------------------");
     }
 
     (dfa, dfa_nodes[&BTreeSet::from([i])])
 }
 
 fn minimal_machine(graph: &Graph, i: NodeId) -> (Graph, NodeId) {
+    println!("entered minimal machine");
+    println!("graph is: {}", serde_json::to_string_pretty(&to_json_machine(graph.clone(), i)).unwrap());
+    println!("number of nodes: {}", graph.node_count());
     let partition = partition_refinement(graph);
     let mut minimal = Graph::new();
     let mut node_to_partition = BTreeMap::new();
@@ -221,13 +246,29 @@ fn minimal_machine(graph: &Graph, i: NodeId) -> (Graph, NodeId) {
     let mut edges = BTreeSet::new();
     let state_name = |nodes: &BTreeSet<NodeId>| -> State {
         let name = format!("{{ {} }}", nodes.iter().map(|n| graph[*n].clone()).join(", "));
+        println!("name: {}", name);
         State::new(&name)
     };
 
     for n in graph.node_indices() {
         node_to_partition.insert(n, partition.iter().find(|block| block.contains(&n)).unwrap());
     }
+    println!("number of keys: {}", node_to_partition.keys().len());
+    for (k,v) in node_to_partition.clone() {
+        println!("node: {:?}", graph[k]);
+        print!("in block: {{ ");
+        for s in v {
+            print!("{:?} ", graph[*s]);
+        }
+        println!(" }}");
+        println!();
+    }
     for block in &partition {
+        println!("----block-----");
+        for s in block {
+            println!("state: {:?}", graph[*s]);
+        }
+        println!("----");
         partition_to_minimal_graph_node.insert(block, minimal.add_node(state_name(block)));
     }
     for node in graph.node_indices() {
@@ -243,6 +284,9 @@ fn minimal_machine(graph: &Graph, i: NodeId) -> (Graph, NodeId) {
         }
     }
     let initial = partition_to_minimal_graph_node[node_to_partition[&i]];
+
+    println!("In minimal number of nodes is: {}", minimal.node_count());
+    print_info(&minimal);
     (minimal, initial)
 
 
