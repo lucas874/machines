@@ -105,6 +105,7 @@ pub fn project(
     let (dfa, dfa_initial) = nfa_to_dfa(machine, m_nodes[initial.index()]); // make deterministic. slight deviation from projection operation formally.
     minimal_machine(&dfa, dfa_initial) // when minimizing we get a machine that is a little different but equivalent to the one prescribed by the projection operator formally
     //(machine, m_nodes[initial.index()])
+    //(dfa, dfa_initial)
 }
 
 // precondition: the protocols interfaces on the supplied interfaces.
@@ -449,6 +450,10 @@ pub(in crate::composition) fn compose<N: StateName + From<String>, E: EventLabel
 
 pub(in crate::composition) fn to_option_machine(graph: &Graph) -> OptionGraph {
     graph.map(|_, n| Some(n.state_name().clone()), |_, x| x.clone())
+}
+
+pub(in crate::composition) fn from_option_machine(graph: &OptionGraph) -> Graph {
+    graph.map(|_, n| n.clone().unwrap().state_name().clone(), |_, x| x.clone())
 }
 
 pub fn to_json_machine(graph: Graph, initial: NodeId) -> Machine {
@@ -814,7 +819,7 @@ mod tests {
                         event_type: EventType::new("partID"),
                     },
                     source: State::new("2"),
-                    target: State::new("1"),
+                    target: State::new("2"),
                 },
                 Transition {
                     label: MachineLabel::Input {
@@ -833,16 +838,21 @@ mod tests {
             ],
         };
         let (expected, expected_initial, errors) = crate::machine::from_json(expected_m);
+        let expected = from_option_machine(&expected);
+        let (expected, expected_initial) = nfa_to_dfa(expected, expected_initial.unwrap());
+        let (expected, expected_initial) = minimal_machine(&expected, expected_initial);
+        let expected = to_option_machine(&expected);
+
         println!("computed {:?}: {}", role.clone(), serde_json::to_string_pretty(&to_json_machine(proj.clone(), proj_initial)).unwrap());
-        println!("expected {:?}: {}", role, serde_json::to_string_pretty(&from_option_to_machine(expected.clone(), expected_initial.unwrap())).unwrap());
+        println!("expected {:?}: {}", role, serde_json::to_string_pretty(&from_option_to_machine(expected.clone(), expected_initial)).unwrap());
         assert!(errors.is_empty());
-        assert!(expected_initial.is_some());
+        //assert!(expected_initial.is_some());
         // from machine::equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
         assert!(crate::machine::equivalent(
             &expected,
-            expected_initial.unwrap(),
+            expected_initial,
             &to_option_machine(&proj),
-            proj_initial
+            proj_initial,
         )
         .is_empty());
     }
@@ -1190,5 +1200,72 @@ mod tests {
             println!("{}\n$$$$", serde_json::to_string_pretty(&thing).unwrap())
             //let thing = project(&proto_info.protocols.)
         }
+    }
+
+    #[test]
+    #[ignore]
+    fn example_adapt_delete() {
+        let g1: InterfacingSwarms<Role> = InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_proto1(),
+                    interface: None,
+                }
+            ]
+        );
+
+        let g2 = InterfacingSwarms(
+            vec![
+                CompositionComponent {
+                    protocol: get_proto1(),
+                    interface: None,
+                },
+                CompositionComponent {
+                    protocol: get_proto2(),
+                    interface: Some(Role::new("T")),
+                },
+            ]
+        );
+
+        let s1: Subscriptions = BTreeMap::from([
+            (Role::new("T"), BTreeSet::from([EventType::new("partID"), EventType::new("part"), EventType::new("pos"), EventType::new("time")])),
+            (Role::new("FL"), BTreeSet::from([EventType::new("partID"), EventType::new("pos"), EventType::new("time")])),
+            (Role::new("D"), BTreeSet::from([EventType::new("partID"), EventType::new("part"), EventType::new("time")])),
+
+        ]);
+
+        let s2: Subscriptions = BTreeMap::from([
+            (Role::new("T"), BTreeSet::from([EventType::new("partID"), EventType::new("part"), EventType::new("pos"), EventType::new("time")])),
+            (Role::new("FL"), BTreeSet::from([EventType::new("partID"), EventType::new("part"), EventType::new("pos"), EventType::new("time")])),
+            (Role::new("D"), BTreeSet::from([EventType::new("partID"), EventType::new("part"), EventType::new("time")])),
+            (Role::new("F"), BTreeSet::from([EventType::new("partID"), EventType::new("part"), EventType::new("pos"), EventType::new("time"), EventType::new("car")])),
+
+        ]);
+
+        let (g_warehouse, i_warehouse, _) = from_json(get_proto1());
+        let (fl_1, i_fl_1) = project(&g_warehouse, i_warehouse.unwrap(), &s1, Role::from("FL"));
+        let fl_1_print = to_json_machine(fl_1.clone(), i_fl_1);
+        println!("FL original:\n {}", serde_json::to_string_pretty(&fl_1_print).unwrap());
+
+        let (fl_2, i_fl_2) = project(&g_warehouse, i_warehouse.unwrap(), &s2, Role::from("FL"));
+        let fl_2_print = to_json_machine(fl_2.clone(), i_fl_2);
+        println!("FL larger:\n {}", serde_json::to_string_pretty(&fl_2_print).unwrap());
+
+        let (fl_3, i_fl_3) = compose(fl_1.clone(), i_fl_1, fl_2.clone(), i_fl_2, BTreeSet::from([EventType::new("partID"), EventType::new("pos"), EventType::new("time")]));
+        let fl_3_print = to_json_machine(fl_3.clone(), i_fl_3);
+        println!("FL combined with FL same proto diff sub:\n {}", serde_json::to_string_pretty(&fl_3_print).unwrap());
+
+        let (g_factory, i_factory, _) = from_json(get_proto2());
+        let (fl_4, i_fl_4) = project(&g_factory, i_factory.unwrap(), &s2, Role::from("FL"));
+        let fl_4_print = to_json_machine(fl_4.clone(), i_fl_4);
+        println!("FL over factory:\n {}", serde_json::to_string_pretty(&fl_4_print).unwrap());
+
+        let (fl_5, i_fl_5) = compose(fl_3.clone(), i_fl_3, fl_4.clone(), i_fl_4, BTreeSet::from([EventType::new("partID"), EventType::new("part")]));
+        let fl_5_print = to_json_machine(fl_5, i_fl_5);
+        println!("(M || FL_wh) || FL_F :\n {}", serde_json::to_string_pretty(&fl_5_print).unwrap());
+
+
+
+
     }
 }

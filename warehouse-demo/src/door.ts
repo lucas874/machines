@@ -1,5 +1,5 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunnerBT } from '@actyx/machine-runner'
+import { createMachineRunnerBT, createMachineRunner } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt } from './warehouse_protocol'
 import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 
@@ -24,12 +24,14 @@ if (projectionInfoResult.type == 'ERROR') throw new Error('error getting project
 const projectionInfo = projectionInfoResult.data
 
 const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "D", door.createJSONForAnalysis(s0))
+if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
 // Run the adapted machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('warehouse-1')
-    const machine = createMachineRunnerBT(app, tags, s0, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
+    //const machine = createMachineRunnerBT(app, tags, s0, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
+    const machine = createMachineRunner(app, tags, s0, undefined)
 
     for await (const state of machine) {
       console.log("door. state is:", state.type)
