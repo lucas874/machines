@@ -12,8 +12,6 @@ export const s1 = forklift.designState('s1').withPayload<{id: string}>()
     return [Events.pos.make({position: "x", part: state.self.id})]})
   .finish()
 export const s2 = forklift.designEmpty('s2').finish()
-export const s3 = forklift.designEmpty('s3').finish()
-
 
 s0.react([Events.partReq], s1, (_, e) => {
     console.log("a", e.payload.id, "was requested");
