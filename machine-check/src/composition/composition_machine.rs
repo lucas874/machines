@@ -295,7 +295,7 @@ fn visit_successors_stop_on_branch(proj: &OptionGraph, machine_state: NodeId, et
     let mut visited = BTreeSet::new();
     let mut to_visit = Vec::from([machine_state]);
     let mut event_types = BTreeSet::new();
-    event_types.insert(et.clone());
+    //event_types.insert(et.clone());
     while let Some(node) = to_visit.pop() {
         visited.insert(node);
         for e in proj.edges_directed(node, Outgoing) {
@@ -310,20 +310,6 @@ fn visit_successors_stop_on_branch(proj: &OptionGraph, machine_state: NodeId, et
     }
     event_types
 }
-
-// return map state * event type --> set event type
-// map(s, t) = is the set containing t and every non-branching event type that follows it
-// and is not concurrent with it and there is no branching event between them.
-/* pub fn paths_from_projection_states(proj: &Graph, special_events: &BTreeSet<EventType>, concurrent_events: &BTreeSet<UnordEventPair>) -> BTreeMap<(State, EventType), BTreeSet<EventType>> {
-    let mut m: BTreeMap<(State, EventType), BTreeSet<EventType>> = BTreeMap::new();
-    for node in proj.node_indices() {
-        for edge in proj.edges_directed(node, Outgoing) {
-            let paths_this_edge = visit_successors_stop_on_branch(proj, edge.target(), &edge.weight().get_event_type(), special_events, concurrent_events);
-            m.insert((proj[node].clone(), edge.weight().get_event_type()), paths_this_edge);
-        }
-    }
-    m
-} */
 
 pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> SucceedingNonBranchingJoining {
     let mut m: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
@@ -341,7 +327,6 @@ pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> Suc
         .chain(proto_info.joining_events.clone().into_iter()
             .filter(|e| !get_pre_joins(e).is_empty()))
         .collect();
-    //println!("special events computed:  {:?}", special_events);
 
     let after_pairs: BTreeSet<UnordEventPair> = transitive_closure_succeeding(proto_info.succeeding_events.clone())
         .into_iter()
@@ -352,7 +337,7 @@ pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> Suc
         .flatten()
         .collect();
     let concurrent_events: BTreeSet<UnordEventPair> = proto_info.concurrent_events.difference(&after_pairs).cloned().collect();
-    //println!("conc2: {:?}", concurrent_events);
+
     for node in proj.node_indices() {
         for edge in proj.edges_directed(node, Outgoing) {
             let mut paths_this_edge = visit_successors_stop_on_branch(proj, edge.target(), &edge.weight().get_event_type(), &special_events, &concurrent_events);
