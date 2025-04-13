@@ -36,7 +36,7 @@
     "test:cjs:remove": "npx tsx scripts/test/cjs-remove.ts"
   },
   "devDependencies": {
-    "@actyx/machine-runner": "^0.4.4",
+    "@actyx/machine-runner": "file:../machine-runner",
     "@jest/globals": "^29.5.0",
     "@types/glob": "^8.1.0",
     "@typescript-eslint/eslint-plugin": "^5.45.0",
