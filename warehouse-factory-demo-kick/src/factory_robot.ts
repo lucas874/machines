@@ -3,7 +3,7 @@ import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms,getRandomInt  } from './protocol'
 import { checkWWFSwarmProtocol, checkComposedProjection, Subscriptions, ResultData, overapproxWWFSubscriptions, projectionAndInformation } from '@actyx/machine-check'
 
-const robotFinal = "{ { { 3 }, { 0 } } || { { 0 } }, { { 3 }, { 0 } } || { { 2 }, { 3 } } }"
+const robotFinal = "{ { { 3 } } || { { 0 } }, { { 3 } } || { { 3 } } }"
 
 // Generate a subscription w.r.t. which Gwarehouse || Gfactory || Gquality is well-formed
 const result_sub: ResultData<Subscriptions>

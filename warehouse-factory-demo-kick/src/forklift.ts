@@ -3,7 +3,7 @@ import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt } from './protocol'
 import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 
-const forkliftFinal = "{ { { 3 }, { 1 }, { 0 } } || { { 0 } }, { { 3 }, { 1 }, { 0 } } || { { 2 } } }"
+const forkliftFinal = "{ { { 3 } } || { { 0 } }, { { 3 } } || { { 2 } } }"
 
 // Using the machine runner DSL an implmentation of forklift in Gwarehouse is:
 const forklift = Composition.makeMachine('FL')

@@ -3,7 +3,7 @@ import { createMachineRunnerBT} from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt } from './protocol'
 import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 
-const doorFinal = "{ { { 0 }, { 3 }, { 0 } } || { { 0 } }, { { 0 }, { 3 }, { 0 } } || { { 2 } } }"
+const doorFinal = "{ { { 3 } } || { { 0 } }, { { 3 } } || { { 2 } } }"
 
 // Using the machine runner DSL an implmentation of door in Gwarehouse is:
 const door = Composition.makeMachine('D')

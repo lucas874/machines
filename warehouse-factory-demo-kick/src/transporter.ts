@@ -3,7 +3,7 @@ import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt  } from './protocol'
 import { checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation } from '@actyx/machine-check'
 
-const transporterFinal = "{ { { 0 }, { 3 }, { 2 }, { 0 } } || { { 0 } }, { { 0 }, { 3 }, { 2 }, { 0 } } || { { 0 }, { 1 }, { 2 } } }"
+const transporterFinal = "{ { { 3 } } || { { 0 } }, { { 3 } } || { { 2 } } }"
 
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 
