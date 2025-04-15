@@ -1,4 +1,5 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{collections::{BTreeMap, BTreeSet}, cmp::Ordering};
+
 
 use itertools::Itertools;
 use petgraph::{
@@ -7,10 +8,10 @@ use petgraph::{
     Direction::{Incoming, Outgoing},
 };
 
-use crate::composition::composition_swarm::transitive_closure_succeeding;
+use crate::{composition::composition_swarm::transitive_closure_succeeding, machine::{Error, Side}};
 
 use super::{
-    composition_types::{unord_event_pair, EventLabel, ProtoInfo, ProtoStruct, SucceedingNonBranchingJoining, UnordEventPair}, types::{StateName, Transition}, EventType, Machine, MachineLabel, NodeId, Role, State, Subscriptions, SwarmLabel
+    composition_types::{unord_event_pair, EventLabel, ProtoInfo, ProtoStruct, SucceedingNonBranchingJoining, UnordEventPair}, types::{StateName, Transition, Command}, EventType, Machine, MachineLabel, NodeId, Role, State, Subscriptions, SwarmLabel
 };
 
 // types more or less copied from machine.rs.
@@ -101,10 +102,8 @@ pub fn project(
             );
         }
     }
-    //nfa_to_dfa(machine, m_nodes[initial.index()])
     let (dfa, dfa_initial) = nfa_to_dfa(machine, m_nodes[initial.index()]); // make deterministic. slight deviation from projection operation formally.
     minimal_machine(&dfa, dfa_initial) // when minimizing we get a machine that is a little different but equivalent to the one prescribed by the projection operator formally
-    //(machine, m_nodes[initial.index()])
 }
 
 // precondition: the protocols interfaces on the supplied interfaces.
@@ -183,7 +182,7 @@ fn nfa_to_dfa(nfa: Graph, i: NodeId) -> (Graph, NodeId) {
             .fold(BTreeMap::new(), |mut m, (edge_label, target)| {
                 m.entry(edge_label)
                     .and_modify(|v: &mut BTreeSet<NodeId>| { v.insert(target); })
-                    .or_insert(BTreeSet::from([target]));
+                    .or_insert_with(|| BTreeSet::from([target]));
                 m
             })
     };
@@ -195,14 +194,13 @@ fn nfa_to_dfa(nfa: Graph, i: NodeId) -> (Graph, NodeId) {
 
     while let Some(states) = stack.pop() {
         let map = outgoing_map(&states);
-
         for edge in map.keys() {
             if !dfa_nodes.contains_key(&map[edge]) {
                 stack.push(map[edge].clone());
             }
             let target: NodeId = *dfa_nodes
                 .entry(map[edge].clone())
-                .or_insert(dfa.add_node(state_name(&map[edge])));
+                .or_insert_with(|| dfa.add_node(state_name(&map[edge])));
             let src: NodeId = *dfa_nodes.get(&states).unwrap();
             dfa.add_edge(src, target, edge.clone());
         }
@@ -225,6 +223,7 @@ fn minimal_machine(graph: &Graph, i: NodeId) -> (Graph, NodeId) {
     for n in graph.node_indices() {
         node_to_partition.insert(n, partition.iter().find(|block| block.contains(&n)).unwrap());
     }
+
     for block in &partition {
         partition_to_minimal_graph_node.insert(block, minimal.add_node(state_name(block)));
     }
@@ -242,8 +241,6 @@ fn minimal_machine(graph: &Graph, i: NodeId) -> (Graph, NodeId) {
     }
     let initial = partition_to_minimal_graph_node[node_to_partition[&i]];
     (minimal, initial)
-
-
 }
 
 
@@ -293,7 +290,7 @@ fn visit_successors_stop_on_branch(proj: &OptionGraph, machine_state: NodeId, et
     let mut visited = BTreeSet::new();
     let mut to_visit = Vec::from([machine_state]);
     let mut event_types = BTreeSet::new();
-    event_types.insert(et.clone());
+    //event_types.insert(et.clone());
     while let Some(node) = to_visit.pop() {
         visited.insert(node);
         for e in proj.edges_directed(node, Outgoing) {
@@ -308,20 +305,6 @@ fn visit_successors_stop_on_branch(proj: &OptionGraph, machine_state: NodeId, et
     }
     event_types
 }
-
-// return map state * event type --> set event type
-// map(s, t) = is the set containing t and every non-branching event type that follows it
-// and is not concurrent with it and there is no branching event between them.
-/* pub fn paths_from_projection_states(proj: &Graph, special_events: &BTreeSet<EventType>, concurrent_events: &BTreeSet<UnordEventPair>) -> BTreeMap<(State, EventType), BTreeSet<EventType>> {
-    let mut m: BTreeMap<(State, EventType), BTreeSet<EventType>> = BTreeMap::new();
-    for node in proj.node_indices() {
-        for edge in proj.edges_directed(node, Outgoing) {
-            let paths_this_edge = visit_successors_stop_on_branch(proj, edge.target(), &edge.weight().get_event_type(), special_events, concurrent_events);
-            m.insert((proj[node].clone(), edge.weight().get_event_type()), paths_this_edge);
-        }
-    }
-    m
-} */
 
 pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> SucceedingNonBranchingJoining {
     let mut m: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
@@ -339,7 +322,6 @@ pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> Suc
         .chain(proto_info.joining_events.clone().into_iter()
             .filter(|e| !get_pre_joins(e).is_empty()))
         .collect();
-    //println!("special events computed:  {:?}", special_events);
 
     let after_pairs: BTreeSet<UnordEventPair> = transitive_closure_succeeding(proto_info.succeeding_events.clone())
         .into_iter()
@@ -350,7 +332,7 @@ pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> Suc
         .flatten()
         .collect();
     let concurrent_events: BTreeSet<UnordEventPair> = proto_info.concurrent_events.difference(&after_pairs).cloned().collect();
-    //println!("conc2: {:?}", concurrent_events);
+
     for node in proj.node_indices() {
         for edge in proj.edges_directed(node, Outgoing) {
             let mut paths_this_edge = visit_successors_stop_on_branch(proj, edge.target(), &edge.weight().get_event_type(), &special_events, &concurrent_events);
@@ -447,6 +429,120 @@ pub(in crate::composition) fn compose<N: StateName + From<String>, E: EventLabel
     (machine, combined_initial)
 }
 
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
+enum DeterministicLabel {
+    Command(Command),
+    Event(EventType),
+}
+
+impl From<&MachineLabel> for DeterministicLabel {
+    fn from(label: &MachineLabel) -> Self {
+        match label {
+            MachineLabel::Execute { cmd, .. } => DeterministicLabel::Command(cmd.clone()),
+            MachineLabel::Input { event_type } => DeterministicLabel::Event(event_type.clone()),
+        }
+    }
+}
+fn state_name(graph: &OptionGraph, index: NodeId) -> String {
+    match &graph[index] {
+        None => "".to_string(),
+        Some(s) => s.to_string()
+    }
+}
+/// error messages are designed assuming that `left` is the reference and `right` the tested
+pub fn equivalent(left: &OptionGraph, li: NodeId, right: &OptionGraph, ri: NodeId) -> Vec<Error> {
+    use Side::*;
+
+    let _span = tracing::debug_span!("equivalent").entered();
+
+    let mut errors = Vec::new();
+
+    // dfs traversal stack
+    // must hold index pairs because node mappings might be m:n
+    let mut stack = vec![(li, ri)];
+    let mut visited = BTreeSet::new();
+
+    while let Some((li, ri)) = stack.pop() {
+        tracing::debug!(left = %state_name(left, li), ?li, right = %state_name(right, ri), ?ri, to_go = stack.len(), "loop");
+        visited.insert((li, ri));
+        // get all outgoing edge labels for the left side
+        let mut l_out = BTreeMap::new();
+        for edge in left.edges_directed(li, Outgoing) {
+            l_out
+                .entry(DeterministicLabel::from(edge.weight()))
+                .and_modify(|_| errors.push(Error::NonDeterministic(Left, edge.id())))
+                .or_insert(edge);
+        }
+        // get all outgoing edge labels for the right side
+        let mut r_out = BTreeMap::new();
+        for edge in right.edges_directed(ri, Outgoing) {
+            r_out
+                .entry(DeterministicLabel::from(edge.weight()))
+                .and_modify(|_| errors.push(Error::NonDeterministic(Right, edge.id())))
+                .or_insert(edge);
+        }
+        // keep note of stack so we can undo additions if !same
+        let stack_len = stack.len();
+
+        // compare both sets; iteration must be in order of weights (hence the BTreeMap above)
+        let mut same = true;
+        let mut l_edges = l_out.into_values().peekable();
+        let mut r_edges = r_out.into_values().peekable();
+        loop {
+            let l = l_edges.peek();
+            let r = r_edges.peek();
+            match (l, r) {
+                (None, None) => break,
+                (None, Some(r_edge)) => {
+                    tracing::debug!("left missing {} 1", r_edge.weight());
+                    errors.push(Error::MissingTransition(Left, li, r_edge.id()));
+                    same = false;
+                    r_edges.next();
+                }
+                (Some(l_edge), None) => {
+                    tracing::debug!("right missing {} 2", l_edge.weight());
+                    errors.push(Error::MissingTransition(Right, ri, l_edge.id()));
+                    same = false;
+                    l_edges.next();
+                }
+                (Some(l_edge), Some(r_edge)) => match l_edge.weight().cmp(r_edge.weight()) {
+                    Ordering::Less => {
+                        tracing::debug!("right missing {}", l_edge.weight());
+                        errors.push(Error::MissingTransition(Right, ri, l_edge.id()));
+                        same = false;
+                        l_edges.next();
+                    }
+                    Ordering::Equal => {
+                        tracing::debug!("found match for {}", l_edge.weight());
+                        let lt = l_edge.target();
+                        let rt = r_edge.target();
+                        if !visited.contains(&(lt, rt)) {
+                            tracing::debug!(?lt, ?rt, "pushing targets");
+                            stack.push((lt, rt));
+                        }
+
+                        l_edges.next();
+                        r_edges.next();
+                    }
+                    Ordering::Greater => {
+                        tracing::debug!("left missing {}", r_edge.weight());
+                        errors.push(Error::MissingTransition(Left, li, r_edge.id()));
+                        same = false;
+                        r_edges.next();
+                    }
+                },
+            }
+        }
+        if !same {
+            // don’t bother visiting subsequent nodes if this one had discrepancies
+            tracing::debug!("dumping {} stack elements", stack.len() - stack_len);
+            stack.truncate(stack_len);
+        }
+    }
+
+    errors
+}
+
 pub(in crate::composition) fn to_option_machine(graph: &Graph) -> OptionGraph {
     graph.map(|_, n| Some(n.state_name().clone()), |_, x| x.clone())
 }
@@ -512,6 +608,9 @@ mod tests {
         }, types::{Command, EventType, Role, Transition}, Machine, Subscriptions, SwarmProtocol
     };
 
+    pub(in crate::composition) fn from_option_machine(graph: &OptionGraph) -> Graph {
+        graph.map(|_, n| n.clone().unwrap().state_name().clone(), |_, x| x.clone())
+    }
     // Example from coplaws slides
     fn get_proto1() -> SwarmProtocol {
         serde_json::from_str::<SwarmProtocol>(
@@ -764,8 +863,8 @@ mod tests {
         let (expected, expected_initial, errors) = crate::machine::from_json(expected_m);
         assert!(errors.is_empty());
         assert!(expected_initial.is_some());
-        // from machine::equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
-        assert!(crate::machine::equivalent(
+        // from equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
+        assert!(equivalent(
             &expected,
             expected_initial.unwrap(),
             &to_option_machine(&proj),
@@ -783,8 +882,8 @@ mod tests {
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
         let (g, i, _) = from_json(proto);
-        let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role.clone());
-        let expected_m = Machine {
+        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone());
+        let right_m = Machine {
             initial: State::new("0"),
             transitions: vec![
                 Transition {
@@ -832,19 +931,20 @@ mod tests {
                 },
             ],
         };
-        let (expected, expected_initial, errors) = crate::machine::from_json(expected_m);
-        println!("computed {:?}: {}", role.clone(), serde_json::to_string_pretty(&to_json_machine(proj.clone(), proj_initial)).unwrap());
-        println!("expected {:?}: {}", role, serde_json::to_string_pretty(&from_option_to_machine(expected.clone(), expected_initial.unwrap())).unwrap());
+        let (right, right_initial, errors) = crate::machine::from_json(right_m);
+        let right = from_option_machine(&right);
+        let right = to_option_machine(&right);
+
+        println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&to_json_machine(left.clone(), left_initial)).unwrap());
+        println!("right {:?}: {}", role, serde_json::to_string_pretty(&from_option_to_machine(right.clone(), right_initial.unwrap())).unwrap());
         assert!(errors.is_empty());
-        assert!(expected_initial.is_some());
-        // from machine::equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
-        assert!(crate::machine::equivalent(
-            &expected,
-            expected_initial.unwrap(),
-            &to_option_machine(&proj),
-            proj_initial
-        )
-        .is_empty());
+
+        let errors = equivalent(
+            &to_option_machine(&left),
+            left_initial,
+            &right,
+            right_initial.unwrap());
+        assert!(errors.is_empty());
     }
 
     #[test]
@@ -888,8 +988,8 @@ mod tests {
 
         assert!(errors.is_empty());
         assert!(expected_initial.is_some());
-        // from machine::equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
-        assert!(crate::machine::equivalent(
+        // from equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
+        assert!(equivalent(
             &expected,
             expected_initial.unwrap(),
             &to_option_machine(&proj),
@@ -990,8 +1090,8 @@ mod tests {
 
         assert!(errors.is_empty());
         assert!(expected_initial.is_some());
-        // from machine::equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
-        assert!(crate::machine::equivalent(
+        // from equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
+        assert!(equivalent(
             &expected,
             expected_initial.unwrap(),
             &to_option_machine(&proj),
@@ -1000,6 +1100,303 @@ mod tests {
         .is_empty());
     }
 
+    #[test]
+    fn test_projection_fail_1() {
+        // warehouse example from coplaws slides
+        let proto = get_proto1();
+        let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), interface: None}]), &BTreeMap::new());
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
+        let role = Role::new("FL");
+        let (g, i, _) = from_json(proto);
+        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone());
+        let right_m = Machine {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                    },
+                    source: State::new("1"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("1"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("1"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("3"),
+                },
+            ],
+        };
+        let (right, right_initial, errors) = crate::machine::from_json(right_m);
+        let right = from_option_machine(&right);
+        let right = to_option_machine(&right);
+
+        println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&to_json_machine(left.clone(), left_initial)).unwrap());
+        println!("right {:?}: {}", role, serde_json::to_string_pretty(&from_option_to_machine(right.clone(), right_initial.unwrap())).unwrap());
+        assert!(errors.is_empty());
+
+        let errors = equivalent(
+            &to_option_machine(&left),
+            left_initial,
+            &right,
+            right_initial.unwrap());
+        assert!(!errors.is_empty());
+        let errors: Vec<String> = errors.into_iter().map(crate::machine::Error::convert(&to_option_machine(&left), &right)).collect();
+        println!("{:?}", errors)
+
+    }
+    #[test]
+    fn test_projection_fail_2() {
+        // warehouse example from coplaws slides
+        let proto = get_proto1();
+        let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), interface: None}]), &BTreeMap::new());
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
+        let role = Role::new("FL");
+        let (g, i, _) = from_json(proto);
+        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone());
+        let right_m = Machine {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                    },
+                    source: State::new("1"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("1"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("3"),
+                },
+            ],
+        };
+        let (right, right_initial, errors) = crate::machine::from_json(right_m);
+        let right = from_option_machine(&right);
+        let right = to_option_machine(&right);
+
+        println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&to_json_machine(left.clone(), left_initial)).unwrap());
+        println!("right {:?}: {}", role, serde_json::to_string_pretty(&from_option_to_machine(right.clone(), right_initial.unwrap())).unwrap());
+        assert!(errors.is_empty());
+
+        let errors = equivalent(
+            &to_option_machine(&left),
+            left_initial,
+            &right,
+            right_initial.unwrap());
+        assert!(!errors.is_empty());
+        let errors: Vec<String> = errors.into_iter().map(crate::machine::Error::convert(&to_option_machine(&left), &right)).collect();
+        println!("{:?}", errors)
+
+    }
+    #[test]
+    fn test_projection_fail_3() {
+        // warehouse example from coplaws slides
+        let proto = get_proto1();
+        let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), interface: None}]), &BTreeMap::new());
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
+        let role = Role::new("FL");
+        let (g, i, _) = from_json(proto);
+        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone());
+        let right_m = Machine {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                    },
+                    source: State::new("1"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("1"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                    },
+                    source: State::new("2"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("3"),
+                },
+            ],
+        };
+        let (right, right_initial, errors) = crate::machine::from_json(right_m);
+        let right = from_option_machine(&right);
+        let right = to_option_machine(&right);
+
+        println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&to_json_machine(left.clone(), left_initial)).unwrap());
+        println!("right {:?}: {}", role, serde_json::to_string_pretty(&from_option_to_machine(right.clone(), right_initial.unwrap())).unwrap());
+        assert!(errors.is_empty());
+
+        let errors = equivalent(
+            &to_option_machine(&left),
+            left_initial,
+            &right,
+            right_initial.unwrap());
+        assert!(!errors.is_empty());
+        let errors: Vec<String> = errors.into_iter().map(crate::machine::Error::convert(&to_option_machine(&left), &right)).collect();
+        println!("{:?}", errors)
+    }
+    #[test]
+    fn test_projection_fail_4() {
+        // warehouse example from coplaws slides
+        let proto = get_proto1();
+        let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), interface: None}]), &BTreeMap::new());
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
+        let role = Role::new("FL");
+        let (g, i, _) = from_json(proto);
+        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone());
+        let right_m = Machine {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                    },
+                    source: State::new("1"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("1"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("3"),
+                },
+            ],
+        };
+        let (right, right_initial, errors) = crate::machine::from_json(right_m);
+        let right = from_option_machine(&right);
+        let right = to_option_machine(&right);
+
+        println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&to_json_machine(left.clone(), left_initial)).unwrap());
+        println!("right {:?}: {}", role, serde_json::to_string_pretty(&from_option_to_machine(right.clone(), right_initial.unwrap())).unwrap());
+        assert!(errors.is_empty());
+
+        let errors = equivalent(
+            &to_option_machine(&left),
+            left_initial,
+            &right,
+            right_initial.unwrap());
+        assert!(!errors.is_empty());
+        let errors: Vec<String> = errors.into_iter().map(crate::machine::Error::convert(&to_option_machine(&left), &right)).collect();
+        println!("{:?}", errors)
+
+    }
     #[test]
     fn test_combine_machines_1() {
         // Example from coplaws slides. Use generated WWF subscriptions. Project over T.
@@ -1024,7 +1421,7 @@ mod tests {
 
         // compose(a, b) should be equal to compose(b, a)
         assert_eq!(subs1, subs2);
-        assert!(crate::machine::equivalent(
+        assert!(equivalent(
             &proj_combined1,
             proj_combined_initial1.unwrap(),
             &proj_combined2,
@@ -1036,7 +1433,7 @@ mod tests {
         assert!(composition.is_ok());
         let (composed_graph, composed_initial) = composition.unwrap();
         let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs1, role.clone());
-        assert!(crate::machine::equivalent(
+        assert!(equivalent(
             &proj_combined2,
             proj_combined_initial2.unwrap(),
             &to_option_machine(&proj),
@@ -1078,7 +1475,7 @@ mod tests {
 
             // compose(a, b) should be equal to compose(b, a)
             assert_eq!(subs1, subs2);
-            assert!(crate::machine::equivalent(
+            assert!(equivalent(
                 &proj_combined1,
                 proj_combined_initial1.unwrap(),
                 &proj_combined2,
@@ -1088,7 +1485,7 @@ mod tests {
             assert_eq!(subs2, subs);
 
             let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, role.clone());
-            let errors =  crate::machine::equivalent(
+            let errors =  equivalent(
                 &proj_combined2,
                 proj_combined_initial2.unwrap(),
                 &to_option_machine(&proj),
@@ -1191,4 +1588,5 @@ mod tests {
             //let thing = project(&proto_info.protocols.)
         }
     }
+
 }
