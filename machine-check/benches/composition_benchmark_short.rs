@@ -14,6 +14,7 @@ use std::path::Path;
 use walkdir::WalkDir;
 
 const BENCHMARK_DIR: &str = "./bench_and_results";
+const SPECIAL_SYMBOL: &str = "done-special-symbol";
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BenchMarkInput {
@@ -88,6 +89,8 @@ fn short_bench_general(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::new("Exact", size), interfacing_swarms,
         |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone())));
+
+        println!("{}", SPECIAL_SYMBOL);
     }
     group.finish();
 }

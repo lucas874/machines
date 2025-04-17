@@ -10,6 +10,7 @@ use std::{
 use walkdir::WalkDir;
 
 const BENCHMARK_DIR: &str = "./bench_and_results";
+const SPECIAL_SYMBOL: &str = "done-special-symbol";
 
 #[test]
 #[ignore]
@@ -37,6 +38,7 @@ fn full_run_bench_sub_sizes_general() {
             DataResult::ERROR{ .. } => None,
         };
         wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), &output_dir);
+        println!("{}", SPECIAL_SYMBOL);
     }
 }
 
@@ -67,6 +69,7 @@ fn short_run_bench_sub_sizes_general() {
             DataResult::ERROR{ .. } => None,
         };
         wrap_and_write_sub_out(&bi, subscriptions.unwrap(), String::from("Exact"), &output_dir);
+        println!("{}", SPECIAL_SYMBOL);
     }
 }
 
