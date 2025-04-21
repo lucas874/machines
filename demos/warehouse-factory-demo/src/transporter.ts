@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
-import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse } from './protocol'
+import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event } from './protocol'
 import { checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation } from '@actyx/machine-check'
 
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
@@ -21,19 +21,20 @@ export const s2 = transporter.designState('s2').withPayload<{part: string}>()
     .finish()
 export const s3 = transporter.designEmpty('s3').finish()
 
-s0.react([Events.partReq], s1, (_) => s1.make())
-s0.react([Events.closingTime], s3, (_) => s3.make())
+s0.react([Events.partReq], s1, (_, e) => { print_event(e); return s1.make() })
+s0.react([Events.closingTime], s3, (_, e) => { print_event(e); return s3.make() })
 s1.react([Events.pos], s2, (_, e) => {
+    print_event(e)
     console.log("got a ", e.payload.part);
     return { part: e.payload.part } })
 
-s2.react([Events.partOK], s0, (_, e) => { return s0.make() })
+s2.react([Events.partOK], s0, (_, e) => { print_event(e); return s0.make() })
 
-// Check that the original machine is a correct implementation. A prerequiste for reusing it.
+// Check that the original machine is a correct implementation. A prerequisite for reusing it.
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "T", transporter.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
-// Projection of warehouse || factory || Gquality over T
+// Projection of warehouse || factory over T
 const projectionInfoResult: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(warehouse_factory_protocol, subs_composition, "T")
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
@@ -48,9 +49,9 @@ async function main() {
     const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
 
     for await (const state of machine) {
-      console.log("transporter. state is:", state.type)
+      console.log("Transporter. State is:", state.type)
       if (state.payload !== undefined) {
-        console.log("state payload is:", state.payload)
+        console.log("State payload is:", state.payload)
       }
       console.log()
       const s = state.cast()

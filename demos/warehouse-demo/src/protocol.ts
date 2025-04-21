@@ -34,19 +34,13 @@ export const Gwarehouse: SwarmProtocolType = {
     {source: '0', target: '3', label: {cmd: 'close', role: 'D', logType: [Events.closingTime.type]}},
   ]}
 
-export const interfacing_swarms: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}]
+export const warehouse_protocol: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}]
 
-const result_subs: ResultData<Subscriptions>
-  = overapproxWWFSubscriptions(interfacing_swarms, {}, 'TwoStep')
-if (result_subs.type === 'ERROR') throw new Error(result_subs.errors.join(', '))
-export const subs: Subscriptions = result_subs.data
+const result_subs_warehouse: ResultData<Subscriptions>
+  = overapproxWWFSubscriptions(warehouse_protocol, {}, 'TwoStep')
+if (result_subs_warehouse.type === 'ERROR') throw new Error(result_subs_warehouse.errors.join(', '))
+export var subs_warehouse: Subscriptions = result_subs_warehouse.data
 
-const result_project_all = projectAll(interfacing_swarms, subs)
-
-if (result_project_all.type === 'ERROR') throw new Error('error getting subscription')
-export const all_projections: MachineType[] = result_project_all.data
-
-// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
 export function getRandomInt(min: number, max: number) {
   const minCeiled = Math.ceil(min);
   const maxFloored = Math.floor(max);

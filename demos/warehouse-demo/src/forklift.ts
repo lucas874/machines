@@ -1,47 +1,48 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunnerBT, createMachineRunner } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt, print_event } from './warehouse_protocol'
-import { checkComposedProjection, projectCombineMachines, projectionAndInformation } from '@actyx/machine-check'
+import { createMachineRunnerBT } from '@actyx/machine-runner'
+import { Events, manifest, Composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event } from './protocol'
+import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 
-// Using the machine runner DSL an implmentation of forklift in Gwarehouse is:
+// Using the machine runner DSL an implmentation of forklift in the warehouse protocol w.r.t. subs_warehouse is:
 const forklift = Composition.makeMachine('FL')
 export const s0 = forklift.designEmpty('s0') .finish()
 export const s1 = forklift.designState('s1').withPayload<{id: string}>()
   .command('get', [Events.pos], (state: any, _: any) => {
     console.log("retrieved a", state.self.id, "at position x");
-    console.log("Lars");
     return [Events.pos.make({position: "x", part: state.self.id})]})
   .finish()
 export const s2 = forklift.designEmpty('s2').finish()
 
 s0.react([Events.partReq], s1, (_, e) => {
-    print_event(e)
+    print_event(e);
     console.log("a", e.payload.id, "was requested");
     if (getRandomInt(0, 10) >= 9) { return { id: "broken part" } }
     return s1.make({id: e.payload.id}) })
 s1.react([Events.pos], s0, (_, e) => { print_event(e); return s0.make() })
 s0.react([Events.closingTime], s2, (_, e) => { print_event(e); return s2.make() })
 
-// Projection of Gwarehouse over FL
-const projectionInfoResult = projectionAndInformation(interfacing_swarms, subs, "FL")
+// Check that the original machine is a correct implementation. A prerequisite for reusing it.
+const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "FL", forklift.createJSONForAnalysis(s0))
+if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
+
+// Projection of warehouse over FL
+const projectionInfoResult = projectionAndInformation(warehouse_protocol, subs_warehouse, "FL")
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
 
-const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "FL", forklift.createJSONForAnalysis(s0))
-console.log(JSON.stringify(checkProjResult, null, 2))
-if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
+// Adapted machine
+const [forkliftAdapted, s0_] = Composition.adaptMachine("FL", projectionInfo, Events.allEvents, s0)
 
 // Run the adapted machine
 async function main() {
     const app = await Actyx.of(manifest)
-    const tags = Composition.tagWithEntityId('warehouse-1')
-    //const machine = createMachineRunner(app, tags, s0, undefined)
-    const machine = createMachineRunnerBT(app, tags, s0, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
+    const tags = Composition.tagWithEntityId('warehouse')
+    const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
 
     for await (const state of machine) {
-      console.log("forklift. state is:", state.type)
+      console.log("Forklift. State is:", state.type)
       if (state.payload !== undefined) {
-        console.log("state payload is:", state.payload)
+        console.log("State payload is:", state.payload)
       }
       console.log()
       const s = state.cast()

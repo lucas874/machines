@@ -1,9 +1,9 @@
 import { Actyx } from '@actyx/sdk'
-import { Events, manifest, Composition  } from './warehouse_protocol'
+import { Events, manifest, Composition  } from './protocol'
 
 async function main() {
     const app = await Actyx.of(manifest)
-    const tags = Composition.tagWithEntityId('warehouse-1')
+    const tags = Composition.tagWithEntityId('warehouse')
     while(true) {
         await new Promise(f => setTimeout(f, 5000));
         await app.publish(tags.apply(Events.closingTime.makeBT({timeOfDay: new Date().toLocaleString()}, "invalidPointer")))
