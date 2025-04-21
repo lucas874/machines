@@ -32,7 +32,7 @@ s2.react([Events.partOK], s0, (_, e) => { print_event(e); return s0.make() })
 
 // Check that the original machine is a correct implementation. A prerequisite for reusing it.
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "T", transporter.createJSONForAnalysis(s0))
-if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
+if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Projection of warehouse || factory over T
 const projectionInfoResult: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(warehouse_factory_protocol, subs_composition, "T")

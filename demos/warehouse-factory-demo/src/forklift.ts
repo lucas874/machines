@@ -23,7 +23,7 @@ s0.react([Events.closingTime], s2, (_, e) => { print_event(e); return s2.make() 
 
 // Check that the original machine is a correct implementation. A prerequisite for reusing it.
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "FL", forklift.createJSONForAnalysis(s0))
-if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
+if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Projection of warehouse || factory over FL
 const projectionInfoResult = projectionAndInformation(warehouse_factory_protocol, subs_composition, "FL")

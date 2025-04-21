@@ -70,7 +70,7 @@ export var subs_composition: Subscriptions = result_subs_composition.data
 
 // check that the subscription generated for the composition is indeed well-formed
 const result_check_wf: Result = checkWWFSwarmProtocol(warehouse_factory_protocol, subs_composition)
-if (result_check_wf.type === 'ERROR') throw new Error(result_check_wf.errors.join(', '))
+if (result_check_wf.type === 'ERROR') throw new Error(result_check_wf.errors.join(', \n'))
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
 export function getRandomInt(min: number, max: number) {
