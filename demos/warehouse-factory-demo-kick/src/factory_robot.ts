@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms,getRandomInt  } from './protocol'
+import { Events, manifest, Composition, interfacing_swarms,getRandomInt, print_event  } from './protocol'
 import { checkWWFSwarmProtocol, checkComposedProjection, Subscriptions, ResultData, overapproxWWFSubscriptions, projectionAndInformation } from '@actyx/machine-check'
 
 const robotFinal = "{ { { 3 } } || { { 0 } }, { { 3 } } || { { 3 } } }"
@@ -27,9 +27,10 @@ export const s1 = robot.designState('s1').withPayload<{part: string}>()
 export const s2 = robot.designEmpty('s2').finish()
 
 s0.react([Events.partOK], s1, (_, e) => {
+  print_event(e);
   console.log("received a ", e.payload.part);
   return s1.make({part: e.payload.part})})
-s1.react([Events.car], s2, (_) => s2.make())
+s1.react([Events.car], s2, (_, e) => { print_event(e); return s2.make() })
 
 // Projection of Gwarehouse || Gfactory || Gquality over R
 const projectionInfoResult = projectionAndInformation(interfacing_swarms, sub, "R")
@@ -50,9 +51,9 @@ async function main() {
     const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
 
     for await (const state of machine) {
-      console.log("robot. state is:", state.type)
+      console.log("Robot. State is:", state.type)
       if (state.payload !== undefined) {
-        console.log("state payload is:", state.payload)
+        console.log("State payload is:", state.payload)
       }
       console.log()
       if (state.type === robotFinal) {

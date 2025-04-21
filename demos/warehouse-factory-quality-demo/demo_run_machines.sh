@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
 # Commands to run in each window and pane
 START_R="echo 'Starting factory-robot'; npm run start-factory-robot;exec bash"
 START_FL="echo 'Starting forklift'; npm run start-forklift;exec bash"

@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt  } from './protocol'
+import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt, print_event  } from './protocol'
 import { checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation } from '@actyx/machine-check'
 
 const transporterFinal = "{ { { 3 } } || { { 0 } }, { { 3 } } || { { 2 } } }"
@@ -23,13 +23,14 @@ export const s2 = transporter.designState('s2').withPayload<{part: string}>()
     .finish()
 export const s3 = transporter.designEmpty('s3').finish()
 
-s0.react([Events.partReq], s1, (_) => s1.make())
-s0.react([Events.closingTime], s3, (_) => s3.make())
+s0.react([Events.partReq], s1, (_, e) => { print_event(e); return s1.make() })
+s0.react([Events.closingTime], s3, (_, e) => { print_event(e); return s3.make() })
 s1.react([Events.pos], s2, (_, e) => {
+    print_event(e)
     console.log("got a ", e.payload.part);
     return { part: e.payload.part } })
 
-s2.react([Events.partOK], s0, (_, e) => { return s0.make() })
+s2.react([Events.partOK], s0, (_, e) => { print_event(e); return s0.make() })
 
 // Projection of Gwarehouse || Gfactory || Gquality over T
 const projectionInfoResult: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(interfacing_swarms, subs, "T")
@@ -49,9 +50,9 @@ async function main() {
     const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
 
     for await (const state of machine) {
-      console.log("transporter. state is:", state.type)
+      console.log("Transporter. State is:", state.type)
       if (state.payload !== undefined) {
-        console.log("state payload is:", state.payload)
+        console.log("State payload is:", state.payload)
       }
       console.log()
       if (state.type === transporterFinal) {

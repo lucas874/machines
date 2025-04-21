@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT, createMachineRunner} from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt  } from './warehouse_protocol'
+import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt, print_event  } from './warehouse_protocol'
 import { checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation } from '@actyx/machine-check'
 
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
@@ -21,13 +21,14 @@ export const s2 = transporter.designState('s2').withPayload<{part: string}>()
     .finish()
 export const s3 = transporter.designEmpty('s3').finish()
 
-s0.react([Events.partReq], s1, (_) => s1.make())
-s0.react([Events.closingTime], s3, (_) => s3.make())
+s0.react([Events.partReq], s1, (_, e) => { print_event(e); return s1.make() })
+s0.react([Events.closingTime], s3, (_, e) => { print_event(e); return s3.make() })
 s1.react([Events.pos], s2, (_, e) => {
+    print_event(e);
     console.log("got a ", e.payload.part);
     return { part: e.payload.part } })
 
-s2.react([Events.partOK], s0, (_, e) => { return s0.make() })
+s2.react([Events.partOK], s0, (_, e) => { print_event(e); return s0.make() })
 
 // Projection of Gwarehouse over T
 const projectionInfoResult: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(interfacing_swarms, subs, "T")
