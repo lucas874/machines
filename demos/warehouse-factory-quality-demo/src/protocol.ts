@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import { MachineEvent, SwarmProtocol } from '@actyx/machine-runner'
-import { SwarmProtocolType, Subscriptions, ResultData, InterfacingSwarms, overapproxWWFSubscriptions, projectAll, MachineType} from '@actyx/machine-check'
+import { SwarmProtocolType, Subscriptions, Result, ResultData, InterfacingSwarms, overapproxWWFSubscriptions, checkWWFSwarmProtocol, MachineType} from '@actyx/machine-check'
 
 export const manifest = {
   appId: 'com.example.car-factory',
@@ -54,21 +54,45 @@ export const Gquality: SwarmProtocolType = {
     {source: '2', target: '3', label: { cmd: 'test', role: 'QCR', logType: [Events.report.type] }},
   ]}
 
-export const interfacing_swarms: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}, {protocol: Gquality, interface: 'R'}]
+export const warehouse_protocol: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}]
+export const factory_protocol: InterfacingSwarms = [{protocol: Gfactory, interface: null}]
+export const quality_protocol: InterfacingSwarms = [{protocol: Gquality, interface: null}]
+export const warehouse_factory_quality_protocol: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}, {protocol: Gquality, interface: 'R'}]
 
-const result_subs: ResultData<Subscriptions>
-  = overapproxWWFSubscriptions(interfacing_swarms, {}, 'TwoStep')
-if (result_subs.type === 'ERROR') throw new Error(result_subs.errors.join(', '))
-export const subs: Subscriptions = result_subs.data
+// Well-formed subscription for the warehouse protocol
+const result_subs_warehouse: ResultData<Subscriptions>
+  = overapproxWWFSubscriptions(warehouse_protocol, {}, 'TwoStep')
+if (result_subs_warehouse.type === 'ERROR') throw new Error(result_subs_warehouse.errors.join(', '))
+export var subs_warehouse: Subscriptions = result_subs_warehouse.data
 
-const result_project_all = projectAll(interfacing_swarms, subs)
+// Well-formed subscription for the factory protocol
+const result_subs_factory: ResultData<Subscriptions>
+  = overapproxWWFSubscriptions(factory_protocol, {}, 'TwoStep')
+if (result_subs_factory.type === 'ERROR') throw new Error(result_subs_factory.errors.join(', '))
+export var subs_factory: Subscriptions = result_subs_factory.data
 
-if (result_project_all.type === 'ERROR') throw new Error('error getting subscription')
-export const all_projections: MachineType[] = result_project_all.data
+// Well-formed subscription for the quality protocol
+const result_subs_quality: ResultData<Subscriptions>
+  = overapproxWWFSubscriptions(quality_protocol, {}, 'TwoStep')
+if (result_subs_quality.type === 'ERROR') throw new Error(result_subs_quality.errors.join(', '))
+export var subs_quality: Subscriptions = result_subs_quality.data
+
+const result_subs_composition: ResultData<Subscriptions>
+  = overapproxWWFSubscriptions(warehouse_factory_quality_protocol, {}, 'TwoStep')
+if (result_subs_composition.type === 'ERROR') throw new Error(result_subs_composition.errors.join(', '))
+export var subs_composition: Subscriptions = result_subs_composition.data
+
+// check that the subscription generated for the composition is indeed well-formed
+const result_check_wf: Result = checkWWFSwarmProtocol(warehouse_factory_quality_protocol, subs_composition)
+if (result_check_wf.type === 'ERROR') throw new Error(result_check_wf.errors.join(', '))
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
 export function getRandomInt(min: number, max: number) {
   const minCeiled = Math.ceil(min);
   const maxFloored = Math.floor(max);
   return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled); // The maximum is exclusive and the minimum is inclusive
+}
+
+export function print_event(e: any) {
+  console.log(`received an event: ${JSON.stringify(e.payload, null, 2)}`)
 }

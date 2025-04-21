@@ -1,11 +1,11 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt  } from './protocol'
+import { Events, manifest, Composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event, warehouse_factory_quality_protocol, subs_composition } from './protocol'
 import { checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation } from '@actyx/machine-check'
 
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 
-// Using the machine runner DSL an implmentation of transporter in Gwarehouse is:
+// Using the machine runner DSL an implmentation of transporter in warehouse w.r.t. subs_warehouse is:
 const transporter = Composition.makeMachine('T')
 export const s0 = transporter.designEmpty('s0')
     .command('request', [Events.partReq], (s: any, e: any) => {
@@ -21,24 +21,26 @@ export const s2 = transporter.designState('s2').withPayload<{part: string}>()
     .finish()
 export const s3 = transporter.designEmpty('s3').finish()
 
-s0.react([Events.partReq], s1, (_) => s1.make())
-s0.react([Events.closingTime], s3, (_) => s3.make())
+s0.react([Events.partReq], s1, (_, e) => { print_event(e); return s1.make() })
+s0.react([Events.closingTime], s3, (_, e) => { print_event(e); return s3.make() })
 s1.react([Events.pos], s2, (_, e) => {
+    print_event(e)
     console.log("got a ", e.payload.part);
     return { part: e.payload.part } })
 
-s2.react([Events.partOK], s0, (_, e) => { return s0.make() })
+s2.react([Events.partOK], s0, (_, e) => { print_event(e); return s0.make() })
 
-// Projection of Gwarehouse || Gfactory || Gquality over T
-const projectionInfoResult: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(interfacing_swarms, subs, "T")
+// Check that the original machine is a correct implementation. A prerequisite for reusing it.
+const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "T", transporter.createJSONForAnalysis(s0))
+if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
+
+// Projection of warehouse || factory || quality over T
+const projectionInfoResult: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(warehouse_factory_quality_protocol, subs_composition, "T")
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
 
 // Adapted machine
 const [transporterAdapted, s0_] = Composition.adaptMachine("T", projectionInfo, Events.allEvents, s0)
-
-const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "T", transporterAdapted.createJSONForAnalysis(s0_))
-if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
 // Run the adapted machine
 async function main() {
