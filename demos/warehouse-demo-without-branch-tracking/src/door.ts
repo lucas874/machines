@@ -1,9 +1,9 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt } from './warehouse_protocol'
+import { Events, manifest, Composition, warehouse_protocol, subs_warehouse, getRandomInt, print_event } from './protocol'
 import { checkComposedProjection } from '@actyx/machine-check'
 
-// Using the machine runner DSL an implmentation of door in Gwarehouse is:
+// Using the machine runner DSL an implmentation of door in warehouse w.r.t. subs_warehouse is:
 const door = Composition.makeMachine('D')
 export const s0 = door.designEmpty('s0')
     .command('close', [Events.closingTime], () => {
@@ -14,11 +14,12 @@ export const s0 = door.designEmpty('s0')
 export const s1 = door.designEmpty('s1').finish()
 export const s2 = door.designEmpty('s2').finish()
 
-s0.react([Events.partReq], s1, (_) => s1.make())
-s1.react([Events.partOK], s0, (_) => s0.make())
-s0.react([Events.closingTime], s2, (_) => s2.make())
+s0.react([Events.partReq], s1, (_, e) => { print_event(e); return s1.make() })
+s1.react([Events.partOK], s0, (_, e) => { print_event(e); return s0.make() })
+s0.react([Events.closingTime], s2, (_, e) => { print_event(e); return s2.make() })
 
-const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "D", door.createJSONForAnalysis(s0))
+// Check that the original machine is a correct implementation. A prerequisite for reusing it.
+const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "D", door.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
 // Run the adapted machine

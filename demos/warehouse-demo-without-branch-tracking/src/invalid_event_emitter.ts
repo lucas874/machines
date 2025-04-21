@@ -1,5 +1,5 @@
 import { Actyx } from '@actyx/sdk'
-import { Events, manifest, Composition  } from './warehouse_protocol'
+import { Events, manifest, Composition  } from './protocol'
 
 async function main() {
     const app = await Actyx.of(manifest)

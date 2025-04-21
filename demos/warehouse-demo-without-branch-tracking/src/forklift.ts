@@ -1,9 +1,9 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_swarms, subs, getRandomInt } from './warehouse_protocol'
-import { checkComposedProjection } from '@actyx/machine-check'
+import { Events, manifest, Composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event } from './protocol'
+import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 
-// Using the machine runner DSL an implmentation of forklift in Gwarehouse is:
+// Using the machine runner DSL an implmentation of forklift in the warehouse protocol w.r.t. subs_warehouse is:
 const forklift = Composition.makeMachine('FL')
 export const s0 = forklift.designEmpty('s0') .finish()
 export const s1 = forklift.designState('s1').withPayload<{id: string}>()
@@ -14,16 +14,18 @@ export const s1 = forklift.designState('s1').withPayload<{id: string}>()
 export const s2 = forklift.designEmpty('s2').finish()
 
 s0.react([Events.partReq], s1, (_, e) => {
+    print_event(e);
     console.log("a", e.payload.id, "was requested");
     if (getRandomInt(0, 10) >= 9) { return { id: "broken part" } }
     return s1.make({id: e.payload.id}) })
-s1.react([Events.pos], s0, (_) => s0.make())
-s0.react([Events.closingTime], s2, (_) => s2.make())
+s1.react([Events.pos], s0, (_, e) => { print_event(e); return s0.make() })
+s0.react([Events.closingTime], s2, (_, e) => { print_event(e); return s2.make() })
 
-const checkProjResult = checkComposedProjection(interfacing_swarms, subs, "FL", forklift.createJSONForAnalysis(s0))
+// Check that the original machine is a correct implementation. A prerequisite for reusing it.
+const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "FL", forklift.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
-// Run the adapted machine
+// Run the machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('warehouse-1')
