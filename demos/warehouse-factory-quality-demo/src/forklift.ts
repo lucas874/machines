@@ -40,9 +40,9 @@ async function main() {
     const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
 
     for await (const state of machine) {
-      console.log("forklift. state is:", state.type)
+      console.log("Forklift. State is:", state.type)
       if (state.payload !== undefined) {
-        console.log("state payload is:", state.payload)
+        console.log("State payload is:", state.payload)
       }
       console.log()
       const s = state.cast()
