@@ -131,7 +131,7 @@ impl ErrorReport {
 
 // same as swarm::check, but for the new well-formedness conditions
 pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions) -> ErrorReport {
-    let _span = tracing::debug_span!("check").entered();
+    let _span = tracing::info_span!("check").entered();
     let combined_proto_info = swarms_to_proto_info(protos, &subs);
     if !combined_proto_info.no_errors() {
         return proto_info_to_error_report(combined_proto_info);
@@ -150,7 +150,7 @@ pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptio
 
 // construct wwf subscription by constructing the composition of all protocols in protos and inspecting the result
 pub fn exact_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions) -> Result<Subscriptions, ErrorReport> {
-    let _span = tracing::debug_span!("exact_weak_well_formed_sub").entered();
+    let _span = tracing::info_span!("exact_weak_well_formed_sub").entered();
     let combined_proto_info = swarms_to_proto_info(protos, &BTreeMap::new());
     if !combined_proto_info.no_errors() {
         return Err(proto_info_to_error_report(combined_proto_info));
@@ -169,7 +169,7 @@ pub fn exact_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwarms<T
 // the subsription of each role. For each role also add the events emitted by the role to its sub and any
 // events immediately preceding these.
 pub fn overapprox_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions, granularity: Granularity) -> Result<Subscriptions, ErrorReport> {
-    let _span = tracing::debug_span!("overapprox_weak_well_formed_sub").entered();
+    let _span = tracing::info_span!("overapprox_weak_well_formed_sub").entered();
     let combined_proto_info = swarms_to_proto_info(protos, &BTreeMap::new());
     if !combined_proto_info.no_errors() {
         return Err(proto_info_to_error_report(combined_proto_info));
@@ -185,13 +185,13 @@ pub fn overapprox_weak_well_formed_sub<T: SwarmInterface>(protos: InterfacingSwa
 // set up combined proto info, one containing all protocols, all branching events, joining events etc.
 // then add any errors arising from confusion freeness to the proto info and return it
 pub fn swarms_to_proto_info<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions) -> ProtoInfo {
-    let _span = tracing::debug_span!("swarms_to_proto_info").entered();
+    let _span = tracing::info_span!("swarms_to_proto_info").entered();
     let combined_proto_info = combine_proto_infos_fold(prepare_proto_infos::<T>(protos));
     confusion_free_proto_info(combined_proto_info, &subs)
 }
 
 pub fn compose_protocols<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Result<(Graph, NodeId), ErrorReport> {
-    let _span = tracing::debug_span!("compose_protocols").entered();
+    let _span = tracing::info_span!("compose_protocols").entered();
     let combined_proto_info = swarms_to_proto_info(protos, &BTreeMap::new());
     if !combined_proto_info.no_errors() {
         return Err(proto_info_to_error_report(combined_proto_info));
@@ -203,7 +203,7 @@ pub fn compose_protocols<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Res
 
 // perform wwf check on every protocol in a ProtoInfo
 fn weak_well_formed_proto_info(proto_info: ProtoInfo, subs: &Subscriptions) -> ProtoInfo {
-    let _span = tracing::debug_span!("weak_well_formed_proto_info").entered();
+    let _span = tracing::info_span!("weak_well_formed_proto_info").entered();
     let protocols: Vec<_> = proto_info
         .protocols
         .clone()
@@ -223,7 +223,7 @@ fn weak_well_formed_proto_info(proto_info: ProtoInfo, subs: &Subscriptions) -> P
 
 // perform confusion freeness check on every protocol in a ProtoInfo
 fn confusion_free_proto_info(proto_info: ProtoInfo, subs: &Subscriptions) -> ProtoInfo {
-    let _span = tracing::debug_span!("confusion_free_proto_info").entered();
+    let _span = tracing::info_span!("confusion_free_proto_info").entered();
     let protocols: Vec<_> = proto_info
         .protocols
         .clone()
@@ -249,7 +249,7 @@ fn confusion_free_proto_info(proto_info: ProtoInfo, subs: &Subscriptions) -> Pro
  * Does not check confusion freeness
  */
 fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize, subs: &Subscriptions) -> Vec<Error> {
-    let _span = tracing::debug_span!("weak_well_formed").entered();
+    let _span = tracing::info_span!("weak_well_formed").entered();
     let mut errors = Vec::new();
     let empty = BTreeSet::new();
     let sub = |r: &Role| subs.get(r).unwrap_or(&empty);
@@ -352,7 +352,7 @@ fn weak_well_formed(proto_info: &ProtoInfo, proto_pointer: usize, subs: &Subscri
 }
 
 fn confusion_free(proto_info: &ProtoInfo, proto_pointer: usize, subs: &Subscriptions) -> Vec<Error> {
-    let _span = tracing::debug_span!("confusion_free").entered();
+    let _span = tracing::info_span!("confusion_free").entered();
     let mut event_to_command_map = BTreeMap::new();
     let (graph, initial, _) = match proto_info.get_ith_proto(proto_pointer) {
         Some(ProtoStruct {graph: g, initial: Some(i), errors: e, interface: _}) => (g, i, e),
@@ -417,7 +417,7 @@ fn confusion_free(proto_info: &ProtoInfo, proto_pointer: usize, subs: &Subscript
  * log and command determinism?
  */
 fn exact_wwf_sub(proto_info: ProtoInfo, proto_pointer: usize, subscriptions: &Subscriptions) -> Subscriptions {
-    let _span = tracing::debug_span!("exact_wwf_sub").entered();
+    let _span = tracing::info_span!("exact_wwf_sub").entered();
     let (graph, initial) = match proto_info.get_ith_proto(proto_pointer) {
         Some(ProtoStruct{graph: g, initial: Some(i), errors: _, interface: _}) => (g, i),
         _ => return BTreeMap::new(),
@@ -431,7 +431,7 @@ fn exact_wwf_sub(proto_info: ProtoInfo, proto_pointer: usize, subscriptions: &Su
     subscriptions
 }
 fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, subscriptions: &mut Subscriptions) -> bool {
-    let _span = tracing::debug_span!("exact_wwf_sub_step").entered();
+    let _span = tracing::info_span!("exact_wwf_sub_step").entered();
     let mut is_stable = true;
     let add_to_sub = |role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subscriptions| -> bool {
         if subs.contains_key(&role) && event_types.iter().all(|e| subs[&role].contains(e)) {
@@ -513,7 +513,7 @@ fn exact_wwf_sub_step(proto_info: &ProtoInfo, graph: &Graph, initial: NodeId, su
 }
 
 fn overapprox_wwf_sub(proto_info: &mut ProtoInfo, subscription: &Subscriptions, granularity: Granularity) -> Subscriptions {
-    let _span = tracing::debug_span!("overapprox_wwf_sub").entered();
+    let _span = tracing::info_span!("overapprox_wwf_sub").entered();
     match granularity {
         Granularity::Fine => finer_overapprox_wwf_sub(proto_info, subscription, false),
         Granularity::Medium => finer_overapprox_wwf_sub(proto_info, subscription, true),
@@ -523,7 +523,7 @@ fn overapprox_wwf_sub(proto_info: &mut ProtoInfo, subscription: &Subscriptions, 
 }
 
 fn coarse_overapprox_wwf_sub(proto_info: &ProtoInfo, subscription: &Subscriptions) -> Subscriptions {
-    let _span = tracing::debug_span!("coarse_overapprox_wwf_sub").entered();
+    let _span = tracing::info_span!("coarse_overapprox_wwf_sub").entered();
     // for each role add all branching.
     // for each role add all joining and immediately pre joining that are concurrent
     // for each role, add own events and the events immediately preceding these
@@ -563,7 +563,7 @@ fn coarse_overapprox_wwf_sub(proto_info: &ProtoInfo, subscription: &Subscription
 }
 
 fn finer_overapprox_wwf_sub(proto_info: &mut ProtoInfo, subscription: &Subscriptions, with_all_interfacing: bool) -> Subscriptions {
-    let _span = tracing::debug_span!("finer_overapprox_wwf_sub").entered();
+    let _span = tracing::info_span!("finer_overapprox_wwf_sub").entered();
     let mut subscription = subscription.clone();
     proto_info.succeeding_events = transitive_closure_succeeding(proto_info.succeeding_events.clone());
     // causal consistency
@@ -581,7 +581,7 @@ fn finer_overapprox_wwf_sub(proto_info: &mut ProtoInfo, subscription: &Subscript
 }
 
 fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mut Subscriptions, with_all_interfacing: bool) {
-    let _span = tracing::debug_span!("finer_approx_add_branches_and_joins").entered();
+    let _span = tracing::info_span!("finer_approx_add_branches_and_joins").entered();
     let mut is_stable = false;
     let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
         let pre = proto_info.immediately_pre.get(e).cloned().unwrap_or_default();
@@ -647,7 +647,7 @@ fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mu
 
 // safe overapproximated subscription generation as described in article.
 fn two_step_overapprox_wwf_sub(proto_info: &mut ProtoInfo, subscription: &mut Subscriptions) -> Subscriptions {
-    let _span = tracing::debug_span!("two_step_overapprox_wwf_sub").entered();
+    let _span = tracing::info_span!("two_step_overapprox_wwf_sub").entered();
     proto_info.concurrent_events.append(&mut intra_concurrency_proto_info(proto_info));
 
     // get concurrent event types preceding a join
@@ -721,7 +721,7 @@ fn two_step_overapprox_wwf_sub(proto_info: &mut ProtoInfo, subscription: &mut Su
 }
 
 fn intra_concurrency(proto: &ProtoStruct) -> BTreeSet<UnordEventPair> {
-    let _span = tracing::debug_span!("intra_concurrency").entered();
+    let _span = tracing::info_span!("intra_concurrency").entered();
     let mut conc = BTreeSet::new();
     let graph = &proto.graph;
     let initial = if proto.initial.is_none() {
@@ -749,7 +749,7 @@ fn intra_concurrency(proto: &ProtoStruct) -> BTreeSet<UnordEventPair> {
 }
 
 fn intra_concurrency_proto_info(proto_info1: &ProtoInfo) -> BTreeSet<UnordEventPair> {
-    let _span = tracing::debug_span!("intra_concurrency_proto_info").entered();
+    let _span = tracing::info_span!("intra_concurrency_proto_info").entered();
     let intra_conc_sets = proto_info1.protocols
         .iter()
         .map(|p| intra_concurrency(p))
@@ -762,7 +762,7 @@ fn combine_proto_infos<T: SwarmInterface>(
     proto_info2: ProtoInfo,
     interface: T,
 ) -> ProtoInfo {
-    let _span = tracing::debug_span!("combine_proto_infos").entered();
+    let _span = tracing::info_span!("combine_proto_infos").entered();
     let errors = interface.check_interface(&proto_info1, &proto_info2);
     if !errors.is_empty() {
         let protocols = vec![
@@ -818,7 +818,7 @@ fn combine_proto_infos<T: SwarmInterface>(
 }
 
 fn combine_proto_infos_fold<T: SwarmInterface>(protos: Vec<(ProtoInfo, Option<T>)>) -> ProtoInfo {
-    let _span = tracing::debug_span!("combine_proto_infos_fold").entered();
+    let _span = tracing::info_span!("combine_proto_infos_fold").entered();
     if protos.is_empty()
         || protos[0].1.is_some()
         || protos[1..].iter().any(|(_, interface)| interface.is_none())
@@ -873,7 +873,7 @@ fn after_not_concurrent(
     initial: NodeId,
     concurrent_events: &BTreeSet<BTreeSet<EventType>>,
 )-> BTreeMap<EventType, BTreeSet<EventType>> {
-    let _span = tracing::debug_span!("after_not_concurrent").entered();
+    let _span = tracing::info_span!("after_not_concurrent").entered();
     let mut succ_map: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
     let mut is_stable = after_not_concurrent_step(graph, initial, concurrent_events, &mut succ_map);
 
@@ -931,7 +931,7 @@ fn after_not_concurrent_step(
 }
 
 pub fn transitive_closure_succeeding(succ_map: BTreeMap<EventType, BTreeSet<EventType>>) -> BTreeMap<EventType, BTreeSet<EventType>> {
-    let _span = tracing::debug_span!("transitive_closure_succeeding").entered();
+    let _span = tracing::info_span!("transitive_closure_succeeding").entered();
     let mut graph: petgraph::Graph::<EventType, (), Directed> = petgraph::Graph::new();
     let mut node_map = BTreeMap::new();
     for (event, succeeding) in &succ_map {
@@ -964,7 +964,7 @@ pub fn transitive_closure_succeeding(succ_map: BTreeMap<EventType, BTreeSet<Even
 }
 
 fn prepare_proto_infos<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Vec<(ProtoInfo, Option<T>)> {
-    let _span = tracing::debug_span!("prepare_proto_infos").entered();
+    let _span = tracing::info_span!("prepare_proto_infos").entered();
     protos.0
         .iter()
         .map(|p| {
@@ -980,7 +980,7 @@ fn prepare_proto_infos<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> Vec<(
 fn prepare_proto_info<T: SwarmInterface>(
     proto: CompositionComponent<T>
 ) -> ProtoInfo {
-    let _span = tracing::debug_span!("prepare_proto_info").entered();
+    let _span = tracing::info_span!("prepare_proto_info").entered();
     let mut role_event_map: RoleEventMap = BTreeMap::new();
     let mut branching_events = Vec::new();
     let mut immediately_pre_map: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
@@ -1044,7 +1044,7 @@ fn prepare_proto_info<T: SwarmInterface>(
 
 // turn a SwarmProtocol into a petgraph. perform some checks that are not strictly related to wwf, but must be successful for any further analysis to take place
 fn swarm_to_graph(proto: &SwarmProtocol) -> (Graph, Option<NodeId>, Vec<Error>) {
-    let _span = tracing::debug_span!("swarm_to_graph").entered();
+    let _span = tracing::info_span!("swarm_to_graph").entered();
     let mut graph = Graph::new();
     let mut errors = vec![];
     let mut nodes = BTreeMap::new();
@@ -1081,7 +1081,7 @@ fn swarm_to_graph(proto: &SwarmProtocol) -> (Graph, Option<NodeId>, Vec<Error>) 
 pub fn from_json(
     proto: SwarmProtocol,
 ) -> (Graph, Option<NodeId>, Vec<String>) {
-    let _span = tracing::debug_span!("from_json").entered();
+    let _span = tracing::info_span!("from_json").entered();
     let proto_info = prepare_proto_info::<Role>(CompositionComponent{protocol: proto, interface: None});
     let (g, i, e) = match proto_info.get_ith_proto(0) {
         Some(ProtoStruct { graph: g, initial: i, errors: e, interface: _}) => (g, i, e),
@@ -1092,7 +1092,7 @@ pub fn from_json(
 }
 
 pub fn proto_info_to_error_report(proto_info: ProtoInfo) -> ErrorReport {
-    let _span = tracing::debug_span!("proto_info_to_error_report").entered();
+    let _span = tracing::info_span!("proto_info_to_error_report").entered();
     ErrorReport(
         proto_info
             .protocols
@@ -1104,7 +1104,7 @@ pub fn proto_info_to_error_report(proto_info: ProtoInfo) -> ErrorReport {
 
 // copied from swarm::swarm.rs
 fn all_nodes_reachable(graph: &Graph, initial: NodeId) -> Vec<Error> {
-    let _span = tracing::debug_span!("all_nodes_reachable").entered();
+    let _span = tracing::info_span!("all_nodes_reachable").entered();
     // Traversal order choice (Bfs vs Dfs vs DfsPostOrder) does not matter
     let visited = Dfs::new(&graph, initial)
         .iter(&graph)
@@ -1202,7 +1202,7 @@ fn get_concurrent_events<T: SwarmInterface>(
     proto_info2: &ProtoInfo,
     interface: &T,
 ) -> BTreeSet<UnordEventPair> {
-    let _span = tracing::debug_span!("get_concurrent_events").entered();
+    let _span = tracing::info_span!("get_concurrent_events").entered();
     let concurrent_events_union: BTreeSet<UnordEventPair> = proto_info1
         .concurrent_events
         .union(&proto_info2.concurrent_events)
@@ -1232,7 +1232,7 @@ fn get_concurrent_events<T: SwarmInterface>(
 }
 
 fn explicit_composition_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
-    let _span = tracing::debug_span!("explicit_composition_proto_info").entered();
+    let _span = tracing::info_span!("explicit_composition_proto_info").entered();
     let (composed, composed_initial) = explicit_composition(&proto_info);
     let succeeding_events = after_not_concurrent(&composed, composed_initial, &proto_info.concurrent_events);
     ProtoInfo {
@@ -1244,7 +1244,7 @@ fn explicit_composition_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
 
 // precondition: the protocols can interface on the given interfaces
 fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
-    let _span = tracing::debug_span!("explicit_composition").entered();
+    let _span = tracing::info_span!("explicit_composition").entered();
     if proto_info.protocols.is_empty() {
         return (Graph::new(), NodeId::end());
     }
@@ -1263,7 +1263,7 @@ fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
 }
 
 pub fn to_swarm_json(graph: crate::Graph, initial: NodeId) -> SwarmProtocol {
-    let _span = tracing::debug_span!("to_swarm_json").entered();
+    let _span = tracing::info_span!("to_swarm_json").entered();
     let machine_label_mapper = |g: &crate::Graph, eref: EdgeReference<'_, SwarmLabel>| {
         let label = eref.weight().clone();
         let source = g[eref.source()].state_name().clone();
@@ -2427,7 +2427,7 @@ mod tests {
         assert!(result_composition.is_ok());
         let subs_composition = result_composition.unwrap();
         println!("subs exact: {}", serde_json::to_string_pretty(&subs_composition).unwrap());
-        let result_composition = overapprox_weak_well_formed_sub(get_interfacing_swarms_3(), &BTreeMap::new(), Granularity::Coarse);
+        let result_composition = overapprox_weak_well_formed_sub(get_interfacing_swarms_3(), &BTreeMap::new(), Granularity::Fine);
         assert!(result_composition.is_ok());
         let subs_composition = result_composition.unwrap();
         println!("subs approx: {}", serde_json::to_string_pretty(&subs_composition).unwrap());
