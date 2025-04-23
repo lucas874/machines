@@ -1,19 +1,14 @@
 use std::{collections::{BTreeMap, BTreeSet}, cmp::Ordering};
-
-
 use itertools::Itertools;
 use petgraph::{
     graph::EdgeReference,
     visit::{EdgeFiltered, EdgeRef, IntoEdgeReferences, IntoEdgesDirected, IntoNodeReferences},
     Direction::{Incoming, Outgoing},
 };
-
 use crate::{composition::composition_swarm::transitive_closure_succeeding, machine::{Error, Side}};
-
 use super::{
     composition_types::{unord_event_pair, EventLabel, ProtoInfo, ProtoStruct, SucceedingNonBranchingJoining, UnordEventPair}, types::{StateName, Transition, Command}, EventType, Machine, MachineLabel, NodeId, Role, State, Subscriptions, SwarmLabel
 };
-
 // types more or less copied from machine.rs.
 type Graph = petgraph::Graph<State, MachineLabel>;
 type OptionGraph = petgraph::Graph<Option<State>, MachineLabel>;
