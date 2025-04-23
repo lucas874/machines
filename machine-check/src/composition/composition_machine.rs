@@ -28,7 +28,7 @@ pub fn project(
     subs: &Subscriptions,
     role: Role,
 ) -> (Graph, NodeId) {
-    let _span = tracing::debug_span!("project", %role).entered();
+    let _span = tracing::info_span!("project", %role).entered();
     let mut machine = Graph::new();
     let sub = BTreeSet::new();
     let sub = subs.get(&role).unwrap_or(&sub);
@@ -102,7 +102,7 @@ pub fn project_combine(
     subs: &Subscriptions,
     role: Role,
 ) -> (OptionGraph, Option<NodeId>) {
-    let _span = tracing::debug_span!("project_combine", %role).entered();
+    let _span = tracing::info_span!("project_combine", %role).entered();
     // check this anyway
     if swarms.is_empty()
         || !swarms[0].interface.is_empty()
@@ -139,7 +139,7 @@ pub fn project_combine_all(
     swarms: &Vec<ProtoStruct>,
     subs: &Subscriptions,
 ) -> Vec<(OptionGraph, Option<NodeId>)> {
-    let _span = tracing::debug_span!("project_combine_all").entered();
+    let _span = tracing::info_span!("project_combine_all").entered();
     subs.keys()
         .map(|role| project_combine(swarms, subs, role.clone()))
         .collect()
@@ -147,7 +147,7 @@ pub fn project_combine_all(
 
 // nfa to dfa using subset construction. Hopcroft, Motwani and Ullman section 2.3.5
 fn nfa_to_dfa(nfa: Graph, i: NodeId) -> (Graph, NodeId) {
-    let _span = tracing::debug_span!("nfa_to_dfa").entered();
+    let _span = tracing::info_span!("nfa_to_dfa").entered();
     let mut dfa = Graph::new();
     // maps vectors of NodeIds from the nfa to a NodeId in the new dfa
     let mut dfa_nodes: BTreeMap<BTreeSet<NodeId>, NodeId> = BTreeMap::new();
@@ -201,7 +201,7 @@ fn nfa_to_dfa(nfa: Graph, i: NodeId) -> (Graph, NodeId) {
 }
 
 fn minimal_machine(graph: &Graph, i: NodeId) -> (Graph, NodeId) {
-    let _span = tracing::debug_span!("minimal_machine").entered();
+    let _span = tracing::info_span!("minimal_machine").entered();
     let partition = partition_refinement(graph);
     let mut minimal = Graph::new();
     let mut node_to_partition = BTreeMap::new();
@@ -237,7 +237,7 @@ fn minimal_machine(graph: &Graph, i: NodeId) -> (Graph, NodeId) {
 
 
 fn partition_refinement(graph: &Graph) -> BTreeSet<BTreeSet<NodeId>> {
-    let _span = tracing::debug_span!("partition_refinement").entered();
+    let _span = tracing::info_span!("partition_refinement").entered();
     let mut partition_old = BTreeSet::new();
     let tmp: (BTreeSet<_>, BTreeSet<_>) = graph
         .node_indices()
@@ -261,7 +261,6 @@ fn partition_refinement(graph: &Graph) -> BTreeSet<BTreeSet<NodeId>> {
 }
 
 fn refine_partition(graph: &Graph, partition: BTreeSet<BTreeSet<NodeId>>, superblock: &BTreeSet<NodeId>, label: &MachineLabel) -> BTreeSet<BTreeSet<NodeId>> {
-    let _span = tracing::debug_span!("refine_partition").entered();
     partition
         .iter()
         .flat_map(|block| refine_block(graph, block, superblock, label))
@@ -269,7 +268,6 @@ fn refine_partition(graph: &Graph, partition: BTreeSet<BTreeSet<NodeId>>, superb
 }
 
 fn refine_block(graph: &Graph, block: &BTreeSet<NodeId>, superblock: &BTreeSet<NodeId>, label: &MachineLabel) -> BTreeSet<BTreeSet<NodeId>> {
-    let _span = tracing::debug_span!("refine_block").entered();
     let predicate = |node: &NodeId| -> bool {
         graph.edges_directed(*node, Outgoing).any(|e| *e.weight() == *label && superblock.contains(&e.target()))
     };
@@ -282,7 +280,7 @@ fn refine_block(graph: &Graph, block: &BTreeSet<NodeId>, superblock: &BTreeSet<N
 }
 
 fn visit_successors_stop_on_branch(proj: &OptionGraph, machine_state: NodeId, et: &EventType, special_events: &BTreeSet<EventType>, concurrent_events: &BTreeSet<UnordEventPair>) -> BTreeSet<EventType> {
-    let _span = tracing::debug_span!("visit_successors_stop_on_branch").entered();
+    let _span = tracing::info_span!("visit_successors_stop_on_branch").entered();
     let mut visited = BTreeSet::new();
     let mut to_visit = Vec::from([machine_state]);
     let mut event_types = BTreeSet::new();
@@ -303,7 +301,7 @@ fn visit_successors_stop_on_branch(proj: &OptionGraph, machine_state: NodeId, et
 }
 
 pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> SucceedingNonBranchingJoining {
-    let _span = tracing::debug_span!("paths_from_event_types").entered();
+    let _span = tracing::info_span!("paths_from_event_types").entered();
     let mut m: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
     let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
         let pre = proto_info.immediately_pre.get(e).cloned().unwrap_or_default();
@@ -349,7 +347,7 @@ pub(in crate::composition) fn compose<N: StateName + From<String>, E: EventLabel
     i2: NodeId,
     interface: BTreeSet<EventType>,
 ) -> (petgraph::Graph<N, E>, NodeId) {
-    let _span = tracing::debug_span!("compose").entered();
+    let _span = tracing::info_span!("compose").entered();
     let mut machine = petgraph::Graph::<N, E>::new();
     let mut node_map: BTreeMap<(NodeId, NodeId), NodeId> = BTreeMap::new();
 
@@ -451,7 +449,7 @@ fn state_name(graph: &OptionGraph, index: NodeId) -> String {
 pub fn equivalent(left: &OptionGraph, li: NodeId, right: &OptionGraph, ri: NodeId) -> Vec<Error> {
     use Side::*;
 
-    let _span = tracing::debug_span!("equivalent").entered();
+    let _span = tracing::info_span!("equivalent").entered();
 
     let mut errors = Vec::new();
 
@@ -546,7 +544,7 @@ pub(in crate::composition) fn to_option_machine(graph: &Graph) -> OptionGraph {
 }
 
 pub fn to_json_machine(graph: Graph, initial: NodeId) -> Machine {
-    let _span = tracing::debug_span!("to_json_machine").entered();
+    let _span = tracing::info_span!("to_json_machine").entered();
     let machine_label_mapper = |m: &Graph, eref: EdgeReference<'_, MachineLabel>| {
         let label = eref.weight().clone();
         let source = m[eref.source()].clone();
@@ -573,7 +571,7 @@ pub fn from_option_to_machine(
     graph: petgraph::Graph<Option<State>, MachineLabel>,
     initial: NodeId,
 ) -> Machine {
-    let _span = tracing::debug_span!("from_option_to_machine").entered();
+    let _span = tracing::info_span!("from_option_to_machine").entered();
     let machine_label_mapper =
         |m: &petgraph::Graph<Option<State>, MachineLabel>,
          eref: EdgeReference<'_, MachineLabel>| {
