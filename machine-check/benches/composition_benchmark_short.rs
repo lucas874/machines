@@ -12,9 +12,18 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 use walkdir::WalkDir;
+use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
 
 const BENCHMARK_DIR: &str = "./bench_and_results";
 const SPECIAL_SYMBOL: &str = "done-special-symbol";
+
+fn setup_logger() {
+    fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
+        .try_init()
+        .ok();
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BenchMarkInput {
@@ -72,6 +81,7 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
 }
 
 fn short_bench_general(c: &mut Criterion) {
+    setup_logger();
     let mut group = c.benchmark_group("General-pattern-algorithm1-vs.-exact-short-run");
     group.sample_size(10);
     let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
