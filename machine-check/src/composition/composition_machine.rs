@@ -539,6 +539,20 @@ pub fn equivalent(left: &OptionGraph, li: NodeId, right: &OptionGraph, ri: NodeI
     errors
 }
 
+
+pub fn adapted_projection(
+    swarms: &Vec<ProtoStruct>,
+    subs: &Subscriptions,
+    role: Role,
+    machine: Machine,
+    k: usize
+) -> (OptionGraph, Option<NodeId>) {
+    let _span = tracing::info_span!("project_combine", %role).entered();
+    // todo check bounds
+    // and the rest
+
+    unimplemented!()
+}
 pub(in crate::composition) fn to_option_machine(graph: &Graph) -> OptionGraph {
     graph.map(|_, n| Some(n.state_name().clone()), |_, x| x.clone())
 }
@@ -1610,5 +1624,87 @@ mod tests {
             //let thing = project(&proto_info.protocols.)
         }
     }
+    #[test]
+    fn combine_with_self() {
+        setup_logger();
+
+        let proto = get_proto1();
+        let result_subs = overapprox_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), interface: None}, CompositionComponent::<Role>{protocol: get_proto2(), interface: Some(Role::new("T"))}]), &BTreeMap::new(), Granularity::TwoStep);
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
+        println!("subs: {}", serde_json::to_string_pretty(&subs).unwrap());
+        let role = Role::new("FL");
+        let (g, i, _) = from_json(proto);
+        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone());
+        let right_m = Machine {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                    },
+                    source: State::new("1"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("1"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("3"),
+                },
+            ],
+        };
+        let (right, right_initial, errors) = crate::machine::from_json(right_m);
+        let right = from_option_machine(&right);
+        let right_option = to_option_machine(&right);
+
+        println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&to_json_machine(left.clone(), left_initial)).unwrap());
+        println!("right {:?}: {}", role, serde_json::to_string_pretty(&from_option_to_machine(right_option.clone(), right_initial.unwrap())).unwrap());
+        assert!(errors.is_empty());
+
+        /* let errors = equivalent(
+            &to_option_machine(&left),
+            left_initial,
+            &right_option,
+            right_initial.unwrap());
+        assert!(errors.is_empty());
+        let errors: Vec<String> = errors.into_iter().map(crate::machine::Error::convert(&to_option_machine(&left), &right_option)).collect(); */
+        println!("{:?}", errors);
+        let interface = BTreeSet::from([EventType::new("partID"), EventType::new("pos"), EventType::new("time")]);
+        // right left swapped here on purpose
+        let (combined, combined_initial) = compose(right, right_initial.unwrap(), left, left_initial, interface);
+        println!("combined {:?}: {}", role.clone(), serde_json::to_string_pretty(&to_json_machine(combined.clone(), combined_initial)).unwrap());
+    }
+
 
 }
