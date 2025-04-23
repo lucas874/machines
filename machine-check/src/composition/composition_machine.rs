@@ -1,19 +1,14 @@
 use std::{collections::{BTreeMap, BTreeSet}, cmp::Ordering};
-
-
 use itertools::Itertools;
 use petgraph::{
     graph::EdgeReference,
     visit::{EdgeFiltered, EdgeRef, IntoEdgeReferences, IntoEdgesDirected, IntoNodeReferences},
     Direction::{Incoming, Outgoing},
 };
-
 use crate::{composition::composition_swarm::transitive_closure_succeeding, machine::{Error, Side}};
-
 use super::{
     composition_types::{unord_event_pair, EventLabel, ProtoInfo, ProtoStruct, SucceedingNonBranchingJoining, UnordEventPair}, types::{StateName, Transition, Command}, EventType, Machine, MachineLabel, NodeId, Role, State, Subscriptions, SwarmLabel
 };
-
 // types more or less copied from machine.rs.
 type Graph = petgraph::Graph<State, MachineLabel>;
 type OptionGraph = petgraph::Graph<Option<State>, MachineLabel>;
@@ -25,21 +20,15 @@ impl From<String> for State {
     }
 }
 
-// projection as described in Composing Swarm Protocols by Florian Furbach
+// Similar to machine::project, except that transitions with event types
+// not subscribed to by role are skipped.
 pub fn project(
     swarm: &super::Graph,
     initial: NodeId,
     subs: &Subscriptions,
     role: Role,
 ) -> (Graph, NodeId) {
-    //  assume each command emits exactly one event type
-    //  find all nodes with incoming edges in subscription union {initial}
-    //  these are the nodes of the projection
-    //  for all nodes in projection:
-    //      starting at node find nearest nodes with outgoing edges in sub. starting at node meaning node included in this search.
-    //      for each edge at such a node:
-    //          if edge describe commands performed by role add an execute self loop
-    //          add an inpute edge terrminating where they terminate in protocol.
+    let _span = tracing::info_span!("project", %role).entered();
     let mut machine = Graph::new();
     let sub = BTreeSet::new();
     let sub = subs.get(&role).unwrap_or(&sub);
@@ -108,12 +97,12 @@ pub fn project(
 
 // precondition: the protocols interfaces on the supplied interfaces.
 // precondition: the composition of the protocols in swarms is wwf w.r.t. subs.
-// the type of the input paremeter not nice? reconsider
 pub fn project_combine(
-    swarms: &Vec<ProtoStruct>,//&Vec<(super::Graph, NodeId, BTreeSet<EventType>)>,
+    swarms: &Vec<ProtoStruct>,
     subs: &Subscriptions,
     role: Role,
 ) -> (OptionGraph, Option<NodeId>) {
+    let _span = tracing::info_span!("project_combine", %role).entered();
     // check this anyway
     if swarms.is_empty()
         || !swarms[0].interface.is_empty()
@@ -150,6 +139,7 @@ pub fn project_combine_all(
     swarms: &Vec<ProtoStruct>,
     subs: &Subscriptions,
 ) -> Vec<(OptionGraph, Option<NodeId>)> {
+    let _span = tracing::info_span!("project_combine_all").entered();
     subs.keys()
         .map(|role| project_combine(swarms, subs, role.clone()))
         .collect()
@@ -157,6 +147,7 @@ pub fn project_combine_all(
 
 // nfa to dfa using subset construction. Hopcroft, Motwani and Ullman section 2.3.5
 fn nfa_to_dfa(nfa: Graph, i: NodeId) -> (Graph, NodeId) {
+    let _span = tracing::info_span!("nfa_to_dfa").entered();
     let mut dfa = Graph::new();
     // maps vectors of NodeIds from the nfa to a NodeId in the new dfa
     let mut dfa_nodes: BTreeMap<BTreeSet<NodeId>, NodeId> = BTreeMap::new();
@@ -210,6 +201,7 @@ fn nfa_to_dfa(nfa: Graph, i: NodeId) -> (Graph, NodeId) {
 }
 
 fn minimal_machine(graph: &Graph, i: NodeId) -> (Graph, NodeId) {
+    let _span = tracing::info_span!("minimal_machine").entered();
     let partition = partition_refinement(graph);
     let mut minimal = Graph::new();
     let mut node_to_partition = BTreeMap::new();
@@ -245,6 +237,7 @@ fn minimal_machine(graph: &Graph, i: NodeId) -> (Graph, NodeId) {
 
 
 fn partition_refinement(graph: &Graph) -> BTreeSet<BTreeSet<NodeId>> {
+    let _span = tracing::info_span!("partition_refinement").entered();
     let mut partition_old = BTreeSet::new();
     let tmp: (BTreeSet<_>, BTreeSet<_>) = graph
         .node_indices()
@@ -287,6 +280,7 @@ fn refine_block(graph: &Graph, block: &BTreeSet<NodeId>, superblock: &BTreeSet<N
 }
 
 fn visit_successors_stop_on_branch(proj: &OptionGraph, machine_state: NodeId, et: &EventType, special_events: &BTreeSet<EventType>, concurrent_events: &BTreeSet<UnordEventPair>) -> BTreeSet<EventType> {
+    let _span = tracing::info_span!("visit_successors_stop_on_branch").entered();
     let mut visited = BTreeSet::new();
     let mut to_visit = Vec::from([machine_state]);
     let mut event_types = BTreeSet::new();
@@ -307,6 +301,7 @@ fn visit_successors_stop_on_branch(proj: &OptionGraph, machine_state: NodeId, et
 }
 
 pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> SucceedingNonBranchingJoining {
+    let _span = tracing::info_span!("paths_from_event_types").entered();
     let mut m: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
     let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
         let pre = proto_info.immediately_pre.get(e).cloned().unwrap_or_default();
@@ -352,6 +347,7 @@ pub(in crate::composition) fn compose<N: StateName + From<String>, E: EventLabel
     i2: NodeId,
     interface: BTreeSet<EventType>,
 ) -> (petgraph::Graph<N, E>, NodeId) {
+    let _span = tracing::info_span!("compose").entered();
     let mut machine = petgraph::Graph::<N, E>::new();
     let mut node_map: BTreeMap<(NodeId, NodeId), NodeId> = BTreeMap::new();
 
@@ -453,7 +449,7 @@ fn state_name(graph: &OptionGraph, index: NodeId) -> String {
 pub fn equivalent(left: &OptionGraph, li: NodeId, right: &OptionGraph, ri: NodeId) -> Vec<Error> {
     use Side::*;
 
-    let _span = tracing::debug_span!("equivalent").entered();
+    let _span = tracing::info_span!("equivalent").entered();
 
     let mut errors = Vec::new();
 
@@ -548,6 +544,7 @@ pub(in crate::composition) fn to_option_machine(graph: &Graph) -> OptionGraph {
 }
 
 pub fn to_json_machine(graph: Graph, initial: NodeId) -> Machine {
+    let _span = tracing::info_span!("to_json_machine").entered();
     let machine_label_mapper = |m: &Graph, eref: EdgeReference<'_, MachineLabel>| {
         let label = eref.weight().clone();
         let source = m[eref.source()].clone();
@@ -574,6 +571,7 @@ pub fn from_option_to_machine(
     graph: petgraph::Graph<Option<State>, MachineLabel>,
     initial: NodeId,
 ) -> Machine {
+    let _span = tracing::info_span!("from_option_to_machine").entered();
     let machine_label_mapper =
         |m: &petgraph::Graph<Option<State>, MachineLabel>,
          eref: EdgeReference<'_, MachineLabel>| {
@@ -607,6 +605,15 @@ mod tests {
             composition_types::{CompositionComponent, Granularity, InterfacingSwarms},
         }, types::{Command, EventType, Role, Transition}, Machine, Subscriptions, SwarmProtocol
     };
+    use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
+
+    fn setup_logger() {
+        fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
+            .try_init()
+            .ok();
+    }
 
     pub(in crate::composition) fn from_option_machine(graph: &OptionGraph) -> Graph {
         graph.map(|_, n| n.clone().unwrap().state_name().clone(), |_, x| x.clone())
@@ -800,6 +807,7 @@ mod tests {
 
     #[test]
     fn test_projection_1() {
+        setup_logger();
         // From Combining Swarm Protocols, example 5.
         let proto = serde_json::from_str::<SwarmProtocol>(
             r#"{
@@ -875,6 +883,7 @@ mod tests {
 
     #[test]
     fn test_projection_2() {
+        setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
         let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), interface: None}]), &BTreeMap::new());
@@ -949,6 +958,7 @@ mod tests {
 
     #[test]
     fn test_projection_3() {
+        setup_logger();
         // car factory from coplaws example
         let proto = get_proto2();
         let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), interface: None}]), &BTreeMap::new());
@@ -1000,6 +1010,7 @@ mod tests {
 
     #[test]
     fn test_projection_4() {
+        setup_logger();
         // car factory from coplaws example
         let protos = get_interfacing_swarms_1();
         let result_subs = overapprox_weak_well_formed_sub(protos.clone(), &BTreeMap::from([(Role::new("T"), BTreeSet::from([EventType::new("car")]))]), Granularity::Coarse);
@@ -1102,6 +1113,7 @@ mod tests {
 
     #[test]
     fn test_projection_fail_1() {
+        setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
         let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), interface: None}]), &BTreeMap::new());
@@ -1178,6 +1190,7 @@ mod tests {
     }
     #[test]
     fn test_projection_fail_2() {
+        setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
         let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), interface: None}]), &BTreeMap::new());
@@ -1254,6 +1267,7 @@ mod tests {
     }
     #[test]
     fn test_projection_fail_3() {
+        setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
         let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), interface: None}]), &BTreeMap::new());
@@ -1330,6 +1344,7 @@ mod tests {
     }
     #[test]
     fn test_projection_fail_4() {
+        setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
         let result_subs = exact_weak_well_formed_sub(InterfacingSwarms(vec![CompositionComponent::<Role>{protocol: proto.clone(), interface: None}]), &BTreeMap::new());
@@ -1399,6 +1414,7 @@ mod tests {
     }
     #[test]
     fn test_combine_machines_1() {
+        setup_logger();
         // Example from coplaws slides. Use generated WWF subscriptions. Project over T.
         let role = Role::new("T");
         let subs1 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_1(), &BTreeMap::new(), Granularity::Coarse);
@@ -1444,6 +1460,7 @@ mod tests {
 
     #[test]
     fn test_combine_machines_2() {
+        setup_logger();
         // fails when you use the exact subscriptions because that way not all roles subscribe to ALL interfaces? Ordering gets messed up.
         // the projected over the explicit composition may be correct, but the combined projections look weird and out of order.
         let composition = compose_protocols(get_interfacing_swarms_2());
@@ -1498,6 +1515,7 @@ mod tests {
 
     #[test]
     fn test_example_from_text_machine() {
+        setup_logger();
         let role = Role::new("F");
         let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_3(), &BTreeMap::new(), Granularity::Medium);
         assert!(subs.is_ok());
@@ -1511,6 +1529,7 @@ mod tests {
 
     #[test]
     fn test_all_projs_whf() {
+        setup_logger();
         let composition = compose_protocols(get_interfacing_swarms_1());
         assert!(composition.is_ok());
         let (composed_graph, composed_initial) = composition.unwrap();
@@ -1529,6 +1548,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_all_projs_whfqcr() {
+        setup_logger();
         let mut input_sub = BTreeMap::new();
         input_sub.insert(Role::new("T"), BTreeSet::from([EventType::new("notOk1")]));
         let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_333(), &input_sub, Granularity::Medium).unwrap();
@@ -1550,6 +1570,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_all_projs_whfqcr1() {
+        setup_logger();
         let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_3(), &BTreeMap::new(), Granularity::Medium).unwrap();
         let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D"), Role::new("F"), Role::new("QCR")];
         let proto_info = swarms_to_proto_info(get_interfacing_swarms_3(), &subs);
@@ -1569,6 +1590,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_all_projs_wh_only() {
+        setup_logger();
         let input_sub = BTreeMap::new();
         let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_whhhh(), &input_sub, Granularity::Medium).unwrap();
         let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D")];

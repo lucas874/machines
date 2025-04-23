@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     cmp, collections::{BTreeMap, BTreeSet}, iter::zip, sync::Mutex
 };
+use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
 
 // reimplemented here because we need to Deserialize. To not change in types.rs
 #[derive(Serialize, Deserialize, Debug)]
@@ -34,6 +35,15 @@ static R_BASE: &str = "R";
 static IR_BASE: &str = "IR";
 static CMD_BASE: &str = "cmd";
 static E_BASE: &str = "e";
+
+
+fn setup_logger() {
+    fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
+        .try_init()
+        .ok();
+}
 
 prop_compose! {
     fn vec_swarm_label(role: Role, max_events: usize)(vec in prop::collection::vec((CMD_BASE, E_BASE), 1..max_events)) -> Vec<SwarmLabel> {
@@ -541,6 +551,7 @@ proptest! {
 proptest! {
     #[test]
     fn test_exact_1(vec in generate_interfacing_swarms(5, 5, 5, false)) {
+        setup_logger();
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let subscription: Option<Subscriptions> = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs)).unwrap() {
@@ -568,6 +579,7 @@ proptest! {
 proptest! {
     #[test]
     fn test_overapproximated_1(vec in generate_interfacing_swarms(5, 5, 5, false)) {
+        setup_logger();
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
@@ -593,6 +605,7 @@ proptest! {
 proptest! {
     #[test]
     fn test_exact_2(vec in generate_interfacing_swarms_refinement(5, 5, 5)) {
+        setup_logger();
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let subscription: Option<Subscriptions> = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs)).unwrap() {
@@ -616,6 +629,7 @@ proptest! {
 proptest! {
     #[test]
     fn test_overapproximated_2(vec in generate_interfacing_swarms_refinement(5, 5, 5)) {
+        setup_logger();
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
@@ -641,6 +655,7 @@ proptest! {
 proptest! {
     #[test]
     fn test_exact_3(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
+        setup_logger();
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let subscription: Option<Subscriptions> = match serde_json::from_str(&exact_weak_well_formed_sub(protos.clone(), subs)).unwrap() {
@@ -664,6 +679,7 @@ proptest! {
 proptest! {
     #[test]
     fn test_overapproximated_3(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
+        setup_logger();
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
@@ -688,6 +704,7 @@ proptest! {
 proptest! {
     #[test]
     fn test_overapproximated_4(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
+        setup_logger();
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::Medium).unwrap();
@@ -712,6 +729,7 @@ proptest! {
 proptest! {
     #[test]
     fn test_overapproximated_5(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
+        setup_logger();
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::Fine).unwrap();
@@ -736,6 +754,7 @@ proptest! {
 proptest! {
     #[test]
     fn test_overapproximated_6(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
+        setup_logger();
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
@@ -760,6 +779,7 @@ proptest! {
 proptest! {
     #[test]
     fn test_overapproximated_7(vec in generate_interfacing_swarms_refinement(5, 5, 5)) {
+        setup_logger();
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
@@ -785,6 +805,7 @@ proptest! {
     #[test]
     #[ignore]
     fn test_overapproximated_refinement_2_only_generate(vec in generate_interfacing_swarms_refinement_2(7, 7, 10)) {
+        setup_logger();
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
@@ -810,6 +831,7 @@ proptest! {
     #[test]
     #[ignore]
     fn test_sub_sizes(vec in generate_interfacing_swarms_refinement_2(5, 5, 5)) {
+        setup_logger();
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::Coarse).unwrap();
@@ -854,6 +876,7 @@ proptest! {
     #[test]
     //#[ignore]
     fn test_combine_machines_prop(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
+        setup_logger();
         let protos = serde_json::to_string(&vec).unwrap();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
         let granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
