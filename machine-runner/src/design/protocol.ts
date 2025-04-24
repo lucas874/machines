@@ -705,7 +705,11 @@ export namespace ProjMachine {
         const eventType = rLabel.label.eventType
         const event = eventTypeStringToEvent.get(eventType)!
         //const reactionHandler = mOldStateToReactions.get(value.originalMStateName)!.get(rLabel.label.eventType) ?? (s: any, _: any) => { return projStateToMachineState.get(rLabel.target).make(s.self) }
-        const reactionHandler = mOldStateToReactions.get(value.originalMStateName)!.has(rLabel.label.eventType) ?
+        //console.log(value.originalMStateName)
+        //console.log(value.projStateName)
+        //console.log(rLabel.source)
+        //console.log(mOldStateToReactions.get(value.originalMStateName))
+        const reactionHandler = mOldStateToReactions.get(value.originalMStateName)?.has(rLabel.label.eventType) ?
           mOldStateToReactions.get(value.originalMStateName)!.get(rLabel.label.eventType) : (s: any, _: any) => { return projStateToMachineState.get(rLabel.target).make(s.self) }
         projStateToMachineState.get(rLabel.source).react([event], projStateToMachineState.get(rLabel.target), reactionHandler)
       }

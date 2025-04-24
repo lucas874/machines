@@ -1,7 +1,7 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event, warehouse_factory_quality_protocol, subs_composition } from './protocol'
-import { checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation } from '@actyx/machine-check'
+import { checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation, projectionAndInformationNew } from '@actyx/machine-check'
 
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 
@@ -34,13 +34,19 @@ s2.react([Events.partOK], s0, (_, e) => { print_event(e); return s0.make() })
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "T", transporter.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
+const projectionInfoResult1 = projectionAndInformationNew(warehouse_factory_quality_protocol, subs_composition, "T", transporter.createJSONForAnalysis(s0), 0)
+if (projectionInfoResult1.type == 'ERROR') throw new Error('error getting projection')
+const projectionInfo1 = projectionInfoResult1.data
+//console.log(JSON.stringify(projectionInfo1, null, 2))
+const [transporterAdapted, s0_] = Composition.adaptMachineNew("T", projectionInfo1, Events.allEvents, s0)
+
 // Projection of warehouse || factory || quality over T
 const projectionInfoResult: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(warehouse_factory_quality_protocol, subs_composition, "T")
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
 
 // Adapted machine
-const [transporterAdapted, s0_] = Composition.adaptMachine("T", projectionInfo, Events.allEvents, s0)
+//const [transporterAdapted, s0_] = Composition.adaptMachine("T", projectionInfo, Events.allEvents, s0)
 
 // Run the adapted machine
 async function main() {

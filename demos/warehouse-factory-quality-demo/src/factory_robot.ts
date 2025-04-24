@@ -1,7 +1,7 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, warehouse_factory_quality_protocol, getRandomInt, factory_protocol, subs_factory, print_event, subs_composition  } from './protocol'
-import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
+import { checkComposedProjection, projectionAndInformation, projectionAndInformationNew } from '@actyx/machine-check'
 
 // Using the machine runner DSL an implmentation of robot in factory w.r.t. subs_factory is:
 const robot = Composition.makeMachine('R')
@@ -24,13 +24,19 @@ s1.react([Events.car], s2, (_) => s2.make())
 const checkProjResult = checkComposedProjection(factory_protocol, subs_factory, "R", robot.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
+const projectionInfoResult1 = projectionAndInformationNew(warehouse_factory_quality_protocol, subs_composition, "R", robot.createJSONForAnalysis(s0), 1)
+if (projectionInfoResult1.type == 'ERROR') throw new Error('error getting projection')
+const projectionInfo1 = projectionInfoResult1.data
+//console.log(JSON.stringify(projectionInfo1, null, 2))
+const [factoryRobotAdapted, s0_] = Composition.adaptMachineNew("R", projectionInfo1, Events.allEvents, s0)
+
 // Projection of warehouse || factory || quality over R
 const projectionInfoResult = projectionAndInformation(warehouse_factory_quality_protocol, subs_composition, "R")
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
 
 // Adapt machine
-const [factoryRobotAdapted, s0_] = Composition.adaptMachine("R", projectionInfo, Events.allEvents, s0)
+//const [factoryRobotAdapted, s0_] = Composition.adaptMachine("R", projectionInfo, Events.allEvents, s0)
 
 // Run the adapted machine
 async function main() {
