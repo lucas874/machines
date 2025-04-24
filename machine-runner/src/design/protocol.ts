@@ -589,38 +589,49 @@ export namespace ProjMachine {
     events: readonly MachineEvent.Factory<any, Record<never, never>>[],
     mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
   ): [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any] => {
-    var projStateToState: Map<string, any> = new Map()
-    var projStateToExec: Map<string, Transition[]> = new Map()
-    var projStateToInput: Map<string, Transition[]> = new Map()
-    const re = /(?<name>.*[^§])§(?<id>[\S\s]*)/;
-    //const re = /(?<name>[^§])§(?<id>(.*?))/;
-    /* const proj = structuredClone(projectionInfo.projection)
-    proj.initial = proj.initial.replace(MachineAnalysisResource.SyntheticDelimiter, '_')
-    for (let t of proj.transitions) {
-      t.target = t.target.replace(MachineAnalysisResource.SyntheticDelimiter, '_')
-      t.source = t.source.replace(MachineAnalysisResource.SyntheticDelimiter, '_')
-    } */
-
-    /* for (let t of projectionInfo.projection.transitions) {
+    const projStateToState: Map<string, string> = new Map()
+    const cmdToEventTypeString: Map<string, string> = new Map() // we assume single event type commands
+    const projStateToExec: Map<string, Transition[]> = new Map()
+    const projStateToInput: Map<string, Transition[]> = new Map()
+    const mStateToCommands: Map<string, [string, string, any][]> = new Map()
+    const mStateToReactions: Map<string, [string, any][]> = new Map()
+    for (let t of projectionInfo.projection.transitions) {
         const [sourceOriginalName, sourceID] = getStateNameAndID(t.source)
         const [targetOriginalName, targetID] = getStateNameAndID(t.target)
 
         if (!projStateToState.has(t.source)) {
-          projStatetoState.set(t.source, new Array())
+          projStateToState.set(t.source, sourceOriginalName)
         }
-        projStatesToExec.get(transition.source)?.push(transition)
-    } */
-    //console.log("hello new proj: ", JSON.stringify(proj, null, 2))
+        if (!projStateToState.has(t.target)) {
+          projStateToState.set(t.target, targetOriginalName)
+        }
+        if (t.label.tag === 'Execute' && !cmdToEventTypeString.has(t.label.cmd)) {
+          cmdToEventTypeString.set(t.label.cmd, t.label.logType[0])
+        }
+    }
+    console.log(projStateToState)
+    mOldInitial.mechanism.protocol.reactionMap.getAll().forEach((reactionMapPerMechanism: any, stateMechanism: any) => {
+      const mStateName = stateMechanism.name;
+      if (!mStateToReactions.has(mStateName)) {
+        mStateToReactions.set(mStateName, new Array())
+      }
+      reactionMapPerMechanism.forEach((eventTypeEntry: any, eventType: any) => {
+        mStateToReactions.get(mStateName)?.push([eventType, eventTypeEntry.handler])
+      });
+    });
+    console.log(mStateToReactions);
     for (const factory of mOldInitial.mechanism.protocol.states.allFactories) {
-      console.log(JSON.stringify(factory, null, 2))
-      console.log("\n-----dsaaasd------\n", JSON.stringify(factory.mechanism, null, 2), "\n-------dsasd----\n")
-      console.log("\n-----dsa123123asaaa11111aasd------\n", Object.entries(factory.mechanism.commandDefinitions), "kurt", factory.mechanism.commandDefinitions, "\n-------ds12312asd----\n")
+      const mStateName = factory.mechanism.name;
       for (let [cmd, cmdDef] of Object.entries(factory.mechanism.commandDefinitions)) {
-        console.log(cmd)
-        console.log(cmdDef)
-        console.log("---------------------")
+        let eventTypeString = cmdToEventTypeString.get(cmd)!
+        if (!mStateToCommands.has(mStateName)) {
+          mStateToCommands.set(mStateName, new Array())
+        }
+        mStateToCommands.get(mStateName)?.push([cmd, eventTypeString, cmdDef])
       };
     }
+    console.log(mStateToCommands)
+
     throw error
   }
 }
