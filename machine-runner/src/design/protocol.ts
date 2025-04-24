@@ -570,6 +570,7 @@ export namespace ProjMachine {
     return [mNew, initial]
   }
 
+  // consider doing this sort of thing in machine-check. Seems ugly.
   function getStateNameAndID(stateName: string): string[] {
     const re = /(?<name>.*[^§])§(?<id>[\S\s]*)/;
     var groups = re.exec(stateName)?.groups;
@@ -579,6 +580,33 @@ export namespace ProjMachine {
         return [groups.name, groups.id]
       }
   }
+
+  type ReactionLabel = {
+      source: string;
+      target: string;
+      label: {
+        tag: "Input";
+        eventType: string;
+      };
+  }
+
+  type CommandLabel = {
+      source: string;
+      target: string;
+      label: {
+        tag: "Execute";
+        cmd: string;
+        logType: string[];
+      };
+  }
+
+  type ProjectionStateInfo = {
+    projStateName: string,
+    originalMStateName: string,
+    reactionLabels: ReactionLabel[],
+    commandLabels: CommandLabel[]
+  }
+
   export const adaptMachineNew = <
     SwarmProtocolName extends string,
     MachineName extends string,
@@ -589,49 +617,100 @@ export namespace ProjMachine {
     events: readonly MachineEvent.Factory<any, Record<never, never>>[],
     mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
   ): [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any] => {
-    const projStateToState: Map<string, string> = new Map()
-    const cmdToEventTypeString: Map<string, string> = new Map() // we assume single event type commands
-    const projStateToExec: Map<string, Transition[]> = new Map()
-    const projStateToInput: Map<string, Transition[]> = new Map()
-    const mStateToCommands: Map<string, [string, string, any][]> = new Map()
-    const mStateToReactions: Map<string, [string, any][]> = new Map()
-    for (let t of projectionInfo.projection.transitions) {
+    // information about projection states, such as their labels incoming and outgoing and what state in old machine they may correspond to
+    const projStateInfoMap: Map<string, ProjectionStateInfo> = new Map()
+
+    // map projection states to states in machine under constructions
+    const projStateToMachineState: Map<string, any> = new Map()
+
+    // we assume single event type commands. map command names to event types as strings
+    const cmdToEventTypeString: Map<string, string> = new Map()
+
+    // replace synthetic delimiter '§' with this string when creating machine states
+    const replaceString = "_";
+    const makeOkMachineName = (oldName: String) => oldName.split(MachineAnalysisResource.SyntheticDelimiter).join(replaceString);
+
+    // map state names in old machine to a map from command names to event type and command code
+    const mOldStateToCommands: Map<string, Map<string, [string, any]>> = new Map()
+
+    // map state names in old machine to a map from event type strings to reaction handler code
+    const mOldStateToReactions: Map<string, Map<string, any>> = new Map()
+
+    // map event type string to Event
+    const eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> =
+      new Map<string, MachineEvent.Factory<any, Record<never, never>>>(events.map(e => [e.type, e]))
+
+      for (let t of projectionInfo.projection.transitions) {
         const [sourceOriginalName, sourceID] = getStateNameAndID(t.source)
         const [targetOriginalName, targetID] = getStateNameAndID(t.target)
 
-        if (!projStateToState.has(t.source)) {
-          projStateToState.set(t.source, sourceOriginalName)
+        if (!projStateInfoMap.has(t.source)) {
+          projStateInfoMap.set(t.source, {projStateName: t.source, originalMStateName: sourceOriginalName, reactionLabels: [], commandLabels: []})
         }
-        if (!projStateToState.has(t.target)) {
-          projStateToState.set(t.target, targetOriginalName)
+        if (!projStateInfoMap.has(t.target)) {
+          projStateInfoMap.set(t.target, {projStateName: t.target, originalMStateName: targetOriginalName, reactionLabels: [], commandLabels: []})
+        }
+        if (t.label.tag === 'Execute') {
+          projStateInfoMap.get(t.source)?.commandLabels.push(t as CommandLabel)
+        } else if (t.label.tag === 'Input') {
+          projStateInfoMap.get(t.source)?.reactionLabels.push(t as ReactionLabel)
         }
         if (t.label.tag === 'Execute' && !cmdToEventTypeString.has(t.label.cmd)) {
           cmdToEventTypeString.set(t.label.cmd, t.label.logType[0])
         }
     }
-    console.log(projStateToState)
+    console.log(projStateInfoMap)
     mOldInitial.mechanism.protocol.reactionMap.getAll().forEach((reactionMapPerMechanism: any, stateMechanism: any) => {
       const mStateName = stateMechanism.name;
-      if (!mStateToReactions.has(mStateName)) {
-        mStateToReactions.set(mStateName, new Array())
+      if (!mOldStateToReactions.has(mStateName)) {
+        mOldStateToReactions.set(mStateName, new Map())
       }
       reactionMapPerMechanism.forEach((eventTypeEntry: any, eventType: any) => {
-        mStateToReactions.get(mStateName)?.push([eventType, eventTypeEntry.handler])
+        mOldStateToReactions.get(mStateName)?.set(eventType, eventTypeEntry.handler)
       });
     });
-    console.log(mStateToReactions);
+    console.log(mOldStateToReactions);
     for (const factory of mOldInitial.mechanism.protocol.states.allFactories) {
       const mStateName = factory.mechanism.name;
       for (let [cmd, cmdDef] of Object.entries(factory.mechanism.commandDefinitions)) {
         let eventTypeString = cmdToEventTypeString.get(cmd)!
-        if (!mStateToCommands.has(mStateName)) {
-          mStateToCommands.set(mStateName, new Array())
+        if (!mOldStateToCommands.has(mStateName)) {
+          mOldStateToCommands.set(mStateName, new Map())
         }
-        mStateToCommands.get(mStateName)?.push([cmd, eventTypeString, cmdDef])
+        mOldStateToCommands.get(mStateName)?.set(cmd, [eventTypeString, cmdDef])
       };
     }
-    console.log(mStateToCommands)
+    console.log(mOldStateToCommands)
 
-    throw error
+    // add all states and self loops to machine
+    projStateInfoMap.forEach((value: ProjectionStateInfo, key: string) => {
+      if (value.commandLabels.length > 0) {
+        let cmdTriples = new Array()
+        for (const cLabel of value.commandLabels) {
+          let cmdName = cLabel.label.cmd
+          let eventTypes = cLabel.label.logType.map((et: string) => eventTypeStringToEvent.get(et))
+          let code = mOldStateToCommands.get(value.originalMStateName)?.get(cmdName)![1]
+          cmdTriples.push([cmdName, eventTypes, code])
+        }
+        //const cmdTriples1 = value.commandLabels.map((t: CommandLabel) => [t.label.cmd, t.label.logType.map((et: string) => eventTypeStringToEvent.get(et)), mOldStateToCommands.get(value.originalMStateName)?.get(t.label.cmd)![1]]).filter(triple => triple.length === 3)
+        projStateToMachineState.set(value.projStateName, mNew.designState(makeOkMachineName(value.projStateName)).withPayload<any>().commandFromList(cmdTriples).finish())
+      } else {
+        projStateToMachineState.set(value.projStateName, mNew.designState(makeOkMachineName(value.projStateName)).withPayload<any>().finish())
+      }
+    });
+
+    // add reactions
+    projStateInfoMap.forEach((value: ProjectionStateInfo, key: string) => {
+      for (const rLabel of value.reactionLabels) {
+        const eventType = rLabel.label.eventType
+        const event = eventTypeStringToEvent.get(eventType)!
+        //const reactionHandler = mOldStateToReactions.get(value.originalMStateName)!.get(rLabel.label.eventType) ?? (s: any, _: any) => { return projStateToMachineState.get(rLabel.target).make(s.self) }
+        const reactionHandler = mOldStateToReactions.get(value.originalMStateName)!.has(rLabel.label.eventType) ?
+          mOldStateToReactions.get(value.originalMStateName)!.get(rLabel.label.eventType) : (s: any, _: any) => { return projStateToMachineState.get(rLabel.target).make(s.self) }
+        projStateToMachineState.get(rLabel.source).react([event], projStateToMachineState.get(rLabel.target), reactionHandler)
+      }
+    })
+
+    return [mNew, projStateToMachineState.get(projectionInfo.projection.initial)]
   }
 }

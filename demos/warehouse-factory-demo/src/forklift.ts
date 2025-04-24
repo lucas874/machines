@@ -21,8 +21,8 @@ s0.react([Events.partReq], s1, (_, e) => {
     return s1.make({id: e.payload.id}) })
 s1.react([Events.pos], s2, (_, e) => { print_event(e); return s2.make() })
 s2.react([Events.partReq], s1, (_, e) => { print_event(e); return s1.make({id: "jfalkdjfls"}) })
-s2.react([Events.closingTime], s3, (_, e) => { print_event(e); return s3.make() })
-s0.react([Events.closingTime], s3, (_, e) => { print_event(e); return s3.make() })
+s2.react([Events.closingTime], s3, (_, e) => { print_event(e); console.log("something was retrieved before warehouse closed"); return s3.make() })
+s0.react([Events.closingTime], s3, (_, e) => { print_event(e); console.log("closed before something was retrieved"); return s3.make() })
 
 // Check that the original machine is a correct implementation. A prerequisite for reusing it.
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "FL", forklift.createJSONForAnalysis(s0))
@@ -32,7 +32,7 @@ const projectionInfoResult1 = projectionAndInformationNew(warehouse_factory_prot
 if (projectionInfoResult1.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo1 = projectionInfoResult1.data
 console.log(JSON.stringify(projectionInfo1, null, 2))
-Composition.adaptMachineNew("FL", projectionInfo1, Events.allEvents, s0)
+ const [forkliftAdapted, s0_] = Composition.adaptMachineNew("FL", projectionInfo1, Events.allEvents, s0)
 
 
 
@@ -42,7 +42,7 @@ if (projectionInfoResult.type == 'ERROR') throw new Error('error getting project
 const projectionInfo = projectionInfoResult.data
 
 // Adapted machine
-const [forkliftAdapted, s0_] = Composition.adaptMachine("FL", projectionInfo, Events.allEvents, s0)
+//const [forkliftAdapted, s0_] = Composition.adaptMachine("FL", projectionInfo, Events.allEvents, s0)
 
 // Run the adapted machine
 async function main() {
