@@ -1,4 +1,4 @@
-import { check_swarm, check_projection, check_wwf_swarm, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, check_composed_projection, revised_projection, project_combine, compose_protocols, project_combine_all, projection_information } from '../pkg/machine_check.js'
+import { check_swarm, check_projection, check_wwf_swarm, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, check_composed_projection, revised_projection, project_combine, compose_protocols, project_combine_all, projection_information, projection_information_new } from '../pkg/machine_check.js'
 
 export type Protocol<Label> = {
   initial: string
@@ -125,6 +125,20 @@ export function projectionAndInformation(protos: InterfacingSwarms, subscription
   const ps = JSON.stringify(protos)
   const s = JSON.stringify(subscriptions)
   const result = JSON.parse(projection_information(ps, s, role));
+  if (result.type === "ERROR") {
+    return result
+  } else {
+    const data = {...result.data, specialEventTypes: new Set<string>(result.data.specialEventTypes) }
+    return {type: "OK", data: data}
+  }
+
+}
+
+export function projectionAndInformationNew(protos: InterfacingSwarms, subscriptions: Subscriptions, role: string, machine: MachineType, k: number): ResultData<ProjectionAndSucceedingMap> {
+  const ps = JSON.stringify(protos)
+  const s = JSON.stringify(subscriptions)
+  const m = JSON.stringify(machine)
+  const result = JSON.parse(projection_information_new(ps, s, role, m, k.toString()));
   if (result.type === "ERROR") {
     return result
   } else {

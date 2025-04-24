@@ -1,3 +1,4 @@
+use composition_machine::adapted_projection;
 use composition_swarm::{proto_info_to_error_report, swarms_to_proto_info, ErrorReport};
 use composition_types::{get_branching_joining_proto_info, DataResult, Granularity, InterfacingSwarms, ProjectionAndSucceedingMap};
 
@@ -170,7 +171,7 @@ pub fn projection_information(protos: String, subs: String, role: String) -> Str
 }
 
 #[wasm_bindgen]
-pub fn projection_information_new(protos: String, subs: String, role: String) -> String {
+pub fn projection_information_new(protos: String, subs: String, role: String, machine: String, k: String) -> String {
     let protocols = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
         Ok(p) => p,
         Err(e) => return derr::<Vec<Machine>>(vec![format!("parsing composition input: {}", e)]),
@@ -179,14 +180,32 @@ pub fn projection_information_new(protos: String, subs: String, role: String) ->
         Ok(s) => s,
         Err(e) => return derr::<Vec<Machine>>(vec![format!("parsing subscriptions: {}", e)]),
     };
+    let machine = match serde_json::from_str::<Machine>(&machine) {
+        Ok(p) => p,
+        Err(e) => return err(vec![format!("parsing machine: {}", e)]),
+    };
+    let k = match serde_json::from_str::<usize>(&k) {
+        Ok(p) => p,
+        Err(e) => return err(vec![format!("parsing k: {}", e)]),
+    };
 
     let proto_info = swarms_to_proto_info(protocols, &subs);
     if !proto_info.no_errors() {
         return derr::<Vec<Machine>>(error_report_to_strings(proto_info_to_error_report(proto_info)));
     }
-
+    let (machine, initial, m_errors) = machine::from_json(machine);
+    let machine_problem = !m_errors.is_empty();
+    let mut errors = vec![];
+    errors.extend(m_errors);
+    let Some(initial) = initial else {
+        errors.push(format!("initial machine state has no transitions"));
+        return err(errors);
+    };
+    if machine_problem {
+        return err(errors);
+    }
     let role = Role::new(&role);
-    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role);
+    let (proj, proj_initial) = adapted_projection(&proto_info.protocols, &subs, role, (machine, initial), k);
     let branches = composition_machine::paths_from_event_types(&proj, &proto_info);
     let special_event_types = get_branching_joining_proto_info(&proto_info);
 
