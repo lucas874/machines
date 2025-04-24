@@ -1,7 +1,7 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event } from './protocol'
-import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
+import { checkComposedProjection, projectionAndInformation, projectionAndInformationNew } from '@actyx/machine-check'
 
 // Using the machine runner DSL an implmentation of forklift in the warehouse protocol w.r.t. subs_warehouse is:
 const forklift = Composition.makeMachine('FL')
@@ -20,6 +20,13 @@ s0.react([Events.partReq], s1, (_, e) => {
     return s1.make({id: e.payload.id}) })
 s1.react([Events.pos], s0, (_, e) => { print_event(e); return s0.make() })
 s0.react([Events.closingTime], s2, (_, e) => { print_event(e); return s2.make() })
+
+
+const projectionInfoResult1 = projectionAndInformationNew(warehouse_factory_protocol, subs_composition, "FL", forklift.createJSONForAnalysis(s0), 0)
+if (projectionInfoResult1.type == 'ERROR') throw new Error('error getting projection')
+const projectionInfo1 = projectionInfoResult1.data
+console.log(JSON.stringify(projectionInfo1, null, 2))
+Composition.adaptMachineNew("FL", projectionInfo1, Events.allEvents, s0)
 
 // Check that the original machine is a correct implementation. A prerequisite for reusing it.
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "FL", forklift.createJSONForAnalysis(s0))

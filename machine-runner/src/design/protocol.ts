@@ -2,6 +2,7 @@
 import { Tag, Tags } from '@actyx/sdk'
 import { StateMechanism, MachineProtocol, ReactionMap, StateFactory } from './state.js'
 import { MachineEvent } from './event.js'
+import { error, group } from 'console'
 
 /**
  * SwarmProtocol is the entry point of designing a swarm of MachineRunners. A
@@ -23,6 +24,12 @@ export type SwarmProtocol<
   ) => Machine<SwarmProtocolName, MachineName, MachineEventFactories>
   tagWithEntityId: (id: string) => Tags<MachineEvents>
   adaptMachine: <MachineName extends string>(
+    machineName: MachineName,
+    proj: ProjMachine.ProjectionAndSucceedingMap,
+    events: readonly MachineEvent.Factory<any, any>[],
+    mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>
+  ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
+  adaptMachineNew: <MachineName extends string>(
     machineName: MachineName,
     proj: ProjMachine.ProjectionAndSucceedingMap,
     events: readonly MachineEvent.Factory<any, any>[],
@@ -75,6 +82,7 @@ export namespace SwarmProtocol {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
       adaptMachine: (machineName, proj, events, mOldInitial) => ProjMachine.adaptMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, mOldInitial),
+      adaptMachineNew: (machineName, proj, events, mOldInitial) => ProjMachine.adaptMachineNew(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, mOldInitial),
     }
   }
 }
@@ -560,5 +568,59 @@ export namespace ProjMachine {
 
     var initial = projStatesToStates.get(proj.initial)
     return [mNew, initial]
+  }
+
+  function getStateNameAndID(stateName: string): string[] {
+    const re = /(?<name>.*[^§])§(?<id>[\S\s]*)/;
+    var groups = re.exec(stateName)?.groups;
+      if (groups === undefined) {
+        return ["", ""]
+      } else {
+        return [groups.name, groups.id]
+      }
+  }
+  export const adaptMachineNew = <
+    SwarmProtocolName extends string,
+    MachineName extends string,
+    MachineEventFactories extends MachineEvent.Factory.Any,
+  >(
+    mNew: Machine<SwarmProtocolName, MachineName, MachineEventFactories>,
+    projectionInfo: ProjectionAndSucceedingMap,
+    events: readonly MachineEvent.Factory<any, Record<never, never>>[],
+    mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
+  ): [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any] => {
+    var projStateToState: Map<string, any> = new Map()
+    var projStateToExec: Map<string, Transition[]> = new Map()
+    var projStateToInput: Map<string, Transition[]> = new Map()
+    const re = /(?<name>.*[^§])§(?<id>[\S\s]*)/;
+    //const re = /(?<name>[^§])§(?<id>(.*?))/;
+    /* const proj = structuredClone(projectionInfo.projection)
+    proj.initial = proj.initial.replace(MachineAnalysisResource.SyntheticDelimiter, '_')
+    for (let t of proj.transitions) {
+      t.target = t.target.replace(MachineAnalysisResource.SyntheticDelimiter, '_')
+      t.source = t.source.replace(MachineAnalysisResource.SyntheticDelimiter, '_')
+    } */
+
+    /* for (let t of projectionInfo.projection.transitions) {
+        const [sourceOriginalName, sourceID] = getStateNameAndID(t.source)
+        const [targetOriginalName, targetID] = getStateNameAndID(t.target)
+
+        if (!projStateToState.has(t.source)) {
+          projStatetoState.set(t.source, new Array())
+        }
+        projStatesToExec.get(transition.source)?.push(transition)
+    } */
+    //console.log("hello new proj: ", JSON.stringify(proj, null, 2))
+    for (const factory of mOldInitial.mechanism.protocol.states.allFactories) {
+      console.log(JSON.stringify(factory, null, 2))
+      console.log("\n-----dsaaasd------\n", JSON.stringify(factory.mechanism, null, 2), "\n-------dsasd----\n")
+      console.log("\n-----dsa123123asaaa11111aasd------\n", Object.entries(factory.mechanism.commandDefinitions), "kurt", factory.mechanism.commandDefinitions, "\n-------ds12312asd----\n")
+      for (let [cmd, cmdDef] of Object.entries(factory.mechanism.commandDefinitions)) {
+        console.log(cmd)
+        console.log(cmdDef)
+        console.log("---------------------")
+      };
+    }
+    throw error
   }
 }
