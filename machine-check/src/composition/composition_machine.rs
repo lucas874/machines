@@ -563,7 +563,20 @@ pub fn adapted_projection(
         (proj, proj_initial, ps.interface.clone())
     };
 
-    let projections: Vec<(Graph, NodeId, BTreeSet<EventType>)> = swarms.iter().map(mapper).collect();
+    // machine-runner machine states may not include the § symbol
+    // everything after this symbol serves as 'internal naming'...
+    // giving state names such significance seems weird, but try it out.
+    let illegal_in_state_names = "§";
+    let state_name_mapper = |i: usize, s: &State| -> State {
+        let state_name = format!("{}{}{}", &*s.replace(&['{', '}', '|', ' '][..], ""), illegal_in_state_names, i);
+        State::new(&state_name)
+    };
+
+    let projections: Vec<(Graph, NodeId, BTreeSet<EventType>)> = swarms
+        .iter()
+        .map(mapper)
+        .map(|(g, i, interface)| (g.map(|_, _| State::new(""), |_, x| x.clone()), i, interface))
+        .collect();
     let (machine, machine_initial) = (from_option_graph_to_graph(&machine.0), machine.1);
     let machine_proj_intersect = machine
         .edge_references()
@@ -577,7 +590,9 @@ pub fn adapted_projection(
     let projections = projections[..k].iter().cloned().chain([(machine_and_proj, machine_and_proj_initial, kth_interface)]).chain(projections[k+1..].iter().cloned()).collect();
     let (combined_projection, combined_initial) = combine_projs(projections);
     let (combined_projection, combined_initial) = machine_without_duplicates(&combined_projection, combined_initial);
-    // should we minimize here?
+    let combined_projection = combined_projection.map(|n_index, s| state_name_mapper(n_index.index(), s), |_, x| x.clone());
+
+    // should we minimize here? not done to keep original shape of input machine as much as possible?
     // option because used in equivalent. Consider changing.
     (
         to_option_machine(&combined_projection),
@@ -1887,7 +1902,7 @@ mod tests {
         let proto_info = swarms_to_proto_info(swarms.clone(), &subs1);
         assert!(proto_info.no_errors());
 
-        let (adapted_proj, adapted_proj_initial) = adapted_projection(&proto_info.protocols, &subs1, role.clone(), (f_m_graph.clone(), f_m_graph_initial.unwrap()), 0);
+        let (adapted_proj, adapted_proj_initial) = adapted_projection(&proto_info.protocols, &subs1, role.clone(), (f_m_graph.clone(), f_m_graph_initial.unwrap()), 1);
         println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&from_option_to_machine(f_m_graph.clone(), f_m_graph_initial.unwrap())).unwrap());
         println!("right {:?}: {}", role, serde_json::to_string_pretty(&from_option_to_machine(adapted_proj.clone(), adapted_proj_initial.unwrap())).unwrap());
 
@@ -1901,7 +1916,7 @@ mod tests {
         let proto_info = swarms_to_proto_info(swarms.clone(), &subs2);
         assert!(proto_info.no_errors());
 
-        let (adapted_proj, adapted_proj_initial) = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (f_m_graph.clone(), f_m_graph_initial.unwrap()), 0);
+        let (adapted_proj, adapted_proj_initial) = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (f_m_graph.clone(), f_m_graph_initial.unwrap()), 1);
         println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&from_option_to_machine(f_m_graph.clone(), f_m_graph_initial.unwrap())).unwrap());
         println!("right {:?}: {}", role, serde_json::to_string_pretty(&from_option_to_machine(adapted_proj.clone(), adapted_proj_initial.unwrap())).unwrap());
     }
