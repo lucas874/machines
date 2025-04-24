@@ -2246,6 +2246,12 @@ mod tests {
         let error_report = check(get_interfacing_swarms_1(), &subs2);
         assert!(error_report.is_empty());
 
+        let result = overapprox_weak_well_formed_sub(get_interfacing_swarms_1(), &BTreeMap::new(), Granularity::TwoStep);
+        assert!(result.is_ok());
+        let subs2 = result.unwrap();
+        let error_report = check(get_interfacing_swarms_1(), &subs2);
+        assert!(error_report.is_empty());
+
         let result = overapprox_weak_well_formed_sub(get_interfacing_swarms_2(), &BTreeMap::new(), Granularity::Medium);
         assert!(result.is_ok());
         let subs2 = result.unwrap();
@@ -2256,6 +2262,49 @@ mod tests {
         assert!(result.is_ok());
         let subs2 = result.unwrap();
         let error_report = check(get_interfacing_swarms_2(), &subs2);
+        assert!(error_report.is_empty());
+
+
+        let result = overapprox_weak_well_formed_sub(get_interfacing_swarms_2(), &BTreeMap::new(), Granularity::TwoStep);
+        assert!(result.is_ok());
+        let subs2 = result.unwrap();
+        let error_report = check(get_interfacing_swarms_2(), &subs2);
+        assert!(error_report.is_empty());
+    }
+
+    #[test]
+    fn test_weak_well_formed_sub_1() {
+        setup_logger();
+        let result = exact_weak_well_formed_sub(get_interfacing_swarms_5(), &BTreeMap::new());
+        assert!(result.is_ok());
+        let subs1 = result.unwrap();
+        let error_report = check(get_interfacing_swarms_5(), &subs1);
+        assert!(error_report.is_empty());
+
+        let result = overapprox_weak_well_formed_sub(get_interfacing_swarms_5(), &BTreeMap::new(), Granularity::Coarse);
+        assert!(result.is_ok());
+        let subs2 = result.unwrap();
+        let error_report = check(get_interfacing_swarms_5(), &subs2);
+        assert!(error_report.is_empty());
+        assert!(is_sub_subscription(subs1, subs2));
+
+        let result = overapprox_weak_well_formed_sub(get_interfacing_swarms_5(), &BTreeMap::new(), Granularity::Medium);
+        assert!(result.is_ok());
+        let subs2 = result.unwrap();
+        let error_report = check(get_interfacing_swarms_5(), &subs2);
+        assert!(error_report.is_empty());
+
+        let result = overapprox_weak_well_formed_sub(get_interfacing_swarms_5(), &BTreeMap::new(), Granularity::Fine);
+        assert!(result.is_ok());
+        let subs2 = result.unwrap();
+        let error_report = check(get_interfacing_swarms_5(), &subs2);
+        assert!(error_report.is_empty());
+
+
+        let result = overapprox_weak_well_formed_sub(get_interfacing_swarms_5(), &BTreeMap::new(), Granularity::TwoStep);
+        assert!(result.is_ok());
+        let subs2 = result.unwrap();
+        let error_report = check(get_interfacing_swarms_5(), &subs2);
         assert!(error_report.is_empty());
     }
 

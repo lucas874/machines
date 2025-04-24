@@ -169,6 +169,30 @@ pub fn projection_information(protos: String, subs: String, role: String) -> Str
     dok(ProjectionAndSucceedingMap {projection: composition::composition_machine::from_option_to_machine(proj, proj_initial.unwrap()), branches, special_event_types})
 }
 
+#[wasm_bindgen]
+pub fn projection_information_new(protos: String, subs: String, role: String) -> String {
+    let protocols = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
+        Ok(p) => p,
+        Err(e) => return derr::<Vec<Machine>>(vec![format!("parsing composition input: {}", e)]),
+    };
+    let subs = match serde_json::from_str::<Subscriptions>(&subs) {
+        Ok(s) => s,
+        Err(e) => return derr::<Vec<Machine>>(vec![format!("parsing subscriptions: {}", e)]),
+    };
+
+    let proto_info = swarms_to_proto_info(protocols, &subs);
+    if !proto_info.no_errors() {
+        return derr::<Vec<Machine>>(error_report_to_strings(proto_info_to_error_report(proto_info)));
+    }
+
+    let role = Role::new(&role);
+    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role);
+    let branches = composition_machine::paths_from_event_types(&proj, &proto_info);
+    let special_event_types = get_branching_joining_proto_info(&proto_info);
+
+    dok(ProjectionAndSucceedingMap {projection: composition::composition_machine::from_option_to_machine(proj, proj_initial.unwrap()), branches, special_event_types})
+}
+
 // check an implementation against the combined projection of swarms over role.
 // consider also offering one projecting over explicit projection?
 #[wasm_bindgen]
