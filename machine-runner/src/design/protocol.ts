@@ -659,7 +659,7 @@ export namespace ProjMachine {
           cmdToEventTypeString.set(t.label.cmd, t.label.logType[0])
         }
     }
-    console.log(projStateInfoMap)
+    //console.log(projStateInfoMap)
     mOldInitial.mechanism.protocol.reactionMap.getAll().forEach((reactionMapPerMechanism: any, stateMechanism: any) => {
       const mStateName = stateMechanism.name;
       if (!mOldStateToReactions.has(mStateName)) {
@@ -669,7 +669,7 @@ export namespace ProjMachine {
         mOldStateToReactions.get(mStateName)?.set(eventType, eventTypeEntry.handler)
       });
     });
-    console.log(mOldStateToReactions);
+    //console.log(mOldStateToReactions);
     for (const factory of mOldInitial.mechanism.protocol.states.allFactories) {
       const mStateName = factory.mechanism.name;
       for (let [cmd, cmdDef] of Object.entries(factory.mechanism.commandDefinitions)) {
@@ -680,7 +680,7 @@ export namespace ProjMachine {
         mOldStateToCommands.get(mStateName)?.set(cmd, [eventTypeString, cmdDef])
       };
     }
-    console.log(mOldStateToCommands)
+    //console.log(mOldStateToCommands)
 
     // add all states and self loops to machine
     projStateInfoMap.forEach((value: ProjectionStateInfo, key: string) => {

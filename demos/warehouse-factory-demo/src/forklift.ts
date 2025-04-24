@@ -31,8 +31,8 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 const projectionInfoResult1 = projectionAndInformationNew(warehouse_factory_protocol, subs_composition, "FL", forklift.createJSONForAnalysis(s0), 0)
 if (projectionInfoResult1.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo1 = projectionInfoResult1.data
-console.log(JSON.stringify(projectionInfo1, null, 2))
- const [forkliftAdapted, s0_] = Composition.adaptMachineNew("FL", projectionInfo1, Events.allEvents, s0)
+//console.log(JSON.stringify(projectionInfo1, null, 2))
+const [forkliftAdapted, s0_] = Composition.adaptMachineNew("FL", projectionInfo1, Events.allEvents, s0)
 
 
 
