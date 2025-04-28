@@ -22,19 +22,14 @@ s0.react([Events.closingTime], s2, (_, e) => { print_event(e); return s2.make() 
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "D", door.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
-  const projectionInfoResult1 = projectionAndInformationNew(warehouse_factory_quality_protocol, subs_composition, "D", door.createJSONForAnalysis(s0), 0)
-if (projectionInfoResult1.type == 'ERROR') throw new Error('error getting projection')
-const projectionInfo1 = projectionInfoResult1.data
-//console.log(JSON.stringify(projectionInfo1, null, 2))
-const [doorAdapted, s0_] = Composition.adaptMachineNew("D", projectionInfo1, Events.allEvents, s0)
-
 // Projection of warehouse || factory || quality over D
-const projectionInfoResult = projectionAndInformation(warehouse_factory_quality_protocol, subs_composition, "D")
+const projectionInfoResult = projectionAndInformationNew(warehouse_factory_quality_protocol, subs_composition, "D", door.createJSONForAnalysis(s0), 0)
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
+//console.log(JSON.stringify(projectionInfo1, null, 2))
 
-// Adapted machine
-//const [doorAdapted, s0_] = Composition.adaptMachine("D", projectionInfo, Events.allEvents, s0)
+// Adapt machine
+const [doorAdapted, s0_] = Composition.adaptMachineNew("D", projectionInfo, Events.allEvents, s0)
 
 // Run the adapted machine
 async function main() {

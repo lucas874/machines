@@ -628,6 +628,7 @@ export namespace ProjMachine {
 
     // replace synthetic delimiter '§' with this string when creating machine states
     const replaceString = "_";
+    //const replaceString = MachineAnalysisResource.SyntheticDelimiter;
     const makeOkMachineName = (oldName: String) => oldName.split(MachineAnalysisResource.SyntheticDelimiter).join(replaceString);
 
     // map state names in old machine to a map from command names to event type and command code
