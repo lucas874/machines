@@ -273,7 +273,7 @@ export namespace StateMechanism {
     props?: {
       commands?: Commands
       commandDataForAnalytics: { commandName: string; events: string[] }[]
-      commandDefinitions?: any
+      commandDefinitions?: Map<string, any>
     },
   ): StateMechanism<
     SwarmProtocolName,
@@ -293,7 +293,7 @@ export namespace StateMechanism {
     >
 
     const commands: Self['commands'] = props?.commands || ({} as Commands)
-    const commandDefinitions: Self['commandDefinitions'] = props?.commandDefinitions || {}
+    const commandDefinitions: Self['commandDefinitions'] = props?.commandDefinitions || ({} as Map<any, any>)
 
     const command: Self['command'] = (name, factories, commandDefinition) => {
       // TODO: make this more sturdy

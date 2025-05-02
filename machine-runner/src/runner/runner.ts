@@ -1608,27 +1608,10 @@ export namespace ImplStateOpaque {
         stateAtSnapshot,
       })
 
-    /* const isLike: ThisStateOpaque['isLike'] = <F extends StateFactory<SwarmProtocolName, any, any, any, any, any>> (
-      factory: F
-    ): this is StateOpaque.Of<F> => {
-
-      console.log(factory.mechanism.commands === factoryAtSnapshot.mechanism.commands)
-
-      return factory.mechanism.commands === factoryAtSnapshot.mechanism.commands
-    } */
-    //const isLike: ThisStateOpaque['isLike'] = (factories) => (factory.mechanism.commands === factoryAtSnapshot.mechanism.commands)
     const isLike: ThisStateOpaque['isLike'] = (factory) => {
-      console.log("in isLike: ", factory.mechanism.commandDefinitions === factoryAtSnapshot.mechanism.commandDefinitions)
-      console.log("in isLike: ", factory.mechanism.commands === factoryAtSnapshot.mechanism.commands)
-      for (let c of Object.keys(factory.mechanism.commands)) {
-        console.log(c)
-      }
-      console.log(factory.mechanism.commandDefinitions)
-      console.log(factoryAtSnapshot.mechanism.commandDefinitions)
-
-      console.log(typeof(factory.mechanism.commandDefinitions))
-      console.log(Object.keys(factory.mechanism.commands).every((cmdName) => cmdName in factoryAtSnapshot.mechanism.commands))//&& factory.mechanism.commandDefinitions.get(cmdName)?.toString() === factoryAtSnapshot.mechanism.commandDefinitions.get(cmdName)?.toString()))
-      return Object.keys(factory.mechanism.commands).every((cmdName) => cmdName in factoryAtSnapshot.mechanism.commands)
+      return Object.keys(factory.mechanism.commands).every((cmdName) => cmdName in factoryAtSnapshot.mechanism.commands) &&
+        Object.keys(factory.mechanism.commandDefinitions).every((cmdName) => cmdName in factoryAtSnapshot.mechanism.commandDefinitions &&
+          factoryAtSnapshot.mechanism.commandDefinitions[cmdName as keyof typeof factoryAtSnapshot.mechanism.commandDefinitions].toString() === factory.mechanism.commandDefinitions[cmdName as keyof typeof factory.mechanism.commandDefinitions].toString())
     }
 
 /*
