@@ -43,6 +43,7 @@ async function main() {
         console.log("State payload is:", state.payload)
       }
       console.log()
+      console.log(state.isLike(s0))
       const s = state.cast()
       for (var c in s.commands()) {
           if (c === 'close') {

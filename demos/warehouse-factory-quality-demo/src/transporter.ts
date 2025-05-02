@@ -1,5 +1,5 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunnerBT } from '@actyx/machine-runner'
+import { createMachineRunner, createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event, warehouse_factory_quality_protocol, subs_composition } from './protocol'
 import { checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation, projectionAndInformationNew } from '@actyx/machine-check'
 
@@ -8,7 +8,7 @@ const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 // Using the machine runner DSL an implmentation of transporter in warehouse w.r.t. subs_warehouse is:
 const transporter = Composition.makeMachine('T')
 export const s0 = transporter.designEmpty('s0')
-    .command('request', [Events.partReq], (s: any, e: any) => {
+    .command('request', [Events.partReq], (s: any) => {
       var id = parts[Math.floor(Math.random() * parts.length)];
       console.log("requesting a", id);
       return [Events.partReq.make({id: id})]})
@@ -48,14 +48,21 @@ async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('warehouse-factory-quality')
     const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
-
+    //const machine = createMachineRunner(app, tags, s0, undefined)
     for await (const state of machine) {
       console.log("Transporter. State is:", state.type)
       if (state.payload !== undefined) {
         console.log("State payload is:", state.payload)
       }
+      console.log(state.isLike(s0))
       console.log()
       const s = state.cast()
+      //if(state.hasCommand('request')) {
+      if(state.isLike(s0)) {
+        console.log("boing")
+        state.cast().commands()?.request()
+      }
+
       for (var c in s.commands()) {
           if (c === 'request') {
             setTimeout(() => {
