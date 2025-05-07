@@ -2,6 +2,12 @@ import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event } from './protocol'
 import { checkComposedProjection, projectionAndInformation, projectionAndInformationNew } from '@actyx/machine-check'
+import * as readline from 'readline';
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
 
 // Using the machine runner DSL an implmentation of forklift in the warehouse protocol w.r.t. subs_warehouse is:
 const forklift = Composition.makeMachine('FL')
@@ -53,14 +59,15 @@ async function main() {
     console.log()
 
     if(state.isLike(s1)) {
-      setTimeout(() => {
+      rl.question("Invoke get? ", (_) => {
         const stateAfterTimeOut = machine.get()
         if (stateAfterTimeOut?.isLike(s1)) {
           stateAfterTimeOut?.cast().commands()?.get()
         }
-      }, getRandomInt(4000, 8000))
+      })
     }
   }
+  rl.close();
   app.dispose()
 }
 

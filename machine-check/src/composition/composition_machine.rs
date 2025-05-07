@@ -123,7 +123,7 @@ pub fn project_combine(
 
     let (combined_projection, combined_initial) = combine_projs(projections);
 
-    let (combined_projection, combined_initial) = minimal_machine(&combined_projection, combined_initial);
+    //let (combined_projection, combined_initial) = minimal_machine(&combined_projection, combined_initial);
     // option because used in equivalent. Consider changing.
     (
         to_option_machine(&combined_projection),
