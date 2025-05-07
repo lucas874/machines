@@ -9,7 +9,7 @@ const forkliftFinal = "{ { { 3 } } || { { 0 } }, { { 3 } } || { { 2 } } }"
 const forklift = Composition.makeMachine('FL')
 export const s0 = forklift.designEmpty('s0') .finish()
 export const s1 = forklift.designState('s1').withPayload<{id: string}>()
-  .command('get', [Events.pos], (state: any, _: any) => {
+  .command('get', [Events.pos], (state: any) => {
     console.log("retrieved a", state.self.id, "at position x");
     return [Events.pos.make({position: "x", part: state.self.id})]})
   .finish()
@@ -50,17 +50,13 @@ async function main() {
       if (state.type === forkliftFinal) {
         console.log("\x1b[32mForklift reached its final state. Press CTRL + C to exit.\x1b[0m")
       }
-      const s = state.cast()
-      for (var c in s.commands()) {
-          if (c === 'get') {
-            setTimeout(() => {
-              var s1 = machine.get()?.cast()?.commands() as any
-              if (Object.keys(s1 || {}).includes('get')) {
-                s1.get()
-              }
-            }, 1500)
-            break
+      if(state.isLike(s1)) {
+        setTimeout(() => {
+          const stateAfterTimeOut = machine.get()
+          if (stateAfterTimeOut?.isLike(s1)) {
+            stateAfterTimeOut?.cast().commands()?.get()
           }
+        }, getRandomInt(4000, 8000))
       }
     }
     app.dispose()

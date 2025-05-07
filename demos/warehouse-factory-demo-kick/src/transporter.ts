@@ -10,14 +10,14 @@ const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 // Using the machine runner DSL an implmentation of transporter in warehouse w.r.t. subs_warehouse is:
 const transporter = Composition.makeMachine('T')
 export const s0 = transporter.designEmpty('s0')
-    .command('request', [Events.partReq], (s: any, e: any) => {
+    .command('request', [Events.partReq], (s: any) => {
       var id = parts[Math.floor(Math.random() * parts.length)];
       console.log("requesting a", id);
       return [Events.partReq.make({id: id})]})
     .finish()
 export const s1 = transporter.designEmpty('s1').finish()
 export const s2 = transporter.designState('s2').withPayload<{part: string}>()
-    .command('deliver', [Events.partOK], (s: any, e: any) => {
+    .command('deliver', [Events.partOK], (s: any) => {
       console.log("delivering a", s.self.part)
       return [Events.partOK.make({part: s.self.part})] })
     .finish()
@@ -59,26 +59,22 @@ async function main() {
       if (state.type === transporterFinal) {
         console.log("\x1b[32mTransporter reached its final state. Press CTRL + C to exit.\x1b[0m")
       }
-      const s = state.cast()
-      for (var c in s.commands()) {
-          if (c === 'request') {
-            setTimeout(() => {
-                var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1 || {}).includes('request')) {
-                    s1.request()
-                }
-            }, getRandomInt(2000, 5000))
-            break
+      if(state.isLike(s0)) {
+        setTimeout(() => {
+          const stateAfterTimeOut = machine.get()
+          if (stateAfterTimeOut?.isLike(s0)) {
+            stateAfterTimeOut?.cast().commands()?.request()
           }
-          if (c === 'deliver') {
-            setTimeout(() => {
-                var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1 || {}).includes('deliver')) {
-                    s1.deliver()
-                }
-            }, getRandomInt(4000, 8000))
-            break
+        }, getRandomInt(4000, 8000))
+      }
+
+      if(state.isLike(s2)) {
+        setTimeout(() => {
+          const stateAfterTimeOut = machine.get()
+          if (stateAfterTimeOut?.isLike(s2)) {
+            stateAfterTimeOut?.cast().commands()?.deliver()
           }
+        }, getRandomInt(4000, 8000))
       }
     }
     app.dispose()

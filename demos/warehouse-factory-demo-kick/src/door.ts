@@ -47,17 +47,13 @@ async function main() {
       if (state.type === doorFinal) {
         console.log("\x1b[32mDoor reached its final state. Press CTRL + C to exit.\x1b[0m")
       }
-      const s = state.cast()
-      for (var c in s.commands()) {
-          if (c === 'close') {
-            setTimeout(() => {
-                var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1 || {}).includes('close')) {
-                    s1.close()
-                }
-            }, getRandomInt(5500, 8000))
-            break
+      if (state.isLike(s0)) {
+        setTimeout(() => {
+          const stateAfterTimeOut = machine.get()
+          if (stateAfterTimeOut?.isLike(s0)) {
+            stateAfterTimeOut?.cast().commands()?.close()
           }
+        }, getRandomInt(4000, 8000))
       }
     }
     app.dispose()
