@@ -6,14 +6,14 @@ import { checkComposedProjection, projectionAndInformation, projectionAndInforma
 // Using the machine runner DSL an implmentation of quality control robot in Gquality is:
 const qcr = Composition.makeMachine('QCR')
 export const s0 = qcr.designEmpty('s0')
-    .command("observe", [Events.observing], (s, _) => {
+    .command("observe", [Events.observing], (s) => {
         console.log("began observing");
         return [Events.observing.make({})]
     })
     .finish()
 export const s1 = qcr.designEmpty('s1').finish()
 export const s2 = qcr.designState('s2').withPayload<{modelName: string, decision: string}>()
-    .command("test", [Events.report], (s: any, _: any) => {
+    .command("test", [Events.report], (s: any) => {
         console.log("the newly built", s.self.modelName, " is", s.self.decision);
         return [Events.report.make({modelName: s.self.modelName, decision: s.self.decision})]})
     .finish()
@@ -32,13 +32,15 @@ const checkProjResult = checkComposedProjection(quality_protocol, subs_quality, 
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Projection of warehouse || factory || quality over QCR
-const projectionInfoResult = projectionAndInformationNew(warehouse_factory_quality_protocol, subs_composition, "QCR", qcr.createJSONForAnalysis(s0), 2)
+const projectionInfoResult = projectionAndInformation(warehouse_factory_quality_protocol, subs_composition, "QCR")
+//const projectionInfoResult = projectionAndInformationNew(warehouse_factory_quality_protocol, subs_composition, "QCR", qcr.createJSONForAnalysis(s0), 2)
+
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
 //console.log(JSON.stringify(projectionInfo1, null, 2))
 
 // Adapted  machine
-const [qcrAdapted, s0_] = Composition.adaptMachineNew("QCR", projectionInfo, Events.allEvents, s0)
+const [qcrAdapted, s0_] = Composition.adaptMachine("QCR", projectionInfo, Events.allEvents, s0)
 
 // Run the extended machine
 async function main() {
@@ -47,32 +49,27 @@ async function main() {
     const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
 
     for await (const state of machine) {
-      console.log("Quality control robot. State is:", state.type)
-      if (state.payload !== undefined) {
-        console.log("State payload is:", state.payload)
-      }
-      console.log()
-      const s = state.cast()
-      for (var c in s.commands()) {
-        if (c === 'observe') {
-            setTimeout(() => {
-                var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1 || {}).includes('observe')) {
-                    s1.observe()
-                }
-            }, getRandomInt(2000, 5000))
-            break
+        console.log("Quality control robot. State is:", state.type)
+        if (state.payload !== undefined) {
+            console.log("State payload is:", state.payload)
         }
-        if (c === 'test') {
+        console.log()
+        if(state.isLike(s0)) {
             setTimeout(() => {
-                var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1 || {}).includes('test')) {
-                    s1.test()
-                }
+            const stateAfterTimeOut = machine.get()
+            if (stateAfterTimeOut?.isLike(s0)) {
+                stateAfterTimeOut?.cast().commands()?.observe()
+            }
             }, getRandomInt(4000, 8000))
-            break
         }
-      }
+        if(state.isLike(s2)) {
+            setTimeout(() => {
+            const stateAfterTimeOut = machine.get()
+            if (stateAfterTimeOut?.isLike(s2)) {
+                stateAfterTimeOut?.cast().commands()?.test()
+            }
+            }, getRandomInt(4000, 8000))
+        }
     }
     app.dispose()
 }
