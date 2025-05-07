@@ -1614,7 +1614,7 @@ export namespace ImplStateOpaque {
     const isLike: ThisStateOpaque['isLike'] = (factory) => {
       return Object.keys(factory.mechanism.commands).every((cmdName) => cmdName in factoryAtSnapshot.mechanism.commands) &&
         Object.keys(factory.mechanism.commandDefinitions).every((cmdName) => cmdName in factoryAtSnapshot.mechanism.commandDefinitions &&
-          factoryAtSnapshot.mechanism.commandDefinitions[cmdName as keyof typeof factoryAtSnapshot.mechanism.commandDefinitions].toString() === factory.mechanism.commandDefinitions[cmdName as keyof typeof factory.mechanism.commandDefinitions].toString())
+          factoryAtSnapshot.mechanism.commandDefinitions[cmdName as keyof typeof factoryAtSnapshot.mechanism.commandDefinitions]?.toString() === factory.mechanism.commandDefinitions[cmdName as keyof typeof factory.mechanism.commandDefinitions]?.toString())
     }
 
     //const hasCommand: ThisStateOpaque['hasCommand'] = (cmd) => cmd in factoryAtSnapshot.mechanism.commands
