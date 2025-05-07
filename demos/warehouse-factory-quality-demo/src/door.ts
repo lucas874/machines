@@ -51,7 +51,7 @@ async function main() {
           if (stateAfterTimeOut?.isLike(s0)) {
             stateAfterTimeOut?.cast().commands()?.close()
           }
-        }, getRandomInt(5500, 8000))
+        }, getRandomInt(4000, 8000))
       }
     }
     app.dispose()

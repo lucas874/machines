@@ -7,7 +7,7 @@ import { checkComposedProjection, projectionAndInformation, projectionAndInforma
 const robot = Composition.makeMachine('R')
 export const s0 = robot.designEmpty('s0').finish()
 export const s1 = robot.designState('s1').withPayload<{part: string}>()
-  .command("build", [Events.car], (s: any, _: any) => {
+  .command("build", [Events.car], (s: any) => {
     var modelName = s.self.part === 'spoiler' ? "sports car" : "sedan";
     console.log("using the ", s.self.part, " to build a ", modelName);
     return [Events.car.make({part: s.self.part, modelName: modelName})]})
@@ -25,13 +25,14 @@ const checkProjResult = checkComposedProjection(factory_protocol, subs_factory, 
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Projection of warehouse || factory || quality over R
-const projectionInfoResult = projectionAndInformationNew(warehouse_factory_quality_protocol, subs_composition, "R", robot.createJSONForAnalysis(s0), 1)
+const projectionInfoResult = projectionAndInformation(warehouse_factory_quality_protocol, subs_composition, "R")
+//const projectionInfoResult = projectionAndInformationNew(warehouse_factory_quality_protocol, subs_composition, "R", robot.createJSONForAnalysis(s0), 1)
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
 //console.log(JSON.stringify(projectionInfo1, null, 2))
 
 // Adapt machine
-const [factoryRobotAdapted, s0_] = Composition.adaptMachineNew("R", projectionInfo, Events.allEvents, s0)
+const [factoryRobotAdapted, s0_] = Composition.adaptMachine("R", projectionInfo, Events.allEvents, s0)
 
 // Run the adapted machine
 async function main() {
@@ -45,17 +46,13 @@ async function main() {
         console.log("State payload is:", state.payload)
       }
       console.log()
-      const s = state.cast()
-      for (var c in s.commands()) {
-          if (c === 'build') {
-            setTimeout(() => {
-                var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1 || {}).includes('build')) {
-                    s1.build()
-                }
-            }, getRandomInt(4000, 8000))
-            break
+      if(state.isLike(s1)) {
+        setTimeout(() => {
+          const stateAfterTimeOut = machine.get()
+          if (stateAfterTimeOut?.isLike(s1)) {
+            stateAfterTimeOut?.cast().commands()?.build()
           }
+        }, getRandomInt(4000, 8000))
       }
     }
     app.dispose()
