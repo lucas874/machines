@@ -24,30 +24,26 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 
 // Run the adapted machine
 async function main() {
-    const app = await Actyx.of(manifest)
-    const tags = Composition.tagWithEntityId('warehouse-1')
-    const machine = createMachineRunner(app, tags, s0, undefined)
+  const app = await Actyx.of(manifest)
+  const tags = Composition.tagWithEntityId('warehouse-1')
+  const machine = createMachineRunner(app, tags, s0, undefined)
 
-    for await (const state of machine) {
-      console.log("Door. State is:", state.type)
-      if (state.payload !== undefined) {
-        console.log("State payload is:", state.payload)
-      }
-      console.log()
-      const s = state.cast()
-      for (var c in s.commands()) {
-          if (c === 'close') {
-            setTimeout(() => {
-                var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1 || {}).includes('close')) {
-                    s1.close()
-                }
-            }, getRandomInt(5000, 8000))
-            break
-          }
-      }
+  for await (const state of machine) {
+    console.log("Door. State is:", state.type)
+    if (state.payload !== undefined) {
+      console.log("State payload is:", state.payload)
     }
-    app.dispose()
+    console.log()
+    if (state.isLike(s0)) {
+      setTimeout(() => {
+        const stateAfterTimeOut = machine.get()
+        if (stateAfterTimeOut?.isLike(s0)) {
+          stateAfterTimeOut?.cast().commands()?.close()
+        }
+      }, getRandomInt(5000, 8000))
+    }
+  }
+  app.dispose()
 }
 
 main()

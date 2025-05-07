@@ -8,14 +8,14 @@ const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 // Using the machine runner DSL an implmentation of transporter in warehouse w.r.t. subs_warehouse is:
 const transporter = Composition.makeMachine('T')
 export const s0 = transporter.designEmpty('s0')
-    .command('request', [Events.partReq], (s: any, e: any) => {
+    .command('request', [Events.partReq], (s: any) => {
       var id = parts[Math.floor(Math.random() * parts.length)];
       console.log("requesting a", id);
       return [Events.partReq.make({id: id})]})
     .finish()
 export const s1 = transporter.designEmpty('s1').finish()
 export const s2 = transporter.designState('s2').withPayload<{part: string}>()
-    .command('deliver', [Events.partOK], (s: any, e: any) => {
+    .command('deliver', [Events.partOK], (s: any) => {
       console.log("delivering a", s.self.part)
       return [Events.partOK.make({part: s.self.part})] })
     .finish()
@@ -36,39 +36,36 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 
 // Run the adapted machine
 async function main() {
-    const app = await Actyx.of(manifest)
-    const tags = Composition.tagWithEntityId('warehouse-1')
-    const machine = createMachineRunner(app, tags, s0, undefined)
+  const app = await Actyx.of(manifest)
+  const tags = Composition.tagWithEntityId('warehouse-1')
+  const machine = createMachineRunner(app, tags, s0, undefined)
 
-    for await (const state of machine) {
-      console.log("Transporter. State is:", state.type)
-      if (state.payload !== undefined) {
-        console.log("State payload is:", state.payload)
-      }
-      console.log()
-      const s = state.cast()
-      for (var c in s.commands()) {
-          if (c === 'request') {
-            setTimeout(() => {
-                var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1 || {}).includes('request')) {
-                    s1.request()
-                }
-            }, getRandomInt(500, 5000))
-            break
-          }
-          if (c === 'deliver') {
-            setTimeout(() => {
-                var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1 || {}).includes('deliver')) {
-                    s1.deliver()
-                }
-            }, getRandomInt(500, 8000))
-            break
-          }
-      }
+  for await (const state of machine) {
+    console.log("Transporter. State is:", state.type)
+    if (state.payload !== undefined) {
+      console.log("State payload is:", state.payload)
     }
-    app.dispose()
+    console.log()
+
+    if(state.isLike(s0)) {
+      setTimeout(() => {
+        const stateAfterTimeOut = machine.get()
+        if (stateAfterTimeOut?.isLike(s0)) {
+          stateAfterTimeOut?.cast().commands()?.request()
+        }
+      }, getRandomInt(500, 5000))
+    }
+
+    if(state.isLike(s2)) {
+      setTimeout(() => {
+        const stateAfterTimeOut = machine.get()
+        if (stateAfterTimeOut?.isLike(s2)) {
+          stateAfterTimeOut?.cast().commands()?.deliver()
+        }
+      }, getRandomInt(500, 8000))
+    }
+  }
+  app.dispose()
 }
 
 main()

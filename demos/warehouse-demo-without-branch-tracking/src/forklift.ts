@@ -7,7 +7,7 @@ import { checkComposedProjection, projectionAndInformation } from '@actyx/machin
 const forklift = Composition.makeMachine('FL')
 export const s0 = forklift.designEmpty('s0') .finish()
 export const s1 = forklift.designState('s1').withPayload<{id: string}>()
-  .command('get', [Events.pos], (state: any, _: any) => {
+  .command('get', [Events.pos], (state: any) => {
     console.log("retrieved a", state.self.id, "at position x");
     return [Events.pos.make({position: "x", part: state.self.id})]})
   .finish()
@@ -25,32 +25,29 @@ s0.react([Events.closingTime], s2, (_, e) => { print_event(e); return s2.make() 
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "FL", forklift.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
-// Run the machine
+// Run the adapted machine
 async function main() {
-    const app = await Actyx.of(manifest)
-    const tags = Composition.tagWithEntityId('warehouse-1')
-    const machine = createMachineRunner(app, tags, s0, undefined)
+  const app = await Actyx.of(manifest)
+  const tags = Composition.tagWithEntityId('warehouse-1')
+  const machine = createMachineRunner(app, tags, s0, undefined)
 
-    for await (const state of machine) {
-      console.log("Forklift. State is:", state.type)
-      if (state.payload !== undefined) {
-        console.log("State payload is:", state.payload)
-      }
-      console.log()
-      const s = state.cast()
-      for (var c in s.commands()) {
-          if (c === 'get') {
-            setTimeout(() => {
-              var s1 = machine.get()?.cast()?.commands() as any
-              if (Object.keys(s1 || {}).includes('get')) {
-                s1.get()
-              }
-            }, 1500)
-            break
-          }
-      }
+  for await (const state of machine) {
+    console.log("Forklift. State is:", state.type)
+    if (state.payload !== undefined) {
+      console.log("State payload is:", state.payload)
     }
-    app.dispose()
+    console.log()
+
+    if(state.isLike(s1)) {
+      setTimeout(() => {
+        const stateAfterTimeOut = machine.get()
+        if (stateAfterTimeOut?.isLike(s1)) {
+          stateAfterTimeOut?.cast().commands()?.get()
+        }
+      }, 1500)
+    }
+  }
+  app.dispose()
 }
 
 main()
