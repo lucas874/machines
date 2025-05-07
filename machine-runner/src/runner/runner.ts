@@ -1475,10 +1475,13 @@ export interface StateOpaque<
 
   /**
    * True if factory has a command named cmd
-   *//*
-  hasCommand<F extends StateFactory<SwarmProtocolName, any, any, any, any, any>>(
-    cmd: string
-  ): this is StateOpaque.Of<F> */
+   *
+   * @param cmd - The name of a command to look up in the StateOpaque.
+   */ //extends StateFactory<SwarmProtocolName, any, any, any, any, any>
+  /* hasCommand(//<F extends StateFactory<SwarmProtocolName, any, any, any, any, any>> (
+    cmd: string,
+    //factory: F
+  ): this is StateOpaque.Of<StateFactory.Any> */
 
   /**
    * Return true when the commands of its state counterpart is available; otherwise return false.
@@ -1614,11 +1617,8 @@ export namespace ImplStateOpaque {
           factoryAtSnapshot.mechanism.commandDefinitions[cmdName as keyof typeof factoryAtSnapshot.mechanism.commandDefinitions].toString() === factory.mechanism.commandDefinitions[cmdName as keyof typeof factory.mechanism.commandDefinitions].toString())
     }
 
-/*
-    const hasCommand: ThisStateOpaque['hasCommand'] = <F extends StateFactory<SwarmProtocolName, any, any, any, any, any>>(
-      cmd: string
-    ): this is StateOpaque.Of<F> =>
-      cmd in factoryAtSnapshot.mechanism.command */
+    //const hasCommand: ThisStateOpaque['hasCommand'] = (cmd) => cmd in factoryAtSnapshot.mechanism.commands
+    //const hasCommand: ThisStateOpaque['hasCommand'] = (cmd: string): this is StateOpaque.Of<StateFactory.Any> => { return cmd in factoryAtSnapshot.mechanism.commands }
       //Object.keys(factoryAtSnapshot.mechanism.commands).includes(cmd)
 
     return {

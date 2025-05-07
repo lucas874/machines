@@ -15,7 +15,7 @@ export const s0 = transporter.designEmpty('s0')
     .finish()
 export const s1 = transporter.designEmpty('s1').finish()
 export const s2 = transporter.designState('s2').withPayload<{part: string}>()
-    .command('deliver', [Events.partOK], (s: any, e: any) => {
+    .command('deliver', [Events.partOK], (s: any) => {
       console.log("delivering a", s.self.part)
       return [Events.partOK.make({part: s.self.part})] })
     .finish()
@@ -35,13 +35,16 @@ const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehou
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
 // Projection of warehouse || factory || quality over T
-const projectionInfoResult = projectionAndInformationNew(warehouse_factory_quality_protocol, subs_composition, "T", transporter.createJSONForAnalysis(s0), 0)
+//const projectionInfoResult = projectionAndInformationNew(warehouse_factory_quality_protocol, subs_composition, "T", transporter.createJSONForAnalysis(s0), 0)
+const projectionInfoResult = projectionAndInformation(warehouse_factory_quality_protocol, subs_composition, "T")
+
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
 //console.log(JSON.stringify(projectionInfo1, null, 2))
 
 // Adapted machine
-const [transporterAdapted, s0_] = Composition.adaptMachineNew("T", projectionInfo, Events.allEvents, s0)
+//const [transporterAdapted, s0_] = Composition.adaptMachineNew("T", projectionInfo, Events.allEvents, s0)
+const [transporterAdapted, s0_] = Composition.adaptMachine("T", projectionInfo, Events.allEvents, s0)
 
 // Run the adapted machine
 async function main() {
@@ -54,34 +57,24 @@ async function main() {
       if (state.payload !== undefined) {
         console.log("State payload is:", state.payload)
       }
-      console.log(state.isLike(s0))
       console.log()
-      const s = state.cast()
-      //if(state.hasCommand('request')) {
+
       if(state.isLike(s0)) {
-        console.log("boing")
-        state.cast().commands()?.request()
+        setTimeout(() => {
+          const stateAfterTimeOut = machine.get()
+          if (stateAfterTimeOut?.isLike(s0)) {
+            stateAfterTimeOut?.cast().commands()?.request()
+          }
+        }, getRandomInt(5500, 8000))
       }
 
-      for (var c in s.commands()) {
-          if (c === 'request') {
-            setTimeout(() => {
-                var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1 || {}).includes('request')) {
-                    s1.request()
-                }
-            }, getRandomInt(2000, 5000))
-            break
+      if(state.isLike(s2)) {
+        setTimeout(() => {
+          const stateAfterTimeOut = machine.get()
+          if (stateAfterTimeOut?.isLike(s2)) {
+            stateAfterTimeOut?.cast().commands()?.deliver()
           }
-          if (c === 'deliver') {
-            setTimeout(() => {
-                var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1 || {}).includes('deliver')) {
-                    s1.deliver()
-                }
-            }, getRandomInt(4000, 8000))
-            break
-          }
+        }, getRandomInt(5500, 8000))
       }
     }
     app.dispose()

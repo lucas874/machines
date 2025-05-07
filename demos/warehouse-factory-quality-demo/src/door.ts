@@ -23,13 +23,15 @@ const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehou
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Projection of warehouse || factory || quality over D
-const projectionInfoResult = projectionAndInformationNew(warehouse_factory_quality_protocol, subs_composition, "D", door.createJSONForAnalysis(s0), 0)
+//const projectionInfoResult = projectionAndInformationNew(warehouse_factory_quality_protocol, subs_composition, "D", door.createJSONForAnalysis(s0), 0)
+const projectionInfoResult = projectionAndInformation(warehouse_factory_quality_protocol, subs_composition, "D")
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
 //console.log(JSON.stringify(projectionInfo1, null, 2))
 
 // Adapt machine
-const [doorAdapted, s0_] = Composition.adaptMachineNew("D", projectionInfo, Events.allEvents, s0)
+//const [doorAdapted, s0_] = Composition.adaptMachineNew("D", projectionInfo, Events.allEvents, s0)
+const [doorAdapted, s0_] = Composition.adaptMachine("D", projectionInfo, Events.allEvents, s0)
 
 // Run the adapted machine
 async function main() {
@@ -43,18 +45,13 @@ async function main() {
         console.log("State payload is:", state.payload)
       }
       console.log()
-      console.log(state.isLike(s0))
-      const s = state.cast()
-      for (var c in s.commands()) {
-          if (c === 'close') {
-            setTimeout(() => {
-                var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1 || {}).includes('close')) {
-                    s1.close()
-                }
-            }, getRandomInt(5500, 8000))
-            break
+      if (state.isLike(s0)) {
+        setTimeout(() => {
+          const stateAfterTimeOut = machine.get()
+          if (stateAfterTimeOut?.isLike(s0)) {
+            stateAfterTimeOut?.cast().commands()?.close()
           }
+        }, getRandomInt(5500, 8000))
       }
     }
     app.dispose()
