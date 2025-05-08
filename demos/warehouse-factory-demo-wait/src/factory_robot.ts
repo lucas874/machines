@@ -24,7 +24,7 @@ s0.react([Events.part], s1, (_, e) => {
   print_event(e);
   console.log("received a ", e.payload.partName);
   return s1.make({partName: e.payload.partName})})
-s1.react([Events.car], s2, (_) => s2.make())
+s1.react([Events.car], s2, (_, e) => {print_event(e); return s2.make()})
 
 // Check that the original machine is a correct implementation. A prerequisite for reusing it.
 const checkProjResult = checkComposedProjection(factory_protocol, subs_factory, "R", robot.createJSONForAnalysis(s0))
