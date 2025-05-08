@@ -12,18 +12,18 @@ const rl = readline.createInterface({
 // Using the machine runner DSL an implmentation of robot in factory w.r.t. subs_factory is:
 const robot = Composition.makeMachine('R')
 export const s0 = robot.designEmpty('s0').finish()
-export const s1 = robot.designState('s1').withPayload<{part: string}>()
+export const s1 = robot.designState('s1').withPayload<{partName: string}>()
   .command("build", [Events.car], (s: any) => {
-    var modelName = s.self.part === 'spoiler' ? "sports car" : "sedan";
-    console.log("using the ", s.self.part, " to build a ", modelName);
-    return [Events.car.make({part: s.self.part, modelName: modelName})]})
+    var modelName = s.self.partName === 'spoiler' ? "sports car" : "sedan";
+    console.log("using the ", s.self.partName, " to build a ", modelName);
+    return [Events.car.make({partName: s.self.part, modelName: modelName})]})
   .finish()
 export const s2 = robot.designEmpty('s2').finish()
 
-s0.react([Events.partOK], s1, (_, e) => {
+s0.react([Events.part], s1, (_, e) => {
   print_event(e);
-  console.log("received a ", e.payload.part);
-  return s1.make({part: e.payload.part})})
+  console.log("received a ", e.payload.partName);
+  return s1.make({partName: e.payload.partName})})
 s1.react([Events.car], s2, (_) => s2.make())
 
 // Check that the original machine is a correct implementation. A prerequisite for reusing it.

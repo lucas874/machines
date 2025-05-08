@@ -12,20 +12,20 @@ const rl = readline.createInterface({
 // Using the machine runner DSL an implmentation of forklift in the warehouse protocol w.r.t. subs_warehouse is:
 const forklift = Composition.makeMachine('FL')
 export const s0 = forklift.designEmpty('s0') .finish()
-export const s1 = forklift.designState('s1').withPayload<{id: string}>()
+export const s1 = forklift.designState('s1').withPayload<{partName: string}>()
   .command('get', [Events.pos], (state: any) => {
-    console.log("retrieved a", state.self.id, "at position x");
-    return [Events.pos.make({position: "x", part: state.self.id})]})
+    console.log("retrieved a", state.self.partName, "at position x");
+    return [Events.pos.make({position: "x", partName: state.self.partName})]})
   .finish()
 export const s2 = forklift.designEmpty('s2').finish()
 
-s0.react([Events.partReq], s1, (_, e) => {
+s0.react([Events.partID], s1, (_, e) => {
     print_event(e);
-    console.log("a", e.payload.id, "was requested");
-    if (getRandomInt(0, 10) >= 9) { return { id: "broken part" } }
-    return s1.make({id: e.payload.id}) })
+    console.log("a", e.payload.partName, "was requested");
+    if (getRandomInt(0, 10) >= 9) { return { partName: "broken part" } }
+    return s1.make({partName: e.payload.partName}) })
 s1.react([Events.pos], s0, (_, e) => { print_event(e); return s0.make() })
-s0.react([Events.closingTime], s2, (_, e) => { print_event(e); return s2.make() })
+s0.react([Events.time], s2, (_, e) => { print_event(e); return s2.make() })
 
 // Check that the original machine is a correct implementation. A prerequisite for reusing it.
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "FL", forklift.createJSONForAnalysis(s0))
