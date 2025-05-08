@@ -80,5 +80,6 @@ export function getRandomInt(min: number, max: number) {
 }
 
 export function print_event(e: any) {
-  console.log(`received an event: ${JSON.stringify(e.payload, null, 2)}`)
+  const {lbj, ...toPrint} = e.payload
+  console.log(`received an event: ${JSON.stringify(toPrint, null, 2)}`)
 }

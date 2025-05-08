@@ -31,12 +31,6 @@ s0.react([Events.closingTime], s2, (_, e) => { print_event(e); return s2.make() 
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "FL", forklift.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
-//const projectionInfoResult1 = projectionAndInformationNew(warehouse_factory_protocol, subs_composition, "FL", forklift.createJSONForAnalysis(s0), 0)
-//if (projectionInfoResult1.type == 'ERROR') throw new Error('error getting projection')
-//const projectionInfo1 = projectionInfoResult1.data
-//console.log(JSON.stringify(projectionInfo1, null, 2))
-//const [forkliftAdapted, s0_] = Composition.adaptMachineNew("FL", projectionInfo1, Events.allEvents, s0)
-
 // Projection of warehouse || factory over FL
 const projectionInfoResult = projectionAndInformation(warehouse_factory_protocol, subs_composition, "FL")
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')

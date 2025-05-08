@@ -560,8 +560,8 @@ export namespace ProjMachine {
           fMap2.reactions.has(eventType)
             ? fMap2.reactions.get(eventType)!
             : (markedStates.has(transition.target)
-              ? (s: any, e: any) => { console.log(`received an event: ${JSON.stringify(e.payload, null, 2)}`); return projStatesToStates.get(transition.target).make(s.self) } // propagate state payload
-              : (s: any, e: any) =>  { console.log(`received an event: ${JSON.stringify(e.payload, null, 2)}`); return projStatesToStates.get(transition.target).make({}) })
+              ? (s: any, e: any) => { const {lbj, ...toPrint} = e.payload; console.log(`received an event: ${JSON.stringify(toPrint, null, 2)}`); return projStatesToStates.get(transition.target).make(s.self) } // propagate state payload
+              : (s: any, e: any) =>  { const {lbj, ...toPrint} = e.payload; console.log(`received an event: ${JSON.stringify(toPrint, null, 2)}`); return projStatesToStates.get(transition.target).make({}) })
         projStatesToStates.get(transition.source).react([event], projStatesToStates.get(transition.target), f)
       }
     }
