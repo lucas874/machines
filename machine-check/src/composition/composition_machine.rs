@@ -91,8 +91,9 @@ pub fn project(
             );
         }
     }
-    let (dfa, dfa_initial) = nfa_to_dfa(machine, m_nodes[initial.index()]); // make deterministic. slight deviation from projection operation formally.
-    minimal_machine(&dfa, dfa_initial) // when minimizing we get a machine that is a little different but equivalent to the one prescribed by the projection operator formally
+    (machine, m_nodes[initial.index()])
+    //let (dfa, dfa_initial) = nfa_to_dfa(machine, m_nodes[initial.index()]); // make deterministic. slight deviation from projection operation formally.
+    //minimal_machine(&dfa, dfa_initial) // when minimizing we get a machine that is a little different but equivalent to the one prescribed by the projection operator formally
 }
 
 // precondition: the protocols interfaces on the supplied interfaces.
