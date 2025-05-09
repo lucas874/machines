@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import { MachineEvent, SwarmProtocol } from '@actyx/machine-runner'
-import { SwarmProtocolType, Subscriptions, Result, ResultData, InterfacingSwarms, overapproxWWFSubscriptions, checkWWFSwarmProtocol, MachineType} from '@actyx/machine-check'
+import { SwarmProtocolType, Subscriptions, Result, ResultData, InterfacingSwarms, overapproxWWFSubscriptions, checkWWFSwarmProtocol, MachineType, projectionAndInformation} from '@actyx/machine-check'
+import chalk from "chalk";
 
 export const manifest = {
   appId: 'com.example.car-factory',
@@ -79,7 +80,14 @@ export function getRandomInt(min: number, max: number) {
   return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled); // The maximum is exclusive and the minimum is inclusive
 }
 
+const log = console.log;
 export function print_event(e: any) {
   const {lbj, ...toPrint} = e.payload
-  console.log(`received an event: ${JSON.stringify(toPrint, null, 2)}`)
+  //console.log(`received an event: ${JSON.stringify(toPrint, null, 2)}`)
+  log(chalk.blue`${e.payload.type}? ⬅ ${JSON.stringify(toPrint, null, 0)}`)
 }
+
+// Projection of warehouse || factory over R
+const projectionInfoResult = projectionAndInformation(warehouse_factory_protocol, subs_composition, "R")
+if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
+export const projectionInfoRobot = projectionInfoResult.data

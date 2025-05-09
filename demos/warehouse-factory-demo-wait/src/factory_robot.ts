@@ -1,48 +1,62 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
-import { Events, manifest, Composition, warehouse_factory_protocol, getRandomInt, factory_protocol, subs_factory, print_event, subs_composition  } from './protocol'
+import { Events, manifest, Composition, warehouse_factory_protocol, getRandomInt, factory_protocol, subs_factory, print_event, subs_composition, projectionInfoRobot  } from './protocol'
 import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 import * as readline from 'readline';
+
+import chalk from "chalk";
+const log = console.log;
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
 });
 
+/* // Ask the question manually
+process.stdout.write(Enter your name: );
+
+rl.on(line, (input) => {
+  // Clear the line
+  readline.clearLine(process.stdout, 0);  // 0 = clear entire line
+  readline.cursorTo(process.stdout, 0);   // move cursor to beginning
+
+  // Replace it with a new message
+  process.stdout.write(`Nice to meet you, ${input}!
+`);
+  rl.close();
+}); */
+
 // Using the machine runner DSL an implmentation of robot in factory w.r.t. subs_factory is:
 const robot = Composition.makeMachine('R')
+// slide with code and next to it depiction of machine. ecoop 23 does this
+
 export const s0 = robot.designEmpty('s0').finish()
+
 export const s1 = robot.designState('s1').withPayload<{partName: string}>()
   .command("build", [Events.car], (s: any) => {
     var modelName = s.self.partName === 'spoiler' ? "sports car" : "sedan";
     console.log("using the ", s.self.partName, " to build a ", modelName);
     return [Events.car.make({partName: s.self.part, modelName: modelName})]})
   .finish()
+
 export const s2 = robot.designEmpty('s2').finish()
 
 s0.react([Events.part], s1, (_, e) => {
   print_event(e);
   console.log("received a ", e.payload.partName);
   return s1.make({partName: e.payload.partName})})
+
 s1.react([Events.car], s2, (_, e) => {print_event(e); return s2.make()})
 
-// Check that the original machine is a correct implementation. A prerequisite for reusing it.
-const checkProjResult = checkComposedProjection(factory_protocol, subs_factory, "R", robot.createJSONForAnalysis(s0))
-if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
-
-// Projection of warehouse || factory over R
-const projectionInfoResult = projectionAndInformation(warehouse_factory_protocol, subs_composition, "R")
-if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
-const projectionInfo = projectionInfoResult.data
-
 // Adapt machine
-const [factoryRobotAdapted, s0_] = Composition.adaptMachine("R", projectionInfo, Events.allEvents, s0)
+const [factoryRobotAdapted, s0Adapted] = Composition.adaptMachine("R", projectionInfoRobot, Events.allEvents, s0)
 
 // Run the adapted machine
 async function main() {
+
   const app = await Actyx.of(manifest)
   const tags = Composition.tagWithEntityId('warehouse-factory-quality')
-  const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
+  const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfoRobot.branches, projectionInfoRobot.specialEventTypes)
 
   for await (const state of machine) {
     console.log("Robot. State is:", state.type)
@@ -51,9 +65,13 @@ async function main() {
     }
     console.log()
     if(state.isLike(s1)) {
-      rl.question("Invoke build? ", (_) => {
+      log(chalk.blue`build!`);
+      rl.on('line', (input: any) => {
         const stateAfterTimeOut = machine.get()
         if (stateAfterTimeOut?.isLike(s1)) {
+          readline.moveCursor(process.stdout,0,-2);
+          readline.clearScreenDown(process.stdout);
+          log(chalk.green.bold`build!`);
           stateAfterTimeOut?.cast().commands()?.build()
         }
       })

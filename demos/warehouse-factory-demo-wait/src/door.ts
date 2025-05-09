@@ -13,7 +13,6 @@ const rl = readline.createInterface({
 const door = Composition.makeMachine('D')
 export const s0 = door.designEmpty('s0')
     .command('close', [Events.time], () => {
-        //rl.question("Close warehouse? ", (_) => {})
         var dateString = new Date().toLocaleString();
         console.log("Closed warehouse at:", dateString);
         return [Events.time.make({timeOfDay: dateString})]})
@@ -50,7 +49,7 @@ async function main() {
     }
     console.log()
     if (state.isLike(s0)) {
-      rl.question("Invoke close? ", (_) => {
+      rl.question("Invoke close? \n", (_) => {
         const stateAfterTimeOut = machine.get()
         if (stateAfterTimeOut?.isLike(s0)) {
           stateAfterTimeOut?.cast().commands()?.close()

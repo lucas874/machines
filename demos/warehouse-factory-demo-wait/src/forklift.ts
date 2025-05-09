@@ -53,7 +53,7 @@ async function main() {
     console.log()
 
     if(state.isLike(s1)) {
-      rl.question("Invoke get? ", (_) => {
+      rl.question("Invoke get? \n", (_) => {
         const stateAfterTimeOut = machine.get()
         if (stateAfterTimeOut?.isLike(s1)) {
           stateAfterTimeOut?.cast().commands()?.get()

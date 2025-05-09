@@ -4,6 +4,9 @@ import { Events, manifest, Composition, warehouse_factory_protocol, subs_composi
 import { checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation } from '@actyx/machine-check'
 import * as readline from 'readline';
 
+import chalk from "chalk";
+const log = console.log;
+
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
@@ -14,25 +17,34 @@ const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 // Using the machine runner DSL an implmentation of transporter in warehouse w.r.t. subs_warehouse is:
 const transporter = Composition.makeMachine('T')
 export const s0 = transporter.designEmpty('s0')
-    .command('request', [Events.partID], (s: any) => {
-      var id = parts[Math.floor(Math.random() * parts.length)];
-      console.log("requesting a", id);
-      return [Events.partID.make({partName: id})]})
-    .finish()
+  .command('request', [Events.partID], (ctx) => {
+    var id = parts[Math.floor(Math.random() * parts.length)];
+    //console.log("requesting a", id);
+    readline.moveCursor(process.stdout, 0, -2);
+    readline.clearScreenDown(process.stdout);
+    log(chalk.green.bold`request! ➡ \{"partName": "${id}", "type": "partID"\}`);
+    return [Events.partID.make({ partName: id })]
+  })
+  .finish()
 export const s1 = transporter.designEmpty('s1').finish()
-export const s2 = transporter.designState('s2').withPayload<{partName: string}>()
-    .command('deliver', [Events.part], (s: any) => {
-      console.log("delivering a", s.self.partName)
-      return [Events.part.make({partName: s.self.partName})] })
-    .finish()
+export const s2 = transporter.designState('s2').withPayload<{ partName: string }>()
+  .command('deliver', [Events.part], (ctx) => {
+    //console.log("delivering a", s.self.partName)
+    readline.moveCursor(process.stdout, 0, -2);
+    readline.clearScreenDown(process.stdout);
+    log(chalk.green.bold`deliver! ➡ \{"partName": "${ctx.self.partName}", "type": "part"\}`);
+    return [Events.part.make({ partName: ctx.self.partName })]
+  })
+  .finish()
 export const s3 = transporter.designEmpty('s3').finish()
 
 s0.react([Events.partID], s1, (_, e) => { print_event(e); return s1.make() })
 s0.react([Events.time], s3, (_, e) => { print_event(e); return s3.make() })
 s1.react([Events.pos], s2, (_, e) => {
-    print_event(e)
-    console.log("got a ", e.payload.partName);
-    return { partName: e.payload.partName } })
+  print_event(e)
+  console.log("got a ", e.payload.partName);
+  return s2.make({ partName: e.payload.partName })
+})
 
 s2.react([Events.part], s0, (_, e) => { print_event(e); return s0.make() })
 
@@ -61,17 +73,25 @@ async function main() {
     }
     console.log()
 
-    if(state.isLike(s0)) {
-      rl.question("Invoke request? ", (_) => {
+    if (state.isLike(s0)) {
+      log(chalk.red`request!`);
+      rl.on('line', (_) => {
         const stateAfterTimeOut = machine.get()
         if (stateAfterTimeOut?.isLike(s0)) {
           stateAfterTimeOut?.cast().commands()?.request()
         }
       })
+      /* rl.question("Invoke request? \n", (_) => {
+        const stateAfterTimeOut = machine.get()
+        if (stateAfterTimeOut?.isLike(s0)) {
+          stateAfterTimeOut?.cast().commands()?.request()
+        }
+      }) */
     }
 
-    if(state.isLike(s2)) {
-      rl.question("Invoke deliver? ", (_) => {
+    if (state.isLike(s2)) {
+      log(chalk.red`deliver!`);
+      rl.on('line', (_) => {
         const stateAfterTimeOut = machine.get()
         if (stateAfterTimeOut?.isLike(s2)) {
           stateAfterTimeOut?.cast().commands()?.deliver()

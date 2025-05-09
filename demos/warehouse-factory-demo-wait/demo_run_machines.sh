@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 
+robot_ascii="
+██████   ██████  ██████   ██████  ████████
+██   ██ ██    ██ ██   ██ ██    ██    ██
+██████  ██    ██ ██████  ██    ██    ██
+██   ██ ██    ██ ██   ██ ██    ██    ██
+██   ██  ██████  ██████   ██████     ██
+"
+
 # Commands to run in each window and pane
-START_R="echo 'Starting factory-robot of the Warehouse || Factory protocol.'; echo 'Press Ctrl + C to exit.'; npm run start-factory-robot;exec bash"
+#START_R="echo 'Starting factory-robot of the Warehouse || Factory protocol.'; echo 'Press Ctrl + C to exit.'; npm run start-factory-robot;exec bash"
+START_R="echo '$robot_ascii'; echo 'of the Warehouse || Factory protocol.'; npm run start-factory-robot;exec bash"
 START_FL="echo 'Starting forklift of the Warehouse || Factory protocol.'; echo 'Press Ctrl + C to exit.'; npm run start-forklift;exec bash"
 START_T="echo 'Starting transporter of the Warehouse || Factory protocol.'; echo 'Press Ctrl + C to exit.'; npm run start-transporter;exec bash"
 START_D="echo 'Starting door of the Warehouse || Factory protocol.'; echo 'Press Ctrl + C to exit.'; npm run start-door;exec bash"
