@@ -47,7 +47,7 @@ async function main() {
   const tags = Composition.tagWithEntityId('warehouse-factory-quality')
   const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
   printState(doorAdapted.machineName, s0Adapted.mechanism.name, undefined)
-  log(chalk.red.dim`    time!`);
+  log(chalk.bgBlack.red.dim`    time!`);
 
   for await (const state of machine) {
     //log(chalk.blue`State: ${state.type}. Payload: ${state.payload === undefined ? "{}" : JSON.stringify(state.payload, null, 0) }`)

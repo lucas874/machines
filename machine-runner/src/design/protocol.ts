@@ -490,15 +490,15 @@ export namespace ProjMachine {
 
   const printEvent = (e: any) => {
     const {lbj, ...toPrint} = e.payload
-    console.log(chalk.blue`    ${e.payload.type}? ⬅ ${JSON.stringify(toPrint, null, 0)}`)
+    console.log(chalk.bgBlack.blue`    ${e.payload.type}? ⬅ ${JSON.stringify(toPrint, null, 0)}`)
   }
   const printState = (machineName: string, stateName: string, statePayload: any) => {
-    console.log(chalk.bold.underline`${machineName}`, chalk.bold`- State:`, chalk.bold.underline`${stateName}`, chalk.bold`. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
+    console.log(chalk.bgBlack.white.bold`${machineName} - State: ${stateName}. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
   }
   const commandEnabledStrings = (labels: CommandLabel[] | undefined): string[] => labels ? labels.map(l => l.label.logType[0]) : []
   const printEnabledCmds = (labels: string[]) => {
     labels.forEach((transition) => {
-      console.log(chalk.red.dim`    ${transition}!`);
+      console.log(chalk.bgBlack.red.dim`    ${transition}!`);
     })
   }
   const printInfoOnTransition = (machineName: string, e: any, stateName: string, statePayload: any, labels: CommandLabel[] | undefined) => {
@@ -575,7 +575,7 @@ export namespace ProjMachine {
           const payload = f(...args);
           readline.moveCursor(process.stdout, 0, -2);
           readline.clearScreenDown(process.stdout);
-          console.log(chalk.green.bold`    ${transition.label.logType[0]}! ➡ ${JSON.stringify(payload[0], null, 0)}`);
+          console.log(chalk.bgBlack.green.bold`    ${transition.label.logType[0]}! ➡ ${JSON.stringify(payload[0], null, 0)}`);
           return payload;
         }
         return [transition.label.cmd, transition.label.logType.map((et: string) => eventTypeStringToEvent.get(et)), ff]
