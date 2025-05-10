@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT} from '@actyx/machine-runner'
-import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event } from './protocol'
+import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event, printState } from './protocol'
 import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 import * as readline from 'readline';
 import chalk from "chalk";
@@ -17,9 +17,9 @@ const door = Composition.makeMachine('D')
 export const s0 = door.designEmpty('s0')
     .command('close', [Events.time], () => {
         var dateString = new Date().toLocaleString();
-        readline.moveCursor(process.stdout, 0, -2);
-        readline.clearScreenDown(process.stdout);
-        log(chalk.green.bold`    time! ➡ \{"timeOfDay":"${dateString}","type":"time"\}`);
+        //readline.moveCursor(process.stdout, 0, -2);
+        //readline.clearScreenDown(process.stdout);
+        //log(chalk.green.bold`    time! ➡ \{"timeOfDay":"${dateString}","type":"time"\}`);
         return [Events.time.make({timeOfDay: dateString})]})
     .finish()
 export const s1 = door.designEmpty('s1').finish()
@@ -39,19 +39,21 @@ if (projectionInfoResult.type == 'ERROR') throw new Error('error getting project
 const projectionInfo = projectionInfoResult.data
 
 // Adapted machine
-const [doorAdapted, s0_] = Composition.adaptMachine("D", projectionInfo, Events.allEvents, s0, true)
+const [doorAdapted, s0Adapted] = Composition.adaptMachine("D", projectionInfo, Events.allEvents, s0, true)
 
 // Run the adapted machine
 async function main() {
   const app = await Actyx.of(manifest)
   const tags = Composition.tagWithEntityId('warehouse-factory-quality')
-  const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
+  const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
+  printState(s0Adapted.mechanism.name, undefined)
+  log(chalk.red.dim`    time!`);
 
   for await (const state of machine) {
     //log(chalk.blue`State: ${state.type}. Payload: ${state.payload === undefined ? "{}" : JSON.stringify(state.payload, null, 0) }`)
 
     if (state.isLike(s0)) {
-      log(chalk.red`    time!`);
+      //log(chalk.red`    time!`);
       rl.on('line', (_) => {
         const stateAfterTimeOut = machine.get()
         if (stateAfterTimeOut?.isLike(s0)) {

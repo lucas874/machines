@@ -3,6 +3,7 @@ import { Tag, Tags } from '@actyx/sdk'
 import { StateMechanism, MachineProtocol, ReactionMap, StateFactory } from './state.js'
 import { MachineEvent } from './event.js'
 import chalk = require('chalk');
+import * as readline from 'readline';
 
 /**
  * SwarmProtocol is the entry point of designing a swarm of MachineRunners. A
@@ -468,6 +469,44 @@ export namespace ProjMachine {
     specialEventTypes: Set<string>,
   }
 
+  type ReactionLabel = {
+    source: string;
+    target: string;
+    label: {
+      tag: "Input";
+      eventType: string;
+    };
+  }
+
+  type CommandLabel = {
+      source: string;
+      target: string;
+      label: {
+        tag: "Execute";
+        cmd: string;
+        logType: string[];
+      };
+  }
+
+  const printEvent = (e: any) => {
+    const {lbj, ...toPrint} = e.payload
+    console.log(chalk.blue`    ${e.payload.type}? ⬅ ${JSON.stringify(toPrint, null, 0)}`)
+  }
+  const printState = (stateName: string, statePayload: any) => {
+    console.log(chalk.blue`State: ${stateName}. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
+  }
+  const commandEnabledStrings = (labels: CommandLabel[] | undefined): string[] => labels ? labels.map(l => l.label.logType[0]) : []
+  const printEnabledCmds = (labels: string[]) => {
+    labels.forEach((transition) => {
+      console.log(chalk.red.dim`    ${transition}!`);
+    })
+  }
+  const printInfoOnTransition = (e: any, stateName: string, statePayload: any, labels: CommandLabel[] | undefined) => {
+    printEvent(e);
+    printState(stateName, statePayload);
+    printEnabledCmds(commandEnabledStrings(labels));
+  }
+
   export const adaptMachine = <
     SwarmProtocolName extends string,
     MachineName extends string,
@@ -480,8 +519,8 @@ export namespace ProjMachine {
     verbose?: boolean,
   ): [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any] => {
     var projStatesToStates: Map<string, any> = new Map()
-    var projStatesToExec: Map<string, Transition[]> = new Map()
-    var projStatesToInput: Map<string, Transition[]> = new Map()
+    var projStatesToExec: Map<string, CommandLabel[]> = new Map()
+    var projStatesToInput: Map<string, ReactionLabel[]> = new Map()
     // map event type string to Event
     const eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> =
       new Map<string, MachineEvent.Factory<any, Record<never, never>>>(events.map(e => [e.type, e]))
@@ -507,13 +546,13 @@ export namespace ProjMachine {
         if (!projStatesToExec.has(transition.source)) {
           projStatesToExec.set(transition.source, new Array())
         }
-        projStatesToExec.get(transition.source)?.push(transition)
+        projStatesToExec.get(transition.source)?.push(transition as CommandLabel)
 
       } else if (transition.label.tag === 'Input') {
         if (!projStatesToInput.has(transition.source)) {
           projStatesToInput.set(transition.source, new Array())
         }
-        projStatesToInput.get(transition.source)?.push(transition)
+        projStatesToInput.get(transition.source)?.push(transition as ReactionLabel)
 
         // add target to projStatesToInput as well. in case no outgoing transitions.
         if (!projStatesToInput.has(transition.target)) {
@@ -529,8 +568,19 @@ export namespace ProjMachine {
       allProjStates.add(transition.target)
     })
 
-    const transitionToTriple = (transition: Transition) => {
-      return transition.label.tag === 'Execute' ? [transition.label.cmd, transition.label.logType.map((et: string) => eventTypeStringToEvent.get(et)), fMap2.commands.get(transition.label.cmd)!] : []
+    const transitionToTriple = (transition: CommandLabel) => {
+      if (verbose) {
+        const f = fMap2.commands.get(transition.label.cmd)!
+        const ff = (...args: any[]) => {
+          const payload = f(...args);
+          readline.moveCursor(process.stdout, 0, -2);
+          readline.clearScreenDown(process.stdout);
+          console.log(chalk.green.bold`    ${transition.label.logType[0]}! ➡ ${JSON.stringify(payload[0], null, 0)}`);
+          return payload;
+        }
+        return [transition.label.cmd, transition.label.logType.map((et: string) => eventTypeStringToEvent.get(et)), ff]
+      }
+      return [transition.label.cmd, transition.label.logType.map((et: string) => eventTypeStringToEvent.get(et)), fMap2.commands.get(transition.label.cmd)!]
     }
 
     // add all states from projection as states to machine
@@ -554,14 +604,6 @@ export namespace ProjMachine {
       }
     }
 
-    const printEvent = (e: any) => {
-      const {lbj, ...toPrint} = e.payload
-      console.log(chalk.blue`    ${e.payload.type}? ⬅ ${JSON.stringify(toPrint, null, 0)}`)
-    }
-    const printTargetState = (stateName: string, statePayload: any) => {
-      console.log(chalk.blue`State: ${stateName}. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
-    }
-
     for (var transition of proj.transitions) {
       if (transition.label.tag === 'Input') {
         const eventType = transition.label.eventType
@@ -572,10 +614,10 @@ export namespace ProjMachine {
           var f =
             fMap2.reactions.has(eventType)
               ? (ctx: any, e: any) => {
-                printEvent(e); const statePayload = fMap2.reactions.get(eventType)!(ctx, e); printTargetState(target, statePayload); return statePayload }
+                const statePayload = fMap2.reactions.get(eventType)!(ctx, e); printInfoOnTransition(e, target, statePayload, projStatesToExec.get(target)); return statePayload }
               : (markedStates.has(target)
-                ? (ctx: any, e: any) => { printEvent(e); const statePayload = projStatesToStates.get(target).make(ctx.self); printTargetState(target, statePayload); return statePayload } // propagate state payload
-                : (ctx: any, e: any) => { printEvent(e); printTargetState(target, undefined); return projStatesToStates.get(target).make({}) })
+                ? (ctx: any, e: any) => { const statePayload = projStatesToStates.get(target).make(ctx.self); printInfoOnTransition(e, target, statePayload, projStatesToExec.get(target)); return statePayload } // propagate state payload
+                : (ctx: any, e: any) => { printInfoOnTransition(e, target, undefined, projStatesToExec.get(target)); return projStatesToStates.get(target).make({}) })
         } else {
           var f =
             fMap2.reactions.has(eventType)
@@ -602,25 +644,6 @@ export namespace ProjMachine {
       } else {
         return [groups.name, groups.id]
       }
-  }
-
-  type ReactionLabel = {
-      source: string;
-      target: string;
-      label: {
-        tag: "Input";
-        eventType: string;
-      };
-  }
-
-  type CommandLabel = {
-      source: string;
-      target: string;
-      label: {
-        tag: "Execute";
-        cmd: string;
-        logType: string[];
-      };
   }
 
   type ProjectionStateInfo = {

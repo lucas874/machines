@@ -91,3 +91,7 @@ export function print_event(e: any) {
 const projectionInfoResult = projectionAndInformation(warehouse_factory_protocol, subs_composition, "R")
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 export const projectionInfoRobot = projectionInfoResult.data
+
+export const printState = (stateName: string, statePayload: any) => {
+  console.log(chalk.blue`State: ${stateName}. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
+}

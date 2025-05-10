@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
-import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event } from './protocol'
+import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event, printState } from './protocol'
 import { checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation } from '@actyx/machine-check'
 import * as readline from 'readline';
 
@@ -20,9 +20,9 @@ export const s0 = transporter.designEmpty('s0')
   .command('request', [Events.partID], (ctx) => {
     var id = parts[Math.floor(Math.random() * parts.length)];
     //console.log("requesting a", id);
-    readline.moveCursor(process.stdout, 0, -2);
-    readline.clearScreenDown(process.stdout);
-    log(chalk.green.bold`    partID! ➡ \{"partName":"${id}","type":"partID"\}`);
+    //readline.moveCursor(process.stdout, 0, -2);
+    //readline.clearScreenDown(process.stdout);
+    //log(chalk.green.bold`    partID! ➡ \{"partName":"${id}","type":"partID"\}`);
     return [Events.partID.make({ partName: id })]
   })
   .finish()
@@ -30,9 +30,9 @@ export const s1 = transporter.designEmpty('s1').finish()
 export const s2 = transporter.designState('s2').withPayload<{ partName: string }>()
   .command('deliver', [Events.part], (ctx) => {
     //console.log("delivering a", s.self.partName)
-    readline.moveCursor(process.stdout, 0, -2);
-    readline.clearScreenDown(process.stdout);
-    log(chalk.green.bold`    part! ➡ \{"partName":"${ctx.self.partName}","type":"part"\}`);
+    //readline.moveCursor(process.stdout, 0, -2);
+    //readline.clearScreenDown(process.stdout);
+    //log(chalk.green.bold`    part! ➡ \{"partName":"${ctx.self.partName}","type":"part"\}`);
     return [Events.part.make({ partName: ctx.self.partName })]
   })
   .finish()
@@ -57,19 +57,20 @@ if (projectionInfoResult.type == 'ERROR') throw new Error('error getting project
 const projectionInfo = projectionInfoResult.data
 
 // Adapted machine
-const [transporterAdapted, s0_] = Composition.adaptMachine("T", projectionInfo, Events.allEvents, s0, true)
-
+const [transporterAdapted, s0Adapted] = Composition.adaptMachine("T", projectionInfo, Events.allEvents, s0, true)
 // Run the adapted machine
 async function main() {
   const app = await Actyx.of(manifest)
   const tags = Composition.tagWithEntityId('warehouse-factory-quality')
-  const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
+  const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
+  printState(s0Adapted.mechanism.name, undefined)
+  log(chalk.red.dim`    partID!`);
 
   for await (const state of machine) {
     //log(chalk.blue`State: ${state.type}. Payload: ${state.payload === undefined ? "{}" : JSON.stringify(state.payload, null, 0) }`)
 
     if (state.isLike(s0)) {
-      log(chalk.red.dim`    partID!`);
+      //log(chalk.red.dim`    partID!`);
       rl.on('line', (_) => {
         const stateAfterTimeOut = machine.get()
         if (stateAfterTimeOut?.isLike(s0)) {
@@ -79,7 +80,7 @@ async function main() {
     }
 
     if (state.isLike(s2)) {
-      log(chalk.red`    part!`);
+      //log(chalk.red`    part!`);
       rl.on('line', (_) => {
         const stateAfterTimeOut = machine.get()
         if (stateAfterTimeOut?.isLike(s2)) {

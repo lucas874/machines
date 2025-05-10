@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
-import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event } from './protocol'
+import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event, printState } from './protocol'
 import { checkComposedProjection, projectionAndInformation, projectionAndInformationNew } from '@actyx/machine-check'
 import * as readline from 'readline';
 import chalk from "chalk";
@@ -17,9 +17,9 @@ export const s0 = forklift.designEmpty('s0') .finish()
 export const s1 = forklift.designState('s1').withPayload<{partName: string}>()
   .command('get', [Events.pos], (state: any) => {
     //console.log("retrieved a", state.self.partName, "at position x");
-    readline.moveCursor(process.stdout, 0, -2);
-    readline.clearScreenDown(process.stdout);
-    log(chalk.green.bold`    pos! ➡ \{"position":"x","partName":${state.self.partName},"type":"pos"\}`);
+    //readline.moveCursor(process.stdout, 0, -2);
+    //readline.clearScreenDown(process.stdout);
+    //log(chalk.green.bold`    pos! ➡ \{"position":"x","partName":${state.self.partName},"type":"pos"\}`);
     return [Events.pos.make({position: "x", partName: state.self.partName})]})
   .finish()
 export const s2 = forklift.designEmpty('s2').finish()
@@ -41,19 +41,20 @@ if (projectionInfoResult.type == 'ERROR') throw new Error('error getting project
 const projectionInfo = projectionInfoResult.data
 
 // Adapted machine
-const [forkliftAdapted, s0_] = Composition.adaptMachine("FL", projectionInfo, Events.allEvents, s0, true)
+const [forkliftAdapted, s0Adapted] = Composition.adaptMachine("FL", projectionInfo, Events.allEvents, s0, true)
 
 // Run the adapted machine
 async function main() {
   const app = await Actyx.of(manifest)
   const tags = Composition.tagWithEntityId('warehouse-factory-quality')
-  const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
+  const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
+  printState(s0Adapted.mechanism.name, undefined)
 
   for await (const state of machine) {
     //log(chalk.blue`State: ${state.type}. Payload: ${state.payload === undefined ? "{}" : JSON.stringify(state.payload, null, 0) }`)
 
     if(state.isLike(s1)) {
-      log(chalk.red`    pos!`);
+      //log(chalk.red`    pos!`);
         rl.on('line', (_) => {
           const stateAfterTimeOut = machine.get()
           if (stateAfterTimeOut?.isLike(s1)) {
