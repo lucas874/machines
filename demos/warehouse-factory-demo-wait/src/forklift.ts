@@ -16,16 +16,11 @@ const forklift = Composition.makeMachine('Forklift')
 export const s0 = forklift.designEmpty('s0') .finish()
 export const s1 = forklift.designState('s1').withPayload<{partName: string}>()
   .command('get', [Events.pos], (state: any) => {
-    //console.log("retrieved a", state.self.partName, "at position x");
-    //readline.moveCursor(process.stdout, 0, -2);
-    //readline.clearScreenDown(process.stdout);
-    //log(chalk.green.bold`    pos! ➡ \{"position":"x","partName":${state.self.partName},"type":"pos"\}`);
     return [Events.pos.make({position: "x", partName: state.self.partName})]})
   .finish()
 export const s2 = forklift.designEmpty('s2').finish()
 
 s0.react([Events.partID], s1, (_, e) => {
-    //console.log("a", e.payload.partName, "was requested");
     if (getRandomInt(0, 10) >= 9) { return { partName: "broken part" } }
     return s1.make({partName: e.payload.partName}) })
 s1.react([Events.pos], s0, (_, e) => { return s0.make() })
@@ -51,10 +46,7 @@ async function main() {
   printState(forkliftAdapted.machineName, s0Adapted.mechanism.name, undefined)
 
   for await (const state of machine) {
-    //log(chalk.blue`State: ${state.type}. Payload: ${state.payload === undefined ? "{}" : JSON.stringify(state.payload, null, 0) }`)
-
     if(state.isLike(s1)) {
-      //log(chalk.red`    pos!`);
         rl.on('line', (_) => {
           const stateAfterTimeOut = machine.get()
           if (stateAfterTimeOut?.isLike(s1)) {

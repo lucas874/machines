@@ -17,9 +17,6 @@ const door = Composition.makeMachine('Door')
 export const s0 = door.designEmpty('s0')
     .command('close', [Events.time], () => {
         var dateString = new Date().toLocaleString();
-        //readline.moveCursor(process.stdout, 0, -2);
-        //readline.clearScreenDown(process.stdout);
-        //log(chalk.green.bold`    time! ➡ \{"timeOfDay":"${dateString}","type":"time"\}`);
         return [Events.time.make({timeOfDay: dateString})]})
     .finish()
 export const s1 = door.designEmpty('s1').finish()
@@ -50,10 +47,7 @@ async function main() {
   log(chalk.bgBlack.red.dim`    time!`);
 
   for await (const state of machine) {
-    //log(chalk.blue`State: ${state.type}. Payload: ${state.payload === undefined ? "{}" : JSON.stringify(state.payload, null, 0) }`)
-
     if (state.isLike(s0)) {
-      //log(chalk.red`    time!`);
       rl.on('line', (_) => {
         const stateAfterTimeOut = machine.get()
         if (stateAfterTimeOut?.isLike(s0)) {
