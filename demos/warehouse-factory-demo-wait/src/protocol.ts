@@ -92,6 +92,6 @@ const projectionInfoResult = projectionAndInformation(warehouse_factory_protocol
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 export const projectionInfoRobot = projectionInfoResult.data
 
-export const printState = (stateName: string, statePayload: any) => {
-  console.log(chalk.blue`State: ${stateName}. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
+export const printState = (machineName: string, stateName: string, statePayload: any) => {
+  console.log(chalk.bold.underline`${machineName}`, chalk.bold`- State: ${stateName}. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
 }

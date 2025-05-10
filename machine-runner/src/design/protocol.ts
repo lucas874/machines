@@ -492,8 +492,8 @@ export namespace ProjMachine {
     const {lbj, ...toPrint} = e.payload
     console.log(chalk.blue`    ${e.payload.type}? ⬅ ${JSON.stringify(toPrint, null, 0)}`)
   }
-  const printState = (stateName: string, statePayload: any) => {
-    console.log(chalk.blue`State: ${stateName}. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
+  const printState = (machineName: string, stateName: string, statePayload: any) => {
+    console.log(chalk.bold.underline`${machineName}`, chalk.bold`- State: ${stateName}. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
   }
   const commandEnabledStrings = (labels: CommandLabel[] | undefined): string[] => labels ? labels.map(l => l.label.logType[0]) : []
   const printEnabledCmds = (labels: string[]) => {
@@ -501,9 +501,9 @@ export namespace ProjMachine {
       console.log(chalk.red.dim`    ${transition}!`);
     })
   }
-  const printInfoOnTransition = (e: any, stateName: string, statePayload: any, labels: CommandLabel[] | undefined) => {
+  const printInfoOnTransition = (machineName: string, e: any, stateName: string, statePayload: any, labels: CommandLabel[] | undefined) => {
     printEvent(e);
-    printState(stateName, statePayload);
+    printState(machineName, stateName, statePayload);
     printEnabledCmds(commandEnabledStrings(labels));
   }
 
@@ -614,10 +614,10 @@ export namespace ProjMachine {
           var f =
             fMap2.reactions.has(eventType)
               ? (ctx: any, e: any) => {
-                const statePayload = fMap2.reactions.get(eventType)!(ctx, e); printInfoOnTransition(e, target, statePayload, projStatesToExec.get(target)); return statePayload }
+                const statePayload = fMap2.reactions.get(eventType)!(ctx, e); printInfoOnTransition(mNew.machineName, e, target, statePayload, projStatesToExec.get(target)); return statePayload }
               : (markedStates.has(target)
-                ? (ctx: any, e: any) => { const statePayload = projStatesToStates.get(target).make(ctx.self); printInfoOnTransition(e, target, statePayload, projStatesToExec.get(target)); return statePayload } // propagate state payload
-                : (ctx: any, e: any) => { printInfoOnTransition(e, target, undefined, projStatesToExec.get(target)); return projStatesToStates.get(target).make({}) })
+                ? (ctx: any, e: any) => { const statePayload = projStatesToStates.get(target).make(ctx.self); printInfoOnTransition(mNew.machineName, e, target, statePayload, projStatesToExec.get(target)); return statePayload } // propagate state payload
+                : (ctx: any, e: any) => { printInfoOnTransition(mNew.machineName, e, target, undefined, projStatesToExec.get(target)); return projStatesToStates.get(target).make({}) })
         } else {
           var f =
             fMap2.reactions.has(eventType)

@@ -13,7 +13,7 @@ const rl = readline.createInterface({
 });
 
 // Using the machine runner DSL an implmentation of door in warehouse w.r.t. subs_warehouse is:
-const door = Composition.makeMachine('D')
+const door = Composition.makeMachine('Door')
 export const s0 = door.designEmpty('s0')
     .command('close', [Events.time], () => {
         var dateString = new Date().toLocaleString();
@@ -39,14 +39,14 @@ if (projectionInfoResult.type == 'ERROR') throw new Error('error getting project
 const projectionInfo = projectionInfoResult.data
 
 // Adapted machine
-const [doorAdapted, s0Adapted] = Composition.adaptMachine("D", projectionInfo, Events.allEvents, s0, true)
+const [doorAdapted, s0Adapted] = Composition.adaptMachine('Door', projectionInfo, Events.allEvents, s0, true)
 
 // Run the adapted machine
 async function main() {
   const app = await Actyx.of(manifest)
   const tags = Composition.tagWithEntityId('warehouse-factory-quality')
   const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
-  printState(s0Adapted.mechanism.name, undefined)
+  printState(doorAdapted.machineName, s0Adapted.mechanism.name, undefined)
   log(chalk.red.dim`    time!`);
 
   for await (const state of machine) {

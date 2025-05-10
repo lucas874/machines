@@ -12,7 +12,7 @@ const rl = readline.createInterface({
 });
 
 // Using the machine runner DSL an implmentation of forklift in the warehouse protocol w.r.t. subs_warehouse is:
-const forklift = Composition.makeMachine('FL')
+const forklift = Composition.makeMachine('Forklift')
 export const s0 = forklift.designEmpty('s0') .finish()
 export const s1 = forklift.designState('s1').withPayload<{partName: string}>()
   .command('get', [Events.pos], (state: any) => {
@@ -41,14 +41,14 @@ if (projectionInfoResult.type == 'ERROR') throw new Error('error getting project
 const projectionInfo = projectionInfoResult.data
 
 // Adapted machine
-const [forkliftAdapted, s0Adapted] = Composition.adaptMachine("FL", projectionInfo, Events.allEvents, s0, true)
+const [forkliftAdapted, s0Adapted] = Composition.adaptMachine('Forklift', projectionInfo, Events.allEvents, s0, true)
 
 // Run the adapted machine
 async function main() {
   const app = await Actyx.of(manifest)
   const tags = Composition.tagWithEntityId('warehouse-factory-quality')
   const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
-  printState(s0Adapted.mechanism.name, undefined)
+  printState(forkliftAdapted.machineName, s0Adapted.mechanism.name, undefined)
 
   for await (const state of machine) {
     //log(chalk.blue`State: ${state.type}. Payload: ${state.payload === undefined ? "{}" : JSON.stringify(state.payload, null, 0) }`)

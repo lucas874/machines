@@ -4,9 +4,6 @@ import { Events, manifest, Composition, warehouse_factory_protocol, getRandomInt
 import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 import * as readline from 'readline';
 
-import chalk from "chalk";
-const log = console.log;
-
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
@@ -27,7 +24,7 @@ rl.on(line, (input) => {
 }); */
 
 // Using the machine runner DSL an implmentation of robot in factory w.r.t. subs_factory is:
-const robot = Composition.makeMachine('R')
+const robot = Composition.makeMachine('Robot')
 // slide with code and next to it depiction of machine. ecoop 23 does this
 
 export const s0 = robot.designEmpty('s0').finish()
@@ -50,7 +47,7 @@ s0.react([Events.part], s1, (_, e) => {
 s1.react([Events.car], s2, (_, e) => { return s2.make()})
 
 // Adapt machine
-const [factoryRobotAdapted, s0Adapted] = Composition.adaptMachine("R", projectionInfoRobot, Events.allEvents, s0, true)
+const [factoryRobotAdapted, s0Adapted] = Composition.adaptMachine('Robot', projectionInfoRobot, Events.allEvents, s0, true)
 
 // Run the adapted machine
 async function main() {
@@ -58,7 +55,7 @@ async function main() {
   const app = await Actyx.of(manifest)
   const tags = Composition.tagWithEntityId('warehouse-factory-quality')
   const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfoRobot.branches, projectionInfoRobot.specialEventTypes)
-  printState(s0Adapted.mechanism.name, undefined)
+  printState(factoryRobotAdapted.machineName, s0Adapted.mechanism.name, undefined)
 
   for await (const state of machine) {
     //log(chalk.blue`State: ${state.type}. Payload: ${state.payload === undefined ? "{}" : JSON.stringify(state.payload, null, 0)}`)

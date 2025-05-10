@@ -15,7 +15,7 @@ const rl = readline.createInterface({
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 
 // Using the machine runner DSL an implmentation of transporter in warehouse w.r.t. subs_warehouse is:
-const transporter = Composition.makeMachine('T')
+const transporter = Composition.makeMachine('Transport')
 export const s0 = transporter.designEmpty('s0')
   .command('request', [Events.partID], (ctx) => {
     var id = parts[Math.floor(Math.random() * parts.length)];
@@ -57,13 +57,13 @@ if (projectionInfoResult.type == 'ERROR') throw new Error('error getting project
 const projectionInfo = projectionInfoResult.data
 
 // Adapted machine
-const [transporterAdapted, s0Adapted] = Composition.adaptMachine("T", projectionInfo, Events.allEvents, s0, true)
+const [transporterAdapted, s0Adapted] = Composition.adaptMachine('Transport', projectionInfo, Events.allEvents, s0, true)
 // Run the adapted machine
 async function main() {
   const app = await Actyx.of(manifest)
   const tags = Composition.tagWithEntityId('warehouse-factory-quality')
   const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
-  printState(s0Adapted.mechanism.name, undefined)
+  printState(transporterAdapted.machineName, s0Adapted.mechanism.name, undefined)
   log(chalk.red.dim`    partID!`);
 
   for await (const state of machine) {
