@@ -22,7 +22,7 @@ export const s0 = transporter.designEmpty('s0')
     //console.log("requesting a", id);
     readline.moveCursor(process.stdout, 0, -2);
     readline.clearScreenDown(process.stdout);
-    log(chalk.green.bold`request! ➡ \{"partName": "${id}", "type": "partID"\}`);
+    log(chalk.green.bold`    partID! ➡ \{"partName":"${id}","type":"partID"\}`);
     return [Events.partID.make({ partName: id })]
   })
   .finish()
@@ -32,21 +32,20 @@ export const s2 = transporter.designState('s2').withPayload<{ partName: string }
     //console.log("delivering a", s.self.partName)
     readline.moveCursor(process.stdout, 0, -2);
     readline.clearScreenDown(process.stdout);
-    log(chalk.green.bold`deliver! ➡ \{"partName": "${ctx.self.partName}", "type": "part"\}`);
+    log(chalk.green.bold`    part! ➡ \{"partName":"${ctx.self.partName}","type":"part"\}`);
     return [Events.part.make({ partName: ctx.self.partName })]
   })
   .finish()
 export const s3 = transporter.designEmpty('s3').finish()
 
-s0.react([Events.partID], s1, (_, e) => { print_event(e); return s1.make() })
-s0.react([Events.time], s3, (_, e) => { print_event(e); return s3.make() })
+s0.react([Events.partID], s1, (_, e) => { return s1.make() })
+s0.react([Events.time], s3, (_, e) => { return s3.make() })
 s1.react([Events.pos], s2, (_, e) => {
-  print_event(e)
-  console.log("got a ", e.payload.partName);
+  //console.log("got a ", e.payload.partName);
   return s2.make({ partName: e.payload.partName })
 })
 
-s2.react([Events.part], s0, (_, e) => { print_event(e); return s0.make() })
+s2.react([Events.part], s0, (_, e) => { return s0.make() })
 
 // Check that the original machine is a correct implementation. A prerequisite for reusing it.
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "T", transporter.createJSONForAnalysis(s0))
@@ -58,39 +57,29 @@ if (projectionInfoResult.type == 'ERROR') throw new Error('error getting project
 const projectionInfo = projectionInfoResult.data
 
 // Adapted machine
-const [transporterAdapted, s0_] = Composition.adaptMachine("T", projectionInfo, Events.allEvents, s0)
+const [transporterAdapted, s0_] = Composition.adaptMachine("T", projectionInfo, Events.allEvents, s0, true)
 
 // Run the adapted machine
 async function main() {
   const app = await Actyx.of(manifest)
   const tags = Composition.tagWithEntityId('warehouse-factory-quality')
   const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
-  //const machine = createMachineRunner(app, tags, s0, undefined)
+
   for await (const state of machine) {
-    console.log("Transporter. State is:", state.type)
-    if (state.payload !== undefined) {
-      console.log("State payload is:", state.payload)
-    }
-    console.log()
+    //log(chalk.blue`State: ${state.type}. Payload: ${state.payload === undefined ? "{}" : JSON.stringify(state.payload, null, 0) }`)
 
     if (state.isLike(s0)) {
-      log(chalk.red`request!`);
+      log(chalk.red.dim`    partID!`);
       rl.on('line', (_) => {
         const stateAfterTimeOut = machine.get()
         if (stateAfterTimeOut?.isLike(s0)) {
           stateAfterTimeOut?.cast().commands()?.request()
         }
       })
-      /* rl.question("Invoke request? \n", (_) => {
-        const stateAfterTimeOut = machine.get()
-        if (stateAfterTimeOut?.isLike(s0)) {
-          stateAfterTimeOut?.cast().commands()?.request()
-        }
-      }) */
     }
 
     if (state.isLike(s2)) {
-      log(chalk.red`deliver!`);
+      log(chalk.red`    part!`);
       rl.on('line', (_) => {
         const stateAfterTimeOut = machine.get()
         if (stateAfterTimeOut?.isLike(s2)) {

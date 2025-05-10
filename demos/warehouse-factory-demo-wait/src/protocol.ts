@@ -84,7 +84,7 @@ const log = console.log;
 export function print_event(e: any) {
   const {lbj, ...toPrint} = e.payload
   //console.log(`received an event: ${JSON.stringify(toPrint, null, 2)}`)
-  log(chalk.blue`${e.payload.type}? ⬅ ${JSON.stringify(toPrint, null, 0)}`)
+  log(chalk.blue`    ${e.payload.type}? ⬅ ${JSON.stringify(toPrint, null, 0)}`)
 }
 
 // Projection of warehouse || factory over R

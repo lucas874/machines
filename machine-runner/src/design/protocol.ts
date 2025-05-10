@@ -2,7 +2,7 @@
 import { Tag, Tags } from '@actyx/sdk'
 import { StateMechanism, MachineProtocol, ReactionMap, StateFactory } from './state.js'
 import { MachineEvent } from './event.js'
-import { error, group } from 'console'
+import chalk = require('chalk');
 
 /**
  * SwarmProtocol is the entry point of designing a swarm of MachineRunners. A
@@ -27,7 +27,8 @@ export type SwarmProtocol<
     machineName: MachineName,
     proj: ProjMachine.ProjectionAndSucceedingMap,
     events: readonly MachineEvent.Factory<any, any>[],
-    mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>
+    mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
+    verbose?: boolean
   ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
   adaptMachineNew: <MachineName extends string>(
     machineName: MachineName,
@@ -81,7 +82,7 @@ export namespace SwarmProtocol {
     return {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
-      adaptMachine: (machineName, proj, events, mOldInitial) => ProjMachine.adaptMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, mOldInitial),
+      adaptMachine: (machineName, proj, events, mOldInitial, verbose?) => ProjMachine.adaptMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, mOldInitial, verbose),
       adaptMachineNew: (machineName, proj, events, mOldInitial) => ProjMachine.adaptMachineNew(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, mOldInitial),
     }
   }
@@ -376,7 +377,7 @@ export namespace ProjMachine {
 
   export type funMap = {
     commands: Map<string, (...args: any[]) => any>,
-    reactions: Map<string, (...args: any[]) => any>
+    reactions: Map<string, (ctx: any, e: any) => any>
   }
 
   export type ProjectionType = {
@@ -476,6 +477,7 @@ export namespace ProjMachine {
     projectionInfo: ProjectionAndSucceedingMap,
     events: readonly MachineEvent.Factory<any, Record<never, never>>[],
     mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
+    verbose?: boolean,
   ): [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any] => {
     var projStatesToStates: Map<string, any> = new Map()
     var projStatesToExec: Map<string, Transition[]> = new Map()
@@ -483,7 +485,7 @@ export namespace ProjMachine {
     // map event type string to Event
     const eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> =
       new Map<string, MachineEvent.Factory<any, Record<never, never>>>(events.map(e => [e.type, e]))
-    var projStatesToStatePayload: Map<string, (...args: any[]) => any> = new Map()
+    var projStatesToStatePayload: Map<string, (ctx: any, e: any) => any> = new Map()
     const proj = projectionInfo.projection
     var incomingMap = incomingEdgesOfStatesMap(proj)
     var markedStates: Set<string> = new Set()
@@ -551,18 +553,39 @@ export namespace ProjMachine {
         projStatesToStates.set(projState, mNew.designState(projState).withPayload<any>().finish())
       }
     }
+
+    const printEvent = (e: any) => {
+      const {lbj, ...toPrint} = e.payload
+      console.log(chalk.blue`    ${e.payload.type}? ⬅ ${JSON.stringify(toPrint, null, 0)}`)
+    }
+    const printTargetState = (stateName: string, statePayload: any) => {
+      console.log(chalk.blue`State: ${stateName}. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
+    }
+
     for (var transition of proj.transitions) {
       if (transition.label.tag === 'Input') {
         const eventType = transition.label.eventType
         const event = eventTypeStringToEvent.get(eventType)!
+        const target = transition.target
         // a reaction like (s, e) => s3.make() does not create s3, it just creates the state payload. So calling it should be fine?
-        var f =
-          fMap2.reactions.has(eventType)
-            ? fMap2.reactions.get(eventType)!
-            : (markedStates.has(transition.target)
-              ? (s: any, e: any) => { const {lbj, ...toPrint} = e.payload; console.log(`received an event: ${JSON.stringify(toPrint, null, 2)}`); return projStatesToStates.get(transition.target).make(s.self) } // propagate state payload
-              : (s: any, e: any) =>  { const {lbj, ...toPrint} = e.payload; console.log(`received an event: ${JSON.stringify(toPrint, null, 2)}`); return projStatesToStates.get(transition.target).make({}) })
-        projStatesToStates.get(transition.source).react([event], projStatesToStates.get(transition.target), f)
+        if (verbose) {
+          var f =
+            fMap2.reactions.has(eventType)
+              ? (ctx: any, e: any) => {
+                printEvent(e); const statePayload = fMap2.reactions.get(eventType)!(ctx, e); printTargetState(target, statePayload); return statePayload }
+              : (markedStates.has(target)
+                ? (ctx: any, e: any) => { printEvent(e); const statePayload = projStatesToStates.get(target).make(ctx.self); printTargetState(target, statePayload); return statePayload } // propagate state payload
+                : (ctx: any, e: any) => { printEvent(e); printTargetState(target, undefined); return projStatesToStates.get(target).make({}) })
+        } else {
+          var f =
+            fMap2.reactions.has(eventType)
+              ? fMap2.reactions.get(eventType)!
+              : (markedStates.has(target)
+                ? (ctx: any, e: any) => projStatesToStates.get(target).make(ctx.self) // propagate state payload
+                : (ctx: any, e: any) => projStatesToStates.get(target).make({}))
+        }
+
+        projStatesToStates.get(transition.source).react([event], projStatesToStates.get(target), f)
       }
     }
 
