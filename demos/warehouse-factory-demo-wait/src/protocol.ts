@@ -93,5 +93,5 @@ if (projectionInfoResult.type == 'ERROR') throw new Error('error getting project
 export const projectionInfoRobot = projectionInfoResult.data
 
 export const printState = (machineName: string, stateName: string, statePayload: any) => {
-  console.log(chalk.bold.underline`${machineName}`, chalk.bold`- State: ${stateName}. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
+  console.log(chalk.bold.underline`${machineName}`, chalk.bold`- State:`, chalk.bold.underline`${stateName}`, chalk.bold`. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
 }

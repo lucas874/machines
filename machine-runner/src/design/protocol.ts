@@ -493,7 +493,7 @@ export namespace ProjMachine {
     console.log(chalk.blue`    ${e.payload.type}? ⬅ ${JSON.stringify(toPrint, null, 0)}`)
   }
   const printState = (machineName: string, stateName: string, statePayload: any) => {
-    console.log(chalk.bold.underline`${machineName}`, chalk.bold`- State: ${stateName}. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
+    console.log(chalk.bold.underline`${machineName}`, chalk.bold`- State:`, chalk.bold.underline`${stateName}`, chalk.bold`. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
   }
   const commandEnabledStrings = (labels: CommandLabel[] | undefined): string[] => labels ? labels.map(l => l.label.logType[0]) : []
   const printEnabledCmds = (labels: string[]) => {
