@@ -3,9 +3,7 @@ import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event, printState } from './protocol'
 import { checkComposedProjection, projectionAndInformation, projectionAndInformationNew } from '@actyx/machine-check'
 import * as readline from 'readline';
-import chalk from "chalk";
 
-const log = console.log
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
