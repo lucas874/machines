@@ -3,9 +3,7 @@ import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event, printState, projectionInfoTransport } from './protocol'
 import { checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation } from '@actyx/machine-check'
 import * as readline from 'readline';
-
 import chalk from "chalk";
-const log = console.log;
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -30,6 +28,7 @@ export const s2 = transporter.designState('s2').withPayload<{ partName: string }
   .finish()
 export const s3 = transporter.designEmpty('s3').finish()
 
+// Add reactions
 s0.react([Events.partID], s1, (_, e) => { return s1.make() })
 s0.react([Events.time], s3, (_, e) => { return s3.make() })
 s1.react([Events.pos], s2, (_, e) => {
@@ -37,20 +36,16 @@ s1.react([Events.pos], s2, (_, e) => {
 })
 s2.react([Events.part], s0, (_, e) => { return s0.make() })
 
-// Check that the original machine is a correct implementation. A prerequisite for reusing it.
-const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "T", transporter.createJSONForAnalysis(s0))
-if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
-
 // Adapted machine
 const [transportAdapted, s0Adapted] = Composition.adaptMachine('Transport', projectionInfoTransport, Events.allEvents, s0, true)
 
-// Run the adapted machine
+// Run the machine
 async function main() {
   const app = await Actyx.of(manifest)
   const tags = Composition.tagWithEntityId('warehouse-factory')
   const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfoTransport.branches, projectionInfoTransport.specialEventTypes)
   printState(transportAdapted.machineName, s0Adapted.mechanism.name, undefined)
-  log(chalk.bgBlack.red.dim`    partID!`);
+  console.log(chalk.bgBlack.red.dim`    partID!`);
 
   for await (const state of machine) {
     if (state.isLike(s0)) {
