@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import { MachineEvent, SwarmProtocol } from '@actyx/machine-runner'
-import { SwarmProtocolType, Subscriptions, Result, ResultData, InterfacingSwarms, overapproxWWFSubscriptions, checkWWFSwarmProtocol, MachineType, projectionAndInformation} from '@actyx/machine-check'
+import { SwarmProtocolType, Subscriptions, Result, ResultData, InterfacingSwarms, overapproxWWFSubscriptions, checkWWFSwarmProtocol, MachineType, projectionAndInformation, ProjectionAndSucceedingMap} from '@actyx/machine-check'
 import chalk from "chalk";
 
 export const manifest = {
@@ -88,9 +88,14 @@ export function print_event(e: any) {
 }
 
 // Projection of warehouse || factory over R
-const projectionInfoResult = projectionAndInformation(warehouse_factory_protocol, subs_composition, "R")
-if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
-export const projectionInfoRobot = projectionInfoResult.data
+const projectionInfoResultRobot: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(warehouse_factory_protocol, subs_composition, "R")
+if (projectionInfoResultRobot.type == 'ERROR') throw new Error('error getting projection')
+export const projectionInfoRobot = projectionInfoResultRobot.data
+
+// Projection of warehouse || factory over T
+const projectionInfoResultTransport: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(warehouse_factory_protocol, subs_composition, "T")
+if (projectionInfoResultTransport.type == 'ERROR') throw new Error('error getting projection')
+export const projectionInfoTransport = projectionInfoResultTransport.data
 
 export const printState = (machineName: string, stateName: string, statePayload: any) => {
   console.log(chalk.bgBlack.white.bold`${machineName} - State: ${stateName}. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)

@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
-import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event, printState } from './protocol'
+import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event, printState, projectionInfoTransport } from './protocol'
 import { checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation } from '@actyx/machine-check'
 import * as readline from 'readline';
 
@@ -41,19 +41,15 @@ s2.react([Events.part], s0, (_, e) => { return s0.make() })
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "T", transporter.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
-// Projection of warehouse || factory over T
-const projectionInfoResult: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(warehouse_factory_protocol, subs_composition, "T")
-if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
-const projectionInfo = projectionInfoResult.data
-
 // Adapted machine
-const [transporterAdapted, s0Adapted] = Composition.adaptMachine('Transport', projectionInfo, Events.allEvents, s0, true)
+const [transportAdapted, s0Adapted] = Composition.adaptMachine('Transport', projectionInfoTransport, Events.allEvents, s0, true)
+
 // Run the adapted machine
 async function main() {
   const app = await Actyx.of(manifest)
-  const tags = Composition.tagWithEntityId('warehouse-factory-quality')
-  const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
-  printState(transporterAdapted.machineName, s0Adapted.mechanism.name, undefined)
+  const tags = Composition.tagWithEntityId('warehouse-factory')
+  const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfoTransport.branches, projectionInfoTransport.specialEventTypes)
+  printState(transportAdapted.machineName, s0Adapted.mechanism.name, undefined)
   log(chalk.bgBlack.red.dim`    partID!`);
 
   for await (const state of machine) {

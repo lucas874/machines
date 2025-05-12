@@ -35,7 +35,7 @@ const [factoryRobotAdapted, s0Adapted] = Composition.adaptMachine('Robot', proje
 async function main() {
 
   const app = await Actyx.of(manifest)
-  const tags = Composition.tagWithEntityId('warehouse-factory-quality')
+  const tags = Composition.tagWithEntityId('warehouse-factory')
   const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfoRobot.branches, projectionInfoRobot.specialEventTypes)
   printState(factoryRobotAdapted.machineName, s0Adapted.mechanism.name, undefined)
 

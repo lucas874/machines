@@ -41,7 +41,7 @@ const [doorAdapted, s0Adapted] = Composition.adaptMachine('Door', projectionInfo
 // Run the adapted machine
 async function main() {
   const app = await Actyx.of(manifest)
-  const tags = Composition.tagWithEntityId('warehouse-factory-quality')
+  const tags = Composition.tagWithEntityId('warehouse-factory')
   const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
   printState(doorAdapted.machineName, s0Adapted.mechanism.name, undefined)
   log(chalk.bgBlack.red.dim`    time!`);
