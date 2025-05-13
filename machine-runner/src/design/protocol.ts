@@ -361,17 +361,7 @@ export type ProjectionType = {
   }[]
 }
 
-/* export type MachineAnalysisResource = {
-  initial: string
-  subscriptions: string[]
-  transitions: {
-    source: string
-    target: string
-    label: { tag: 'Execute'; cmd: string; logType: string[] } | { tag: 'Input'; eventType: string }
-  }[]
-} */
-
-  export interface MachineAnalysisResource extends ProjectionType {
+export interface MachineAnalysisResource extends ProjectionType {
   subscriptions: string[]
 }
 
@@ -629,7 +619,7 @@ export namespace ProjMachine {
     events: readonly MachineEvent.Factory<any, Record<never, never>>[],
     mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
     verbose?: boolean,
-  ): MachineResult<[AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>, any]> => { //[Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any] => {
+  ): MachineResult<[AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>, any]> => {
     var projStatesToStates: Map<string, any> = new Map()
     var projStatesToExec: Map<string, CommandLabel[]> = new Map()
     var projStatesToInput: Map<string, ReactionLabel[]> = new Map()
