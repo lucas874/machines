@@ -34,7 +34,8 @@ if (projectionInfoResult.type == 'ERROR') throw new Error('error getting project
 const projectionInfo = projectionInfoResult.data
 
 // Adapted machine
-const [forkliftAdapted, s0Adapted] = Composition.adaptMachine('Forklift', projectionInfo, Events.allEvents, s0, true)
+//const [forkliftAdapted, s0Adapted] = Composition.adaptMachine('Forklift', projectionInfo, Events.allEvents, s0, true)
+const [forkliftAdapted, s0Adapted] = Composition.adaptMachine('Forklift', 'FL', warehouse_factory_protocol, subs_composition, s0, true).data!
 
 // Run the adapted machine
 async function main() {

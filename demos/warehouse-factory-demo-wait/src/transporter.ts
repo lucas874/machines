@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
-import { Events, manifest, Composition, printState, projectionInfoTransport } from './protocol'
+import { Events, manifest, Composition, printState, projectionInfoTransport, warehouse_factory_protocol, subs_composition } from './protocol'
 import * as readline from 'readline';
 import chalk from "chalk";
 
@@ -36,7 +36,8 @@ s1.react([Events.pos], s2, (_, e) => {
 s2.react([Events.part], s0, (_, e) => { return s0.make() })
 
 // Adapted machine
-const [transportAdapted, s0Adapted] = Composition.adaptMachine('Transport', projectionInfoTransport, Events.allEvents, s0, true)
+//const [transportAdapted, s0Adapted] = Composition.adaptMachine('Transport', projectionInfoTransport, Events.allEvents, s0, true)
+const [transportAdapted, s0Adapted] = Composition.adaptMachine('Transport', 'T', warehouse_factory_protocol, subs_composition, s0, true).data!
 
 // Run the machine
 async function main() {

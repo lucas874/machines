@@ -29,7 +29,8 @@ s0.react([Events.part], s1, (_, e) => {
 s1.react([Events.car], s2, (_, e) => { return s2.make()})
 
 // Adapt machine
-const [factoryRobotAdapted, s0Adapted] = Composition.adaptMachine('Robot', projectionInfoRobot, Events.allEvents, s0, true)
+//const [factoryRobotAdapted, s0Adapted] = Composition.adaptMachine('Robot', projectionInfoRobot, Events.allEvents, s0, true)
+const [factoryRobotAdapted, s0Adapted] = Composition.adaptMachine('Robot', 'R', warehouse_factory_protocol, subs_composition, s0, true).data!
 
 // Run the adapted machine
 async function main() {

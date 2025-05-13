@@ -2,6 +2,7 @@
 import { Tag, Tags } from '@actyx/sdk'
 import { StateMechanism, MachineProtocol, ReactionMap, StateFactory } from './state.js'
 import { MachineEvent } from './event.js'
+import { Subscriptions, InterfacingSwarms, projectionAndInformation } from '@actyx/machine-check'
 import chalk = require('chalk');
 import * as readline from 'readline';
 
@@ -26,11 +27,12 @@ export type SwarmProtocol<
   tagWithEntityId: (id: string) => Tags<MachineEvents>
   adaptMachine: <MachineName extends string>(
     machineName: MachineName,
-    proj: ProjMachine.ProjectionAndSucceedingMap,
-    events: readonly MachineEvent.Factory<any, any>[],
+    role: MachineName,
+    protocols: InterfacingSwarms,
+    subscriptions: Subscriptions,
     mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
     verbose?: boolean
-  ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
+  ) => MachineResult<[AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>, any]>
   adaptMachineNew: <MachineName extends string>(
     machineName: MachineName,
     proj: ProjMachine.ProjectionAndSucceedingMap,
@@ -83,7 +85,13 @@ export namespace SwarmProtocol {
     return {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
-      adaptMachine: (machineName, proj, events, mOldInitial, verbose?) => ProjMachine.adaptMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, mOldInitial, verbose),
+      adaptMachine: (machineName, role, protocols, subscriptions, mOldInitial, verbose?) => {
+        const projectionInfo = projectionAndInformation(protocols, subscriptions, role)
+        if (projectionInfo.type == 'ERROR') {
+          return {data: undefined, ... projectionInfo}
+        }
+        return ProjMachine.adaptMachine(ImplMachine.makeAdapted(swarmName, machineName, eventFactories, projectionInfo.data), eventFactories, mOldInitial, verbose)
+      },
       adaptMachineNew: (machineName, proj, events, mOldInitial) => ProjMachine.adaptMachineNew(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, mOldInitial),
     }
   }
@@ -142,6 +150,14 @@ export type Machine<
     initial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
   ) => MachineAnalysisResource
 }>
+
+interface AdaptedMachine<
+  SwarmProtocolName extends string,
+  MachineName extends string,
+  MachineEventFactories extends MachineEvent.Factory.Any
+> extends Machine<SwarmProtocolName, MachineName, MachineEventFactories>{
+  readonly projectionInfo: ProjectionInfo
+}
 
 type DesignStateIntermediate<
   SwarmProtocolName extends string,
@@ -260,9 +276,92 @@ namespace ImplMachine {
       createJSONForAnalysis,
     }
   }
+
+  /**
+   * Create a machine protocol with a specific name, event factories,
+   * a function mapping event types to sets of events types
+   * and set of 'special event types' used for branch tracking.
+   * @param machineName - name of the machine protocol.
+   * @param registeredEventFactories - tuple of MachineEventFactories.
+   * @see MachineEvent.design to get started on creating MachineEventFactories
+   * for the registeredEventFactories parameter.
+   * @example
+   * const hangarBay = Machine.make("hangarBay")
+   */
+    export const makeAdapted = <
+    SwarmProtocolName extends string,
+    MachineName extends string,
+    MachineEventFactories extends MachineEvent.Factory.Any,
+  >(
+    swarmName: SwarmProtocolName,
+    machineName: MachineName,
+    registeredEventFactories: MachineEventFactories[],
+    projectionInfo: ProjectionInfo
+  ): AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories> => {
+    type Self = Machine<SwarmProtocolName, MachineName, MachineEventFactories>
+    type Protocol = MachineProtocol<SwarmProtocolName, MachineName, MachineEventFactories>
+
+    const protocol: Protocol = {
+      swarmName: swarmName,
+      name: machineName,
+      registeredEvents: registeredEventFactories,
+      reactionMap: ReactionMap.make(),
+      commands: [],
+      states: {
+        registeredNames: new Set(),
+        allFactories: new Set(),
+      },
+    }
+
+    const markStateNameAsUsed = (stateName: string) => {
+      if (stateName.includes(MachineAnalysisResource.SyntheticDelimiter)) {
+        throw new Error(
+          `Name should not contain character '${MachineAnalysisResource.SyntheticDelimiter}'`,
+        )
+      }
+
+      if (protocol.states.registeredNames.has(stateName)) {
+        throw new Error(`State "${stateName}" already registered within this protocol`)
+      }
+      protocol.states.registeredNames.add(stateName)
+    }
+
+    const designState: Self['designState'] = (stateName) => {
+      markStateNameAsUsed(stateName)
+      return {
+        withPayload: () => StateMechanism.make(protocol, stateName),
+      }
+    }
+
+    const designEmpty: Self['designEmpty'] = (stateName) => {
+      markStateNameAsUsed(stateName)
+      return StateMechanism.make(protocol, stateName)
+    }
+
+    const createJSONForAnalysis: Self['createJSONForAnalysis'] = (initial) =>
+      MachineAnalysisResource.fromMachineInternals(protocol, initial)
+
+    return {
+      swarmName,
+      machineName,
+      designState,
+      designEmpty,
+      createJSONForAnalysis,
+      projectionInfo
+    }
+  }
 }
 
-export type MachineAnalysisResource = {
+export type ProjectionType = {
+  initial: string
+  transitions: {
+    source: string
+    target: string
+    label: { tag: 'Execute'; cmd: string; logType: string[] } | { tag: 'Input'; eventType: string }
+  }[]
+}
+
+/* export type MachineAnalysisResource = {
   initial: string
   subscriptions: string[]
   transitions: {
@@ -270,7 +369,15 @@ export type MachineAnalysisResource = {
     target: string
     label: { tag: 'Execute'; cmd: string; logType: string[] } | { tag: 'Input'; eventType: string }
   }[]
+} */
+
+  export interface MachineAnalysisResource extends ProjectionType {
+  subscriptions: string[]
 }
+
+export type MachineResult<T> = { type: 'OK'; data: T } | { type: 'ERROR'; errors: string[]; data: undefined }
+
+export type ProjectionInfo = { projection: ProjectionType, branches: Record<string, Set<string>>, specialEventTypes: Set<string> }
 
 export namespace MachineAnalysisResource {
   export const SyntheticDelimiter = '§' as const
@@ -518,12 +625,11 @@ export namespace ProjMachine {
     MachineName extends string,
     MachineEventFactories extends MachineEvent.Factory.Any,
   >(
-    mNew: Machine<SwarmProtocolName, MachineName, MachineEventFactories>,
-    projectionInfo: ProjectionAndSucceedingMap,
+    mNew: AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>,
     events: readonly MachineEvent.Factory<any, Record<never, never>>[],
     mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
     verbose?: boolean,
-  ): [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any] => {
+  ): MachineResult<[AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>, any]> => { //[Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any] => {
     var projStatesToStates: Map<string, any> = new Map()
     var projStatesToExec: Map<string, CommandLabel[]> = new Map()
     var projStatesToInput: Map<string, ReactionLabel[]> = new Map()
@@ -531,7 +637,7 @@ export namespace ProjMachine {
     const eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> =
       new Map<string, MachineEvent.Factory<any, Record<never, never>>>(events.map(e => [e.type, e]))
     var projStatesToStatePayload: Map<string, (ctx: any, e: any) => any> = new Map()
-    const proj = projectionInfo.projection
+    const proj = mNew.projectionInfo.projection
     var incomingMap = incomingEdgesOfStatesMap(proj)
     var markedStates: Set<string> = new Set()
     var fMap2: funMap = { commands: new Map(), reactions: new Map() }
@@ -636,7 +742,7 @@ export namespace ProjMachine {
     }
 
     var initial = projStatesToStates.get(proj.initial)
-    return [mNew, initial]
+    return {type: 'OK', data: [mNew, initial]}
   }
 
   // consider doing this sort of thing in machine-check. Seems ugly.

@@ -35,8 +35,19 @@ const projectionInfoResult = projectionAndInformation(warehouse_factory_protocol
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
 
+/*
+machineName: MachineName,
+    role: MachineName,
+    protocols: InterfacingSwarms,
+    subscriptions: Subscriptions,
+    mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
+    verbose?: boolean
+
+*/
+
 // Adapted machine
-const [doorAdapted, s0Adapted] = Composition.adaptMachine('Door', projectionInfo, Events.allEvents, s0, true)
+//const [doorAdapted, s0Adapted] = Composition.adaptMachine('Door', projectionInfo, Events.allEvents, s0, true)
+const [doorAdapted, s0Adapted] = Composition.adaptMachine('Door', 'D', warehouse_factory_protocol, subs_composition, s0, true).data!
 
 // Run the adapted machine
 async function main() {
