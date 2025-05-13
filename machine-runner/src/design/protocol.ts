@@ -507,6 +507,12 @@ export namespace ProjMachine {
     printEnabledCmds(commandEnabledStrings(labels));
   }
 
+  const printEventEmission = (label: string, payload: string) => {
+    readline.moveCursor(process.stdout, 0, -2);
+    readline.clearScreenDown(process.stdout);
+    console.log(chalk.bgBlack.green.bold`    ${label} ➡ ${payload}`);
+  }
+
   export const adaptMachine = <
     SwarmProtocolName extends string,
     MachineName extends string,
@@ -573,9 +579,7 @@ export namespace ProjMachine {
         const f = fMap2.commands.get(transition.label.cmd)!
         const ff = (...args: any[]) => {
           const payload = f(...args);
-          readline.moveCursor(process.stdout, 0, -2);
-          readline.clearScreenDown(process.stdout);
-          console.log(chalk.bgBlack.green.bold`    ${transition.label.logType[0]}! ➡ ${JSON.stringify(payload[0], null, 0)}`);
+          printEventEmission(`${transition.label.logType[0]}!`, `${JSON.stringify(payload[0], null, 0)}`)
           return payload;
         }
         return [transition.label.cmd, transition.label.logType.map((et: string) => eventTypeStringToEvent.get(et)), ff]
