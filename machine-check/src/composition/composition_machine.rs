@@ -1,9 +1,7 @@
 use std::{collections::{BTreeMap, BTreeSet}, cmp::Ordering};
 use itertools::Itertools;
 use petgraph::{
-    graph::EdgeReference,
-    visit::{EdgeFiltered, EdgeRef, IntoEdgeReferences, IntoEdgesDirected, IntoNodeReferences},
-    Direction::{Incoming, Outgoing},
+    graph::EdgeReference, visit::{EdgeFiltered, EdgeRef, IntoEdgeReferences, IntoEdgesDirected, IntoNodeReferences}, Direction::{Incoming, Outgoing}
 };
 use crate::{composition::composition_swarm::transitive_closure_succeeding, machine::{Error, Side}};
 use super::{
@@ -27,6 +25,7 @@ pub fn project(
     initial: NodeId,
     subs: &Subscriptions,
     role: Role,
+    minimize: bool
 ) -> (Graph, NodeId) {
     let _span = tracing::info_span!("project", %role).entered();
     let mut machine = Graph::new();
@@ -91,9 +90,13 @@ pub fn project(
             );
         }
     }
-    (machine, m_nodes[initial.index()])
-    //let (dfa, dfa_initial) = nfa_to_dfa(machine, m_nodes[initial.index()]); // make deterministic. slight deviation from projection operation formally.
-    //minimal_machine(&dfa, dfa_initial) // when minimizing we get a machine that is a little different but equivalent to the one prescribed by the projection operator formally
+    //(machine, m_nodes[initial.index()])
+    if minimize {
+        let (dfa, dfa_initial) = nfa_to_dfa(machine, m_nodes[initial.index()]); // make deterministic. slight deviation from projection operation formally.
+        minimal_machine(&dfa, dfa_initial) // when minimizing we get a machine that is a little different but equivalent to the one prescribed by the projection operator formally
+    } else {
+        (machine, m_nodes[initial.index()])
+    }
 }
 
 // precondition: the protocols interfaces on the supplied interfaces.
@@ -102,6 +105,7 @@ pub fn project_combine(
     swarms: &Vec<ProtoStruct>,
     subs: &Subscriptions,
     role: Role,
+    minimize: bool,
 ) -> (OptionGraph, Option<NodeId>) {
     let _span = tracing::info_span!("project_combine", %role).entered();
     // check this anyway
@@ -116,7 +120,7 @@ pub fn project_combine(
     }
 
     let mapper = |p: &ProtoStruct| -> (Graph, NodeId, BTreeSet<EventType>) {
-        let (projection, projection_initial) = project(&p.graph, p.initial.unwrap(), subs, role.clone());
+        let (projection, projection_initial) = project(&p.graph, p.initial.unwrap(), subs, role.clone(), minimize);
         (projection, projection_initial, p.interface.clone())
     };
 
@@ -146,10 +150,11 @@ fn combine_projs(projections: Vec<(Graph, NodeId, BTreeSet<EventType>)>) -> (Gra
 pub fn project_combine_all(
     swarms: &Vec<ProtoStruct>,
     subs: &Subscriptions,
+    minimize: bool
 ) -> Vec<(OptionGraph, Option<NodeId>)> {
     let _span = tracing::info_span!("project_combine_all").entered();
     subs.keys()
-        .map(|role| project_combine(swarms, subs, role.clone()))
+        .map(|role| project_combine(swarms, subs, role.clone(), minimize))
         .collect()
 }
 
@@ -560,7 +565,7 @@ pub fn adapted_projection(
         return (OptionGraph::new(), None);
     }
     let mapper = |ps: &ProtoStruct| {
-        let (proj, proj_initial) = project(&ps.graph, ps.initial.unwrap(), subs, role.clone());
+        let (proj, proj_initial) = project(&ps.graph, ps.initial.unwrap(), subs, role.clone(), false);
         (proj, proj_initial, ps.interface.clone())
     };
 
@@ -917,7 +922,7 @@ mod tests {
 
         let role = Role::new("F");
         let (g, i, _) = from_json(proto);
-        let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role);
+        let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role, false);
         let expected_m = Machine {
             initial: State::new("0"),
             transitions: vec![
@@ -975,7 +980,7 @@ mod tests {
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
         let (g, i, _) = from_json(proto);
-        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone());
+        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
         let right_m = Machine {
             initial: State::new("0"),
             transitions: vec![
@@ -1050,7 +1055,7 @@ mod tests {
         let subs = result_subs.unwrap();
         let role = Role::new("F");
         let (g, i, _) = from_json(proto);
-        let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role);
+        let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role, false);
         let expected_m = Machine {
             initial: State::new("1"),
             transitions: vec![
@@ -1103,7 +1108,7 @@ mod tests {
 
         let role = Role::new("T");
         let (g, i) = compose_protocols(protos).unwrap();
-        let (proj, proj_initial) = project(&g, i, &subs, role);
+        let (proj, proj_initial) = project(&g, i, &subs, role, false);
         let expected_m = Machine {
             initial: State::new("0"),
             transitions: vec![
@@ -1205,7 +1210,7 @@ mod tests {
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
         let (g, i, _) = from_json(proto);
-        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone());
+        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
         let right_m = Machine {
             initial: State::new("0"),
             transitions: vec![
@@ -1282,7 +1287,7 @@ mod tests {
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
         let (g, i, _) = from_json(proto);
-        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone());
+        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
         let right_m = Machine {
             initial: State::new("0"),
             transitions: vec![
@@ -1359,7 +1364,7 @@ mod tests {
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
         let (g, i, _) = from_json(proto);
-        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone());
+        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
         let right_m = Machine {
             initial: State::new("0"),
             transitions: vec![
@@ -1436,7 +1441,7 @@ mod tests {
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
         let (g, i, _) = from_json(proto);
-        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone());
+        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
         let right_m = Machine {
             initial: State::new("0"),
             transitions: vec![
@@ -1508,7 +1513,7 @@ mod tests {
         assert!(proto_info.no_errors());
 
         let (proj_combined1, proj_combined_initial1) =
-            project_combine(&proto_info.protocols, &subs1, role.clone());
+            project_combine(&proto_info.protocols, &subs1, role.clone(), false);
 
         let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_1_reversed(), &BTreeMap::new(), Granularity::Coarse);
         assert!(subs2.is_ok());
@@ -1517,7 +1522,7 @@ mod tests {
         assert!(proto_info.no_errors());
 
         let (proj_combined2, proj_combined_initial2) =
-            project_combine(&proto_info.protocols, &subs2, role.clone());
+            project_combine(&proto_info.protocols, &subs2, role.clone(), false);
 
         // compose(a, b) should be equal to compose(b, a)
         assert_eq!(subs1, subs2);
@@ -1532,14 +1537,23 @@ mod tests {
         let composition = compose_protocols(get_interfacing_swarms_1());
         assert!(composition.is_ok());
         let (composed_graph, composed_initial) = composition.unwrap();
-        let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs1, role.clone());
-        assert!(equivalent(
+        let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs1, role.clone(), true);
+        let errors = equivalent(
+            &proj_combined2,
+            proj_combined_initial2.unwrap(),
+            &to_option_machine(&proj),
+            proj_initial
+        );
+        println!("{}", serde_json::to_string_pretty(&to_json_machine(proj.clone(), proj_initial)).unwrap());
+        println!("{:?}", errors.iter().map(|e| e.to_string(&proj_combined2, &to_option_machine(&proj))).collect::<Vec<_>>());
+        /* assert!(equivalent(
             &proj_combined2,
             proj_combined_initial2.unwrap(),
             &to_option_machine(&proj),
             proj_initial
         )
-        .is_empty());
+        .is_empty()); */
+        assert!(errors.is_empty());
     }
 
     #[test]
@@ -1563,7 +1577,7 @@ mod tests {
             assert!(proto_info.no_errors());
 
             let (proj_combined1, proj_combined_initial1) =
-                project_combine(&proto_info.protocols, &subs1, role.clone());
+                project_combine(&proto_info.protocols, &subs1, role.clone(), false);
 
             let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_2_reversed(), &BTreeMap::new(), Granularity::Coarse);
             assert!(subs2.is_ok());
@@ -1572,7 +1586,7 @@ mod tests {
             assert!(proto_info.no_errors());
 
             let (proj_combined2, proj_combined_initial2) =
-                project_combine(&proto_info.protocols, &subs2, role.clone());
+                project_combine(&proto_info.protocols, &subs2, role.clone(), false);
 
             // compose(a, b) should be equal to compose(b, a)
             assert_eq!(subs1, subs2);
@@ -1585,7 +1599,7 @@ mod tests {
             .is_empty());
             assert_eq!(subs2, subs);
 
-            let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, role.clone());
+            let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, role.clone(), true);
             let errors =  equivalent(
                 &proj_combined2,
                 proj_combined_initial2.unwrap(),
@@ -1607,7 +1621,7 @@ mod tests {
         let proto_info = swarms_to_proto_info(get_interfacing_swarms_3(), &subs);
             assert!(proto_info.no_errors());
         let (proj, proj_initial) =
-            project_combine(&proto_info.protocols, &subs, role.clone());
+            project_combine(&proto_info.protocols, &subs, role.clone(), false);
         println!("projection of {}: {}", role.to_string(), serde_json::to_string_pretty(&from_option_to_machine(proj, proj_initial.unwrap())).unwrap());
     }
 
@@ -1624,7 +1638,7 @@ mod tests {
         let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D"), Role::new("F")];
 
         for role in all_roles {
-            let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, role.clone());
+            let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, role.clone(), false);
             println!("{}: {}", role.clone().to_string(), serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap());
         }
     }
@@ -1642,7 +1656,7 @@ mod tests {
         //println!("conc: {:?}", proto_info.concurrent_events);
         for role in all_roles {
             let (proj, proj_initial) =
-                project_combine(&proto_info.protocols, &subs, role.clone());
+                project_combine(&proto_info.protocols, &subs, role.clone(), false);
             //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
             let branch_thing = paths_from_event_types(&proj, &proto_info);
             println!("role: {}\n branch thing: {}", role.to_string(), serde_json::to_string_pretty(&branch_thing).unwrap());
@@ -1662,7 +1676,7 @@ mod tests {
         //println!("conc: {:?}", proto_info.concurrent_events);
         for role in all_roles {
             let (proj, proj_initial) =
-                project_combine(&proto_info.protocols, &subs, role.clone());
+                project_combine(&proto_info.protocols, &subs, role.clone(), false);
             //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
             let branch_thing = paths_from_event_types(&proj, &proto_info);
             println!("role: {}\n branch thing: {}", role.to_string(), serde_json::to_string_pretty(&branch_thing).unwrap());
@@ -1685,7 +1699,7 @@ mod tests {
 
         for role in all_roles {
             let (proj, proj_initial) =
-                project_combine(&proto_info.protocols, &subs, role.clone());
+                project_combine(&proto_info.protocols, &subs, role.clone(), false);
             //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
             let _branch_thing = paths_from_event_types(&proj, &proto_info);
             //println!("role: {}\n branch thing: {}", role.to_string(), serde_json::to_string_pretty(&branch_thing).unwrap());
@@ -1706,7 +1720,7 @@ mod tests {
         println!("subs: {}", serde_json::to_string_pretty(&subs).unwrap());
         let role = Role::new("FL");
         let (g, i, _) = from_json(proto);
-        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone());
+        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
         let right_m = Machine {
             initial: State::new("0"),
             transitions: vec![
@@ -2007,5 +2021,62 @@ mod tests {
 
         println!("combined: {}", serde_json::to_string_pretty(&combined).unwrap());
     }
-}
 
+    #[test]
+    fn test_det_proj_1() {
+        setup_logger();
+        let composition = compose_protocols(get_interfacing_swarms_1());
+        assert!(composition.is_ok());
+        let (composed_graph, composed_initial) = composition.unwrap();
+        let subs = crate::composition::composition_swarm::exact_weak_well_formed_sub(get_interfacing_swarms_1(), &BTreeMap::new());
+        assert!(subs.is_ok());
+        let subs = subs.unwrap();
+        println!("subscription: {}", serde_json::to_string_pretty(&subs).unwrap());
+        //let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D"), Role::new("F")];
+        let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, Role::new("D"), false);
+        println!("{}: {}", Role::new("D").to_string(), serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap());
+        /* for role in all_roles {
+            let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, role.clone());
+            println!("{}: {}", role.clone().to_string(), serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap());
+        } */
+    }
+
+    #[test]
+    fn test_det_proj_2() {
+        setup_logger();
+        let composition = compose_protocols(get_interfacing_swarms_3());
+        assert!(composition.is_ok());
+        let (composed_graph, composed_initial) = composition.unwrap();
+        let subs = crate::composition::composition_swarm::exact_weak_well_formed_sub(get_interfacing_swarms_3(), &BTreeMap::new());
+        assert!(subs.is_ok());
+        let subs = subs.unwrap();
+        //println!("subscription: {}", serde_json::to_string_pretty(&subs).unwrap());
+        let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, Role::new("D"), false);
+        println!("{}: {}", Role::new("D").to_string(), serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap());
+        /* let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D"), Role::new("F"), Role::new("QCR")];
+        for role in all_roles {
+            let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, role.clone());
+            //println!("{}: {}", role.clone().to_string(), serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap());
+            println!("{}\n$$$$\n", serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap());
+        } */
+    }
+
+    #[test]
+    fn test_det_proj_3() {
+        setup_logger();
+        let composition = compose_protocols(get_interfacing_swarms_whhhh());
+        assert!(composition.is_ok());
+        let (composed_graph, composed_initial) = composition.unwrap();
+        let subs = crate::composition::composition_swarm::exact_weak_well_formed_sub(get_interfacing_swarms_whhhh(), &BTreeMap::new());
+        assert!(subs.is_ok());
+        let subs = subs.unwrap();
+        //println!("subscription: {}", serde_json::to_string_pretty(&subs).unwrap());
+        let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D")];
+
+        for role in all_roles {
+            let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, role.clone(), false);
+            //println!("{}: {}", role.clone().to_string(), serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap());
+            println!("{}\n$$$$\n", serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap());
+        }
+    }
+}

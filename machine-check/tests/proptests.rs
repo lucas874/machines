@@ -1,5 +1,5 @@
 use machine_check::{
-    composition::{check_composed_projection, check_wwf_swarm, compose_protocols, composition_types::{CompositionComponent, DataResult, Granularity, InterfacingSwarms}, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, project_combine, revised_projection}, types::{Command, EventType, Role, State, StateName, SwarmLabel, Transition}, EdgeId, Graph, Machine, NodeId, Subscriptions, SwarmProtocol
+    composition::{check_composed_projection, check_wwf_swarm, compose_protocols, composition_types::{CompositionComponent, DataResult, Granularity, InterfacingSwarms}, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, project_combine, revised_projection}, types::{Command, EventType, MachineLabel, Role, State, StateName, SwarmLabel, Transition}, EdgeId, Graph, Machine, NodeId, Subscriptions, SwarmProtocol
 };
 use petgraph::{
     graph::EdgeReference,
@@ -871,6 +871,42 @@ proptest! {
     }
 }
 
+fn num_states(proto: &Machine) -> usize {
+    let mut states = BTreeSet::new();
+    states.insert(proto.initial.clone());
+    for t in &proto.transitions {
+        states.insert(t.source.clone());
+        states.insert(t.target.clone());
+    }
+    states.len()
+}
+
+fn num_transitions(proto: &Machine) -> usize {
+    let mut transitions = BTreeSet::new();
+    for t in &proto.transitions {
+        transitions.insert(t.clone());
+    }
+    transitions.len()
+}
+
+fn num_terminal(proto: &Machine) -> usize {
+    let mut states = BTreeSet::new();
+    states.insert(proto.initial.clone());
+    let mut states_to_outgoing = BTreeMap::new();
+    let mut terminal_states = BTreeSet::new();
+    for t in &proto.transitions {
+        states.insert(t.source.clone());
+        states.insert(t.target.clone());
+        states_to_outgoing.entry(t.source.clone()).and_modify(|ts: &mut BTreeSet<Transition<MachineLabel>>| {ts.insert(t.clone());}).or_insert_with(|| BTreeSet::new());
+    }
+    for state in &states {
+        if !states_to_outgoing.contains_key(state) {
+            terminal_states.insert(state.clone());
+        }
+    }
+    terminal_states.len()
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(100))]
     #[test]
@@ -897,7 +933,7 @@ proptest! {
         let composition_string = serde_json::to_string(&composition.clone()).unwrap();
         for role in subscriptions.keys() {
             let role_string = role.to_string();
-            let projection: Option<Machine> = match serde_json::from_str(&revised_projection(composition_string.clone(), sub_string.clone(), role_string.clone())).unwrap() {
+            let projection: Option<Machine> = match serde_json::from_str(&revised_projection(composition_string.clone(), sub_string.clone(), role_string.clone(), true.to_string())).unwrap() {
                 DataResult::OK{data: projection} => {
                 Some(projection) },
                 DataResult::ERROR{ .. } => None,
@@ -909,7 +945,7 @@ proptest! {
             match serde_json::from_str(&check_composed_projection(protos.clone(), sub_string.clone(), role.clone().to_string(), machine_string)).unwrap() {
                 CheckResult::OK => (),
                 CheckResult::ERROR {errors: e} => {
-                    match serde_json::from_str(&project_combine(protos.clone(), sub_string.clone(), role.clone().to_string())).unwrap() {
+                    match serde_json::from_str(&project_combine(protos.clone(), sub_string.clone(), role.clone().to_string(), false.to_string())).unwrap() {
                         DataResult::OK{data: projection1} => {
                             println!("machine combined: {}", serde_json::to_string_pretty::<Machine>(&projection1).unwrap());
                         },
@@ -920,6 +956,73 @@ proptest! {
                     for v in &vec.0 {
                         println!("component: {}", serde_json::to_string_pretty(&v.protocol).unwrap());
                     }
+                    println!("errors: {:?}", e); assert!(false)
+                },
+            }
+        }
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(100))]
+    #[test]
+    #[ignore]
+    fn test_combine_machines_prop_more_verbose(vec in generate_interfacing_swarms_refinement_2(5, 5, 3)) {
+        setup_logger();
+        let protos = serde_json::to_string(&vec).unwrap();
+        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
+        let subscriptions: Option<Subscriptions> = match serde_json::from_str(&overapproximated_weak_well_formed_sub(protos.clone(), subs, granularity)).unwrap() {
+            DataResult::OK{data: subscriptions} => Some(subscriptions),
+            DataResult::ERROR{ .. } => None,
+        };
+        let composition: Option<SwarmProtocol> = match serde_json::from_str(&compose_protocols(protos.clone())).unwrap() {
+            DataResult::OK{data: composition} => Some(composition),
+            DataResult::ERROR{ .. } => None,
+        };
+        assert!(subscriptions.is_some());
+        assert!(composition.is_some());
+        let subscriptions = subscriptions.unwrap();
+        let composition = composition.unwrap();
+        //let composition = InterfacingSwarms::<Role>(vec![CompositionComponent{protocol: composition.unwrap(), interface: None}]);
+        let sub_string = serde_json::to_string(&subscriptions).unwrap();
+        let composition_string = serde_json::to_string(&composition.clone()).unwrap();
+        for role in subscriptions.keys() {
+            let role_string = role.to_string();
+            let projection: Option<Machine> = match serde_json::from_str(&revised_projection(composition_string.clone(), sub_string.clone(), role_string.clone(), true.to_string())).unwrap() {
+                DataResult::OK{data: projection} => {
+                Some(projection) },
+                DataResult::ERROR{ .. } => None,
+            };
+
+            assert!(projection.is_some());
+            let machine_string = serde_json::to_string(&projection.clone().unwrap()).unwrap();
+            // should work like this projecting over the explicit composition initially and comparing that with combined machines?
+            match serde_json::from_str(&check_composed_projection(protos.clone(), sub_string.clone(), role.clone().to_string(), machine_string)).unwrap() {
+                CheckResult::OK => {
+                    let combined: Option<Machine> = match serde_json::from_str(&project_combine(protos.clone(), sub_string.clone(), role.clone().to_string(), false.to_string())).unwrap() {
+                        DataResult::OK{data: combined} => {
+                        Some(combined) },
+                        DataResult::ERROR{ .. } => None,
+                    };
+                    println!("combined: num states: {}, num transitions: {}, num terminal: {}", num_states(&combined.clone().unwrap()), num_transitions(&combined.clone().unwrap()), num_terminal(&combined.clone().unwrap()));
+                    println!("expanded: num states: {}, num transitions: {}, num terminal: {}", num_states(&projection.clone().unwrap()), num_transitions(&projection.clone().unwrap()), num_terminal(&projection.clone().unwrap()));
+                    println!("|combined states| - |expanded states|: {}", num_states(&combined.clone().unwrap()) - num_states(&projection.clone().unwrap()));
+                    println!("|combined states| - |expanded states| = |combined terminal| - |expanded terminal|: {}", (num_states(&combined.clone().unwrap()) - num_states(&projection.clone().unwrap())) == (num_terminal(&combined.clone().unwrap()) - num_terminal(&projection.clone().unwrap())));
+                    println!("");
+                },//(),
+                CheckResult::ERROR {errors: e} => {
+                    match serde_json::from_str(&project_combine(protos.clone(), sub_string.clone(), role.clone().to_string(), false.to_string())).unwrap() {
+                        DataResult::OK{data: projection1} => {
+                            println!("machine combined: {}", serde_json::to_string_pretty::<Machine>(&projection1).unwrap());
+                        },
+                        DataResult::ERROR{ errors: e } => println!("errors combined: {:?}", e),
+                    };
+                    println!("machine: {}", serde_json::to_string_pretty(&projection.unwrap()).unwrap());
+                    /* println!("composition: {}", serde_json::to_string_pretty(&composition).unwrap());
+                    for v in &vec.0 {
+                        println!("component: {}", serde_json::to_string_pretty(&v.protocol).unwrap());
+                    } */
                     println!("errors: {:?}", e); assert!(false)
                 },
             }

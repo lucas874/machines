@@ -66,7 +66,7 @@ pub fn overapproximated_weak_well_formed_sub(protos: String, subs: String, granu
 }
 
 #[wasm_bindgen]
-pub fn revised_projection(proto: String, subs: String, role: String) -> String {
+pub fn revised_projection(proto: String, subs: String, role: String, minimize: String) -> String {
     let proto = match serde_json::from_str::<SwarmProtocol>(&proto) {
         Ok(p) => p,
 
@@ -76,12 +76,16 @@ pub fn revised_projection(proto: String, subs: String, role: String) -> String {
         Ok(s) => s,
         Err(e) => return derr::<Machine>(vec![format!("parsing subscriptions: {}", e)]),
     };
+    let role = Role::new(&role);
+    let minimize = match serde_json::from_str::<bool>(&minimize) {
+        Ok(s) => s,
+        Err(e) => return derr::<Machine>(vec![format!("parsing subscriptions: {}", e)]),
+    };
     let (swarm, initial, errors) = composition_swarm::from_json(proto);
     let Some(initial) = initial else {
         return err(errors);
     };
-    let role = Role::new(&role);
-    let (proj, initial) = composition::composition_machine::project(&swarm, initial, &subs, role);
+    let (proj, initial) = composition::composition_machine::project(&swarm, initial, &subs, role, minimize);
 
     dok(
         composition::composition_machine::to_json_machine(proj, initial)
@@ -89,7 +93,7 @@ pub fn revised_projection(proto: String, subs: String, role: String) -> String {
 }
 
 #[wasm_bindgen]
-pub fn project_combine(protos: String, subs: String, role: String) -> String {
+pub fn project_combine(protos: String, subs: String, role: String, minimize: String) -> String {
     let protocols = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
         Ok(p) => p,
         Err(e) => return derr::<Machine>(vec![format!("parsing composition input: {}", e)]),
@@ -99,13 +103,16 @@ pub fn project_combine(protos: String, subs: String, role: String) -> String {
         Err(e) => return derr::<Machine>(vec![format!("parsing subscriptions: {}", e)]),
     };
     let role = Role::new(&role);
-
+    let minimize = match serde_json::from_str::<bool>(&minimize) {
+        Ok(s) => s,
+        Err(e) => return derr::<Machine>(vec![format!("parsing subscriptions: {}", e)]),
+    };
     let proto_info = swarms_to_proto_info(protocols, &subs);
     if !proto_info.no_errors() {
         return derr::<Machine>(error_report_to_strings(proto_info_to_error_report(proto_info)));
     }
 
-    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role);
+    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role, minimize);
 
     dok(
         composition::composition_machine::from_option_to_machine(proj, proj_initial.unwrap())
@@ -113,7 +120,7 @@ pub fn project_combine(protos: String, subs: String, role: String) -> String {
 }
 
 #[wasm_bindgen]
-pub fn project_combine_all(protos: String, subs: String) -> String {
+pub fn project_combine_all(protos: String, subs: String, minimize: String) -> String {
     let protocols = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
         Ok(p) => p,
         Err(e) => return derr::<Vec<Machine>>(vec![format!("parsing composition input: {}", e)]),
@@ -122,13 +129,16 @@ pub fn project_combine_all(protos: String, subs: String) -> String {
         Ok(s) => s,
         Err(e) => return derr::<Vec<Machine>>(vec![format!("parsing subscriptions: {}", e)]),
     };
-
+    let minimize = match serde_json::from_str::<bool>(&minimize) {
+        Ok(s) => s,
+        Err(e) => return derr::<Machine>(vec![format!("parsing subscriptions: {}", e)]),
+    };
     let proto_info = swarms_to_proto_info(protocols, &subs);
     if !proto_info.no_errors() {
         return derr::<Vec<Machine>>(error_report_to_strings(proto_info_to_error_report(proto_info)));
     }
 
-    let projections = composition_machine::project_combine_all(&proto_info.protocols, &subs);
+    let projections = composition_machine::project_combine_all(&proto_info.protocols, &subs, minimize);
 
     // do not think we need this check here
     if projections.iter().any(|(_, i)| i.is_none()) {
@@ -147,7 +157,7 @@ pub fn project_combine_all(protos: String, subs: String) -> String {
 }
 
 #[wasm_bindgen]
-pub fn projection_information(protos: String, subs: String, role: String) -> String {
+pub fn projection_information(protos: String, subs: String, role: String, minimize: String) -> String {
     let protocols = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
         Ok(p) => p,
         Err(e) => return derr::<Vec<Machine>>(vec![format!("parsing composition input: {}", e)]),
@@ -156,14 +166,16 @@ pub fn projection_information(protos: String, subs: String, role: String) -> Str
         Ok(s) => s,
         Err(e) => return derr::<Vec<Machine>>(vec![format!("parsing subscriptions: {}", e)]),
     };
-
+    let role = Role::new(&role);
+    let minimize = match serde_json::from_str::<bool>(&minimize) {
+        Ok(s) => s,
+        Err(e) => return derr::<Machine>(vec![format!("parsing subscriptions: {}", e)]),
+    };
     let proto_info = swarms_to_proto_info(protocols, &subs);
     if !proto_info.no_errors() {
         return derr::<Vec<Machine>>(error_report_to_strings(proto_info_to_error_report(proto_info)));
     }
-
-    let role = Role::new(&role);
-    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role);
+    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role, minimize);
     let branches = composition_machine::paths_from_event_types(&proj, &proto_info);
     let special_event_types = get_branching_joining_proto_info(&proto_info);
 
@@ -239,7 +251,7 @@ pub fn check_composed_projection(
         return err(error_report_to_strings(proto_info_to_error_report(proto_info)));
     }
 
-    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role);
+    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role, false);
     let (machine, json_initial, m_errors) = machine::from_json(machine);
     let machine_problem = !m_errors.is_empty();
     let mut errors = vec![];
