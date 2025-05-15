@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use tsify::{Tsify, declare};
 
 use crate::{
     composition::composition_swarm::Error,
@@ -10,9 +11,10 @@ use crate::{
 
 use super::{NodeId, SwarmProtocol};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Tsify, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub enum DataResult<T: Serialize> {
+#[tsify(into_wasm_abi)]
+pub enum DataResult<T> {
     OK { data: T },
     ERROR { errors: Vec<String> },
 }
@@ -134,16 +136,19 @@ pub fn get_branching_joining_proto_info(proto_info: &ProtoInfo) -> BTreeSet<Even
         .collect()
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct CompositionComponent<T: SwarmInterface> {
+#[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct CompositionComponent<T> {
     pub protocol: SwarmProtocol,
     pub interface: Option<T>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct InterfacingSwarms<T: SwarmInterface>(pub Vec<CompositionComponent<T>>);
+#[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct InterfacingSwarms<T>(pub Vec<CompositionComponent<T>>);
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Tsify, Serialize, Deserialize, Debug, Clone)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum Granularity {
     Fine,
     Medium,
@@ -151,14 +156,25 @@ pub enum Granularity {
     TwoStep,
 }
 
-pub type SucceedingNonBranchingJoining = BTreeMap<EventType, BTreeSet<EventType>>;
+#[declare]
+pub type SucceedingNonBranchingJoining = BTreeMap<EventType, Vec<EventType>>;
+#[declare]
+pub type SpecialEventTypes = BTreeSet<EventType>;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+/* #[derive(Serialize, Deserialize)]
+pub struct EventSet(pub BTreeSet<EventType>);
+
+impl Tsify for EventSet {
+    const DECL: &'static str = "Set<string>";
+} */
+
+#[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "camelCase")]
-pub struct ProjectionAndSucceedingMap {
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct ProjectionInfo {
     pub projection: Machine,
     pub branches: SucceedingNonBranchingJoining,
-    pub special_event_types: BTreeSet<EventType>,
+    pub special_event_types: SpecialEventTypes,
 }
 
 /* Used when combining machines and protocols */

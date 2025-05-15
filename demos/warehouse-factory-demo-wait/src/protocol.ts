@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import { MachineEvent, SwarmProtocol } from '@actyx/machine-runner'
-import { SwarmProtocolType, Subscriptions, Result, ResultData, InterfacingSwarms, overapproxWWFSubscriptions, checkWWFSwarmProtocol, MachineType, projectionAndInformation, ProjectionAndSucceedingMap} from '@actyx/machine-check'
+import { SwarmProtocolType, Subscriptions, Result, DataResult, InterfacingSwarms, overapproxWWFSubscriptions, checkWWFSwarmProtocol, MachineType, projectionInformation, ProjectionInfo} from '@actyx/machine-check'
 import chalk from "chalk";
 
 export const manifest = {
@@ -49,19 +49,19 @@ export const factory_protocol: InterfacingSwarms = [{protocol: Gfactory, interfa
 export const warehouse_factory_protocol: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}]
 
 // Well-formed subscription for the warehouse protocol
-const result_subs_warehouse: ResultData<Subscriptions>
+const result_subs_warehouse: DataResult<Subscriptions>
   = overapproxWWFSubscriptions(warehouse_protocol, {}, 'TwoStep')
 if (result_subs_warehouse.type === 'ERROR') throw new Error(result_subs_warehouse.errors.join(', '))
 export var subs_warehouse: Subscriptions = result_subs_warehouse.data
 
 // Well-formed subscription for the factory protocol
-const result_subs_factory: ResultData<Subscriptions>
+const result_subs_factory: DataResult<Subscriptions>
   = overapproxWWFSubscriptions(factory_protocol, {}, 'TwoStep')
 if (result_subs_factory.type === 'ERROR') throw new Error(result_subs_factory.errors.join(', '))
 export var subs_factory: Subscriptions = result_subs_factory.data
 
 // Well-formed subscription for the warehouse || factory protocol
-const result_subs_composition: ResultData<Subscriptions>
+const result_subs_composition: DataResult<Subscriptions>
   = overapproxWWFSubscriptions(warehouse_factory_protocol, {}, 'TwoStep')
 if (result_subs_composition.type === 'ERROR') throw new Error(result_subs_composition.errors.join(', '))
 export var subs_composition: Subscriptions = result_subs_composition.data
@@ -88,12 +88,12 @@ export function print_event(e: any) {
 }
 
 // Projection of warehouse || factory over R
-const projectionInfoResultRobot: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(warehouse_factory_protocol, subs_composition, "R")
+const projectionInfoResultRobot: DataResult<ProjectionInfo> = projectionInformation(warehouse_factory_protocol, subs_composition, "R", false)
 if (projectionInfoResultRobot.type == 'ERROR') throw new Error('error getting projection')
 export const projectionInfoRobot = projectionInfoResultRobot.data
 
 // Projection of warehouse || factory over T
-const projectionInfoResultTransport: ResultData<ProjectionAndSucceedingMap> = projectionAndInformation(warehouse_factory_protocol, subs_composition, "T")
+const projectionInfoResultTransport: DataResult<ProjectionInfo> = projectionInformation(warehouse_factory_protocol, subs_composition, "T", false)
 if (projectionInfoResultTransport.type == 'ERROR') throw new Error('error getting projection')
 export const projectionInfoTransport = projectionInfoResultTransport.data
 

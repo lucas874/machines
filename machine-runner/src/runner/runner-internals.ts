@@ -365,14 +365,14 @@ export namespace RunnerInternalsBT {
   export type BranchTracker = {
     jbLast: Map<string, string>
     specialEventTypes: Set<string>
-    branches: Record<string, Set<string>>
+    branches: Record<string, string[]>
 
   }
   // if event is branching or joining update jbLast accordingly otherwise return old
   const updateJBLast = (branchTracker: BranchTracker, event: ActyxEvent<MachineEvent.Any>): BranchTracker => {
     if (branchTracker.specialEventTypes.has(event.payload.type)) {
       const branchFromT = branchTracker.branches[event.payload.type]
-      var jbLastUpdated = structuredClone(branchTracker.jbLast)
+      const jbLastUpdated = structuredClone(branchTracker.jbLast)
       for (var et of branchFromT) {
         jbLastUpdated.set(et, event.meta.eventId)
       }
@@ -400,7 +400,7 @@ export namespace RunnerInternalsBT {
     >,
     payload: StatePayload,
     specialEventTypes: Set<string>,
-    branches: Record<string, Set<string>>,
+    branches: Record<string, string[]>,
     commandCallback: CommandCallback<MachineEventFactories>,
   ) => {
     const initial: StateAndFactory<

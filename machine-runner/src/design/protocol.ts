@@ -2,7 +2,7 @@
 import { Tag, Tags } from '@actyx/sdk'
 import { StateMechanism, MachineProtocol, ReactionMap, StateFactory } from './state.js'
 import { MachineEvent } from './event.js'
-import { Subscriptions, InterfacingSwarms, projectionAndInformation } from '@actyx/machine-check'
+import { Subscriptions, InterfacingSwarms, projectionInformation, ProjectionInfo } from '@actyx/machine-check'
 import chalk = require('chalk');
 import * as readline from 'readline';
 
@@ -35,7 +35,7 @@ export type SwarmProtocol<
   ) => MachineResult<[AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>, any]>
   adaptMachineNew: <MachineName extends string>(
     machineName: MachineName,
-    proj: ProjMachine.ProjectionAndSucceedingMap,
+    proj: ProjectionInfo,
     events: readonly MachineEvent.Factory<any, any>[],
     mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>
   ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
@@ -86,7 +86,7 @@ export namespace SwarmProtocol {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
       adaptMachine: (machineName, role, protocols, subscriptions, mOldInitial, verbose?) => {
-        const projectionInfo = projectionAndInformation(protocols, subscriptions, role)
+        const projectionInfo = projectionInformation(protocols, subscriptions, role, true)
         if (projectionInfo.type == 'ERROR') {
           return {data: undefined, ... projectionInfo}
         }
@@ -367,7 +367,7 @@ export interface MachineAnalysisResource extends ProjectionType {
 
 export type MachineResult<T> = { type: 'OK'; data: T } | { type: 'ERROR'; errors: string[]; data: undefined }
 
-export type ProjectionInfo = { projection: ProjectionType, branches: Record<string, Set<string>>, specialEventTypes: Set<string> }
+//export type ProjectionInfo = { projection: ProjectionType, branches: Record<string, Set<string>>, specialEventTypes: Set<string> }
 
 export namespace MachineAnalysisResource {
   export const SyntheticDelimiter = '§' as const
@@ -759,7 +759,7 @@ export namespace ProjMachine {
     MachineEventFactories extends MachineEvent.Factory.Any,
   >(
     mNew: Machine<SwarmProtocolName, MachineName, MachineEventFactories>,
-    projectionInfo: ProjectionAndSucceedingMap,
+    projectionInfo: ProjectionInfo,
     events: readonly MachineEvent.Factory<any, Record<never, never>>[],
     mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
   ): [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any] => {

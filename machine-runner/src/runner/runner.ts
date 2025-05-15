@@ -44,7 +44,7 @@ import { deepEqual } from 'fast-equals'
 import { deepCopy } from '../utils/object-utils.js'
 import * as globals from '../globals.js'
 import { MachineRunnerFailure } from '../errors.js'
-import { boolean } from 'zod'
+import { ProjectionInfo } from '@actyx/machine-check'
 
 /**
  * Contains and manages the state of a machine by subscribing and publishing
@@ -296,8 +296,8 @@ export const createMachineRunnerBT = <
     any
   >,
   initialPayload: any,
-  succeedingNonBranchingJoining: Record<string, Set<string>>,
-  specialEvents: Set<string>
+  projectionInfo: ProjectionInfo, /* succeedingNonBranchingJoining: Record<string, Set<string>>,
+  specialEvents: Set<string> */
 ): MachineRunner<SwarmProtocolName, MachineName, StateUnion> => {
   const subscribeMonotonicQuery = {
     query: tags,
@@ -310,7 +310,7 @@ export const createMachineRunnerBT = <
   const subscribe: SubscribeFn<MachineEvents> = (callback, onCompleteOrErr) =>
     sdk.subscribeMonotonic<MachineEvents>(subscribeMonotonicQuery, callback, onCompleteOrErr)
 
-  return createMachineRunnerInternalBT(subscribe, persist, tags, initialFactory, initialPayload, succeedingNonBranchingJoining, specialEvents)
+  return createMachineRunnerInternalBT(subscribe, persist, tags, initialFactory, initialPayload, projectionInfo.branches, new Set(projectionInfo.specialEventTypes))
 }
 export const createMachineRunnerInternal = <
   SwarmProtocolName extends string,
@@ -692,7 +692,7 @@ export const createMachineRunnerInternalBT = <
     any
   >,
   initialPayload: Payload,
-  succeedingNonBranchingJoining: Record<string, Set<string>>,
+  succeedingNonBranchingJoining: Record<string, string[]>,
   specialEvents: Set<string>,
 ): MachineRunner<SwarmProtocolName, MachineName, StateUnion> => {
   type ThisStateOpaque = StateOpaque<SwarmProtocolName, MachineName, string, StateUnion>

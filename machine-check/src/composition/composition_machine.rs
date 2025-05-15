@@ -343,11 +343,17 @@ pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> Suc
 
     for node in proj.node_indices() {
         for edge in proj.edges_directed(node, Outgoing) {
-            let mut paths_this_edge = visit_successors_stop_on_branch(proj, edge.target(), &edge.weight().get_event_type(), &special_events, &concurrent_events);
-            m.entry(edge.weight().get_event_type()).and_modify(|s| s.append(&mut paths_this_edge)).or_insert_with(|| paths_this_edge);
+            match edge.weight() {
+                MachineLabel::Execute { .. } => continue,
+                MachineLabel::Input { .. } => {
+                    let mut paths_this_edge = visit_successors_stop_on_branch(proj, edge.target(), &edge.weight().get_event_type(), &special_events, &concurrent_events);
+                    m.entry(edge.weight().get_event_type()).and_modify(|s| s.append(&mut paths_this_edge)).or_insert_with(|| paths_this_edge);
+                }
+            }
         }
     }
-    m
+
+    m.into_iter().map(|(t, after_t)| (t, after_t.into_iter().collect())).collect()
 }
 
 // precondition: both machines are projected from wwf protocols?
@@ -1690,7 +1696,7 @@ mod tests {
     fn test_all_projs_wh_only() {
         setup_logger();
         let input_sub = BTreeMap::new();
-        let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_whhhh(), &input_sub, Granularity::Medium).unwrap();
+        let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(get_interfacing_swarms_whhhh(), &input_sub, Granularity::TwoStep).unwrap();
         let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D")];
         println!("subs: {}", serde_json::to_string_pretty(&subs).unwrap());
         let proto_info = swarms_to_proto_info(get_interfacing_swarms_whhhh(), &subs);
@@ -1701,10 +1707,12 @@ mod tests {
             let (proj, proj_initial) =
                 project_combine(&proto_info.protocols, &subs, role.clone(), false);
             //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
-            let _branch_thing = paths_from_event_types(&proj, &proto_info);
-            //println!("role: {}\n branch thing: {}", role.to_string(), serde_json::to_string_pretty(&branch_thing).unwrap());
+            if role.to_string() == "D" {
+                let branch_thing = paths_from_event_types(&proj, &proto_info);
+                println!("role: {}\n branch thing: {}", role.to_string(), serde_json::to_string_pretty(&branch_thing).unwrap());
+            }
             let thing = from_option_to_machine(proj, proj_initial.unwrap());
-            println!("{}\n$$$$", serde_json::to_string_pretty(&thing).unwrap())
+            //println!("{}\n$$$$", serde_json::to_string_pretty(&thing).unwrap())
             //let thing = project(&proto_info.protocols.)
         }
     }

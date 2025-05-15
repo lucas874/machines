@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use wasm_bindgen::prelude::*;
+use tsify::{declare};
 
 mod machine;
 mod swarm;
@@ -9,8 +10,11 @@ pub mod composition;
 use petgraph::visit::GraphBase;
 use types::{CheckResult, EventType, MachineLabel, Protocol, Role, State, SwarmLabel};
 
+#[declare]
 pub type Subscriptions = BTreeMap<Role, BTreeSet<EventType>>;
+#[declare]
 pub type SwarmProtocol = Protocol<SwarmLabel>;
+#[declare]
 pub type Machine = Protocol<MachineLabel>;
 
 pub type Graph = petgraph::Graph<State, SwarmLabel>;

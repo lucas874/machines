@@ -1,7 +1,7 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, warehouse_factory_protocol, getRandomInt, factory_protocol, subs_factory, print_event, subs_composition, projectionInfoRobot, printState  } from './protocol'
-import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
+//import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 import * as readline from 'readline';
 
 const rl = readline.createInterface({
@@ -37,7 +37,7 @@ async function main() {
 
   const app = await Actyx.of(manifest)
   const tags = Composition.tagWithEntityId('warehouse-factory')
-  const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfoRobot.branches, projectionInfoRobot.specialEventTypes)
+  const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfoRobot)
   printState(factoryRobotAdapted.machineName, s0Adapted.mechanism.name, undefined)
 
   for await (const state of machine) {

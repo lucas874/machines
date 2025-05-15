@@ -43,7 +43,7 @@ const [transportAdapted, s0Adapted] = Composition.adaptMachine('Transport', 'T',
 async function main() {
   const app = await Actyx.of(manifest)
   const tags = Composition.tagWithEntityId('warehouse-factory')
-  const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfoTransport.branches, projectionInfoTransport.specialEventTypes)
+  const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfoTransport)
   printState(transportAdapted.machineName, s0Adapted.mechanism.name, undefined)
   console.log(chalk.bgBlack.red.dim`    partID!`);
 
