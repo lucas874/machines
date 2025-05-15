@@ -147,17 +147,6 @@ fn combine_projs(projections: Vec<(Graph, NodeId, BTreeSet<EventType>)>) -> (Gra
     (combined_projection, combined_initial)
 }
 
-pub fn project_combine_all(
-    swarms: &Vec<ProtoStruct>,
-    subs: &Subscriptions,
-    minimize: bool
-) -> Vec<(OptionGraph, Option<NodeId>)> {
-    let _span = tracing::info_span!("project_combine_all").entered();
-    subs.keys()
-        .map(|role| project_combine(swarms, subs, role.clone(), minimize))
-        .collect()
-}
-
 // nfa to dfa using subset construction. Hopcroft, Motwani and Ullman section 2.3.5
 fn nfa_to_dfa(nfa: Graph, i: NodeId) -> (Graph, NodeId) {
     let _span = tracing::info_span!("nfa_to_dfa").entered();

@@ -30,14 +30,6 @@ pub fn check_wwf_swarm(protos: InterfacingSwarms<Role>, subs: String) -> CheckRe
 
 #[wasm_bindgen]
 pub fn exact_weak_well_formed_sub(protos: InterfacingSwarms<Role>, subs: String) -> DataResult<Subscriptions> {
-    /* let protos = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
-        Ok(p) => p,
-        Err(e) => return derr::<Subscriptions>(vec![format!("parsing swarm protocol: {}", e)]),
-    }; */
-    /* let subs = match serde_json::from_str::<Subscriptions>(&subs) {
-        Ok(p) => p,
-        Err(e) => return DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]},
-    }; */
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
     let result = composition_swarm::exact_weak_well_formed_sub(protos, &subs);
     match result {
@@ -96,7 +88,6 @@ pub fn projection_information(protos: InterfacingSwarms<Role>, subs: String, rol
 #[wasm_bindgen]
 pub fn projection_information_new(protos: InterfacingSwarms<Role>, subs: String, role: Role, machine: Machine, k: usize) -> DataResult<ProjectionInfo> {
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
-
     let proto_info = swarms_to_proto_info(protos, &subs);
     if !proto_info.no_errors() {
         return DataResult:: ERROR { errors: error_report_to_strings(proto_info_to_error_report(proto_info)) };
@@ -171,15 +162,6 @@ pub fn compose_protocols(protos: InterfacingSwarms<Role>) -> DataResult<SwarmPro
         }
         Err(errors) => DataResult::ERROR { errors: error_report_to_strings(errors) },
     }
-}
-
-fn derr<T: serde::Serialize>(errors: Vec<String>) -> String {
-    let result: DataResult<String> = DataResult::ERROR { errors };
-    serde_json::to_string(&result).unwrap()
-}
-
-fn dok<T: serde::Serialize>(data: T) -> String {
-    serde_json::to_string(&DataResult::OK { data }).unwrap()
 }
 
 fn error_report_to_strings(error_report: ErrorReport) -> Vec<String> {
