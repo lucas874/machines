@@ -68,29 +68,18 @@ export function exactWWFSubscriptions(protos: InterfacingSwarms, subscriptions: 
 }
 
 export function overapproxWWFSubscriptions(protos: InterfacingSwarms, subscriptions: Subscriptions, granularity: Granularity): DataResult<Subscriptions> {
-  //const p = JSON.stringify(protos)
-  //const s = JSON.stringify(subscriptions)
-  //const g = JSON.stringify(granularity)
-  //const result = overapproximated_weak_well_formed_sub(protos, JSON.stringify(subscriptions), granularity);
-  //return JSON.parse(result)
-  //const result: any = 1
-  //return result
   return overapproximated_weak_well_formed_sub(protos, JSON.stringify(subscriptions), granularity);
 }
-/*
+
 export function checkComposedProjection(
   protos: InterfacingSwarms,
   subscriptions: Subscriptions,
-  role: string,
-  machine: MachineType,
-): Result {
-  const ps = JSON.stringify(protos)
-  const sub = JSON.stringify(subscriptions)
-  const m = JSON.stringify(machine)
-  const result = check_composed_projection(ps, sub, role, m)
-  return JSON.parse(result)
+  role: Role,
+  machine: Machine,
+): CheckResult {
+  return check_composed_projection(protos, JSON.stringify(subscriptions), role, machine)
 }
-*/
+
 export function revisedProjection(
   proto: SwarmProtocol,
   subscriptions: Subscriptions,
@@ -114,13 +103,10 @@ export function projectCombineMachines(protos: InterfacingSwarms, subscriptions:
   return project_combine(protos, JSON.stringify(subscriptions), role, minimize)
 }
 
-/*
-export function composeProtocols(protos: InterfacingSwarms): ResultData<SwarmProtocolType> {
-  const ps = JSON.stringify(protos)
-  const result = compose_protocols(ps)
-  return JSON.parse(result)
+export function composeProtocols(protos: InterfacingSwarms): DataResult<SwarmProtocol> {
+  return compose_protocols(protos)
 }
-
+/*
 export function projectAll(protos: InterfacingSwarms, subscriptions: Subscriptions, minimize: boolean): ResultData<MachineType[]> {
   const ps = JSON.stringify(protos)
   const s = JSON.stringify(subscriptions)
@@ -129,7 +115,7 @@ export function projectAll(protos: InterfacingSwarms, subscriptions: Subscriptio
   return JSON.parse(result)
 }
 */
-export function projectionInformation(protos: InterfacingSwarms, subscriptions: Subscriptions, role: string, minimize: boolean): DataResult<ProjectionInfo> {
+export function projectionInformation(protos: InterfacingSwarms, subscriptions: Subscriptions, role: Role, minimize: boolean): DataResult<ProjectionInfo> {
   /* const ps = JSON.stringify(protos)
   const s = JSON.stringify(subscriptions)
   const m = minimize.toString()
@@ -153,17 +139,6 @@ export function projectionInformation(protos: InterfacingSwarms, subscriptions: 
   return projection_information(protos, JSON.stringify(subscriptions), role, minimize);
 }
 
-export function projectionAndInformationNew(protos: InterfacingSwarms, subscriptions: Subscriptions, role: string, machine: Machine, k: number): DataResult<ProjectionInfo> {
-/*   const ps = JSON.stringify(protos)
-  const s = JSON.stringify(subscriptions)
-  const m = JSON.stringify(machine)
-  const result = JSON.parse(projection_information_new(ps, s, role, m, k.toString()));
-  if (result.type === "ERROR") {
-    return result
-  } else {
-    const data = {...result.data, specialEventTypes: new Set<string>(result.data.specialEventTypes) }
-    return {type: "OK", data: data}
-  } */
-  throw console.error();
-
+export function projectionAndInformationNew(protos: InterfacingSwarms, subscriptions: Subscriptions, role: Role, machine: Machine, k: number): DataResult<ProjectionInfo> {
+  return projection_information_new(protos, JSON.stringify(subscriptions), role, machine, k);
 }

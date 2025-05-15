@@ -1,8 +1,8 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, warehouse_factory_protocol, getRandomInt, factory_protocol, subs_factory, print_event, subs_composition, projectionInfoRobot, printState  } from './protocol'
-//import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 import * as readline from 'readline';
+import { checkComposedProjection } from '@actyx/machine-check';
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -25,13 +25,16 @@ export const s2 = robot.designEmpty('s2').finish()
 
 s0.react([Events.part], s1, (_, e) => {
   return s1.make({partName: e.payload.partName})})
-
 s1.react([Events.car], s2, (_, e) => { return s2.make()})
+
+// Check that the original machine is a correct implementation. A prerequisite for reusing it.
+const checkProjResult = checkComposedProjection(factory_protocol, subs_factory, "R", robot.createJSONForAnalysis(s0))
+if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Adapt machine
 //const [factoryRobotAdapted, s0Adapted] = Composition.adaptMachine('Robot', projectionInfoRobot, Events.allEvents, s0, true)
 const [factoryRobotAdapted, s0Adapted] = Composition.adaptMachine('Robot', 'R', warehouse_factory_protocol, subs_composition, s0, true).data!
-
+//console.log(projectionInfoRobot)
 // Run the adapted machine
 async function main() {
 

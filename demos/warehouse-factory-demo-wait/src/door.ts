@@ -4,7 +4,7 @@ import { Events, manifest, Composition, warehouse_factory_protocol, subs_composi
 //import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 import * as readline from 'readline';
 import chalk from "chalk";
-import { projectionInformation } from '@actyx/machine-check';
+import { checkComposedProjection, projectionInformation } from '@actyx/machine-check';
 
 const log = console.log;
 
@@ -28,15 +28,15 @@ s1.react([Events.part], s0, (_, e) => { return s0.make() })
 s0.react([Events.time], s2, (_, e) => { return s2.make() })
 
 // Check that the original machine is a correct implementation. A prerequisite for reusing it.
-//const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "D", door.createJSONForAnalysis(s0))
-//if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
+const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "D", door.createJSONForAnalysis(s0))
+if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Projection of warehouse || factory over D
 const projectionInfoResult = projectionInformation(warehouse_factory_protocol, subs_composition, "D", false)
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
-console.log(projectionInfo)
-console.log(JSON.stringify(projectionInfo, null, 2))
+//console.log(projectionInfo)
+//console.log(JSON.stringify(projectionInfo, null, 2))
 /* console.log(typeof(projectionInfo.branches))
 console.log(typeof(projectionInfo.specialEventTypes))
 let special = new Set(projectionInfo.specialEventTypes)

@@ -107,10 +107,10 @@ pub fn projection_information_new(protos: InterfacingSwarms<Role>, subs: String,
     errors.extend(m_errors);
     let Some(initial) = initial else {
         errors.push(format!("initial machine state has no transitions"));
-        return DataResult:: ERROR { errors: errors }
+        return DataResult:: ERROR { errors }
     };
     if machine_problem {
-        return DataResult:: ERROR { errors: errors }
+        return DataResult:: ERROR { errors }
     }
 
     let (proj, proj_initial) = adapted_projection(&proto_info.protocols, &subs, role, (machine, initial), k);
@@ -142,10 +142,10 @@ pub fn check_composed_projection(
     errors.extend(m_errors);
     let Some(json_initial) = json_initial else {
         errors.push(format!("initial machine state has no transitions"));
-        return CheckResult::ERROR { errors: error_report_to_strings(proto_info_to_error_report(proto_info)) };
+        return CheckResult::ERROR { errors };
     };
     if machine_problem {
-        return CheckResult::ERROR { errors: error_report_to_strings(proto_info_to_error_report(proto_info)) };
+        return CheckResult::ERROR { errors };
     }
 
     errors.extend(
@@ -157,23 +157,19 @@ pub fn check_composed_projection(
     if errors.is_empty() {
         CheckResult::OK
     } else {
-        CheckResult::ERROR { errors: error_report_to_strings(proto_info_to_error_report(proto_info)) }
+        CheckResult::ERROR { errors }
     }
 }
 
 #[wasm_bindgen]
-pub fn compose_protocols(protos: String) -> String {
-    let protocols = match serde_json::from_str::<InterfacingSwarms<Role>>(&protos) {
-        Ok(p) => p,
-        Err(e) => return derr::<SwarmProtocol>(vec![format!("parsing composition input: {}", e)]),
-    };
-    let composition = composition_swarm::compose_protocols(protocols);
+pub fn compose_protocols(protos: InterfacingSwarms<Role>) -> DataResult<SwarmProtocol> {
+    let composition = composition_swarm::compose_protocols(protos);
 
     match composition {
         Ok((graph, initial)) => {
-            dok(composition_swarm::to_swarm_json(graph, initial))
+            DataResult::OK { data: composition_swarm::to_swarm_json(graph, initial) }
         }
-        Err(errors) => derr::<SwarmProtocol>(error_report_to_strings(errors)),
+        Err(errors) => DataResult::ERROR { errors: error_report_to_strings(errors) },
     }
 }
 

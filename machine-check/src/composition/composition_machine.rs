@@ -1712,7 +1712,7 @@ mod tests {
                 println!("role: {}\n branch thing: {}", role.to_string(), serde_json::to_string_pretty(&branch_thing).unwrap());
             }
             let thing = from_option_to_machine(proj, proj_initial.unwrap());
-            //println!("{}\n$$$$", serde_json::to_string_pretty(&thing).unwrap())
+            println!("{}\n$$$$", serde_json::to_string_pretty(&thing).unwrap())
             //let thing = project(&proto_info.protocols.)
         }
     }
