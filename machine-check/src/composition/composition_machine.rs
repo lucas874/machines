@@ -5,7 +5,7 @@ use petgraph::{
 };
 use crate::{composition::composition_swarm::transitive_closure_succeeding, machine::{Error, Side}};
 use super::{
-    composition_types::{unord_event_pair, EventLabel, ProtoInfo, ProtoStruct, SucceedingNonBranchingJoining, UnordEventPair}, types::{StateName, Transition, Command}, EventType, Machine, MachineLabel, NodeId, Role, State, Subscriptions, SwarmLabel
+    composition_types::{unord_event_pair, EventLabel, ProtoInfo, ProtoStruct, BranchMap, UnordEventPair}, types::{StateName, Transition, Command}, EventType, MachineType, MachineLabel, NodeId, Role, State, Subscriptions, SwarmLabel
 };
 // types more or less copied from machine.rs.
 type Graph = petgraph::Graph<State, MachineLabel>;
@@ -302,7 +302,7 @@ fn visit_successors_stop_on_branch(proj: &OptionGraph, machine_state: NodeId, et
     event_types
 }
 
-pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> SucceedingNonBranchingJoining {
+pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> BranchMap {
     let _span = tracing::info_span!("paths_from_event_types").entered();
     let mut m: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
     let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
@@ -627,7 +627,7 @@ pub(in crate::composition) fn from_option_graph_to_graph(graph: &OptionGraph) ->
     graph.map(|_, n| n.clone().unwrap_or_else(|| State::new("")), |_, x| x.clone())
 }
 
-pub fn to_json_machine(graph: Graph, initial: NodeId) -> Machine {
+pub fn to_json_machine(graph: Graph, initial: NodeId) -> MachineType {
     let _span = tracing::info_span!("to_json_machine").entered();
     let machine_label_mapper = |m: &Graph, eref: EdgeReference<'_, MachineLabel>| {
         let label = eref.weight().clone();
@@ -645,7 +645,7 @@ pub fn to_json_machine(graph: Graph, initial: NodeId) -> Machine {
         .map(|e| machine_label_mapper(&graph, e))
         .collect();
 
-    Machine {
+    MachineType {
         initial: graph[initial].clone(),
         transitions,
     }
@@ -654,7 +654,7 @@ pub fn to_json_machine(graph: Graph, initial: NodeId) -> Machine {
 pub fn from_option_to_machine(
     graph: petgraph::Graph<Option<State>, MachineLabel>,
     initial: NodeId,
-) -> Machine {
+) -> MachineType {
     let _span = tracing::info_span!("from_option_to_machine").entered();
     let machine_label_mapper =
         |m: &petgraph::Graph<Option<State>, MachineLabel>,
@@ -674,7 +674,7 @@ pub fn from_option_to_machine(
         .map(|e| machine_label_mapper(&graph, e))
         .collect();
 
-    Machine {
+    MachineType {
         initial: graph[initial].clone().unwrap_or(State::from("")),
         transitions,
     }
@@ -687,7 +687,7 @@ mod tests {
         composition::{
             composition_swarm::{compose_protocols, exact_weak_well_formed_sub, from_json, overapprox_weak_well_formed_sub, swarms_to_proto_info},
             composition_types::{CompositionComponent, Granularity, InterfacingSwarms},
-        }, types::{Command, EventType, Role, Transition}, Machine, Subscriptions, SwarmProtocol
+        }, types::{Command, EventType, Role, Transition}, MachineType, Subscriptions, SwarmProtocolType
     };
     use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
 
@@ -703,8 +703,8 @@ mod tests {
         graph.map(|_, n| n.clone().unwrap().state_name().clone(), |_, x| x.clone())
     }
     // Example from coplaws slides
-    fn get_proto1() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn get_proto1() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -717,8 +717,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn get_proto2() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn get_proto2() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -730,8 +730,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn get_proto3() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn get_proto3() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -744,8 +744,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn get_proto32() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn get_proto32() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -757,8 +757,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn get_proto333() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn get_proto333() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -893,7 +893,7 @@ mod tests {
     fn test_projection_1() {
         setup_logger();
         // From Combining Swarm Protocols, example 5.
-        let proto = serde_json::from_str::<SwarmProtocol>(
+        let proto = serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -918,7 +918,7 @@ mod tests {
         let role = Role::new("F");
         let (g, i, _) = from_json(proto);
         let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role, false);
-        let expected_m = Machine {
+        let expected_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
                 Transition {
@@ -976,7 +976,7 @@ mod tests {
         let role = Role::new("FL");
         let (g, i, _) = from_json(proto);
         let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
-        let right_m = Machine {
+        let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
                 Transition {
@@ -1051,7 +1051,7 @@ mod tests {
         let role = Role::new("F");
         let (g, i, _) = from_json(proto);
         let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role, false);
-        let expected_m = Machine {
+        let expected_m = MachineType {
             initial: State::new("1"),
             transitions: vec![
                 Transition {
@@ -1104,7 +1104,7 @@ mod tests {
         let role = Role::new("T");
         let (g, i) = compose_protocols(protos).unwrap();
         let (proj, proj_initial) = project(&g, i, &subs, role, false);
-        let expected_m = Machine {
+        let expected_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
                 Transition {
@@ -1206,7 +1206,7 @@ mod tests {
         let role = Role::new("FL");
         let (g, i, _) = from_json(proto);
         let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
-        let right_m = Machine {
+        let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
                 Transition {
@@ -1283,7 +1283,7 @@ mod tests {
         let role = Role::new("FL");
         let (g, i, _) = from_json(proto);
         let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
-        let right_m = Machine {
+        let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
                 Transition {
@@ -1360,7 +1360,7 @@ mod tests {
         let role = Role::new("FL");
         let (g, i, _) = from_json(proto);
         let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
-        let right_m = Machine {
+        let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
                 Transition {
@@ -1437,7 +1437,7 @@ mod tests {
         let role = Role::new("FL");
         let (g, i, _) = from_json(proto);
         let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
-        let right_m = Machine {
+        let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
                 Transition {
@@ -1718,7 +1718,7 @@ mod tests {
         let role = Role::new("FL");
         let (g, i, _) = from_json(proto);
         let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
-        let right_m = Machine {
+        let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
                 Transition {
@@ -1793,7 +1793,7 @@ mod tests {
     fn test_adapted_projection_fl() {
         setup_logger();
 
-        let fl_m = Machine {
+        let fl_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
                 Transition {
@@ -1876,7 +1876,7 @@ mod tests {
     fn test_adapted_projection_r() {
         setup_logger();
 
-        let f_m = Machine {
+        let f_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
                 Transition {
@@ -1936,7 +1936,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_compose_zero() {
-        let left = Machine {
+        let left = MachineType {
             initial: State::new("left_0"),
             transitions: vec![
                 Transition {
@@ -1972,7 +1972,7 @@ mod tests {
                 },
             ],
         };
-        let right = Machine {
+        let right = MachineType {
             initial: State::new("right_0"),
             transitions: vec![
                 Transition {

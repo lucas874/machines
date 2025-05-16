@@ -6,10 +6,10 @@ use tsify::{Tsify, declare};
 use crate::{
     composition::composition_swarm::Error,
     types::{Command, EventType, MachineLabel, Role, SwarmLabel},
-    Graph, Machine,
+    Graph, MachineType,
 };
 
-use super::{NodeId, SwarmProtocol};
+use super::{NodeId, SwarmProtocolType};
 
 #[derive(Tsify, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -139,7 +139,7 @@ pub fn get_branching_joining_proto_info(proto_info: &ProtoInfo) -> BTreeSet<Even
 #[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct CompositionComponent<T> {
-    pub protocol: SwarmProtocol,
+    pub protocol: SwarmProtocolType,
     pub interface: Option<T>,
 }
 
@@ -157,7 +157,7 @@ pub enum Granularity {
 }
 
 #[declare]
-pub type SucceedingNonBranchingJoining = BTreeMap<EventType, Vec<EventType>>;
+pub type BranchMap = BTreeMap<EventType, Vec<EventType>>;
 #[declare]
 pub type SpecialEventTypes = BTreeSet<EventType>;
 
@@ -172,8 +172,8 @@ impl Tsify for EventSet {
 #[serde(rename_all = "camelCase")]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct ProjectionInfo {
-    pub projection: Machine,
-    pub branches: SucceedingNonBranchingJoining,
+    pub projection: MachineType,
+    pub branches: BranchMap,
     pub special_event_types: SpecialEventTypes,
 }
 

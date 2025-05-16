@@ -74,7 +74,7 @@ pub enum CheckResult {
 
 #[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
-pub struct Protocol<L> {
+pub struct ProtocolType<L> {
     pub initial: State,
     pub transitions: Vec<Transition<L>>,
 }

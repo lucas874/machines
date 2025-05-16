@@ -49,7 +49,7 @@ pub fn overapproximated_weak_well_formed_sub(protos: InterfacingSwarms<Role>, su
 }
 
 #[wasm_bindgen]
-pub fn revised_projection(proto: SwarmProtocol, subs: String, role: Role, minimize: bool) -> DataResult<Machine> {
+pub fn revised_projection(proto: SwarmProtocolType, subs: String, role: Role, minimize: bool) -> DataResult<MachineType> {
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
     let (swarm, initial, errors) = composition_swarm::from_json(proto);
     let Some(initial) = initial else {
@@ -60,7 +60,7 @@ pub fn revised_projection(proto: SwarmProtocol, subs: String, role: Role, minimi
 }
 
 #[wasm_bindgen]
-pub fn project_combine(protos: InterfacingSwarms<Role>, subs: String, role: Role, minimize: bool) -> DataResult<Machine> {
+pub fn project_combine(protos: InterfacingSwarms<Role>, subs: String, role: Role, minimize: bool) -> DataResult<MachineType> {
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
     let proto_info = swarms_to_proto_info(protos, &subs);
     if !proto_info.no_errors() {
@@ -86,7 +86,7 @@ pub fn projection_information(protos: InterfacingSwarms<Role>, subs: String, rol
 }
 
 #[wasm_bindgen]
-pub fn projection_information_new(protos: InterfacingSwarms<Role>, subs: String, role: Role, machine: Machine, k: usize) -> DataResult<ProjectionInfo> {
+pub fn projection_information_new(protos: InterfacingSwarms<Role>, subs: String, role: Role, machine: MachineType, k: usize) -> DataResult<ProjectionInfo> {
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
     let proto_info = swarms_to_proto_info(protos, &subs);
     if !proto_info.no_errors() {
@@ -118,7 +118,7 @@ pub fn check_composed_projection(
     protos: InterfacingSwarms<Role>,
     subs: String,
     role: Role,
-    machine: Machine,
+    machine: MachineType,
 ) -> CheckResult {
     let subs = deserialize_subs!(subs, |e| CheckResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
     let proto_info = swarms_to_proto_info(protos, &subs);
@@ -153,7 +153,7 @@ pub fn check_composed_projection(
 }
 
 #[wasm_bindgen]
-pub fn compose_protocols(protos: InterfacingSwarms<Role>) -> DataResult<SwarmProtocol> {
+pub fn compose_protocols(protos: InterfacingSwarms<Role>) -> DataResult<SwarmProtocolType> {
     let composition = composition_swarm::compose_protocols(protos);
 
     match composition {

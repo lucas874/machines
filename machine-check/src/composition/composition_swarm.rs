@@ -1,7 +1,7 @@
 use crate::composition::composition_types::ProtoLabel;
 use crate::{
     types::{EventType, Role, State, StateName, SwarmLabel, Transition},
-    EdgeId, NodeId, Subscriptions, SwarmProtocol,
+    EdgeId, NodeId, Subscriptions, SwarmProtocolType,
 };
 use itertools::Itertools;
 use petgraph::algo::floyd_warshall;
@@ -1043,7 +1043,7 @@ fn prepare_proto_info<T: SwarmInterface>(
 }
 
 // turn a SwarmProtocol into a petgraph. perform some checks that are not strictly related to wwf, but must be successful for any further analysis to take place
-fn swarm_to_graph(proto: &SwarmProtocol) -> (Graph, Option<NodeId>, Vec<Error>) {
+fn swarm_to_graph(proto: &SwarmProtocolType) -> (Graph, Option<NodeId>, Vec<Error>) {
     let _span = tracing::info_span!("swarm_to_graph").entered();
     let mut graph = Graph::new();
     let mut errors = vec![];
@@ -1079,7 +1079,7 @@ fn swarm_to_graph(proto: &SwarmProtocol) -> (Graph, Option<NodeId>, Vec<Error>) 
 }
 
 pub fn from_json(
-    proto: SwarmProtocol,
+    proto: SwarmProtocolType,
 ) -> (Graph, Option<NodeId>, Vec<String>) {
     let _span = tracing::info_span!("from_json").entered();
     let proto_info = prepare_proto_info::<Role>(CompositionComponent{protocol: proto, interface: None});
@@ -1262,7 +1262,7 @@ fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
         .fold((g, i.unwrap()), folder)
 }
 
-pub fn to_swarm_json(graph: crate::Graph, initial: NodeId) -> SwarmProtocol {
+pub fn to_swarm_json(graph: crate::Graph, initial: NodeId) -> SwarmProtocolType {
     let _span = tracing::info_span!("to_swarm_json").entered();
     let machine_label_mapper = |g: &crate::Graph, eref: EdgeReference<'_, SwarmLabel>| {
         let label = eref.weight().clone();
@@ -1280,7 +1280,7 @@ pub fn to_swarm_json(graph: crate::Graph, initial: NodeId) -> SwarmProtocol {
         .map(|e| machine_label_mapper(&graph, e))
         .collect();
 
-    SwarmProtocol {
+    SwarmProtocolType {
         initial: graph[initial].state_name().clone(),
         transitions,
     }
@@ -1308,8 +1308,8 @@ mod tests {
     }
 
     // Example from coplaws slides
-    fn get_proto1() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn get_proto1() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1332,8 +1332,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn get_proto2() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn get_proto2() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1354,8 +1354,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn get_proto3() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn get_proto3() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1379,8 +1379,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn get_proto31() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn get_proto31() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1393,8 +1393,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn get_proto32() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn get_proto32() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1420,8 +1420,8 @@ mod tests {
     }
 
     // two event types in close, request appears multiple times, get emits no events
-    fn get_malformed_proto1() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn get_malformed_proto1() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1436,8 +1436,8 @@ mod tests {
     }
 
     // initial state state unreachable
-    fn get_malformed_proto2() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn get_malformed_proto2() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1450,8 +1450,8 @@ mod tests {
     }
 
     // all states not reachable
-    fn get_malformed_proto3() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn get_malformed_proto3() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1465,8 +1465,8 @@ mod tests {
     }
 
     // pos event type associated with multiple commands and nondeterminism at 0, no terminal state can be reached from any state
-    fn get_confusionful_proto1() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn get_confusionful_proto1() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1480,8 +1480,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn get_fail_1_component_1() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn get_fail_1_component_1() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"
             {
                 "initial": "456",
@@ -1515,8 +1515,8 @@ mod tests {
         .unwrap()
     }
 
-    fn get_fail_1_component_2() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn get_fail_1_component_2() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"
             {
                 "initial": "459",
@@ -1561,8 +1561,8 @@ mod tests {
         .unwrap()
     }
 
-    fn pattern_4_proto_0() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn pattern_4_proto_0() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1573,8 +1573,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn pattern_4_proto_1() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn pattern_4_proto_1() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1585,8 +1585,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn pattern_4_proto_2() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn pattern_4_proto_2() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1597,8 +1597,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn pattern_4_proto_3() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn pattern_4_proto_3() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1609,8 +1609,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn pattern_4_proto_4() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn pattern_4_proto_4() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1622,8 +1622,8 @@ mod tests {
         .unwrap()
     }
 
-    fn diff_example_proto_0() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn diff_example_proto_0() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1636,8 +1636,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn diff_example_proto_1() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn diff_example_proto_1() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1649,8 +1649,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn ref_pat_proto_0() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn ref_pat_proto_0() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1661,8 +1661,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn ref_pat_proto_1() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn ref_pat_proto_1() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1677,8 +1677,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn ref_pat_proto_2() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn ref_pat_proto_2() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -1691,8 +1691,8 @@ mod tests {
         .unwrap()
     }
 
-    fn get_intra_conc_proto() -> SwarmProtocol {
-        serde_json::from_str::<SwarmProtocol>(
+    fn get_intra_conc_proto() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
