@@ -4,7 +4,7 @@ import { Events, manifest, Composition, warehouse_factory_protocol, subs_composi
 //import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
 import * as readline from 'readline';
 import chalk from "chalk";
-import { checkComposedProjection, projectionInformation } from '@actyx/machine-check';
+import { checkComposedProjection, CompositionComponent, InterfacingSwarms, projectionInformation } from '@actyx/machine-check';
 
 const log = console.log;
 
@@ -30,9 +30,13 @@ s0.react([Events.time], s2, (_, e) => { return s2.make() })
 // Check that the original machine is a correct implementation. A prerequisite for reusing it.
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "D", door.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
-
+//var z: CompositionComponent = [{protocol: {initial: "", transitions: []}, interface: 1}]
 // Projection of warehouse || factory over D
+//var x: InterfacingSwarms = [{protocol: {initial: "", transitions: []}, interface: 1}]
+//var y: boolean = "das"
 const projectionInfoResult = projectionInformation(warehouse_factory_protocol, subs_composition, "D", false)
+//const projectionInfoResult = projectionInformation(warehouse_factory_protocol, {"1": ["true"]}, "D", false)
+//console.log(JSON.stringify(projectionInfoResult, null, 2))
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
 //console.log(projectionInfo)

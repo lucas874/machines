@@ -1,8 +1,9 @@
 import { check_swarm, check_projection, check_wwf_swarm, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, check_composed_projection,
   revised_projection, project_combine, compose_protocols, projection_information, projection_information_new,
-  CheckResult, MachineType, SwarmProtocolType, Subscriptions, InterfacingSwarms as InterfacingSwarmsInner, Role, DataResult, Granularity,
+  CheckResult, MachineType, SwarmProtocolType, Subscriptions, InterfacingSwarms as InterfacingSwarmsInner, CompositionComponent as CompositionComponentInner, Role, DataResult, Granularity,
   ProjectionInfo } from '../pkg/machine_check.js'
 export { MachineType, SwarmProtocolType, Subscriptions, Role, CheckResult as Result, DataResult, Granularity, ProjectionInfo }
+export type CompositionComponent = CompositionComponentInner<Role>;
 export type InterfacingSwarms = InterfacingSwarmsInner<Role>;
 
 export function checkSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): CheckResult {
