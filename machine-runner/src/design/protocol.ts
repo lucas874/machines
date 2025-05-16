@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Tag, Tags } from '@actyx/sdk'
-import { StateMechanism, MachineProtocol, ReactionMap, StateFactory } from './state.js'
-import { MachineEvent } from './event.js'
+import { StateMechanism, MachineProtocol, ReactionMap, StateFactory, CommandDefinerMap } from './state.js'
+import { Contained, MachineEvent } from './event.js'
 import { Subscriptions, InterfacingSwarms, projectionInformation, ProjectionInfo } from '@actyx/machine-check'
 import chalk = require('chalk');
 import * as readline from 'readline';
@@ -25,14 +25,19 @@ export type SwarmProtocol<
     machineName: MachineName,
   ) => Machine<SwarmProtocolName, MachineName, MachineEventFactories>
   tagWithEntityId: (id: string) => Tags<MachineEvents>
-  adaptMachine: <MachineName extends string>(
+  adaptMachine: <
+    MachineName extends string,
+    StateName extends string,
+    StatePayload,
+    Commands extends CommandDefinerMap<any, any, Contained.ContainedEvent<MachineEvent.Any>[]>,
+  >(
     machineName: MachineName,
     role: MachineName,
     protocols: InterfacingSwarms,
     subscriptions: Subscriptions,
     mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
     verbose?: boolean
-  ) => MachineResult<[AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>, any]>
+  ) => MachineResult<[AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>, StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>]>
   adaptMachineNew: <MachineName extends string>(
     machineName: MachineName,
     proj: ProjectionInfo,
@@ -614,12 +619,15 @@ export namespace ProjMachine {
     SwarmProtocolName extends string,
     MachineName extends string,
     MachineEventFactories extends MachineEvent.Factory.Any,
+    StateName extends string,
+    StatePayload,
+    Commands extends CommandDefinerMap<any, any, Contained.ContainedEvent<MachineEvent.Any>[]>,
   >(
     mNew: AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>,
     events: readonly MachineEvent.Factory<any, Record<never, never>>[],
     mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
     verbose?: boolean,
-  ): MachineResult<[AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>, any]> => {
+  ): MachineResult<[AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>, StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>]> => {
     var projStatesToStates: Map<string, any> = new Map()
     var projStatesToExec: Map<string, CommandLabel[]> = new Map()
     var projStatesToInput: Map<string, ReactionLabel[]> = new Map()
