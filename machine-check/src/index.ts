@@ -4,41 +4,7 @@ import { check_swarm, check_projection, check_wwf_swarm, exact_weak_well_formed_
   ProjectionInfo } from '../pkg/machine_check.js'
 export { MachineType, SwarmProtocolType, Subscriptions, Role, CheckResult as Result, DataResult, Granularity, ProjectionInfo }
 export type InterfacingSwarms = InterfacingSwarmsInner<Role>;
-/* export type Protocol<Label> = {
-  initial: string
-  transitions: { source: string; target: string; label: Label }[]
-}
-export type SwarmLabel = {
-  cmd: string
-  logType: string[]
-  role: string
-}
 
-export type MachineLabel =
-  | { tag: 'Execute'; cmd: string; logType: string[] }
-  | { tag: 'Input'; eventType: string }
-
-export type SwarmProtocolType = Protocol<SwarmLabel>
-export type MachineType = Protocol<MachineLabel>
-
-export type Subscriptions = Record<string, string[]>
-
-export type Result = { type: 'OK' } | { type: 'ERROR'; errors: string[] }
-
-export type ResultData<Data> = { type: 'OK'; data: Data } | { type: 'ERROR'; errors: string[] }
-export type CompositionComponent = {protocol: SwarmProtocolType, interface: string | null }
-export type InterfacingSwarms = CompositionComponent[]
-export type Granularity =
-  | 'Fine'
-  | 'Medium'
-  | 'Coarse'
-  | 'TwoStep' */
-/* export type SucceedingNonBranchingJoining = Record<string, Set<string>>;
-export type ProjectionAndSucceedingMap = {
-  projection: Machine,
-  branches: SucceedingNonBranchingJoining,
-  specialEventTypes: Set<string>,
-} */
 export function checkSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): CheckResult {
   const p = JSON.stringify(proto)
   const s = JSON.stringify(subscriptions)
