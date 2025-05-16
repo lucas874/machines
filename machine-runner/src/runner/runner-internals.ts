@@ -363,10 +363,9 @@ export type RunnerInternalsBT<
 export namespace RunnerInternalsBT {
   export type Any = RunnerInternalsBT<any, any, any, any, any, any>
   export type BranchTracker = {
-    jbLast: Map<string, string>
-    specialEventTypes: Set<string>
-    branches: Record<string, string[]>
-
+    readonly jbLast: Map<string, string>
+    readonly specialEventTypes: Set<string>
+    readonly branches: Record<string, string[]>
   }
   // if event is branching or joining update jbLast accordingly otherwise return old
   const updateJBLast = (branchTracker: BranchTracker, event: ActyxEvent<MachineEvent.Any>): BranchTracker => {
@@ -464,12 +463,8 @@ export namespace RunnerInternalsBT {
     const matchingReaction = reactions.get(firstEvent.payload.type)
 
     if (!matchingReaction) return { shouldQueue: false }
-    //console.log("in shouldEventBeEnqueued newEvent is: ", newEvent)
-    //console.log("in shouldEventBeEnqueued event type and event lbj: ", newEvent.payload.type, newEvent.payload.lbj)
-    //console.log("in shouldEventBeEnqueued state lbj: ", branchTracker.jbLast)
     if (newEvent.payload.lbj != branchTracker.jbLast.get(newEvent.payload.type) ) { console.log("event not enqueued\n"); return { shouldQueue: false } }
-    //console.log("event enqueued")
-    //console.log()
+
     // Asserted as non-nullish because it is impossible for `queue`'s length to
     // exceeed `matchingReaction.eventChainTrigger`'s length
     //
