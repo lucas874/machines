@@ -32,7 +32,7 @@ pub struct BenchMarkInput {
     pub interfacing_swarms: InterfacingSwarms<Role>,
 }
 
-fn prepare_input(file_name: String) -> (usize, String) {
+fn prepare_input(file_name: String) -> (usize, InterfacingSwarms<Role>) {
     // Create a path to the desired file
     let path = Path::new(&file_name);
     let display = path.display();
@@ -57,12 +57,12 @@ fn prepare_input(file_name: String) -> (usize, String) {
 
     (
         state_space_size,
-        serde_json::to_string(&interfacing_swarms).unwrap(),
+        interfacing_swarms,//serde_json::to_string(&interfacing_swarms).unwrap(),
     )
 }
 
-fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
-    let mut inputs: Vec<(usize, String)> = vec![];
+fn prepare_files_in_directory(directory: String) -> Vec<(usize, InterfacingSwarms<Role>)> {
+    let mut inputs: Vec<(usize, InterfacingSwarms<Role>)> = vec![];
 
     for entry in WalkDir::new(directory) {
         match entry {
@@ -80,9 +80,9 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, String)> {
     inputs
 }
 
-fn full_bench_general(c: &mut Criterion) {
+fn short_bench_general(c: &mut Criterion) {
     setup_logger();
-    let mut group = c.benchmark_group("General-pattern-algorithm1-vs.-exact-full-run");
+    let mut group = c.benchmark_group("General-pattern-algorithm1-vs.-exact-short-run");
     group.sample_size(10);
     let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
     let mut interfacing_swarms_general =
@@ -90,9 +90,10 @@ fn full_bench_general(c: &mut Criterion) {
     interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
 
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
-    let two_step_granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
+    let two_step_granularity = Granularity::TwoStep;
+    let step: usize = 120;
 
-    for (size, interfacing_swarms) in interfacing_swarms_general.iter() {
+    for (size, interfacing_swarms) in interfacing_swarms_general.iter().step_by(step) {
         group.bench_with_input(BenchmarkId::new("Algorithm 1", size), interfacing_swarms,
         |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), two_step_granularity.clone())));
 
@@ -104,5 +105,5 @@ fn full_bench_general(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, full_bench_general);
+criterion_group!(benches, short_bench_general);
 criterion_main!(benches);
