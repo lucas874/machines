@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, Subscriptions, ResultData, InterfacingSwarms, checkComposedProjection, overapproxWWFSubscriptions} from '../../..'
+import { SwarmProtocolType, Subscriptions, DataResult, InterfacingSwarms, checkComposedProjection, overapproxWWFSubscriptions} from '../../..'
 import { Events, Composition } from './car-factory-protos.js'
 
 
@@ -95,7 +95,7 @@ const G2: SwarmProtocolType = {
 }
 
 const interfacing_swarms: InterfacingSwarms = [{protocol: G1, interface: null}, {protocol: G2, interface: 'T'}]
-const overapprox_result_subscriptions: ResultData<Subscriptions> = overapproxWWFSubscriptions(interfacing_swarms, {}, "Coarse")
+const overapprox_result_subscriptions: DataResult<Subscriptions> = overapproxWWFSubscriptions(interfacing_swarms, {}, "Coarse")
 
 describe('subscriptions', () => {
   it('overapproximation should be ok', () => {
@@ -133,7 +133,7 @@ describe('checkComposedProjection', () => {
         ),
       ).toEqual({
         type: 'ERROR',
-        errors: ["missing transition deliver/part in state S21 (from reference state { { { 2 } } || { { 1 } } })"]
+        errors: ["missing transition deliver/part in state S21 (from reference state 2 || 1)"]
       })
     })
   })

@@ -4,7 +4,7 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import { MachineEvent, SwarmProtocol } from '@actyx/machine-runner'
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, Subscriptions, checkWWFSwarmProtocol, ResultData, InterfacingSwarms, overapproxWWFSubscriptions, checkComposedProjection} from '../../../..'
+import { SwarmProtocolType, Subscriptions, checkWWFSwarmProtocol, DataResult, InterfacingSwarms, overapproxWWFSubscriptions, checkComposedProjection} from '../../../..'
 
 /*
  * Example from CoPLaWS slides by Florian Furbach
@@ -51,7 +51,7 @@ const Gquality: SwarmProtocolType = {
 
 const protocols: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}, {protocol: Gquality, interface: 'R'}]
 
-const result_subs: ResultData<Subscriptions>
+const result_subs: DataResult<Subscriptions>
   = overapproxWWFSubscriptions(protocols, {}, 'Medium')
 if (result_subs.type === 'ERROR') throw new Error(result_subs.errors.join(', '))
 const subs: Subscriptions = result_subs.data
