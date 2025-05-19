@@ -142,7 +142,7 @@ fn combine_projs(projections: Vec<(Graph, NodeId, BTreeSet<EventType>)>) -> (Gra
     let (acc_machine, acc_initial, _) = projections[0].clone();
     let (combined_projection, combined_initial) = projections[1..].to_vec().into_iter().fold(
         (acc_machine, acc_initial),
-        |(acc, acc_i), (m, i, interface)| compose(acc, acc_i, m, i, interface),
+        |(acc, acc_i), (m, i, interface)| compose(acc, acc_i, m, i, interface, gen_state_name),
     );
     (combined_projection, combined_initial)
 }
@@ -348,21 +348,17 @@ pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> Bra
 // precondition: both machines are projected from wwf protocols?
 // precondition: m1 and m2 subscribe to all events in interface? Sort of works without but not really?
 // takes type parameters to make it work for machines and protocols.
-pub(in crate::composition) fn compose<N: StateName + From<String>, E: EventLabel>(
+pub(in crate::composition) fn compose<N, E: EventLabel, F>(
     m1: petgraph::Graph<N, E>,
     i1: NodeId,
     m2: petgraph::Graph<N, E>,
     i2: NodeId,
     interface: BTreeSet<EventType>,
-) -> (petgraph::Graph<N, E>, NodeId) {
+    gen_node: F
+) -> (petgraph::Graph<N, E>, NodeId) where F: Fn(&N, &N) -> N {
     let _span = tracing::info_span!("compose").entered();
     let mut machine = petgraph::Graph::<N, E>::new();
     let mut node_map: BTreeMap<(NodeId, NodeId), NodeId> = BTreeMap::new();
-
-    let gen_state_name = |s1: &N, s2: &N| -> N {
-        let name = format!("{} || {}", s1.state_name(), s2.state_name());
-        N::from(name)
-    };
 
     let weight_target_mapper = |e: EdgeReference<'_, E>| (e.weight().clone(), e.target());
 
@@ -400,7 +396,7 @@ pub(in crate::composition) fn compose<N: StateName + From<String>, E: EventLabel
             .collect()
     };
 
-    let combined_initial = machine.add_node(gen_state_name(&m1[i1], &m2[i2]));
+    let combined_initial = machine.add_node(gen_node(&m1[i1], &m2[i2]));
     node_map.insert((i1, i2), combined_initial);
     let mut worklist = vec![(combined_initial, (i1, i2))];
 
@@ -422,7 +418,7 @@ pub(in crate::composition) fn compose<N: StateName + From<String>, E: EventLabel
                 let dst = node_map.get(&(dst1, dst2)).unwrap();
                 machine.add_edge(src, *dst, e);
             } else {
-                let new_dst = machine.add_node(gen_state_name(&m1[dst1], &m2[dst2]));
+                let new_dst = machine.add_node(gen_node(&m1[dst1], &m2[dst2]));
                 machine.add_edge(src, new_dst, e);
                 node_map.insert((dst1, dst2), new_dst);
                 worklist.push((new_dst, (dst1, dst2)));
@@ -431,6 +427,14 @@ pub(in crate::composition) fn compose<N: StateName + From<String>, E: EventLabel
     }
 
     (machine, combined_initial)
+}
+
+pub fn gen_state_name<N: StateName + From<String>>(
+    n1: &N,
+    n2: &N,
+) -> N {
+    let name = format!("{} || {}", n1.state_name(), n2.state_name());
+    N::from(name)
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
@@ -586,7 +590,7 @@ pub fn adapted_projection(
         .intersection(&projections[k].0.edge_references().map(|e_ref| e_ref.weight().get_event_type()).collect::<BTreeSet<EventType>>())
         .cloned()
         .collect();
-    let ((machine_and_proj, machine_and_proj_initial), kth_interface) = (compose(machine, machine_initial, projections[k].0.clone(), projections[k].1, machine_proj_intersect), projections[k].2.clone());
+    let ((machine_and_proj, machine_and_proj_initial), kth_interface) = (compose(machine, machine_initial, projections[k].0.clone(), projections[k].1, machine_proj_intersect, gen_state_name), projections[k].2.clone());
 
     let projections = projections[..k].iter().cloned().chain([(machine_and_proj, machine_and_proj_initial, kth_interface)]).chain(projections[k+1..].iter().cloned()).collect();
     let (combined_projection, combined_initial) = combine_projs(projections);
@@ -1784,7 +1788,7 @@ mod tests {
         println!("{:?}", errors);
         let interface = BTreeSet::from([EventType::new("partID"), EventType::new("pos"), EventType::new("time")]);
         // right left swapped here on purpose
-        let (combined, combined_initial) = compose(right, right_initial.unwrap(), left, left_initial, interface);
+        let (combined, combined_initial) = compose(right, right_initial.unwrap(), left, left_initial, interface, gen_state_name);
         println!("combined {:?}: {}", role.clone(), serde_json::to_string_pretty(&to_json_machine(combined.clone(), combined_initial)).unwrap());
     }
 
@@ -2013,7 +2017,7 @@ mod tests {
         let (right, right_initial, _) = crate::machine::from_json(right);
         let right = from_option_graph_to_graph(&right);
         let interface = BTreeSet::from([EventType::new("a"), EventType::new("b")]);
-        let (combined, combined_initial) = compose(right, right_initial.unwrap(), left, left_initial.unwrap(), interface);
+        let (combined, combined_initial) = compose(right, right_initial.unwrap(), left, left_initial.unwrap(), interface, gen_state_name);
         let combined = to_json_machine(combined, combined_initial);
 
         println!("combined: {}", serde_json::to_string_pretty(&combined).unwrap());

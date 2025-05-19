@@ -1254,7 +1254,7 @@ fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
         |(acc_g, acc_i): (Graph, NodeId),
          p: ProtoStruct|
          -> (Graph, NodeId) {
-            crate::composition::composition_machine::compose(acc_g, acc_i, p.graph, p.initial.unwrap(), p.interface)
+            crate::composition::composition_machine::compose(acc_g, acc_i, p.graph, p.initial.unwrap(), p.interface, crate::composition::composition_machine::gen_state_name)
         };
     proto_info.protocols[1..]
         .to_vec()
