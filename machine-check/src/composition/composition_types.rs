@@ -5,7 +5,7 @@ use tsify::{Tsify, declare};
 
 use crate::{
     composition::composition_swarm::Error,
-    types::{Command, EventType, MachineLabel, Role, SwarmLabel},
+    types::{Command, EventType, MachineLabel, Role, State, SwarmLabel},
     Graph, MachineType,
 };
 
@@ -160,7 +160,8 @@ pub enum Granularity {
 pub type BranchMap = BTreeMap<EventType, Vec<EventType>>;
 #[declare]
 pub type SpecialEventTypes = BTreeSet<EventType>;
-
+#[declare]
+pub type ProjToMachineStates = BTreeMap<State, Vec<State>>;
 /* #[derive(Serialize, Deserialize)]
 pub struct EventSet(pub BTreeSet<EventType>);
 
@@ -175,6 +176,7 @@ pub struct ProjectionInfo {
     pub projection: MachineType,
     pub branches: BranchMap,
     pub special_event_types: SpecialEventTypes,
+    pub proj_to_machine_states: ProjToMachineStates,
 }
 
 /* Used when combining machines and protocols */

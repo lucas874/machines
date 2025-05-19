@@ -5,7 +5,7 @@ use petgraph::{
 };
 use crate::{composition::composition_swarm::transitive_closure_succeeding, machine::{Error, Side}};
 use super::{
-    composition_types::{unord_event_pair, EventLabel, ProtoInfo, ProtoStruct, BranchMap, UnordEventPair}, types::{StateName, Transition, Command}, EventType, MachineType, MachineLabel, NodeId, Role, State, Subscriptions, SwarmLabel
+    composition_types::{get_branching_joining_proto_info, unord_event_pair, BranchMap, EventLabel, ProjToMachineStates, ProjectionInfo, ProtoInfo, ProtoStruct, UnordEventPair}, types::{Command, StateName, Transition}, EventType, MachineLabel, MachineType, NodeId, Role, State, Subscriptions, SwarmLabel
 };
 // types more or less copied from machine.rs.
 type Graph = petgraph::Graph<State, MachineLabel>;
@@ -17,6 +17,19 @@ impl From<String> for State {
         State::new(&value)
     }
 }
+
+// Used for creating adapted machine.
+// A composed state in an adapted machine contains some
+// state from the original machine to be adapted.
+// The field machine_states points to the state(s).
+// A set of states because seems more general, maybe
+// we need that in the future.
+#[derive(Clone, PartialEq, PartialOrd, Ord, Eq, Hash)]
+struct AdaptationNode {
+    state: State,
+    machine_states: Option<BTreeSet<State>>
+}
+type AdaptationGraph = petgraph::Graph<AdaptationNode, MachineLabel>;
 
 // Similar to machine::project, except that transitions with event types
 // not subscribed to by role are skipped.
@@ -126,7 +139,7 @@ pub fn project_combine(
 
     let projections: Vec<_> = swarms.into_iter().map(mapper).collect();
 
-    let (combined_projection, combined_initial) = combine_projs(projections);
+    let (combined_projection, combined_initial) = combine_projs(projections, gen_state_name);
 
     //let (combined_projection, combined_initial) = minimal_machine(&combined_projection, combined_initial);
     // option because used in equivalent. Consider changing.
@@ -137,12 +150,12 @@ pub fn project_combine(
 
 }
 
-fn combine_projs(projections: Vec<(Graph, NodeId, BTreeSet<EventType>)>) -> (Graph, NodeId) {
+fn combine_projs<N: Clone, E: Clone + EventLabel>(projections: Vec<(petgraph::Graph<N, E>, NodeId, BTreeSet<EventType>)>, gen_node: fn(&N, &N) -> N) -> (petgraph::Graph<N, E>, NodeId) {
     let _span = tracing::info_span!("combine_projs").entered();
     let (acc_machine, acc_initial, _) = projections[0].clone();
     let (combined_projection, combined_initial) = projections[1..].to_vec().into_iter().fold(
         (acc_machine, acc_initial),
-        |(acc, acc_i), (m, i, interface)| compose(acc, acc_i, m, i, interface, gen_state_name),
+        |(acc, acc_i), (m, i, interface)| compose(acc, acc_i, m, i, interface, gen_node),
     );
     (combined_projection, combined_initial)
 }
@@ -348,14 +361,14 @@ pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> Bra
 // precondition: both machines are projected from wwf protocols?
 // precondition: m1 and m2 subscribe to all events in interface? Sort of works without but not really?
 // takes type parameters to make it work for machines and protocols.
-pub(in crate::composition) fn compose<N, E: EventLabel, F>(
+pub(in crate::composition) fn compose<N, E: EventLabel>(
     m1: petgraph::Graph<N, E>,
     i1: NodeId,
     m2: petgraph::Graph<N, E>,
     i2: NodeId,
     interface: BTreeSet<EventType>,
-    gen_node: F
-) -> (petgraph::Graph<N, E>, NodeId) where F: Fn(&N, &N) -> N {
+    gen_node: fn(&N, &N) -> N
+) -> (petgraph::Graph<N, E>, NodeId) {
     let _span = tracing::info_span!("compose").entered();
     let mut machine = petgraph::Graph::<N, E>::new();
     let mut node_map: BTreeMap<(NodeId, NodeId), NodeId> = BTreeMap::new();
@@ -552,37 +565,43 @@ pub fn equivalent(left: &OptionGraph, li: NodeId, right: &OptionGraph, ri: NodeI
 }
 
 
-pub fn adapted_projection(
+fn adapted_projection(
     swarms: &Vec<ProtoStruct>,
     subs: &Subscriptions,
     role: Role,
     machine: (OptionGraph, NodeId),
     k: usize
-) -> (OptionGraph, Option<NodeId>) {
+) -> Option<(AdaptationGraph, Option<NodeId>)> {
     let _span = tracing::info_span!("adapted_projection", %role).entered();
     if k >= swarms.len() {
-        return (OptionGraph::new(), None);
+        return None;
     }
+
+    // project a protocol and turn the projection into an AdaptationGraph
     let mapper = |ps: &ProtoStruct| {
         let (proj, proj_initial) = project(&ps.graph, ps.initial.unwrap(), subs, role.clone(), false);
+        let proj = proj.map(|_, n| AdaptationNode{state: n.clone(), machine_states: None}, |_, label| label.clone());
         (proj, proj_initial, ps.interface.clone())
     };
 
-    // machine-runner machine states may not include the § symbol
-    // everything after this symbol serves as 'internal naming'...
-    // giving state names such significance seems weird, but try it out.
-    let illegal_in_state_names = "§";
-    let state_name_mapper = |i: usize, s: &State| -> State {
-        let state_name = format!("{}{}{}", &*s.replace(&['{', '}', '|', ' '][..], ""), illegal_in_state_names, i);
-        State::new(&state_name)
+    let gen_node = |n1: &AdaptationNode, n2: &AdaptationNode| -> AdaptationNode {
+        let name = format!("{} || {}", n1.state.state_name(), n2.state.state_name());
+        match (n1.machine_states.clone(), n2.machine_states.clone()) {
+            (None, None) => AdaptationNode { state: State::from(name), machine_states: None },
+            (Some(ms), None) => AdaptationNode { state: State::from(name), machine_states: Some(ms) },
+            (None, Some(ms)) => AdaptationNode { state: State::from(name), machine_states: Some(ms) },
+            (Some(ms1), Some(ms2)) => AdaptationNode { state: State::from(name), machine_states: Some(ms1.intersection(&ms2).cloned().collect()) }
+        }
     };
 
-    let projections: Vec<(Graph, NodeId, BTreeSet<EventType>)> = swarms
+    let projections: Vec<(AdaptationGraph, NodeId, BTreeSet<EventType>)> = swarms
         .iter()
         .map(mapper)
-        .map(|(g, i, interface)| (g.map(|_, _| State::new(""), |_, x| x.clone()), i, interface))
         .collect();
+
+    //AdaptationGraph{state: n.clone(), machine_state: Some(state.clone())}
     let (machine, machine_initial) = (from_option_graph_to_graph(&machine.0), machine.1);
+    let machine = machine.map(|_, n| AdaptationNode { state: n.clone(), machine_states: Some(BTreeSet::from([n.clone()])) }, |_, label| label.clone());
     let machine_proj_intersect = machine
         .edge_references()
         .map(|e_ref| e_ref.weight().get_event_type())
@@ -590,37 +609,41 @@ pub fn adapted_projection(
         .intersection(&projections[k].0.edge_references().map(|e_ref| e_ref.weight().get_event_type()).collect::<BTreeSet<EventType>>())
         .cloned()
         .collect();
-    let ((machine_and_proj, machine_and_proj_initial), kth_interface) = (compose(machine, machine_initial, projections[k].0.clone(), projections[k].1, machine_proj_intersect, gen_state_name), projections[k].2.clone());
+    let ((machine_and_proj, machine_and_proj_initial), kth_interface) = (compose(machine, machine_initial, projections[k].0.clone(), projections[k].1, machine_proj_intersect, gen_node), projections[k].2.clone());
 
     let projections = projections[..k].iter().cloned().chain([(machine_and_proj, machine_and_proj_initial, kth_interface)]).chain(projections[k+1..].iter().cloned()).collect();
-    let (combined_projection, combined_initial) = combine_projs(projections);
-    let (combined_projection, combined_initial) = machine_without_duplicates(&combined_projection, combined_initial);
-    let combined_projection = combined_projection.map(|n_index, s| state_name_mapper(n_index.index(), s), |_, x| x.clone());
+    let (combined_projection, combined_initial) = combine_projs(projections, gen_node);
 
     // should we minimize here? not done to keep original shape of input machine as much as possible?
-    // option because used in equivalent. Consider changing.
-    (
-        to_option_machine(&combined_projection),
+    Some((
+        combined_projection,
         Some(combined_initial),
-    )
-
+    ))
 }
 
-fn machine_without_duplicates(graph: &Graph, initial: NodeId) -> (Graph, NodeId) {
-    let mut new_graph = Graph::new();
-    let mut new_to_old = BTreeMap::new();
-    let mut old_to_new = BTreeMap::new();
-    for old_node_id in graph.node_indices() {
-        let new_node_id = new_graph.add_node(graph[old_node_id].clone());
-        new_to_old.insert(new_node_id, old_node_id);
-        old_to_new.insert(old_node_id, new_node_id);
-    }
-    let edges = graph.edge_references().map(|e_ref| (e_ref.source(), e_ref.weight().clone(), e_ref.target())).collect::<BTreeSet<(NodeId, MachineLabel, NodeId)>>();
-        for (source, label, target) in edges {
-            new_graph.add_edge(old_to_new[&source], old_to_new[&target], label);
-    }
+pub fn projection_information(
+    proto_info: &ProtoInfo,
+    subs: &Subscriptions,
+    role: Role,
+    machine: (OptionGraph, NodeId),
+    k: usize
+) -> Option<ProjectionInfo> {
+    let (proj, proj_initial) = match adapted_projection(&proto_info.protocols, subs, role, machine, k) {
+        Some((proj, Some(proj_initial))) => (proj, proj_initial),
+        _ => return None
+    };
 
-    (new_graph, old_to_new[&initial])
+    let proj_to_machine_states: ProjToMachineStates = proj
+        .node_references()
+        .map(|(_, n_ref)| (n_ref.state.clone(), n_ref.machine_states.clone().unwrap().into_iter().collect()))
+        .collect();
+
+    let proj = from_adaptation_graph_to_option_graph(&proj);
+
+    let branches = paths_from_event_types(&proj, &proto_info);
+    let special_event_types = get_branching_joining_proto_info(&proto_info);
+
+    Some(ProjectionInfo { projection: from_option_to_machine(proj, proj_initial), branches, special_event_types, proj_to_machine_states })
 }
 
 pub(in crate::composition) fn to_option_machine(graph: &Graph) -> OptionGraph {
@@ -631,6 +654,11 @@ pub(in crate::composition) fn from_option_graph_to_graph(graph: &OptionGraph) ->
     graph.map(|_, n| n.clone().unwrap_or_else(|| State::new("")), |_, x| x.clone())
 }
 
+fn from_adaptation_graph_to_option_graph(graph: &AdaptationGraph) -> OptionGraph {
+    graph.map(|_, n| Some(n.state.state_name().clone()), |_, x| x.clone())
+}
+
+//from_adaption_to_machine
 pub fn to_json_machine(graph: Graph, initial: NodeId) -> MachineType {
     let _span = tracing::info_span!("to_json_machine").entered();
     let machine_label_mapper = |m: &Graph, eref: EdgeReference<'_, MachineLabel>| {
@@ -705,6 +733,9 @@ mod tests {
 
     pub(in crate::composition) fn from_option_machine(graph: &OptionGraph) -> Graph {
         graph.map(|_, n| n.clone().unwrap().state_name().clone(), |_, x| x.clone())
+    }
+    fn from_adaptation_graph_to_graph(graph: &AdaptationGraph) -> Graph {
+        graph.map(|_, n| n.state.state_name().clone(), |_, x| x.clone())
     }
     // Example from coplaws slides
     fn get_proto1() -> SwarmProtocolType {
@@ -1856,10 +1887,10 @@ mod tests {
         let proto_info = swarms_to_proto_info(swarms.clone(), &subs1);
         assert!(proto_info.no_errors());
 
-        let (adapted_proj, adapted_proj_initial) = adapted_projection(&proto_info.protocols, &subs1, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
+        let adapted = adapted_projection(&proto_info.protocols, &subs1, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
+        let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
         println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&from_option_to_machine(fl_m_graph.clone(), fl_m_graph_initial.unwrap())).unwrap());
-        println!("right {:?}: {}", role, serde_json::to_string_pretty(&from_option_to_machine(adapted_proj.clone(), adapted_proj_initial.unwrap())).unwrap());
-
+        println!("right {:?}: {}", role, serde_json::to_string_pretty(&to_json_machine(from_adaptation_graph_to_graph(&adapted_proj.clone()), adapted_proj_initial.unwrap())).unwrap());
 
         let role = Role::new("FL");
         let swarms = get_interfacing_swarms_3();
@@ -1870,9 +1901,11 @@ mod tests {
         let proto_info = swarms_to_proto_info(swarms.clone(), &subs2);
         assert!(proto_info.no_errors());
 
-        let (adapted_proj, adapted_proj_initial) = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
+        //let (adapted_proj, adapted_proj_initial) = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
+        let adapted = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
+        let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
         println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&from_option_to_machine(fl_m_graph.clone(), fl_m_graph_initial.unwrap())).unwrap());
-        println!("right {:?}: {}", role, serde_json::to_string_pretty(&from_option_to_machine(adapted_proj.clone(), adapted_proj_initial.unwrap())).unwrap());
+        println!("right {:?}: {}", role, serde_json::to_string_pretty(&to_json_machine(from_adaptation_graph_to_graph(&adapted_proj.clone()), adapted_proj_initial.unwrap())).unwrap());
     }
 
     #[test]
@@ -1918,9 +1951,10 @@ mod tests {
         let proto_info = swarms_to_proto_info(swarms.clone(), &subs1);
         assert!(proto_info.no_errors());
 
-        let (adapted_proj, adapted_proj_initial) = adapted_projection(&proto_info.protocols, &subs1, role.clone(), (f_m_graph.clone(), f_m_graph_initial.unwrap()), 1);
+        let adapted = adapted_projection(&proto_info.protocols, &subs1, role.clone(), (f_m_graph.clone(), f_m_graph_initial.unwrap()), 1);
+        let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
         println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&from_option_to_machine(f_m_graph.clone(), f_m_graph_initial.unwrap())).unwrap());
-        println!("right {:?}: {}", role, serde_json::to_string_pretty(&from_option_to_machine(adapted_proj.clone(), adapted_proj_initial.unwrap())).unwrap());
+        println!("right {:?}: {}", role, serde_json::to_string_pretty(&to_json_machine(from_adaptation_graph_to_graph(&adapted_proj.clone()), adapted_proj_initial.unwrap())).unwrap());
 
 
         let role = Role::new("F");
@@ -1932,9 +1966,10 @@ mod tests {
         let proto_info = swarms_to_proto_info(swarms.clone(), &subs2);
         assert!(proto_info.no_errors());
 
-        let (adapted_proj, adapted_proj_initial) = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (f_m_graph.clone(), f_m_graph_initial.unwrap()), 1);
+        let adapted = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (f_m_graph.clone(), f_m_graph_initial.unwrap()), 1);
+        let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
         println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&from_option_to_machine(f_m_graph.clone(), f_m_graph_initial.unwrap())).unwrap());
-        println!("right {:?}: {}", role, serde_json::to_string_pretty(&from_option_to_machine(adapted_proj.clone(), adapted_proj_initial.unwrap())).unwrap());
+        println!("right {:?}: {}", role, serde_json::to_string_pretty(&to_json_machine(from_adaptation_graph_to_graph(&adapted_proj.clone()), adapted_proj_initial.unwrap())).unwrap());
     }
 
     #[test]

@@ -1,4 +1,3 @@
-use composition_machine::adapted_projection;
 use composition_swarm::{proto_info_to_error_report, swarms_to_proto_info, ErrorReport};
 use composition_types::{get_branching_joining_proto_info, DataResult, Granularity, InterfacingSwarms, ProjectionInfo};
 
@@ -82,7 +81,7 @@ pub fn projection_information(protos: InterfacingSwarms<Role>, subs: String, rol
     let branches = composition_machine::paths_from_event_types(&proj, &proto_info);
     let special_event_types = get_branching_joining_proto_info(&proto_info);
 
-    DataResult::OK { data: ProjectionInfo {projection: composition::composition_machine::from_option_to_machine(proj, proj_initial.unwrap()), branches, special_event_types} }
+    DataResult::OK { data: ProjectionInfo {projection: composition::composition_machine::from_option_to_machine(proj, proj_initial.unwrap()), branches, special_event_types, proj_to_machine_states: BTreeMap::new()} }
 }
 
 #[wasm_bindgen]
@@ -103,12 +102,10 @@ pub fn projection_information_new(protos: InterfacingSwarms<Role>, subs: String,
     if machine_problem {
         return DataResult:: ERROR { errors }
     }
-
-    let (proj, proj_initial) = adapted_projection(&proto_info.protocols, &subs, role, (machine, initial), k);
-    let branches = composition_machine::paths_from_event_types(&proj, &proto_info);
-    let special_event_types = get_branching_joining_proto_info(&proto_info);
-
-    DataResult::OK { data: ProjectionInfo {projection: composition::composition_machine::from_option_to_machine(proj, proj_initial.unwrap()), branches, special_event_types} }
+    match composition::composition_machine::projection_information(&proto_info, &subs, role, (machine, initial), k) {
+        Some(projection_info) => DataResult::OK { data: projection_info },
+        None => DataResult::ERROR { errors:  vec![format!("invalid index {}", k)]}
+    }
 }
 
 // check an implementation against the combined projection of swarms over role.
