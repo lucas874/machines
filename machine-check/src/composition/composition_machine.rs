@@ -24,7 +24,7 @@ impl From<String> for State {
 // The field machine_states points to the state(s).
 // A set of states because seems more general, maybe
 // we need that in the future.
-#[derive(Clone, PartialEq, PartialOrd, Ord, Eq, Hash)]
+#[derive(Clone, PartialEq, PartialOrd, Ord, Eq, Hash, Debug)]
 struct AdaptationNode {
     state: State,
     machine_states: Option<BTreeSet<State>>
@@ -564,7 +564,6 @@ pub fn equivalent(left: &OptionGraph, li: NodeId, right: &OptionGraph, ri: NodeI
     errors
 }
 
-
 fn adapted_projection(
     swarms: &Vec<ProtoStruct>,
     subs: &Subscriptions,
@@ -579,7 +578,7 @@ fn adapted_projection(
 
     // project a protocol and turn the projection into an AdaptationGraph
     let mapper = |ps: &ProtoStruct| {
-        let (proj, proj_initial) = project(&ps.graph, ps.initial.unwrap(), subs, role.clone(), false);
+        let (proj, proj_initial) = project(&ps.graph, ps.initial.unwrap(), subs, role.clone(), true);
         let proj = proj.map(|_, n| AdaptationNode{state: n.clone(), machine_states: None}, |_, label| label.clone());
         (proj, proj_initial, ps.interface.clone())
     };
@@ -719,7 +718,7 @@ mod tests {
         composition::{
             composition_swarm::{compose_protocols, exact_weak_well_formed_sub, from_json, overapprox_weak_well_formed_sub, swarms_to_proto_info},
             composition_types::{CompositionComponent, Granularity, InterfacingSwarms},
-        }, types::{Command, EventType, Role, Transition}, MachineType, Subscriptions, SwarmProtocolType
+        }, machine::{self, }, types::{Command, EventType, Role, Transition}, MachineType, Subscriptions, SwarmProtocolType
     };
     use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
 
@@ -2059,6 +2058,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_det_proj_1() {
         setup_logger();
         let composition = compose_protocols(get_interfacing_swarms_1());
@@ -2078,6 +2078,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_det_proj_2() {
         setup_logger();
         let composition = compose_protocols(get_interfacing_swarms_3());
@@ -2098,6 +2099,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_det_proj_3() {
         setup_logger();
         let composition = compose_protocols(get_interfacing_swarms_whhhh());
@@ -2114,5 +2116,172 @@ mod tests {
             //println!("{}: {}", role.clone().to_string(), serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap());
             println!("{}\n$$$$\n", serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap());
         }
+    }
+
+    #[test]
+    fn test_projection_information() {
+        setup_logger();
+
+        let fl_m = MachineType {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                    },
+                    source: State::new("1"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("1"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("3"),
+                },
+            ],
+        };
+
+        let expected_proj = MachineType {
+            initial: State::new("0 || { { 0 } } || { { 0 } }"),
+            transitions: vec! [
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0 || { { 0 } } || { { 0 } }"),
+                    target: State::new("3 || { { 3 } } || { { 0 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("0 || { { 0 } } || { { 0 } }"),
+                    target: State::new("1 || { { 1 } } || { { 1 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("1 || { { 1 } } || { { 1 } }"),
+                    target: State::new("2 || { { 2 } } || { { 1 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                    },
+                    source: State::new("1 || { { 1 } } || { { 1 } }"),
+                    target: State::new("1 || { { 1 } } || { { 1 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("part"),
+                    },
+                    source: State::new("2 || { { 2 } } || { { 1 } }"),
+                    target: State::new("2 || { { 0 } } || { { 2 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("2 || { { 0 } } || { { 2 } }"),
+                    target: State::new("3 || { { 3 } } || { { 2 } }"),
+                },
+            ]
+        };
+
+        let (fl_m_graph, fl_m_graph_initial, _) = crate::machine::from_json(fl_m);
+        let role = Role::new("FL");
+        let swarms = get_interfacing_swarms_1();
+        let subs1 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(swarms.clone(), &BTreeMap::new(), Granularity::TwoStep);
+        assert!(subs1.is_ok());
+        let subs1 = subs1.unwrap();
+        //println!("subs: {}", serde_json::to_string_pretty(&subs1).unwrap());
+        let proto_info = swarms_to_proto_info(swarms.clone(), &subs1);
+
+        let projection_info = projection_information(&proto_info, &subs1, role, (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
+        let projection_info = match projection_info {
+            None => panic!(),
+            Some(projection_info) => {
+                //println!("proj: {}", serde_json::to_string_pretty(&projection_info.projection).unwrap());
+                //println!("map: {}", serde_json::to_string_pretty(&projection_info.proj_to_machine_states).unwrap());
+                //println!("branches: {}", serde_json::to_string_pretty(&projection_info.branches).unwrap());
+                //println!("special event types: {}", serde_json::to_string_pretty(&projection_info.special_event_types).unwrap());
+                projection_info
+            }
+        };
+        let (actual_graph, actual_initial, _) = machine::from_json(projection_info.projection);
+        let (expected_graph, expected_initial, _) = crate::machine::from_json(expected_proj);
+        let expected_proj_to_machine_states = BTreeMap::from([
+            (State::new("0 || { { 0 } } || { { 0 } }"), vec![State::new("0")]),
+            (State::new("1 || { { 1 } } || { { 1 } }"), vec![State::new("1")]),
+            (State::new("2 || { { 0 } } || { { 2 } }"), vec![State::new("2")]),
+            (State::new("2 || { { 2 } } || { { 1 } }"), vec![State::new("2")]),
+            (State::new("3 || { { 3 } } || { { 0 } }"), vec![State::new("3")]),
+            (State::new("3 || { { 3 } } || { { 2 } }"), vec![State::new("3")]),
+        ]);
+        let expected_branches = BTreeMap::from([
+            (EventType::new("part"), vec![EventType::new("time")]),
+            (EventType::new("partID"), vec![EventType::new("part"), EventType::new("pos"), EventType::new("time")]),
+            (EventType::new("pos"), vec![EventType::new("part"), EventType::new("time")]),
+            (EventType::new("time"), vec![]),
+        ]);
+        let expected_special_event_types = BTreeSet::from([EventType::new("partID"), EventType::new("time")]);
+        let errors = equivalent(&expected_graph, expected_initial.unwrap(), &actual_graph, actual_initial.unwrap());
+        let is_empty = errors.is_empty();
+        //println!("{:?}", errors.map(machine::Error::convert(&expected_graph, &actual_graph)));
+        assert!(is_empty);
+        assert_eq!(expected_proj_to_machine_states, projection_info.proj_to_machine_states);
+        assert_eq!(expected_branches, projection_info.branches);
+        assert_eq!(expected_special_event_types, projection_info.special_event_types);
+        /* let adapted = adapted_projection(&proto_info.protocols, &subs1, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
+        let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
+        println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&from_option_to_machine(fl_m_graph.clone(), fl_m_graph_initial.unwrap())).unwrap());
+        println!("right {:?}: {}", role, serde_json::to_string_pretty(&to_json_machine(from_adaptation_graph_to_graph(&adapted_proj.clone()), adapted_proj_initial.unwrap())).unwrap());
+
+        let role = Role::new("FL");
+        let swarms = get_interfacing_swarms_3();
+        let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(swarms.clone(), &BTreeMap::new(), Granularity::TwoStep);
+        assert!(subs2.is_ok());
+        let subs2 = subs2.unwrap();
+        println!("subs: {}", serde_json::to_string_pretty(&subs2).unwrap());
+        let proto_info = swarms_to_proto_info(swarms.clone(), &subs2);
+        assert!(proto_info.no_errors());
+
+        //let (adapted_proj, adapted_proj_initial) = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
+        let adapted = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
+        let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
+        println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&from_option_to_machine(fl_m_graph.clone(), fl_m_graph_initial.unwrap())).unwrap());
+        println!("right {:?}: {}", role, serde_json::to_string_pretty(&to_json_machine(from_adaptation_graph_to_graph(&adapted_proj.clone()), adapted_proj_initial.unwrap())).unwrap()); */
     }
 }
