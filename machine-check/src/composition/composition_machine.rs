@@ -2264,24 +2264,5 @@ mod tests {
         assert_eq!(expected_proj_to_machine_states, projection_info.proj_to_machine_states);
         assert_eq!(expected_branches, projection_info.branches);
         assert_eq!(expected_special_event_types, projection_info.special_event_types);
-        /* let adapted = adapted_projection(&proto_info.protocols, &subs1, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
-        let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
-        println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&from_option_to_machine(fl_m_graph.clone(), fl_m_graph_initial.unwrap())).unwrap());
-        println!("right {:?}: {}", role, serde_json::to_string_pretty(&to_json_machine(from_adaptation_graph_to_graph(&adapted_proj.clone()), adapted_proj_initial.unwrap())).unwrap());
-
-        let role = Role::new("FL");
-        let swarms = get_interfacing_swarms_3();
-        let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(swarms.clone(), &BTreeMap::new(), Granularity::TwoStep);
-        assert!(subs2.is_ok());
-        let subs2 = subs2.unwrap();
-        println!("subs: {}", serde_json::to_string_pretty(&subs2).unwrap());
-        let proto_info = swarms_to_proto_info(swarms.clone(), &subs2);
-        assert!(proto_info.no_errors());
-
-        //let (adapted_proj, adapted_proj_initial) = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
-        let adapted = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
-        let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
-        println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&from_option_to_machine(fl_m_graph.clone(), fl_m_graph_initial.unwrap())).unwrap());
-        println!("right {:?}: {}", role, serde_json::to_string_pretty(&to_json_machine(from_adaptation_graph_to_graph(&adapted_proj.clone()), adapted_proj_initial.unwrap())).unwrap()); */
     }
 }
