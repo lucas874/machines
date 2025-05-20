@@ -40,7 +40,7 @@ async function main() {
 
   const app = await Actyx.of(manifest)
   const tags = Composition.tagWithEntityId('warehouse-factory')
-  const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfoRobot)
+  const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, factoryRobotAdapted)
   printState(factoryRobotAdapted.machineName, s0Adapted.mechanism.name, undefined)
 
   for await (const state of machine) {

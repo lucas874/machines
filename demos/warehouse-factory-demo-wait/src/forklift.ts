@@ -43,7 +43,7 @@ const [forkliftAdapted, s0Adapted] = Composition.adaptMachine('Forklift', 'FL', 
 async function main() {
   const app = await Actyx.of(manifest)
   const tags = Composition.tagWithEntityId('warehouse-factory')
-  const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfo)
+  const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, forkliftAdapted)
   printState(forkliftAdapted.machineName, s0Adapted.mechanism.name, undefined)
 
   for await (const state of machine) {

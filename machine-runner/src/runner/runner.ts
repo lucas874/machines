@@ -39,7 +39,7 @@ import {
   makeEmitter,
   ActiveRunnerRegistryRegisterSymbol,
 } from './runner-utils.js'
-import { Machine, SwarmProtocol } from '../design/protocol.js'
+import { Machine, SwarmProtocol, AdaptedMachine } from '../design/protocol.js'
 import { deepEqual } from 'fast-equals'
 import { deepCopy } from '../utils/object-utils.js'
 import * as globals from '../globals.js'
@@ -296,8 +296,7 @@ export const createMachineRunnerBT = <
     any
   >,
   initialPayload: any,
-  projectionInfo: ProjectionInfo, /* succeedingNonBranchingJoining: Record<string, Set<string>>,
-  specialEvents: Set<string> */
+  adaptedMachine: AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>
 ): MachineRunner<SwarmProtocolName, MachineName, StateUnion> => {
   const subscribeMonotonicQuery = {
     query: tags,
@@ -310,7 +309,7 @@ export const createMachineRunnerBT = <
   const subscribe: SubscribeFn<MachineEvents> = (callback, onCompleteOrErr) =>
     sdk.subscribeMonotonic<MachineEvents>(subscribeMonotonicQuery, callback, onCompleteOrErr)
 
-  return createMachineRunnerInternalBT(subscribe, persist, tags, initialFactory, initialPayload, projectionInfo.branches, new Set(projectionInfo.specialEventTypes))
+  return createMachineRunnerInternalBT(subscribe, persist, tags, initialFactory, initialPayload, adaptedMachine.projectionInfo.branches, new Set(adaptedMachine.projectionInfo.specialEventTypes))
 }
 export const createMachineRunnerInternal = <
   SwarmProtocolName extends string,

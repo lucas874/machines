@@ -151,7 +151,7 @@ export type Machine<
   ) => MachineAnalysisResource
 }>
 
-interface AdaptedMachine<
+export interface AdaptedMachine<
   SwarmProtocolName extends string,
   MachineName extends string,
   MachineEventFactories extends MachineEvent.Factory.Any
