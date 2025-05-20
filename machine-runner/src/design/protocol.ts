@@ -639,9 +639,7 @@ export namespace ProjMachine {
     return verboseCommandDef
   }
 
-  const verboseReaction = <
-    Context
-  >(
+  const verboseReaction = <Context>(
     reactionHandler: ReactionHandler<ActyxEvent<MachineEvent.Any>[], Context, unknown>,
     machineName: string,
     targetState: string,
