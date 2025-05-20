@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Tag, Tags } from '@actyx/sdk'
-import { StateMechanism, MachineProtocol, ReactionMap, StateFactory, CommandDefinerMap } from './state.js'
+import { ActyxEvent, Tag, Tags } from '@actyx/sdk'
+import { StateMechanism, MachineProtocol, ReactionMap, StateFactory, CommandDefinerMap, ReactionHandler } from './state.js'
 import { Contained, MachineEvent } from './event.js'
 import { Subscriptions, InterfacingSwarms, projectionInformation, ProjectionInfo, projectionInformationNew } from '@actyx/machine-check'
 import chalk = require('chalk');
@@ -630,6 +630,30 @@ export namespace ProjMachine {
     console.log(chalk.bgBlack.green.bold`    ${label} ➡ ${payload}`);
   }
 
+  const verboseCommandDef = (label: CommandLabel, commandDef: any) => {
+    const verboseCommandDef = (...args: any[]) => {
+      const payload = commandDef(...args);
+      printEventEmission(`${label.label.logType[0]}!`, `${JSON.stringify(payload[0], null, 0)}`)
+      return payload;
+    }
+    return verboseCommandDef
+  }
+
+  const verboseReaction = <
+    Context
+  >(
+    reactionHandler: ReactionHandler<ActyxEvent<MachineEvent.Any>[], Context, unknown>,
+    machineName: string,
+    targetState: string,
+    cmdsEnabledAtTarget: CommandLabel[],
+  ): ReactionHandler<ActyxEvent<MachineEvent.Any>[], Context, unknown> => {
+    return (ctx: Context, event: ActyxEvent<MachineEvent.Any>) => {
+      const statePayload = reactionHandler(ctx, event);
+      printInfoOnTransition(machineName, event, targetState, statePayload, cmdsEnabledAtTarget);
+      return statePayload
+    }
+  }
+
   export const adaptMachine = <
     SwarmProtocolName extends string,
     MachineName extends string,
@@ -845,8 +869,8 @@ export namespace ProjMachine {
         for (const cLabel of value.commandLabels) {
           let cmdName = cLabel.label.cmd
           let eventTypes = cLabel.label.logType.map((et: string) => eventTypeStringToEvent.get(et))
-          let code = mOldStateToCommands.get(value.originalMStateName)?.get(cmdName)![1]
-          cmdTriples.push([cmdName, eventTypes, code])
+          const commandDef = verbose ? verboseCommandDef(cLabel, mOldStateToCommands.get(value.originalMStateName)?.get(cmdName)![1]) : mOldStateToCommands.get(value.originalMStateName)?.get(cmdName)![1]
+          cmdTriples.push([cmdName, eventTypes, commandDef])
         }
         //const cmdTriples1 = value.commandLabels.map((t: CommandLabel) => [t.label.cmd, t.label.logType.map((et: string) => eventTypeStringToEvent.get(et)), mOldStateToCommands.get(value.originalMStateName)?.get(t.label.cmd)![1]]).filter(triple => triple.length === 3)
         const newState = mNew.designState(value.projStateName).withPayload<any>().commandFromList(cmdTriples).finish() as StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>
@@ -862,14 +886,13 @@ export namespace ProjMachine {
       for (const rLabel of value.reactionLabels) {
         const eventType = rLabel.label.eventType
         const event = eventTypeStringToEvent.get(eventType)!
-        //const reactionHandler = mOldStateToReactions.get(value.originalMStateName)!.get(rLabel.label.eventType) ?? (s: any, _: any) => { return projStateToMachineState.get(rLabel.target).make(s.self) }
-        //console.log(value.originalMStateName)
-        //console.log(value.projStateName)
-        //console.log(rLabel.source)
-        //console.log(mOldStateToReactions.get(value.originalMStateName))
-        const reactionHandler = mOldStateToReactions.get(value.originalMStateName)?.has(rLabel.label.eventType) ?
-          mOldStateToReactions.get(value.originalMStateName)!.get(rLabel.label.eventType) : (s: any, _: any) => { return projStateToMachineState.get(rLabel.target)!.make(s.self) }
-        projStateToMachineState.get(rLabel.source)!.react([event], projStateToMachineState.get(rLabel.target)!, reactionHandler)
+
+        const reactionHandler = mOldStateToReactions.get(value.originalMStateName)?.has(rLabel.label.eventType)
+          ? (verbose ? verboseReaction(mOldStateToReactions.get(value.originalMStateName)!.get(rLabel.label.eventType), mNew.machineName, rLabel.target, projStateInfoMap.get(rLabel.target)!.commandLabels) : mOldStateToReactions.get(value.originalMStateName)!.get(rLabel.label.eventType))
+          : (verbose ? verboseReaction((ctx: any, e: any) => { return projStateToMachineState.get(rLabel.target)!.make(ctx.self) }, mNew.machineName, rLabel.target, projStateInfoMap.get(rLabel.target)!.commandLabels) : (ctx: any, e: any) => { return projStateToMachineState.get(rLabel.target)!.make(ctx.self) })
+
+        const targetState = projStateToMachineState.get(rLabel.target)! as StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, string, unknown, any>
+        projStateToMachineState.get(rLabel.source)!.react([event], targetState, reactionHandler)
       }
     })
 
