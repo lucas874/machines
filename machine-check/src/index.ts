@@ -68,6 +68,6 @@ export function projectionInformation(protos: InterfacingSwarms, subscriptions: 
   return projection_information(protos, JSON.stringify(subscriptions), role, minimize);
 }
 
-export function projectionAndInformationNew(protos: InterfacingSwarms, subscriptions: Subscriptions, role: Role, machine: MachineType, k: number, minimize: boolean): DataResult<ProjectionInfo> {
+export function projectionInformationNew(protos: InterfacingSwarms, subscriptions: Subscriptions, role: Role, machine: MachineType, k: number, minimize: boolean): DataResult<ProjectionInfo> {
   return projection_information_new(protos, JSON.stringify(subscriptions), role, machine, k, minimize);
 }

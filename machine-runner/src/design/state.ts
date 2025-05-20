@@ -241,7 +241,7 @@ export type StateMechanism<
   // come back to this remove any! come back to all uses of any regarding commandDefinitions
   readonly commandDefinitions:  Map<string, CommandDefiner<
     CommandContext<StatePayload, MachineEvent.Factory.Reduce<any>> | CommandContextBT<StatePayload, MachineEvent.Factory.Reduce<any>>,
-    any,
+    unknown[],
     MachineEvent.Factory.MapToPayloadOrContainedPayload<any>>>
 
   /**
