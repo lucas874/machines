@@ -41,7 +41,7 @@ const projectionInfo = projectionInfoResult.data
 // Adapted machine
 //const [doorAdapted, s0Adapted] = Composition.adaptMachine('Door', projectionInfo, Events.allEvents, s0, true)
 //const [doorAdapted, s0Adapted] = Composition.adaptMachine('Door', 'D', warehouse_factory_protocol, subs_composition, s0, true).data!
-const [doorAdapted, s0Adapted] = Composition.adaptMachineNew('Door', 'D', warehouse_factory_protocol, subs_composition, 0, door.createJSONForAnalysis(s0), s0, true).data!
+const [doorAdapted, s0Adapted] = Composition.adaptMachine('Door', 'D', warehouse_factory_protocol, subs_composition, 0, door.createJSONForAnalysis(s0), s0, true).data!
 
 // Run the adapted machine
 async function main() {
