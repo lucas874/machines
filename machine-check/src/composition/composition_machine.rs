@@ -610,6 +610,7 @@ fn adapted_projection(
         .cloned()
         .collect();
     let ((machine_and_proj, machine_and_proj_initial), kth_interface) = (compose(machine, machine_initial, projections[k].0.clone(), projections[k].1, machine_proj_intersect, gen_node), projections[k].2.clone());
+    let machine_and_proj = machine_and_proj.map(|_, n| AdaptationNode { state: State::from(format!("({})", n.state.state_name().clone())), ..n.clone() }, |_, label| label.clone());
 
     let projections = projections[..k].iter().cloned().chain([(machine_and_proj, machine_and_proj_initial, kth_interface)]).chain(projections[k+1..].iter().cloned()).collect();
     let (combined_projection, combined_initial) = combine_projs(projections, gen_node);
@@ -2245,12 +2246,12 @@ mod tests {
         let (actual_graph, actual_initial, _) = machine::from_json(projection_info.projection);
         let (expected_graph, expected_initial, _) = crate::machine::from_json(expected_proj);
         let expected_proj_to_machine_states = BTreeMap::from([
-            (State::new("0 || { { 0 } } || { { 0 } }"), vec![State::new("0")]),
-            (State::new("1 || { { 1 } } || { { 1 } }"), vec![State::new("1")]),
-            (State::new("2 || { { 0 } } || { { 2 } }"), vec![State::new("2")]),
-            (State::new("2 || { { 2 } } || { { 1 } }"), vec![State::new("2")]),
-            (State::new("3 || { { 3 } } || { { 0 } }"), vec![State::new("3")]),
-            (State::new("3 || { { 3 } } || { { 2 } }"), vec![State::new("3")]),
+            (State::new("(0 || { { 0 } }) || { { 0 } }"), vec![State::new("0")]),
+            (State::new("(1 || { { 1 } }) || { { 1 } }"), vec![State::new("1")]),
+            (State::new("(2 || { { 0 } }) || { { 2 } }"), vec![State::new("2")]),
+            (State::new("(2 || { { 2 } }) || { { 1 } }"), vec![State::new("2")]),
+            (State::new("(3 || { { 3 } }) || { { 0 } }"), vec![State::new("3")]),
+            (State::new("(3 || { { 3 } }) || { { 2 } }"), vec![State::new("3")]),
         ]);
         let expected_branches = BTreeMap::from([
             (EventType::new("part"), vec![EventType::new("time")]),
@@ -2373,10 +2374,10 @@ mod tests {
         let (actual_graph, actual_initial, _) = machine::from_json(projection_info.projection);
         let (expected_graph, expected_initial, _) = crate::machine::from_json(expected_proj);
         let expected_proj_to_machine_states = BTreeMap::from([
-            (State::new("0 || { { 0 } }"), vec![State::new("0")]),
-            (State::new("0 || { { 2 } }"), vec![State::new("0")]),
-            (State::new("1 || { { 1 } }"), vec![State::new("1")]),
-            (State::new("3 || { { 3 } }"), vec![State::new("3")]),
+            (State::new("(0 || { { 0 } })"), vec![State::new("0")]),
+            (State::new("(0 || { { 2 } })"), vec![State::new("0")]),
+            (State::new("(1 || { { 1 } })"), vec![State::new("1")]),
+            (State::new("(3 || { { 3 } })"), vec![State::new("3")]),
         ]);
         let expected_branches = BTreeMap::from([
             (EventType::new("part"), vec![EventType::new("partID"), EventType::new("time")]),
