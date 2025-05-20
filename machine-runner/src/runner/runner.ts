@@ -1617,10 +1617,6 @@ export namespace ImplStateOpaque {
           //factoryAtSnapshot.mechanism.commandDefinitions[cmdName as keyof typeof factoryAtSnapshot.mechanism.commandDefinitions]?.toString() === factory.mechanism.commandDefinitions[cmdName as keyof typeof factory.mechanism.commandDefinitions]?.toString())
     }
 
-    //const hasCommand: ThisStateOpaque['hasCommand'] = (cmd) => cmd in factoryAtSnapshot.mechanism.commands
-    //const hasCommand: ThisStateOpaque['hasCommand'] = (cmd: string): this is StateOpaque.Of<StateFactory.Any> => { return cmd in factoryAtSnapshot.mechanism.commands }
-      //Object.keys(factoryAtSnapshot.mechanism.commands).includes(cmd)
-
     return {
       is,
       as,
@@ -1628,7 +1624,6 @@ export namespace ImplStateOpaque {
       payload: stateAtSnapshot.payload,
       type: stateAtSnapshot.type,
       isLike,
-      //hasCommand,
       commandsAvailable: () =>
         commandEnabledAtSnapshot && CommandGeneratorCriteria.allOk(commandGeneratorCriteria),
       [InternalAccess]: () => ({ data: stateAtSnapshot, factory: factoryAtSnapshot }),

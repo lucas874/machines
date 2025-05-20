@@ -789,6 +789,98 @@ export namespace ProjMachine {
     commandLabels: CommandLabel[]
   }
 
+  // Information about projection states, such as their labels incoming and outgoing and what state in some machine they may correspond to
+  const projStateInfo = <
+    SwarmProtocolName extends string,
+    MachineName extends string,
+    MachineEventFactories extends MachineEvent.Factory.Any,
+  >(
+    m: AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>
+  ): Map<string, ProjectionStateInfo> => {
+    const projStateInfoMap: Map<string, ProjectionStateInfo> = new Map()
+
+    for (let t of m.projectionInfo.projection.transitions) {
+        const sourceOriginalName = m.projectionInfo.projToMachineStates[t.source][0]
+        const targetOriginalName = m.projectionInfo.projToMachineStates[t.target][0]
+
+        if (!projStateInfoMap.has(t.source)) {
+          projStateInfoMap.set(t.source, {projStateName: t.source, originalMStateName: sourceOriginalName, reactionLabels: [], commandLabels: []})
+        }
+        if (!projStateInfoMap.has(t.target)) {
+          projStateInfoMap.set(t.target, {projStateName: t.target, originalMStateName: targetOriginalName, reactionLabels: [], commandLabels: []})
+        }
+        if (t.label.tag === 'Execute') {
+          projStateInfoMap.get(t.source)?.commandLabels.push(t as CommandLabel)
+        } else if (t.label.tag === 'Input') {
+          projStateInfoMap.get(t.source)?.reactionLabels.push(t as ReactionLabel)
+        }
+    }
+    return projStateInfoMap
+  }
+
+  // We assume single event type commands. map command names to event types as strings
+  const cmdNameToEventType = <
+    SwarmProtocolName extends string,
+    MachineName extends string,
+    MachineEventFactories extends MachineEvent.Factory.Any,
+  >(
+    m: AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>
+  ): Map<string, string> => {
+    const cmdToEventTypeString: Map<string, string> = new Map()
+    for (let t of m.projectionInfo.projection.transitions) {
+        if (t.label.tag === 'Execute' && !cmdToEventTypeString.has(t.label.cmd)) {
+          cmdToEventTypeString.set(t.label.cmd, t.label.logType[0])
+        }
+    }
+    return cmdToEventTypeString
+  }
+
+  // Map state names in a machine to a map from event type strings to reaction handler code
+  const mStateToReactions = <
+    SwarmProtocolName extends string,
+    MachineName extends string,
+    MachineEventFactories extends MachineEvent.Factory.Any,
+  >(
+    mState: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
+  ): Map<string, Map<string, any>> => {
+    const mStateToReactionsMap: Map<string, Map<string, any>> = new Map()
+    mState.mechanism.protocol.reactionMap.getAll().forEach((reactionMapPerMechanism: any, stateMechanism: any) => {
+      const mStateName = stateMechanism.name;
+      if (!mStateToReactionsMap.has(mStateName)) {
+        mStateToReactionsMap.set(mStateName, new Map())
+      }
+      reactionMapPerMechanism.forEach((eventTypeEntry: any, eventType: any) => {
+        mStateToReactionsMap.get(mStateName)?.set(eventType, eventTypeEntry.handler)
+      });
+    });
+
+    return mStateToReactionsMap
+  }
+
+  // Map state names in a machine to a map from command names to event type and command code
+  const mStateToCommands = <
+    SwarmProtocolName extends string,
+    MachineName extends string,
+    MachineEventFactories extends MachineEvent.Factory.Any,
+  >(
+    mState: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
+    cmdToEventTypeString: Map<string, string>
+  ): Map<string, Map<string, [string, any]>> => {
+    const mStateToCommandsMap: Map<string, Map<string, [string, any]>> = new Map()
+    for (const factory of mState.mechanism.protocol.states.allFactories) {
+      const mStateName = factory.mechanism.name;
+      for (let [cmd, cmdDef] of Object.entries(factory.mechanism.commandDefinitions)) {
+        let eventTypeString = cmdToEventTypeString.get(cmd)!
+        if (!mStateToCommandsMap.has(mStateName)) {
+          mStateToCommandsMap.set(mStateName, new Map())
+        }
+        mStateToCommandsMap.get(mStateName)?.set(cmd, [eventTypeString, cmdDef])
+      };
+    }
+
+    return mStateToCommandsMap
+  }
+
   export const adaptMachineNew = <
     SwarmProtocolName extends string,
     MachineName extends string,
@@ -803,65 +895,24 @@ export namespace ProjMachine {
     verbose?: boolean,
   ): MachineResult<[AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>, StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>]> => {
     // information about projection states, such as their labels incoming and outgoing and what state in old machine they may correspond to
-    const projStateInfoMap: Map<string, ProjectionStateInfo> = new Map()
+    const projStateInfoMap: Map<string, ProjectionStateInfo> = projStateInfo(mNew)
 
     // map projection states to states in machine under constructions
     const projStateToMachineState: Map<string, StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>> = new Map()
 
     // we assume single event type commands. map command names to event types as strings
-    const cmdToEventTypeString: Map<string, string> = new Map()
+    const cmdToEventTypeString: Map<string, string> = cmdNameToEventType(mNew)
 
     // map state names in old machine to a map from command names to event type and command code
-    const mOldStateToCommands: Map<string, Map<string, [string, any]>> = new Map()
+    const mOldStateToCommands: Map<string, Map<string, [string, any]>> = mStateToCommands(mOldInitial, cmdToEventTypeString)
 
     // map state names in old machine to a map from event type strings to reaction handler code
-    const mOldStateToReactions: Map<string, Map<string, any>> = new Map()
+    const mOldStateToReactions: Map<string, Map<string, any>> = mStateToReactions(mOldInitial)
 
     // map event type string to Event
     const eventTypeStringToEvent: Map<string, MachineEventFactories> =
       new Map<string, MachineEventFactories>(events.map(e => [e.type, e]))
 
-      for (let t of mNew.projectionInfo.projection.transitions) {
-        const sourceOriginalName = mNew.projectionInfo.projToMachineStates[t.source][0]
-        const targetOriginalName = mNew.projectionInfo.projToMachineStates[t.target][0]
-
-        if (!projStateInfoMap.has(t.source)) {
-          projStateInfoMap.set(t.source, {projStateName: t.source, originalMStateName: sourceOriginalName, reactionLabels: [], commandLabels: []})
-        }
-        if (!projStateInfoMap.has(t.target)) {
-          projStateInfoMap.set(t.target, {projStateName: t.target, originalMStateName: targetOriginalName, reactionLabels: [], commandLabels: []})
-        }
-        if (t.label.tag === 'Execute') {
-          projStateInfoMap.get(t.source)?.commandLabels.push(t as CommandLabel)
-        } else if (t.label.tag === 'Input') {
-          projStateInfoMap.get(t.source)?.reactionLabels.push(t as ReactionLabel)
-        }
-        if (t.label.tag === 'Execute' && !cmdToEventTypeString.has(t.label.cmd)) {
-          cmdToEventTypeString.set(t.label.cmd, t.label.logType[0])
-        }
-    }
-    //console.log(projStateInfoMap)
-    mOldInitial.mechanism.protocol.reactionMap.getAll().forEach((reactionMapPerMechanism: any, stateMechanism: any) => {
-      const mStateName = stateMechanism.name;
-      if (!mOldStateToReactions.has(mStateName)) {
-        mOldStateToReactions.set(mStateName, new Map())
-      }
-      reactionMapPerMechanism.forEach((eventTypeEntry: any, eventType: any) => {
-        mOldStateToReactions.get(mStateName)?.set(eventType, eventTypeEntry.handler)
-      });
-    });
-    //console.log(mOldStateToReactions);
-    for (const factory of mOldInitial.mechanism.protocol.states.allFactories) {
-      const mStateName = factory.mechanism.name;
-      for (let [cmd, cmdDef] of Object.entries(factory.mechanism.commandDefinitions)) {
-        let eventTypeString = cmdToEventTypeString.get(cmd)!
-        if (!mOldStateToCommands.has(mStateName)) {
-          mOldStateToCommands.set(mStateName, new Map())
-        }
-        mOldStateToCommands.get(mStateName)?.set(cmd, [eventTypeString, cmdDef])
-      };
-    }
-    //console.log(mOldStateToCommands)
     // add all states and self loops to machine
     projStateInfoMap.forEach((value: ProjectionStateInfo, key: string) => {
       if (value.commandLabels.length > 0) {
@@ -872,7 +923,7 @@ export namespace ProjMachine {
           const commandDef = verbose ? verboseCommandDef(cLabel, mOldStateToCommands.get(value.originalMStateName)?.get(cmdName)![1]) : mOldStateToCommands.get(value.originalMStateName)?.get(cmdName)![1]
           cmdTriples.push([cmdName, eventTypes, commandDef])
         }
-        //const cmdTriples1 = value.commandLabels.map((t: CommandLabel) => [t.label.cmd, t.label.logType.map((et: string) => eventTypeStringToEvent.get(et)), mOldStateToCommands.get(value.originalMStateName)?.get(t.label.cmd)![1]]).filter(triple => triple.length === 3)
+
         const newState = mNew.designState(value.projStateName).withPayload<any>().commandFromList(cmdTriples).finish() as StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>
         projStateToMachineState.set(value.projStateName, newState)
       } else {
