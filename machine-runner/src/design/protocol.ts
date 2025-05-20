@@ -91,7 +91,7 @@ export namespace SwarmProtocol {
         if (projectionInfo.type == 'ERROR') {
           return {data: undefined, ... projectionInfo}
         }
-        return ProjMachine.adaptMachine(ImplMachine.makeAdapted(swarmName, machineName, eventFactories, projectionInfo.data), eventFactories, mOldInitial, verbose)
+        return MachineAdaptation.adaptMachine(ImplMachine.makeAdapted(swarmName, machineName, eventFactories, projectionInfo.data), eventFactories, mOldInitial, verbose)
       }
     }
   }
@@ -466,7 +466,7 @@ export namespace MachineAnalysisResource {
   }
 }
 
-export namespace ProjMachine {
+export namespace MachineAdaptation {
   // f is the
   // reaction. should be the same for each base case since any intermediate states are due to
   // concurrency and subscribing to event types from other protocols.
