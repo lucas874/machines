@@ -42,8 +42,9 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 
 // Adapted machine
 //const [transportAdapted, s0Adapted] = Composition.adaptMachine('Transport', projectionInfoTransport, Events.allEvents, s0, true)
-const [transportAdapted, s0Adapted] = Composition.adaptMachine('Transport', 'T', warehouse_factory_protocol, subs_composition, s0, true).data!
-//console.log(projectionInfoTransport)
+//const [transportAdapted, s0Adapted] = Composition.adaptMachine('Transport', 'T', warehouse_factory_protocol, subs_composition, s0, true).data!
+const [transportAdapted, s0Adapted] = Composition.adaptMachineNew('Transport', 'T', warehouse_factory_protocol, subs_composition, 0, transporter.createJSONForAnalysis(s0), s0, true).data!
+
 // Run the machine
 async function main() {
   const app = await Actyx.of(manifest)

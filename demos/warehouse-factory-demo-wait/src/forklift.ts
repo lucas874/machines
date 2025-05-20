@@ -36,7 +36,8 @@ export const projectionInfo = projectionInfoResult.data
 //console.log(projectionInfo)
 // Adapted machine
 //const [forkliftAdapted, s0Adapted] = Composition.adaptMachine('Forklift', projectionInfo, Events.allEvents, s0, true)
-const [forkliftAdapted, s0Adapted] = Composition.adaptMachine('Forklift', 'FL', warehouse_factory_protocol, subs_composition, s0, true).data!
+//const [forkliftAdapted, s0Adapted] = Composition.adaptMachine('Forklift', 'FL', warehouse_factory_protocol, subs_composition, s0, true).data!
+const [forkliftAdapted, s0Adapted] = Composition.adaptMachineNew('Forklift', 'FL', warehouse_factory_protocol, subs_composition, 0, forklift.createJSONForAnalysis(s0), s0, true).data!
 
 // Run the adapted machine
 async function main() {

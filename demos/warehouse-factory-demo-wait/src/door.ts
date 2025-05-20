@@ -30,36 +30,18 @@ s0.react([Events.time], s2, (_, e) => { return s2.make() })
 // Check that the original machine is a correct implementation. A prerequisite for reusing it.
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "D", door.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
-//var z: CompositionComponent = [{protocol: {initial: "", transitions: []}, interface: 1}]
-// Projection of warehouse || factory over D
-//var x: InterfacingSwarms = [{protocol: {initial: "", transitions: []}, interface: 1}]
-//var y: boolean = "das"
+
 const projectionInfoResult = projectionInformation(warehouse_factory_protocol, subs_composition, "D", false)
 //const projectionInfoResult = projectionInformation(warehouse_factory_protocol, {"1": ["true"]}, "D", false)
 //console.log(JSON.stringify(projectionInfoResult, null, 2))
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
-//console.log(projectionInfo)
-//console.log(JSON.stringify(projectionInfo, null, 2))
-/* console.log(typeof(projectionInfo.branches))
-console.log(typeof(projectionInfo.specialEventTypes))
-let special = new Set(projectionInfo.specialEventTypes)
-let thing = projectionInfo.specialEventTypes[0] */
-//let branches = new Set(projectionInfo.branches)
-/*
-machineName: MachineName,
-    role: MachineName,
-    protocols: InterfacingSwarms,
-    subscriptions: Subscriptions,
-    mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
-    verbose?: boolean
-
-*/
 
 
 // Adapted machine
 //const [doorAdapted, s0Adapted] = Composition.adaptMachine('Door', projectionInfo, Events.allEvents, s0, true)
-const [doorAdapted, s0Adapted] = Composition.adaptMachine('Door', 'D', warehouse_factory_protocol, subs_composition, s0, true).data!
+//const [doorAdapted, s0Adapted] = Composition.adaptMachine('Door', 'D', warehouse_factory_protocol, subs_composition, s0, true).data!
+const [doorAdapted, s0Adapted] = Composition.adaptMachineNew('Door', 'D', warehouse_factory_protocol, subs_composition, 0, door.createJSONForAnalysis(s0), s0, true).data!
 
 // Run the adapted machine
 async function main() {
