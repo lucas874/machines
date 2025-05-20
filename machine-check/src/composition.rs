@@ -85,7 +85,7 @@ pub fn projection_information(protos: InterfacingSwarms<Role>, subs: String, rol
 }
 
 #[wasm_bindgen]
-pub fn projection_information_new(protos: InterfacingSwarms<Role>, subs: String, role: Role, machine: MachineType, k: usize) -> DataResult<ProjectionInfo> {
+pub fn projection_information_new(protos: InterfacingSwarms<Role>, subs: String, role: Role, machine: MachineType, k: usize, minimize: bool) -> DataResult<ProjectionInfo> {
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
     let proto_info = swarms_to_proto_info(protos, &subs);
     if !proto_info.no_errors() {
@@ -102,7 +102,7 @@ pub fn projection_information_new(protos: InterfacingSwarms<Role>, subs: String,
     if machine_problem {
         return DataResult:: ERROR { errors }
     }
-    match composition::composition_machine::projection_information(&proto_info, &subs, role, (machine, initial), k) {
+    match composition::composition_machine::projection_information(&proto_info, &subs, role, (machine, initial), k, minimize) {
         Some(projection_info) => DataResult::OK { data: projection_info },
         None => DataResult::ERROR { errors:  vec![format!("invalid index {}", k)]}
     }

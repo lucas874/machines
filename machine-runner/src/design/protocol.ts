@@ -38,12 +38,19 @@ export type SwarmProtocol<
     mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
     verbose?: boolean
   ) => MachineResult<[AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>, StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>]>
-  adaptMachineNew: <MachineName extends string>(
+  adaptMachineNew: <
+    MachineName extends string,
+    StateName extends string,
+    StatePayload,
+    Commands extends CommandDefinerMap<any, any, Contained.ContainedEvent<MachineEvent.Any>[]>,
+  >(
     machineName: MachineName,
-    proj: ProjectionInfo,
-    events: readonly MachineEvent.Factory<any, any>[],
-    mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>
-  ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
+    role: MachineName,
+    protocols: InterfacingSwarms,
+    subscriptions: Subscriptions,
+    mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
+    verbose?: boolean
+  ) => MachineResult<[AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>, StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>]>
 }
 
 /**
@@ -97,7 +104,13 @@ export namespace SwarmProtocol {
         }
         return ProjMachine.adaptMachine(ImplMachine.makeAdapted(swarmName, machineName, eventFactories, projectionInfo.data), eventFactories, mOldInitial, verbose)
       },
-      adaptMachineNew: (machineName, proj, events, mOldInitial) => ProjMachine.adaptMachineNew(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, mOldInitial),
+      adaptMachineNew: (machineName, role, protocols, subscriptions, mOldInitial, verbose?) => {
+        const projectionInfo = projectionInformation(protocols, subscriptions, role, true)
+        if (projectionInfo.type == 'ERROR') {
+          return {data: undefined, ... projectionInfo}
+        }
+        return ProjMachine.adaptMachineNew(ImplMachine.makeAdapted(swarmName, machineName, eventFactories, projectionInfo.data), eventFactories, mOldInitial, verbose)
+      }
     }
   }
 }
@@ -765,17 +778,21 @@ export namespace ProjMachine {
     SwarmProtocolName extends string,
     MachineName extends string,
     MachineEventFactories extends MachineEvent.Factory.Any,
+    StateName extends string,
+    StatePayload,
+    Commands extends CommandDefinerMap<any, any, Contained.ContainedEvent<MachineEvent.Any>[]>,
   >(
-    mNew: Machine<SwarmProtocolName, MachineName, MachineEventFactories>,
-    projectionInfo: ProjectionInfo,
+    mNew: AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>,
     events: readonly MachineEvent.Factory<any, Record<never, never>>[],
     mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
-  ): [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any] => {
+    verbose?: boolean,
+  ): MachineResult<[AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>, StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>]> => {
     // information about projection states, such as their labels incoming and outgoing and what state in old machine they may correspond to
     const projStateInfoMap: Map<string, ProjectionStateInfo> = new Map()
 
     // map projection states to states in machine under constructions
-    const projStateToMachineState: Map<string, any> = new Map()
+    //any> = new Map()// string, any, Record<never, never>
+    const projStateToMachineState: Map<string, StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, string, any, Record<never, never>>> = new Map()
 
     // we assume single event type commands. map command names to event types as strings
     const cmdToEventTypeString: Map<string, string> = new Map()
@@ -795,9 +812,9 @@ export namespace ProjMachine {
     const eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> =
       new Map<string, MachineEvent.Factory<any, Record<never, never>>>(events.map(e => [e.type, e]))
 
-      for (let t of projectionInfo.projection.transitions) {
-        const [sourceOriginalName, sourceID] = getStateNameAndID(t.source)
-        const [targetOriginalName, targetID] = getStateNameAndID(t.target)
+      for (let t of mNew.projectionInfo.projection.transitions) {
+        const sourceOriginalName = mNew.projectionInfo.projToMachineStates[t.source][0]
+        const targetOriginalName = mNew.projectionInfo.projToMachineStates[t.target][0]
 
         if (!projStateInfoMap.has(t.source)) {
           projStateInfoMap.set(t.source, {projStateName: t.source, originalMStateName: sourceOriginalName, reactionLabels: [], commandLabels: []})
@@ -848,9 +865,10 @@ export namespace ProjMachine {
           cmdTriples.push([cmdName, eventTypes, code])
         }
         //const cmdTriples1 = value.commandLabels.map((t: CommandLabel) => [t.label.cmd, t.label.logType.map((et: string) => eventTypeStringToEvent.get(et)), mOldStateToCommands.get(value.originalMStateName)?.get(t.label.cmd)![1]]).filter(triple => triple.length === 3)
-        projStateToMachineState.set(value.projStateName, mNew.designState(makeOkMachineName(value.projStateName)).withPayload<any>().commandFromList(cmdTriples).finish())
+        const thing = mNew.designState(value.projStateName).withPayload<any>().commandFromList(cmdTriples).finish()
+        projStateToMachineState.set(value.projStateName, mNew.designState(value.projStateName).withPayload<any>().commandFromList(cmdTriples).finish())
       } else {
-        projStateToMachineState.set(value.projStateName, mNew.designState(makeOkMachineName(value.projStateName)).withPayload<any>().finish())
+        projStateToMachineState.set(value.projStateName, mNew.designState(value.projStateName).withPayload<any>().finish())
       }
     });
 
@@ -870,6 +888,7 @@ export namespace ProjMachine {
       }
     })
 
-    return [mNew, projStateToMachineState.get(projectionInfo.projection.initial)]
+    throw Error
+    //return [mNew, projStateToMachineState.get(mNew.projectionInfo.projection.initial)]
   }
 }

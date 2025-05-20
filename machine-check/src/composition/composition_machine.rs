@@ -569,7 +569,8 @@ fn adapted_projection(
     subs: &Subscriptions,
     role: Role,
     machine: (OptionGraph, NodeId),
-    k: usize
+    k: usize,
+    minimize: bool
 ) -> Option<(AdaptationGraph, Option<NodeId>)> {
     let _span = tracing::info_span!("adapted_projection", %role).entered();
     if k >= swarms.len() {
@@ -578,7 +579,7 @@ fn adapted_projection(
 
     // project a protocol and turn the projection into an AdaptationGraph
     let mapper = |ps: &ProtoStruct| {
-        let (proj, proj_initial) = project(&ps.graph, ps.initial.unwrap(), subs, role.clone(), true);
+        let (proj, proj_initial) = project(&ps.graph, ps.initial.unwrap(), subs, role.clone(), minimize);
         let proj = proj.map(|_, n| AdaptationNode{state: n.clone(), machine_states: None}, |_, label| label.clone());
         (proj, proj_initial, ps.interface.clone())
     };
@@ -625,9 +626,10 @@ pub fn projection_information(
     subs: &Subscriptions,
     role: Role,
     machine: (OptionGraph, NodeId),
-    k: usize
+    k: usize,
+    minimize: bool
 ) -> Option<ProjectionInfo> {
-    let (proj, proj_initial) = match adapted_projection(&proto_info.protocols, subs, role, machine, k) {
+    let (proj, proj_initial) = match adapted_projection(&proto_info.protocols, subs, role, machine, k, minimize) {
         Some((proj, Some(proj_initial))) => (proj, proj_initial),
         _ => return None
     };
@@ -1886,7 +1888,7 @@ mod tests {
         let proto_info = swarms_to_proto_info(swarms.clone(), &subs1);
         assert!(proto_info.no_errors());
 
-        let adapted = adapted_projection(&proto_info.protocols, &subs1, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
+        let adapted = adapted_projection(&proto_info.protocols, &subs1, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0, true);
         let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
         println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&from_option_to_machine(fl_m_graph.clone(), fl_m_graph_initial.unwrap())).unwrap());
         println!("right {:?}: {}", role, serde_json::to_string_pretty(&to_json_machine(from_adaptation_graph_to_graph(&adapted_proj.clone()), adapted_proj_initial.unwrap())).unwrap());
@@ -1901,7 +1903,7 @@ mod tests {
         assert!(proto_info.no_errors());
 
         //let (adapted_proj, adapted_proj_initial) = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
-        let adapted = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
+        let adapted = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0, true);
         let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
         println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&from_option_to_machine(fl_m_graph.clone(), fl_m_graph_initial.unwrap())).unwrap());
         println!("right {:?}: {}", role, serde_json::to_string_pretty(&to_json_machine(from_adaptation_graph_to_graph(&adapted_proj.clone()), adapted_proj_initial.unwrap())).unwrap());
@@ -1950,7 +1952,7 @@ mod tests {
         let proto_info = swarms_to_proto_info(swarms.clone(), &subs1);
         assert!(proto_info.no_errors());
 
-        let adapted = adapted_projection(&proto_info.protocols, &subs1, role.clone(), (f_m_graph.clone(), f_m_graph_initial.unwrap()), 1);
+        let adapted = adapted_projection(&proto_info.protocols, &subs1, role.clone(), (f_m_graph.clone(), f_m_graph_initial.unwrap()), 1, true);
         let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
         println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&from_option_to_machine(f_m_graph.clone(), f_m_graph_initial.unwrap())).unwrap());
         println!("right {:?}: {}", role, serde_json::to_string_pretty(&to_json_machine(from_adaptation_graph_to_graph(&adapted_proj.clone()), adapted_proj_initial.unwrap())).unwrap());
@@ -1965,7 +1967,7 @@ mod tests {
         let proto_info = swarms_to_proto_info(swarms.clone(), &subs2);
         assert!(proto_info.no_errors());
 
-        let adapted = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (f_m_graph.clone(), f_m_graph_initial.unwrap()), 1);
+        let adapted = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (f_m_graph.clone(), f_m_graph_initial.unwrap()), 1, true);
         let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
         println!("left {:?}: {}", role.clone(), serde_json::to_string_pretty(&from_option_to_machine(f_m_graph.clone(), f_m_graph_initial.unwrap())).unwrap());
         println!("right {:?}: {}", role, serde_json::to_string_pretty(&to_json_machine(from_adaptation_graph_to_graph(&adapted_proj.clone()), adapted_proj_initial.unwrap())).unwrap());
@@ -2119,7 +2121,7 @@ mod tests {
     }
 
     #[test]
-    fn test_projection_information() {
+    fn test_projection_information_1() {
         setup_logger();
 
         let fl_m = MachineType {
@@ -2229,7 +2231,7 @@ mod tests {
         //println!("subs: {}", serde_json::to_string_pretty(&subs1).unwrap());
         let proto_info = swarms_to_proto_info(swarms.clone(), &subs1);
 
-        let projection_info = projection_information(&proto_info, &subs1, role, (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
+        let projection_info = projection_information(&proto_info, &subs1, role, (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0, true);
         let projection_info = match projection_info {
             None => panic!(),
             Some(projection_info) => {
@@ -2254,6 +2256,132 @@ mod tests {
             (EventType::new("part"), vec![EventType::new("time")]),
             (EventType::new("partID"), vec![EventType::new("part"), EventType::new("pos"), EventType::new("time")]),
             (EventType::new("pos"), vec![EventType::new("part"), EventType::new("time")]),
+            (EventType::new("time"), vec![]),
+        ]);
+        let expected_special_event_types = BTreeSet::from([EventType::new("partID"), EventType::new("time")]);
+        let errors = equivalent(&expected_graph, expected_initial.unwrap(), &actual_graph, actual_initial.unwrap());
+        let is_empty = errors.is_empty();
+        //println!("{:?}", errors.map(machine::Error::convert(&expected_graph, &actual_graph)));
+        assert!(is_empty);
+        assert_eq!(expected_proj_to_machine_states, projection_info.proj_to_machine_states);
+        assert_eq!(expected_branches, projection_info.branches);
+        assert_eq!(expected_special_event_types, projection_info.special_event_types);
+    }
+    #[test]
+    fn test_projection_information_2() {
+        setup_logger();
+
+        let fl_m = MachineType {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                    },
+                    source: State::new("1"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("1"),
+                    target: State::new("0"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("3"),
+                },
+            ],
+        };
+
+        let expected_proj = MachineType {
+            initial: State::new("0 || { { 0 } }"),
+            transitions: vec! [
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0 || { { 0 } }"),
+                    target: State::new("3 || { { 3 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("0 || { { 0 } }"),
+                    target: State::new("1 || { { 1 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("1 || { { 1 } }"),
+                    target: State::new("0 || { { 2 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                    },
+                    source: State::new("1 || { { 1 } }"),
+                    target: State::new("1 || { { 1 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("part"),
+                    },
+                    source: State::new("0 || { { 2 } }"),
+                    target: State::new("0 || { { 0 } }"),
+                },
+            ]
+        };
+
+        let (fl_m_graph, fl_m_graph_initial, _) = crate::machine::from_json(fl_m.clone());
+        let role = Role::new("FL");
+        let swarms: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent{protocol: get_proto1(), interface: None}]);
+        let swarms_for_sub = get_interfacing_swarms_1();
+        let larger_than_necessary_sub = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(swarms_for_sub, &BTreeMap::new(), Granularity::TwoStep);
+        assert!(larger_than_necessary_sub.is_ok());
+        let subs1 = larger_than_necessary_sub.unwrap();
+        //println!("subs: {}", serde_json::to_string_pretty(&subs1).unwrap());
+        let proto_info = swarms_to_proto_info(swarms.clone(), &subs1);
+
+        let projection_info = projection_information(&proto_info, &subs1, role, (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0, true);
+        let projection_info = match projection_info {
+            None => panic!(),
+            Some(projection_info) => {
+                /* println!("proj: {}", serde_json::to_string_pretty(&projection_info.projection).unwrap());
+                println!("fl_m: {}", serde_json::to_string_pretty(&fl_m).unwrap());
+                println!("map: {}", serde_json::to_string_pretty(&projection_info.proj_to_machine_states).unwrap());
+                println!("branches: {}", serde_json::to_string_pretty(&projection_info.branches).unwrap());
+                println!("special event types: {}", serde_json::to_string_pretty(&projection_info.special_event_types).unwrap()); */
+                projection_info
+            }
+        };
+        let (actual_graph, actual_initial, _) = machine::from_json(projection_info.projection);
+        let (expected_graph, expected_initial, _) = crate::machine::from_json(expected_proj);
+        let expected_proj_to_machine_states = BTreeMap::from([
+            (State::new("0 || { { 0 } }"), vec![State::new("0")]),
+            (State::new("0 || { { 2 } }"), vec![State::new("0")]),
+            (State::new("1 || { { 1 } }"), vec![State::new("1")]),
+            (State::new("3 || { { 3 } }"), vec![State::new("3")]),
+        ]);
+        let expected_branches = BTreeMap::from([
+            (EventType::new("part"), vec![EventType::new("partID"), EventType::new("time")]),
+            (EventType::new("partID"), vec![EventType::new("part"), EventType::new("partID"), EventType::new("pos"), EventType::new("time")]),
+            (EventType::new("pos"), vec![EventType::new("part"), EventType::new("partID"), EventType::new("time")]),
             (EventType::new("time"), vec![]),
         ]);
         let expected_special_event_types = BTreeSet::from([EventType::new("partID"), EventType::new("time")]);
