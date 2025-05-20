@@ -108,7 +108,6 @@ export namespace SwarmProtocol {
       },
       adaptMachineNew: (machineName, role, protocols, subscriptions, k, mType, mOldInitial, verbose?) => {
         const projectionInfo = projectionInformationNew(protocols, subscriptions, role, mType, k, true)
-        console.log(projectionInfo)
         if (projectionInfo.type == 'ERROR') {
           return {data: undefined, ... projectionInfo}
         }
@@ -759,17 +758,6 @@ export namespace ProjMachine {
     return {type: 'OK', data: [mNew, initial]}
   }
 
-  // consider doing this sort of thing in machine-check. Seems ugly.
-  function getStateNameAndID(stateName: string): string[] {
-    const re = /(?<name>.*[^§])§(?<id>[\S\s]*)/;
-    var groups = re.exec(stateName)?.groups;
-      if (groups === undefined) {
-        return ["", ""]
-      } else {
-        return [groups.name, groups.id]
-      }
-  }
-
   type ProjectionStateInfo = {
     projStateName: string,
     originalMStateName: string,
@@ -794,8 +782,6 @@ export namespace ProjMachine {
     const projStateInfoMap: Map<string, ProjectionStateInfo> = new Map()
 
     // map projection states to states in machine under constructions
-    //any> = new Map()// string, any, Record<never, never>
-    //Record<never, never>
     const projStateToMachineState: Map<string, StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>> = new Map()
 
     // we assume single event type commands. map command names to event types as strings
@@ -808,13 +794,8 @@ export namespace ProjMachine {
     const mOldStateToReactions: Map<string, Map<string, any>> = new Map()
 
     // map event type string to Event
-    //const eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> =
-    //  new Map<string, MachineEvent.Factory<any, Record<never, never>>>(events.map(e => [e.type, e]))
-    //const eventTypeStringToEvent: Map<string, MachineEvent.Factory.Any> =
-    //  new Map<string, MachineEvent.Factory.Any>(events.map(e => [e.type, e]))
     const eventTypeStringToEvent: Map<string, MachineEventFactories> =
       new Map<string, MachineEventFactories>(events.map(e => [e.type, e]))
-
 
       for (let t of mNew.projectionInfo.projection.transitions) {
         const sourceOriginalName = mNew.projectionInfo.projToMachineStates[t.source][0]
@@ -857,12 +838,8 @@ export namespace ProjMachine {
       };
     }
     //console.log(mOldStateToCommands)
-    console.log(projStateInfoMap)
     // add all states and self loops to machine
     projStateInfoMap.forEach((value: ProjectionStateInfo, key: string) => {
-      console.log("key: ", key)
-      console.log("value.projStateName: ", value.projStateName)
-      console.log("key == value.projStateName", key === value.projStateName)
       if (value.commandLabels.length > 0) {
         let cmdTriples = new Array()
         for (const cLabel of value.commandLabels) {
@@ -872,9 +849,11 @@ export namespace ProjMachine {
           cmdTriples.push([cmdName, eventTypes, code])
         }
         //const cmdTriples1 = value.commandLabels.map((t: CommandLabel) => [t.label.cmd, t.label.logType.map((et: string) => eventTypeStringToEvent.get(et)), mOldStateToCommands.get(value.originalMStateName)?.get(t.label.cmd)![1]]).filter(triple => triple.length === 3)
-        projStateToMachineState.set(value.projStateName, mNew.designState(value.projStateName).withPayload<any>().commandFromList(cmdTriples).finish())
+        const newState = mNew.designState(value.projStateName).withPayload<any>().commandFromList(cmdTriples).finish() as StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>
+        projStateToMachineState.set(value.projStateName, newState)
       } else {
-        projStateToMachineState.set(value.projStateName, mNew.designState(value.projStateName).withPayload<any>().finish())
+        const newState = mNew.designState(value.projStateName).withPayload<any>().finish() as StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>
+        projStateToMachineState.set(value.projStateName, newState)
       }
     });
 
@@ -894,10 +873,7 @@ export namespace ProjMachine {
       }
     })
 
-    //throw Error
     const initial = projStateToMachineState.get(mNew.projectionInfo.projection.initial)!
-    return {type: 'OK', data: [mNew, initial] }
-
-    //return  data: [mNew, initial]}
+    return { type: 'OK', data: [mNew, initial] }
   }
 }
