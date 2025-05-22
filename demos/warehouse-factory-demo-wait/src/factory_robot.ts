@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
-import { Events, manifest, Composition, warehouse_factory_protocol, getRandomInt, factory_protocol, subs_factory, print_event, subs_composition, projectionInfoRobot, printState  } from './protocol'
+import { Events, manifest, Composition, warehouse_factory_protocol, factory_protocol, subs_factory, subs_composition, printState  } from './protocol'
 import * as readline from 'readline';
 import { checkComposedProjection } from '@actyx/machine-check';
 
@@ -32,9 +32,8 @@ const checkProjResult = checkComposedProjection(factory_protocol, subs_factory, 
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Adapt machine
-//const [factoryRobotAdapted, s0Adapted] = Composition.adaptMachine('Robot', projectionInfoRobot, Events.allEvents, s0, true)
 const [factoryRobotAdapted, s0Adapted] = Composition.adaptMachine('Robot', 'R', warehouse_factory_protocol, subs_composition, 1, robot.createJSONForAnalysis(s0), s0, true).data!
-//console.log(projectionInfoRobot)
+
 // Run the adapted machine
 async function main() {
 

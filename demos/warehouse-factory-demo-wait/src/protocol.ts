@@ -80,23 +80,6 @@ export function getRandomInt(min: number, max: number) {
   return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled); // The maximum is exclusive and the minimum is inclusive
 }
 
-const log = console.log;
-export function print_event(e: any) {
-  const {lbj, ...toPrint} = e.payload
-  //console.log(`received an event: ${JSON.stringify(toPrint, null, 2)}`)
-  log(chalk.blue`    ${e.payload.type}? ⬅ ${JSON.stringify(toPrint, null, 0)}`)
-}
-
-// Projection of warehouse || factory over R
-const projectionInfoResultRobot: DataResult<ProjectionInfo> = projectionInformation(warehouse_factory_protocol, subs_composition, "R", false)
-if (projectionInfoResultRobot.type == 'ERROR') throw new Error('error getting projection')
-export const projectionInfoRobot = projectionInfoResultRobot.data
-
-// Projection of warehouse || factory over T
-const projectionInfoResultTransport: DataResult<ProjectionInfo> = projectionInformation(warehouse_factory_protocol, subs_composition, "T", false)
-if (projectionInfoResultTransport.type == 'ERROR') throw new Error('error getting projection')
-export const projectionInfoTransport = projectionInfoResultTransport.data
-
 export const printState = (machineName: string, stateName: string, statePayload: any) => {
   console.log(chalk.bgBlack.white.bold`${machineName} - State: ${stateName}. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
 }

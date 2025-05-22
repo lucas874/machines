@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
-import { Events, manifest, Composition, printState, projectionInfoTransport, warehouse_factory_protocol, subs_composition, warehouse_protocol, subs_warehouse } from './protocol'
+import { Events, manifest, Composition, printState, warehouse_factory_protocol, subs_composition, warehouse_protocol, subs_warehouse } from './protocol'
 import * as readline from 'readline';
 import chalk from "chalk";
 import { checkComposedProjection } from '@actyx/machine-check';
@@ -41,8 +41,6 @@ const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehou
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Adapted machine
-//const [transportAdapted, s0Adapted] = Composition.adaptMachine('Transport', projectionInfoTransport, Events.allEvents, s0, true)
-//const [transportAdapted, s0Adapted] = Composition.adaptMachine('Transport', 'T', warehouse_factory_protocol, subs_composition, s0, true).data!
 const [transportAdapted, s0Adapted] = Composition.adaptMachine('Transport', 'T', warehouse_factory_protocol, subs_composition, 0, transporter.createJSONForAnalysis(s0), s0, true).data!
 
 // Run the machine

@@ -2,7 +2,7 @@ import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, printState } from './protocol'
 import * as readline from 'readline';
-import { checkComposedProjection, DataResult, ProjectionInfo, projectionInformation } from '@actyx/machine-check';
+import { checkComposedProjection } from '@actyx/machine-check';
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -28,14 +28,7 @@ s0.react([Events.time], s2, (_, e) => { return s2.make() })
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "FL", forklift.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
-// Projection of warehouse || factory over FL
-const projectionInfoResult: DataResult<ProjectionInfo> = projectionInformation(warehouse_factory_protocol, subs_composition, "FL", false)
-if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
-export const projectionInfo = projectionInfoResult.data
-//console.log(projectionInfo)
 // Adapted machine
-//const [forkliftAdapted, s0Adapted] = Composition.adaptMachine('Forklift', projectionInfo, Events.allEvents, s0, true)
-//const [forkliftAdapted, s0Adapted] = Composition.adaptMachine('Forklift', 'FL', warehouse_factory_protocol, subs_composition, s0, true).data!
 const [forkliftAdapted, s0Adapted] = Composition.adaptMachine('Forklift', 'FL', warehouse_factory_protocol, subs_composition, 0, forklift.createJSONForAnalysis(s0), s0, true).data!
 
 // Run the adapted machine
