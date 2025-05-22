@@ -1,12 +1,9 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT} from '@actyx/machine-runner'
-import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event, printState } from './protocol'
-//import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
+import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, warehouse_protocol, subs_warehouse, printState } from './protocol'
 import * as readline from 'readline';
 import chalk from "chalk";
-import { checkComposedProjection, CompositionComponent, InterfacingSwarms, projectionInformation } from '@actyx/machine-check';
-
-const log = console.log;
+import { checkComposedProjection } from '@actyx/machine-check';
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -31,16 +28,7 @@ s0.react([Events.time], s2, (_, e) => { return s2.make() })
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "D", door.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
-const projectionInfoResult = projectionInformation(warehouse_factory_protocol, subs_composition, "D", false)
-//const projectionInfoResult = projectionInformation(warehouse_factory_protocol, {"1": ["true"]}, "D", false)
-//console.log(JSON.stringify(projectionInfoResult, null, 2))
-if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
-const projectionInfo = projectionInfoResult.data
-
-
 // Adapted machine
-//const [doorAdapted, s0Adapted] = Composition.adaptMachine('Door', projectionInfo, Events.allEvents, s0, true)
-//const [doorAdapted, s0Adapted] = Composition.adaptMachine('Door', 'D', warehouse_factory_protocol, subs_composition, s0, true).data!
 const [doorAdapted, s0Adapted] = Composition.adaptMachine('Door', 'D', warehouse_factory_protocol, subs_composition, 0, door.createJSONForAnalysis(s0), s0, true).data!
 
 // Run the adapted machine
@@ -49,7 +37,7 @@ async function main() {
   const tags = Composition.tagWithEntityId('warehouse-factory')
   const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, doorAdapted)
   printState(doorAdapted.machineName, s0Adapted.mechanism.name, undefined)
-  log(chalk.bgBlack.red.dim`    time!`);
+  console.log(chalk.bgBlack.red.dim`    time!`);
 
   for await (const state of machine) {
     if (state.isLike(s0)) {
