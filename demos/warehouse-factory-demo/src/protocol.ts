@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import { MachineEvent, SwarmProtocol } from '@actyx/machine-runner'
-import { SwarmProtocolType, Subscriptions, Result, ResultData, InterfacingSwarms, overapproxWWFSubscriptions, checkWWFSwarmProtocol, MachineType} from '@actyx/machine-check'
+import { SwarmProtocolType, Subscriptions, Result, DataResult, InterfacingSwarms, overapproxWWFSubscriptions, checkWWFSwarmProtocol } from '@actyx/machine-check'
+import chalk from "chalk";
 
 export const manifest = {
   appId: 'com.example.car-factory',
@@ -9,19 +10,19 @@ export const manifest = {
 }
 
 type ClosingTimePayload = { timeOfDay: string }
-type PartReqPayload = {id: string}
-type PosPayload = {position: string, part: string}
-type PartOKPayload = {part: string}
-type CarPayload = {part: string, modelName: string}
+type PartIDPayload = {partName: string}
+type PosPayload = {position: string, partName: string}
+type PartPayload = {partName: string}
+type CarPayload = {partName: string, modelName: string}
 
 export namespace Events {
-  export const partReq = MachineEvent.design('partReq').withPayload<PartReqPayload>()
-  export const partOK = MachineEvent.design('partOK').withPayload<PartOKPayload>()
+  export const partID = MachineEvent.design('partID').withPayload<PartIDPayload>()
+  export const part = MachineEvent.design('part').withPayload<PartPayload>()
   export const pos = MachineEvent.design('pos').withPayload<PosPayload>()
-  export const closingTime = MachineEvent.design('closingTime').withPayload<ClosingTimePayload>()
+  export const time = MachineEvent.design('time').withPayload<ClosingTimePayload>()
   export const car = MachineEvent.design('car').withPayload<CarPayload>()
 
-  export const allEvents = [partReq, partOK, pos, closingTime, car] as const
+  export const allEvents = [partID, part, pos, time, car] as const
 }
 
 export const Composition = SwarmProtocol.make('Composition', Events.allEvents)
@@ -29,17 +30,17 @@ export const Composition = SwarmProtocol.make('Composition', Events.allEvents)
 export const Gwarehouse: SwarmProtocolType = {
   initial: '0',
   transitions: [
-    {source: '0', target: '1', label: {cmd: 'request', role: 'T', logType: [Events.partReq.type]}},
+    {source: '0', target: '1', label: {cmd: 'request', role: 'T', logType: [Events.partID.type]}},
     {source: '1', target: '2', label: {cmd: 'get', role: 'FL', logType: [Events.pos.type]}},
-    {source: '2', target: '0', label: {cmd: 'deliver', role: 'T', logType: [Events.partOK.type]}},
-    {source: '0', target: '3', label: {cmd: 'close', role: 'D', logType: [Events.closingTime.type]}},
+    {source: '2', target: '0', label: {cmd: 'deliver', role: 'T', logType: [Events.part.type]}},
+    {source: '0', target: '3', label: {cmd: 'close', role: 'D', logType: [Events.time.type]}},
   ]}
 
 export const Gfactory: SwarmProtocolType = {
   initial: '0',
   transitions: [
-    {source: '0', target: '1', label: { cmd: 'request', role: 'T', logType: [Events.partReq.type]}},
-    {source: '1', target: '2', label: { cmd: 'deliver', role: 'T', logType: [Events.partOK.type]}},
+    {source: '0', target: '1', label: { cmd: 'request', role: 'T', logType: [Events.partID.type]}},
+    {source: '1', target: '2', label: { cmd: 'deliver', role: 'T', logType: [Events.part.type]}},
     {source: '2', target: '3', label: { cmd: 'build', role: 'R', logType: [Events.car.type] }},
   ]}
 
@@ -48,19 +49,19 @@ export const factory_protocol: InterfacingSwarms = [{protocol: Gfactory, interfa
 export const warehouse_factory_protocol: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}]
 
 // Well-formed subscription for the warehouse protocol
-const result_subs_warehouse: ResultData<Subscriptions>
+const result_subs_warehouse: DataResult<Subscriptions>
   = overapproxWWFSubscriptions(warehouse_protocol, {}, 'TwoStep')
 if (result_subs_warehouse.type === 'ERROR') throw new Error(result_subs_warehouse.errors.join(', '))
 export var subs_warehouse: Subscriptions = result_subs_warehouse.data
 
 // Well-formed subscription for the factory protocol
-const result_subs_factory: ResultData<Subscriptions>
+const result_subs_factory: DataResult<Subscriptions>
   = overapproxWWFSubscriptions(factory_protocol, {}, 'TwoStep')
 if (result_subs_factory.type === 'ERROR') throw new Error(result_subs_factory.errors.join(', '))
 export var subs_factory: Subscriptions = result_subs_factory.data
 
 // Well-formed subscription for the warehouse || factory protocol
-const result_subs_composition: ResultData<Subscriptions>
+const result_subs_composition: DataResult<Subscriptions>
   = overapproxWWFSubscriptions(warehouse_factory_protocol, {}, 'TwoStep')
 if (result_subs_composition.type === 'ERROR') throw new Error(result_subs_composition.errors.join(', '))
 export var subs_composition: Subscriptions = result_subs_composition.data
@@ -79,6 +80,6 @@ export function getRandomInt(min: number, max: number) {
   return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled); // The maximum is exclusive and the minimum is inclusive
 }
 
-export function print_event(e: any) {
-  console.log(`received an event: ${JSON.stringify(e.payload, null, 2)}`)
+export const printState = (machineName: string, stateName: string, statePayload: any) => {
+  console.log(chalk.bgBlack.white.bold`${machineName} - State: ${stateName}. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
 }
