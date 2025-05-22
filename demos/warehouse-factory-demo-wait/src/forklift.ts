@@ -1,7 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
-import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event, printState } from './protocol'
-//import { checkComposedProjection, projectionAndInformation, projectionAndInformationNew } from '@actyx/machine-check'
+import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, printState } from './protocol'
 import * as readline from 'readline';
 import { checkComposedProjection, DataResult, ProjectionInfo, projectionInformation } from '@actyx/machine-check';
 

@@ -34,7 +34,7 @@ const [doorAdapted, s0Adapted] = Composition.adaptMachine('Door', 'D', warehouse
 // Run the adapted machine
 async function main() {
   const app = await Actyx.of(manifest)
-  const tags = Composition.tagWithEntityId('warehouse-factory')
+  const tags = Composition.tagWithEntityId('warehouse')
   const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, doorAdapted)
   printState(doorAdapted.machineName, s0Adapted.mechanism.name, undefined)
   console.log(chalk.bgBlack.red.dim`    time!`);
@@ -44,9 +44,10 @@ async function main() {
       setTimeout(() => {
         const stateAfterTimeOut = machine.get()
         if (stateAfterTimeOut?.isLike(s0)) {
+          console.log()
           stateAfterTimeOut?.cast().commands()?.close()
         }
-      }, getRandomInt(4000, 8000))
+      }, getRandomInt(3000, 8000))
     }
   }
   rl.close();
