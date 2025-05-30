@@ -9,7 +9,7 @@ use crate::{
     Graph, MachineType,
 };
 
-use super::{NodeId, SwarmProtocolType};
+use super::{NodeId, SwarmProtocolType, Subscriptions};
 
 #[derive(Tsify, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -332,4 +332,24 @@ impl SwarmInterface for Role {
             .map(|(_, e, _)| e)
             .collect()
     }
+}
+
+// Used for analyzing benchmarks suite.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct InspectionStruct  {
+    pub n_states: usize,
+    pub n_edges: usize,
+    pub n_roles: usize,
+    pub n_event_types: usize,
+    pub n_interfacing: usize,
+    pub n_branches: usize,
+    pub n_joins: usize,
+    pub n_branches_actual: usize,
+    pub n_joins_actual: usize,
+    pub n_interfacing_actual: usize,
+    pub n_concurrent_pairs: usize,
+    pub n_protocols: usize,
+    pub subscriptions: Subscriptions,
+    pub interfacing_swarms: InterfacingSwarms<Role>,
+    pub expanded_composition: SwarmProtocolType,
 }

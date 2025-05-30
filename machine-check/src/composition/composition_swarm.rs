@@ -12,7 +12,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
 };
-use super::composition_types::{CompositionComponent, Granularity, InterfacingSwarms, ProtoStruct};
+use super::composition_types::{CompositionComponent, Granularity, InspectionStruct, InterfacingSwarms, ProtoStruct};
 use super::MapVec;
 use super::{
     composition_types::{
@@ -1284,6 +1284,44 @@ pub fn to_swarm_json(graph: crate::Graph, initial: NodeId) -> SwarmProtocolType 
         initial: graph[initial].state_name().clone(),
         transitions,
     }
+}
+
+pub fn inspection_struct(interfacing_swarms: InterfacingSwarms<Role>) -> InspectionStruct {
+    let _span = tracing::info_span!("inspection_struct").entered();
+    let combined_proto_info = swarms_to_proto_info(interfacing_swarms, &BTreeMap::new());
+    if !combined_proto_info.no_errors() {
+        unimplemented!()
+    }
+
+    // if we reach this point the protocols can interface and are all confusion free
+    // we construct a ProtoInfo with the composition as the only protocol and all the
+    // information about branches etc. from combined_proto_info
+    let composition = explicit_composition_proto_info(combined_proto_info);
+    let composition_graph = composition.get_ith_proto(0).unwrap();
+
+    let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
+        let pre = composition.immediately_pre.get(e).cloned().unwrap_or_default();
+        let product = pre.clone().into_iter().cartesian_product(&pre);
+        product.filter(|(e1, e2)| *e1 != **e2 && composition.concurrent_events.contains(&unord_event_pair(e1.clone(), (*e2).clone())))
+            .map(|(e1, e2)| [e1, e2.clone()])
+            .flatten()
+            .collect()
+    };
+
+    let n_states = composition_graph.graph.node_count();
+    let n_edges = composition_graph.graph.edge_count();
+    let n_roles = composition.role_event_map.keys().count();
+    let n_event_types = composition.protocols.map(|ps: ProtoStruct| ps.graph.edge_count()).iter().fold(0, |acc, n| acc + n);
+    let n_interfacing = composition.joining_events.len();
+    let n_branches = composition.branching_events.iter().map(|bset| bset.len()).fold(0, |acc, n| acc + n);
+    let n_joins = composition.joining_events.iter().filter(|e| !get_pre_joins(*e).is_empty()).count();
+    let flat_branch_set: BTreeSet<EventType> = composition.branching_events.clone().into_iter().flatten().collect();
+    let n_branches_actual = composition_graph.graph.edge_references().filter(|label| flat_branch_set.contains(&label.weight().get_event_type())).count();
+    let n_joins_actual = composition_graph.graph.edge_references().filter(|label| !get_pre_joins(&label.weight().get_event_type()).is_empty()).count();
+    let n_interfacing_actual = composition_graph.graph.edge_references().filter(|label| composition.joining_events.contains(&label.weight().get_event_type())).count();
+    //let succ_pairs = composition.succeeding_events.iter().flat_map(|thing| 0)
+
+    unimplemented!()
 }
 
 #[cfg(test)]
