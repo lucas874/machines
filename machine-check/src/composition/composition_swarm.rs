@@ -1607,7 +1607,7 @@ pub fn inspection_struct(interfacing_swarms: InterfacingSwarms<Role>) -> Inspect
     let roles: BTreeSet<Role> = composition.role_event_map.keys().cloned().collect();
     let n_roles = roles.len();
 
-    let event_types = composition
+    let event_types: BTreeSet<EventType> = composition
         .protocols
         .iter()
         .flat_map(|ps: &ProtoStruct| {
@@ -1616,11 +1616,7 @@ pub fn inspection_struct(interfacing_swarms: InterfacingSwarms<Role>) -> Inspect
                 .map(|e| e.weight().get_event_type())
         })
         .collect();
-    let n_event_types = composition
-        .protocols
-        .iter()
-        .map(|ps: &ProtoStruct| ps.graph.edge_count())
-        .fold(0, |acc, n| acc + n);
+    let n_event_types = event_types.len();
 
     let interfacing_roles = interfacing_swarms
         .0
@@ -1666,7 +1662,7 @@ pub fn inspection_struct(interfacing_swarms: InterfacingSwarms<Role>) -> Inspect
     let n_joins_actual = composition_graph
         .graph
         .edge_references()
-        .filter(|label| !get_pre_joins(&label.weight().get_event_type()).is_empty())
+        .filter(|label| joining_event_types.contains(&label.weight().get_event_type()))
         .count();
     let n_interfacing_actual = composition_graph
         .graph
