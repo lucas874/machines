@@ -1569,11 +1569,13 @@ pub fn to_swarm_json(graph: crate::Graph, initial: NodeId) -> SwarmProtocolType 
     }
 }
 
-pub fn inspection_struct(interfacing_swarms: InterfacingSwarms<Role>) -> InspectionStruct {
+pub fn inspection_struct(
+    interfacing_swarms: InterfacingSwarms<Role>,
+) -> Result<InspectionStruct, String> {
     let _span = tracing::info_span!("inspection_struct").entered();
     let combined_proto_info = swarms_to_proto_info(interfacing_swarms.clone(), &BTreeMap::new());
     if !combined_proto_info.no_errors() {
-        unimplemented!()
+        return Err(String::from("Bad input"));
     }
 
     // if we reach this point the protocols can interface and are all confusion free
@@ -1699,7 +1701,8 @@ pub fn inspection_struct(interfacing_swarms: InterfacingSwarms<Role>) -> Inspect
     let expanded_composition =
         to_swarm_json(composition_graph.graph, composition_graph.initial.unwrap());
 
-    InspectionStruct {
+    Ok(
+        InspectionStruct {
         n_states,
         n_edges,
         roles,
@@ -1721,7 +1724,7 @@ pub fn inspection_struct(interfacing_swarms: InterfacingSwarms<Role>) -> Inspect
         subscriptions,
         interfacing_swarms,
         expanded_composition,
-    }
+    })
 }
 
 #[cfg(test)]

@@ -1,39 +1,20 @@
 use machine_check::{
-    composition::{composition_types::{DataResult, Granularity, InterfacingSwarms}, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub}, types::{EventType, ProtocolType, Role}, Subscriptions, SwarmProtocolType
+    composition::{composition_types::{DataResult, InterfacingSwarms, InspectionStruct}, inspection_struct}, types::Role
 };
 
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, BTreeSet}, fs::{create_dir_all, File}, path::Path, io::prelude::*
-};
+use std::{fs::{create_dir_all, File}, path::Path, io::prelude::*};
 
 use walkdir::WalkDir;
 
 const BENCHMARK_DIR: &str = "./bench_and_results";
+const SPECIAL_SYMBOL: &str = "done-special-symbol";
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BenchMarkInput  {
     pub state_space_size: usize,
     pub number_of_edges: usize,
     pub interfacing_swarms: InterfacingSwarms<Role>
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct InspectionStruct  {
-    pub n_states: usize,
-    pub n_edges: usize,
-    pub n_roles: usize,
-    pub n_event_types: usize,
-    pub n_branches: usize,
-    pub n_joins: usize,
-    pub n_interfacing: usize,
-    pub n_branches_actual: usize,
-    pub n_joins_actual: usize,
-    pub n_interfacing_actual: usize,
-    pub n_concurrent_pairs: usize,
-    pub subscriptions: Subscriptions,
-    pub interfacing_swarms: InterfacingSwarms<Role>,
-    pub expanded_composition: SwarmProtocolType,
 }
 
 fn prepare_input(file_name: String) -> (usize, BenchMarkInput) {
@@ -107,17 +88,51 @@ fn write_file(file_name: &String, content: String) -> () {
     }
 }
 
-fn wrap_and_write_sub_out(bench_input: &BenchMarkInput, subscriptions: Subscriptions, granularity: String, parent_path: &String) {
-    unimplemented!()
-    //let out = BenchmarkSubSizeOutput { state_space_size: bench_input.state_space_size, number_of_edges: bench_input.number_of_edges, subscriptions: subscriptions};
-    //let file_name = format!("{parent_path}/{:010}_{}.json", bench_input.state_space_size, granularity);
-    //let out = serde_json::to_string(&out).unwrap();
-    //write_file(&file_name, out);
+fn write_output(inspection_struct: InspectionStruct, parent_path: &String) {
+    let file_name = format!("{parent_path}/{:010}.json", inspection_struct.n_states);
+    let out = serde_json::to_string(&inspection_struct).unwrap();
+    write_file(&file_name, out);
 }
 
 #[test]
 #[ignore]
-fn full_run_bench_sub_sizes_general() {
+fn full_inspection() {
     let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
-    println!("HEJ");
+    let output_dir = format!("{BENCHMARK_DIR}/benchmark_inspection/general_pattern");
+    create_directory(&output_dir);
+    let mut interfacing_swarms_general =
+        prepare_files_in_directory(input_dir);
+    interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+
+    for (_, bi) in interfacing_swarms_general.iter() {
+        let swarms = &bi.interfacing_swarms;
+        match inspection_struct(swarms.clone()) {
+            DataResult::OK{data: inspection_result} => write_output(inspection_result, &output_dir),
+            DataResult::ERROR{ .. } => panic!("Something went wrong while getting inspection struct"),
+        };
+
+        println!("{}", SPECIAL_SYMBOL);
+    }
+}
+
+#[test]
+#[ignore]
+fn short_inspection() {
+    let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
+    let output_dir = format!("{BENCHMARK_DIR}/benchmark_inspection/general_pattern");
+    create_directory(&output_dir);
+    let mut interfacing_swarms_general =
+        prepare_files_in_directory(input_dir);
+    interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
+    let step: usize = 120;
+
+    for (_, bi) in interfacing_swarms_general.iter().step_by(step) {
+        let swarms = &bi.interfacing_swarms;
+        match inspection_struct(swarms.clone()) {
+            DataResult::OK{data: inspection_result} => write_output(inspection_result, &output_dir),
+            DataResult::ERROR{ .. } => panic!("Something went wrong while getting inspection struct"),
+        };
+
+        println!("{}", SPECIAL_SYMBOL);
+    }
 }

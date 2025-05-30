@@ -1,5 +1,5 @@
 use composition_swarm::{proto_info_to_error_report, swarms_to_proto_info, ErrorReport};
-use composition_types::{get_branching_joining_proto_info, DataResult, Granularity, InterfacingSwarms, ProjectionInfo};
+use composition_types::{get_branching_joining_proto_info, DataResult, Granularity, InspectionStruct, InterfacingSwarms, ProjectionInfo};
 
 use super::*;
 
@@ -158,6 +158,15 @@ pub fn compose_protocols(protos: InterfacingSwarms<Role>) -> DataResult<SwarmPro
             DataResult::OK { data: composition_swarm::to_swarm_json(graph, initial) }
         }
         Err(errors) => DataResult::ERROR { errors: error_report_to_strings(errors) },
+    }
+}
+
+#[wasm_bindgen]
+pub fn inspection_struct(protos: InterfacingSwarms<Role>) -> DataResult<InspectionStruct> {
+    let result = composition_swarm::inspection_struct(protos);
+    match result {
+        Ok(inspection_result) => DataResult::OK { data: inspection_result },
+        Err(error) => DataResult::ERROR { errors: vec![error]},
     }
 }
 
