@@ -1638,9 +1638,11 @@ pub fn inspection_struct(
     let branch_sets = composition.branching_events.clone();
     let n_branches = composition
         .branching_events
-        .iter()
-        .map(|bset| bset.len())
-        .fold(0, |acc, n| acc + n);
+        .clone()
+        .into_iter()
+        .flat_map(|set| set)
+        .collect::<BTreeSet<EventType>>()
+        .len();
 
     let joining_event_types: BTreeSet<EventType> = composition
         .joining_events
