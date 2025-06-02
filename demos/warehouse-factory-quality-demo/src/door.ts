@@ -1,7 +1,7 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT} from '@actyx/machine-runner'
 import { Events, manifest, Composition, warehouse_factory_quality_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event } from './protocol'
-import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
+import { checkComposedProjection, projectionAndInformation, projectionAndInformationNew } from '@actyx/machine-check'
 
 // Using the machine runner DSL an implmentation of door in warehouse w.r.t. subs_warehouse is:
 const door = Composition.makeMachine('D')
@@ -23,11 +23,14 @@ const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehou
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Projection of warehouse || factory || quality over D
+//const projectionInfoResult = projectionAndInformationNew(warehouse_factory_quality_protocol, subs_composition, "D", door.createJSONForAnalysis(s0), 0)
 const projectionInfoResult = projectionAndInformation(warehouse_factory_quality_protocol, subs_composition, "D")
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
+//console.log(JSON.stringify(projectionInfo1, null, 2))
 
-// Adapted machine
+// Adapt machine
+//const [doorAdapted, s0_] = Composition.adaptMachineNew("D", projectionInfo, Events.allEvents, s0)
 const [doorAdapted, s0_] = Composition.adaptMachine("D", projectionInfo, Events.allEvents, s0)
 
 // Run the adapted machine
@@ -42,17 +45,13 @@ async function main() {
         console.log("State payload is:", state.payload)
       }
       console.log()
-      const s = state.cast()
-      for (var c in s.commands()) {
-          if (c === 'close') {
-            setTimeout(() => {
-                var s1 = machine.get()?.cast()?.commands() as any
-                if (Object.keys(s1 || {}).includes('close')) {
-                    s1.close()
-                }
-            }, getRandomInt(5500, 8000))
-            break
+      if (state.isLike(s0)) {
+        setTimeout(() => {
+          const stateAfterTimeOut = machine.get()
+          if (stateAfterTimeOut?.isLike(s0)) {
+            stateAfterTimeOut?.cast().commands()?.close()
           }
+        }, getRandomInt(4000, 8000))
       }
     }
     app.dispose()

@@ -1,41 +1,12 @@
-import { check_swarm, check_projection, check_wwf_swarm, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, check_composed_projection, revised_projection, project_combine, compose_protocols, project_combine_all, projection_information } from '../pkg/machine_check.js'
+import { check_swarm, check_projection, check_wwf_swarm, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, check_composed_projection,
+  revised_projection, project_combine, compose_protocols, projection_information, projection_information_new,
+  CheckResult, MachineType, SwarmProtocolType, Subscriptions, InterfacingSwarms as InterfacingSwarmsInner, CompositionComponent as CompositionComponentInner, Role, DataResult, Granularity,
+  ProjectionInfo } from '../pkg/machine_check.js'
+export { MachineType, SwarmProtocolType, Subscriptions, Role, CheckResult as Result, DataResult, Granularity, ProjectionInfo }
+export type CompositionComponent = CompositionComponentInner<Role>;
+export type InterfacingSwarms = InterfacingSwarmsInner<Role>;
 
-export type Protocol<Label> = {
-  initial: string
-  transitions: { source: string; target: string; label: Label }[]
-}
-export type SwarmLabel = {
-  cmd: string
-  logType: string[]
-  role: string
-}
-
-export type MachineLabel =
-  | { tag: 'Execute'; cmd: string; logType: string[] }
-  | { tag: 'Input'; eventType: string }
-
-export type SwarmProtocolType = Protocol<SwarmLabel>
-export type MachineType = Protocol<MachineLabel>
-
-export type Subscriptions = Record<string, string[]>
-
-export type Result = { type: 'OK' } | { type: 'ERROR'; errors: string[] }
-
-export type ResultData<Data> = { type: 'OK'; data: Data } | { type: 'ERROR'; errors: string[] }
-export type CompositionComponent = {protocol: SwarmProtocolType, interface: string | null }
-export type InterfacingSwarms = CompositionComponent[]
-export type Granularity =
-  | 'Fine'
-  | 'Medium'
-  | 'Coarse'
-  | 'TwoStep'
-export type SucceedingNonBranchingJoining = Record<string, Set<string>>;
-export type ProjectionAndSucceedingMap = {
-    projection: MachineType,
-    branches: SucceedingNonBranchingJoining,
-    specialEventTypes: Set<string>,
-}
-export function checkSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): Result {
+export function checkSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): CheckResult {
   const p = JSON.stringify(proto)
   const s = JSON.stringify(subscriptions)
   const result = check_swarm(p, s)
@@ -47,7 +18,7 @@ export function checkProjection(
   subscriptions: Subscriptions,
   role: string,
   machine: MachineType,
-): Result {
+): CheckResult {
   const sw = JSON.stringify(swarm)
   const sub = JSON.stringify(subscriptions)
   const m = JSON.stringify(machine)
@@ -55,81 +26,48 @@ export function checkProjection(
   return JSON.parse(result)
 }
 
-export function checkWWFSwarmProtocol(protos: InterfacingSwarms, subscriptions: Subscriptions): Result {
-  const p = JSON.stringify(protos)
-  const s = JSON.stringify(subscriptions)
-  const result = check_wwf_swarm(p, s)
-  return JSON.parse(result)
+export function checkWWFSwarmProtocol(protos: InterfacingSwarms, subscriptions: Subscriptions): CheckResult {
+  return check_wwf_swarm(protos, JSON.stringify(subscriptions))
 }
 
-export function exactWWFSubscriptions(protos: InterfacingSwarms, subscriptions: Subscriptions): ResultData<Subscriptions> {
-  const p = JSON.stringify(protos)
-  const s = JSON.stringify(subscriptions)
-  const result = exact_weak_well_formed_sub(p, s);
-  return JSON.parse(result)
+export function exactWWFSubscriptions(protos: InterfacingSwarms, subscriptions: Subscriptions): DataResult<Subscriptions> {
+  return exact_weak_well_formed_sub(protos, JSON.stringify(subscriptions));
 }
 
-export function overapproxWWFSubscriptions(protos: InterfacingSwarms, subscriptions: Subscriptions, granularity: Granularity): ResultData<Subscriptions> {
-  const p = JSON.stringify(protos)
-  const s = JSON.stringify(subscriptions)
-  const g = JSON.stringify(granularity)
-  const result = overapproximated_weak_well_formed_sub(p, s, g);
-  return JSON.parse(result)
+export function overapproxWWFSubscriptions(protos: InterfacingSwarms, subscriptions: Subscriptions, granularity: Granularity): DataResult<Subscriptions> {
+  return overapproximated_weak_well_formed_sub(protos, JSON.stringify(subscriptions), granularity);
 }
 
 export function checkComposedProjection(
   protos: InterfacingSwarms,
   subscriptions: Subscriptions,
-  role: string,
+  role: Role,
   machine: MachineType,
-): Result {
-  const ps = JSON.stringify(protos)
-  const sub = JSON.stringify(subscriptions)
-  const m = JSON.stringify(machine)
-  const result = check_composed_projection(ps, sub, role, m)
-  return JSON.parse(result)
+): CheckResult {
+  return check_composed_projection(protos, JSON.stringify(subscriptions), role, machine)
 }
 
 export function revisedProjection(
   proto: SwarmProtocolType,
   subscriptions: Subscriptions,
-  role: string
-): ResultData<MachineType> {
-  const p = JSON.stringify(proto)
-  const s = JSON.stringify(subscriptions)
-  const result = revised_projection(p, s, role)
-  return JSON.parse(result)
+  role: Role,
+  minimize: boolean
+): DataResult<MachineType> {
+  return revised_projection(proto, JSON.stringify(subscriptions), role, minimize)
 }
 
-export function projectCombineMachines(protos: InterfacingSwarms, subscriptions: Subscriptions, role: string): ResultData<MachineType> {
-  const ps = JSON.stringify(protos)
-  const s = JSON.stringify(subscriptions)
-  const result = project_combine(ps, s, role);
-  return JSON.parse(result)
+export function projectCombineMachines(protos: InterfacingSwarms, subscriptions: Subscriptions, role: string, minimize: boolean): DataResult<MachineType> {
+  return project_combine(protos, JSON.stringify(subscriptions), role, minimize)
 }
 
-export function composeProtocols(protos: InterfacingSwarms): ResultData<SwarmProtocolType> {
-  const ps = JSON.stringify(protos)
-  const result = compose_protocols(ps)
-  return JSON.parse(result)
+export function composeProtocols(protos: InterfacingSwarms): DataResult<SwarmProtocolType> {
+  return compose_protocols(protos)
 }
 
-export function projectAll(protos: InterfacingSwarms, subscriptions: Subscriptions): ResultData<MachineType[]> {
-  const ps = JSON.stringify(protos)
-  const s = JSON.stringify(subscriptions)
-  const result = project_combine_all(ps, s)
-  return JSON.parse(result)
+export function projectionInformation(protos: InterfacingSwarms, subscriptions: Subscriptions, role: Role, minimize: boolean): DataResult<ProjectionInfo> {
+  return projection_information(protos, JSON.stringify(subscriptions), role, minimize);
 }
 
-export function projectionAndInformation(protos: InterfacingSwarms, subscriptions: Subscriptions, role: string): ResultData<ProjectionAndSucceedingMap> {
-  const ps = JSON.stringify(protos)
-  const s = JSON.stringify(subscriptions)
-  const result = JSON.parse(projection_information(ps, s, role));
-  if (result.type === "ERROR") {
-    return result
-  } else {
-    const data = {...result.data, specialEventTypes: new Set<string>(result.data.specialEventTypes) }
-    return {type: "OK", data: data}
-  }
-
+export function projectionInformationNew(protos: InterfacingSwarms, subscriptions: Subscriptions, role: Role, machine: MachineType, k: number, minimize: boolean): DataResult<ProjectionInfo> {
+  return projection_information_new(protos, JSON.stringify(subscriptions), role, machine, k, minimize);
 }

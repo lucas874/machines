@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use wasm_bindgen::prelude::*;
+use tsify::{declare};
 
 mod machine;
 mod swarm;
@@ -7,11 +8,14 @@ pub mod types;
 pub mod composition;
 
 use petgraph::visit::GraphBase;
-use types::{CheckResult, EventType, MachineLabel, Protocol, Role, State, SwarmLabel};
+use types::{CheckResult, EventType, MachineLabel, ProtocolType, Role, State, SwarmLabel};
 
+#[declare]
 pub type Subscriptions = BTreeMap<Role, BTreeSet<EventType>>;
-pub type SwarmProtocol = Protocol<SwarmLabel>;
-pub type Machine = Protocol<MachineLabel>;
+#[declare]
+pub type SwarmProtocolType = ProtocolType<SwarmLabel>;
+#[declare]
+pub type MachineType = ProtocolType<MachineLabel>;
 
 pub type Graph = petgraph::Graph<State, SwarmLabel>;
 pub type NodeId = <petgraph::Graph<(), ()> as GraphBase>::NodeId;
@@ -19,7 +23,7 @@ pub type EdgeId = <petgraph::Graph<(), ()> as GraphBase>::EdgeId;
 
 #[wasm_bindgen]
 pub fn check_swarm(proto: String, subs: String) -> String {
-    let proto = match serde_json::from_str::<SwarmProtocol>(&proto) {
+    let proto = match serde_json::from_str::<SwarmProtocolType>(&proto) {
         Ok(p) => p,
         Err(e) => return err(vec![format!("parsing swarm protocol: {}", e)]),
     };
@@ -37,7 +41,7 @@ pub fn check_swarm(proto: String, subs: String) -> String {
 
 #[wasm_bindgen]
 pub fn check_projection(swarm: String, subs: String, role: String, machine: String) -> String {
-    let swarm = match serde_json::from_str::<SwarmProtocol>(&swarm) {
+    let swarm = match serde_json::from_str::<SwarmProtocolType>(&swarm) {
         Ok(p) => p,
         Err(e) => return err(vec![format!("parsing swarm protocol: {}", e)]),
     };
@@ -46,7 +50,7 @@ pub fn check_projection(swarm: String, subs: String, role: String, machine: Stri
         Err(e) => return err(vec![format!("parsing subscriptions: {}", e)]),
     };
     let role = Role::new(&role);
-    let machine = match serde_json::from_str::<Machine>(&machine) {
+    let machine = match serde_json::from_str::<MachineType>(&machine) {
         Ok(p) => p,
         Err(e) => return err(vec![format!("parsing machine: {}", e)]),
     };

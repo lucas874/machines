@@ -1,6 +1,6 @@
 use crate::{
     types::{Command, EventType, MachineLabel, Role, State},
-    EdgeId, Machine, NodeId, Subscriptions,
+    EdgeId, MachineType, NodeId, Subscriptions,
 };
 use itertools::Itertools;
 use petgraph::{
@@ -92,7 +92,7 @@ pub fn project(
     (machine, m_nodes[initial.index()])
 }
 
-pub fn from_json(proto: Machine) -> (Graph, Option<NodeId>, Vec<String>) {
+pub fn from_json(proto: MachineType) -> (Graph, Option<NodeId>, Vec<String>) {
     let _span = tracing::debug_span!("from_json").entered();
     let mut errors = Vec::new();
     let mut machine = Graph::new();

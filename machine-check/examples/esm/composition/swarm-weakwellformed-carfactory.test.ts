@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, checkSwarmProtocol, Subscriptions, checkWWFSwarmProtocol, ResultData, InterfacingSwarms, exactWWFSubscriptions, overapproxWWFSubscriptions} from '../../..'
+import { SwarmProtocolType, checkSwarmProtocol, Subscriptions, checkWWFSwarmProtocol, DataResult, InterfacingSwarms, exactWWFSubscriptions, overapproxWWFSubscriptions} from '../../..'
 import { Events } from './car-factory-protos.js'
 
 /*
@@ -83,9 +83,9 @@ const G3: SwarmProtocolType = {
 const G1_: InterfacingSwarms = [{protocol: G1, interface: null}]
 const G2_: InterfacingSwarms = [{protocol: G2, interface: null}]
 const G3_: InterfacingSwarms = [{protocol: G3, interface: null}]
-const exact_result_subscriptions1: ResultData<Subscriptions> = exactWWFSubscriptions(G1_, {})
-const exact_result_subscriptions2: ResultData<Subscriptions> = exactWWFSubscriptions(G2_, {})
-const exact_result_subscriptions3: ResultData<Subscriptions> = exactWWFSubscriptions(G3_, {})
+const exact_result_subscriptions1: DataResult<Subscriptions> = exactWWFSubscriptions(G1_, {})
+const exact_result_subscriptions2: DataResult<Subscriptions> = exactWWFSubscriptions(G2_, {})
+const exact_result_subscriptions3: DataResult<Subscriptions> = exactWWFSubscriptions(G3_, {})
 
 describe('extended subscriptions', () => {
   it('subscription1 should be ok', () => {
@@ -160,9 +160,9 @@ describe('checkWWFSwarmProtocol for protocols with exact wwf subscription', () =
   })
 })
 
-const overapprox_result_subscriptions1: ResultData<Subscriptions> = overapproxWWFSubscriptions(G1_, {}, "Coarse")
-const overapprox_result_subscriptions2: ResultData<Subscriptions> = overapproxWWFSubscriptions(G2_, {}, "Coarse")
-const overapprox_result_subscriptions3: ResultData<Subscriptions> = overapproxWWFSubscriptions(G3_, {}, "Coarse")
+const overapprox_result_subscriptions1: DataResult<Subscriptions> = overapproxWWFSubscriptions(G1_, {}, "Coarse")
+const overapprox_result_subscriptions2: DataResult<Subscriptions> = overapproxWWFSubscriptions(G2_, {}, "Coarse")
+const overapprox_result_subscriptions3: DataResult<Subscriptions> = overapproxWWFSubscriptions(G3_, {}, "Coarse")
 if (overapprox_result_subscriptions1.type === 'ERROR') throw new Error('error getting subscription')
 const overapprox_subscriptions1: Subscriptions = overapprox_result_subscriptions1.data
 
@@ -194,7 +194,7 @@ describe('checkWWFSwarmProtocol for protocols with overapproximated wwf subscrip
 
 
 const Gcomposed: InterfacingSwarms = [{protocol: G1, interface: null}, {protocol: G2, interface: 'T'}, {protocol: G3, interface: 'F'}]
-const overapprox_result_subscriptions_composed: ResultData<Subscriptions> = overapproxWWFSubscriptions(Gcomposed, {}, "Fine")
+const overapprox_result_subscriptions_composed: DataResult<Subscriptions> = overapproxWWFSubscriptions(Gcomposed, {}, "Fine")
 if (overapprox_result_subscriptions_composed.type === 'ERROR') throw new Error('error getting subscription')
 const overapprox_subscriptions_composed: Subscriptions = overapprox_result_subscriptions_composed.data
 

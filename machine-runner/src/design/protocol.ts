@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Tag, Tags } from '@actyx/sdk'
-import { StateMechanism, MachineProtocol, ReactionMap, StateFactory } from './state.js'
-import { MachineEvent } from './event.js'
+import { ActyxEvent, Tag, Tags } from '@actyx/sdk'
+import { StateMechanism, MachineProtocol, ReactionMap, StateFactory, CommandDefinerMap, ReactionHandler } from './state.js'
+import { Contained, MachineEvent } from './event.js'
+import { Subscriptions, InterfacingSwarms, projectionInformation, ProjectionInfo, projectionInformationNew } from '@actyx/machine-check'
+import chalk = require('chalk');
+import * as readline from 'readline';
 
 /**
  * SwarmProtocol is the entry point of designing a swarm of MachineRunners. A
@@ -22,12 +25,21 @@ export type SwarmProtocol<
     machineName: MachineName,
   ) => Machine<SwarmProtocolName, MachineName, MachineEventFactories>
   tagWithEntityId: (id: string) => Tags<MachineEvents>
-  adaptMachine: <MachineName extends string>(
+  adaptMachine: <
+    MachineName extends string,
+    StateName extends string,
+    StatePayload,
+    Commands extends CommandDefinerMap<any, any, Contained.ContainedEvent<MachineEvent.Any>[]>,
+  >(
     machineName: MachineName,
-    proj: ProjMachine.ProjectionAndSucceedingMap,
-    events: readonly MachineEvent.Factory<any, any>[],
-    mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>
-  ) => [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any]
+    role: MachineName,
+    protocols: InterfacingSwarms,
+    subscriptions: Subscriptions,
+    k: number,
+    mType: ProjectionType,
+    mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
+    verbose?: boolean
+  ) => MachineResult<[AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>, StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>]>
 }
 
 /**
@@ -74,7 +86,13 @@ export namespace SwarmProtocol {
     return {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
-      adaptMachine: (machineName, proj, events, mOldInitial) => ProjMachine.adaptMachine(ImplMachine.make(swarmName, machineName, eventFactories), proj, events, mOldInitial),
+      adaptMachine: (machineName, role, protocols, subscriptions, k, mType, mOldInitial, verbose?) => {
+        const projectionInfo = projectionInformationNew(protocols, subscriptions, role, mType, k, true)
+        if (projectionInfo.type == 'ERROR') {
+          return {data: undefined, ... projectionInfo}
+        }
+        return MachineAdaptation.adaptMachine(ImplMachine.makeAdapted(swarmName, machineName, eventFactories, projectionInfo.data), eventFactories, mOldInitial, verbose)
+      }
     }
   }
 }
@@ -132,6 +150,14 @@ export type Machine<
     initial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
   ) => MachineAnalysisResource
 }>
+
+export interface AdaptedMachine<
+  SwarmProtocolName extends string,
+  MachineName extends string,
+  MachineEventFactories extends MachineEvent.Factory.Any
+> extends Machine<SwarmProtocolName, MachineName, MachineEventFactories>{
+  readonly projectionInfo: ProjectionInfo
+}
 
 type DesignStateIntermediate<
   SwarmProtocolName extends string,
@@ -250,17 +276,98 @@ namespace ImplMachine {
       createJSONForAnalysis,
     }
   }
+
+  /**
+   * Create a machine protocol with a specific name, event factories,
+   * a function mapping event types to sets of events types
+   * and set of 'special event types' used for branch tracking.
+   * @param machineName - name of the machine protocol.
+   * @param registeredEventFactories - tuple of MachineEventFactories.
+   * @see MachineEvent.design to get started on creating MachineEventFactories
+   * for the registeredEventFactories parameter.
+   * @example
+   * const hangarBay = Machine.make("hangarBay")
+   */
+    export const makeAdapted = <
+    SwarmProtocolName extends string,
+    MachineName extends string,
+    MachineEventFactories extends MachineEvent.Factory.Any,
+  >(
+    swarmName: SwarmProtocolName,
+    machineName: MachineName,
+    registeredEventFactories: MachineEventFactories[],
+    projectionInfo: ProjectionInfo
+  ): AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories> => {
+    type Self = Machine<SwarmProtocolName, MachineName, MachineEventFactories>
+    type Protocol = MachineProtocol<SwarmProtocolName, MachineName, MachineEventFactories>
+
+    const protocol: Protocol = {
+      swarmName: swarmName,
+      name: machineName,
+      registeredEvents: registeredEventFactories,
+      reactionMap: ReactionMap.make(),
+      commands: [],
+      states: {
+        registeredNames: new Set(),
+        allFactories: new Set(),
+      },
+    }
+
+    const markStateNameAsUsed = (stateName: string) => {
+      if (stateName.includes(MachineAnalysisResource.SyntheticDelimiter)) {
+        throw new Error(
+          `Name should not contain character '${MachineAnalysisResource.SyntheticDelimiter}'`,
+        )
+      }
+
+      if (protocol.states.registeredNames.has(stateName)) {
+        throw new Error(`State "${stateName}" already registered within this protocol`)
+      }
+      protocol.states.registeredNames.add(stateName)
+    }
+
+    const designState: Self['designState'] = (stateName) => {
+      markStateNameAsUsed(stateName)
+      return {
+        withPayload: () => StateMechanism.make(protocol, stateName),
+      }
+    }
+
+    const designEmpty: Self['designEmpty'] = (stateName) => {
+      markStateNameAsUsed(stateName)
+      return StateMechanism.make(protocol, stateName)
+    }
+
+    const createJSONForAnalysis: Self['createJSONForAnalysis'] = (initial) =>
+      MachineAnalysisResource.fromMachineInternals(protocol, initial)
+
+    return {
+      swarmName,
+      machineName,
+      designState,
+      designEmpty,
+      createJSONForAnalysis,
+      projectionInfo
+    }
+  }
 }
 
-export type MachineAnalysisResource = {
+export type ProjectionType = {
   initial: string
-  subscriptions: string[]
   transitions: {
     source: string
     target: string
     label: { tag: 'Execute'; cmd: string; logType: string[] } | { tag: 'Input'; eventType: string }
   }[]
 }
+
+export interface MachineAnalysisResource extends ProjectionType {
+  subscriptions: string[]
+}
+
+export type MachineResult<T> = { type: 'OK'; data: T } | { type: 'ERROR'; errors: string[]; data: undefined }
+
+//export type ProjectionInfo = { projection: ProjectionType, branches: Record<string, Set<string>>, specialEventTypes: Set<string> }
 
 export namespace MachineAnalysisResource {
   export const SyntheticDelimiter = '§' as const
@@ -359,206 +466,243 @@ export namespace MachineAnalysisResource {
   }
 }
 
-export namespace ProjMachine {
-  type Transition = {
-    source: string
-    target: string
-    label: { tag: 'Execute'; cmd: string; logType: string[] } | { tag: 'Input'; eventType: string }
+export namespace MachineAdaptation {
+  // f is the
+  // reaction. should be the same for each base case since any intermediate states are due to
+  // concurrency and subscribing to event types from other protocols.
+
+  type ReactionLabel = {
+    source: string;
+    target: string;
+    label: {
+      tag: "Input";
+      eventType: string;
+    };
   }
 
-  export type funMap = {
-    commands: Map<string, (...args: any[]) => any>,
-    reactions: Map<string, (...args: any[]) => any>
-  }
-
-  export type ProjectionType = {
-    initial: string;
-    transitions: {
+  type CommandLabel = {
       source: string;
       target: string;
       label: {
         tag: "Execute";
         cmd: string;
         logType: string[];
-      } | {
-        tag: "Input";
-        eventType: string;
       };
-    }[];
   }
 
-  // all the incoming edges of some state. including self loops
-  function incomingEdgesOfStatesMap(proj: ProjectionType): Map<string, Transition[]> {
-    const m: Map<string, Transition[]> = new Map()
-    proj.transitions.forEach((transition) => {
-      if (!m.has(transition.target)) {
-        m.set(transition.target, [structuredClone(transition)])
-      } else {
-        m.get(transition.target)!.push(structuredClone(transition))
-      }
+  const printEvent = (e: any) => {
+    const {lbj, ...toPrint} = e.payload
+    console.log(chalk.bgBlack.blue`    ${e.payload.type}? ⬅ ${JSON.stringify(toPrint, null, 0)}`)
+  }
+  const printState = (machineName: string, stateName: string, statePayload: any) => {
+    console.log(chalk.bgBlack.white.bold`${machineName} - State: ${stateName}. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
+  }
+  const commandEnabledStrings = (labels: CommandLabel[] | undefined): string[] => labels ? labels.map(l => l.label.logType[0]) : []
+  const printEnabledCmds = (labels: string[]) => {
+    labels.forEach((transition) => {
+      console.log(chalk.bgBlack.red.dim`    ${transition}!`);
     })
-    if (!m.has(proj.initial)) {
-      m.set(proj.initial, [])
-    }
-
-    return m
+  }
+  const printInfoOnTransition = (machineName: string, e: any, stateName: string, statePayload: any, labels: CommandLabel[] | undefined) => {
+    printEvent(e);
+    printState(machineName, stateName, statePayload);
+    printEnabledCmds(commandEnabledStrings(labels));
   }
 
-  // States with same payload types as s and a function whose return type is this payload type
-  // starting from some state move backwards in projection until we reach a state with a command
-  // enabled or the initial state. If we reach a state with a reaction generating non void payload
-  // add this state and all states between this state and s to the returned set of strings. f is the
-  // reaction. should be the same for each base case since any intermediate states are due to
-  // concurrency and subscribing to event types from other protocols.
-  function payloadStates(
-    s: string,
-    initial: string,
-    incomingEdgesMap: Map<string, Transition[]>,
-    projStatesToStatePayload: Map<string, (...args: any[]) => any>
-  ): [Set<string>, ((...args: any[]) => any) | undefined] {
-    function inner(
-      s: string,
-      initial: string,
-      incomingEdgesMap: Map<string, Transition[]>,
-      projStatesToStatePayload: Map<string, (...args: any[]) => any>,
-      visited: Set<string>
-    ): [Set<string>, Set<((...args: any[]) => any)>] {
-      if (projStatesToStatePayload.has(s)) {
-        return [new Set([s]), new Set([projStatesToStatePayload.get(s)!])]
-      } else if (s === initial) {
-        return [new Set(), new Set()]
-      }
+  const printEventEmission = (label: string, payload: string) => {
+    readline.moveCursor(process.stdout, 0, -2);
+    readline.clearScreenDown(process.stdout);
+    console.log(chalk.bgBlack.green.bold`    ${label} ➡ ${payload}`);
+  }
 
-      const states: Set<string> = new Set()
-      const fs: Set<((...args: any[]) => any)> = new Set()
-      for (var t of incomingEdgesMap.get(s)!) {
-        if (!visited.has(t.source)) {
-          visited.add(t.source)
-          const [preStates, preFs] = inner(t.source, initial, incomingEdgesMap, projStatesToStatePayload, visited)
-          if (preStates.size != 0) {
-            preStates.forEach(states.add, states)
-            states.add(s)
-            preFs.forEach(fs.add, fs)
-          }
+  const verboseCommandDef = (label: CommandLabel, commandDef: any) => {
+    const verboseCommandDef = (...args: any[]) => {
+      const payload = commandDef(...args);
+      printEventEmission(`${label.label.logType[0]}!`, `${JSON.stringify(payload[0], null, 0)}`)
+      return payload;
+    }
+    return verboseCommandDef
+  }
+
+  const verboseReaction = <Context>(
+    reactionHandler: ReactionHandler<ActyxEvent<MachineEvent.Any>[], Context, unknown>,
+    machineName: string,
+    targetState: string,
+    cmdsEnabledAtTarget: CommandLabel[],
+  ): ReactionHandler<ActyxEvent<MachineEvent.Any>[], Context, unknown> => {
+    return (ctx: Context, event: ActyxEvent<MachineEvent.Any>) => {
+      const statePayload = reactionHandler(ctx, event);
+      printInfoOnTransition(machineName, event, targetState, statePayload, cmdsEnabledAtTarget);
+      return statePayload
+    }
+  }
+
+  type ProjectionStateInfo = {
+    projStateName: string,
+    originalMStateName: string,
+    reactionLabels: ReactionLabel[],
+    commandLabels: CommandLabel[]
+  }
+
+  // Information about projection states, such as their labels incoming and outgoing and what state in some machine they may correspond to
+  const projStateInfo = <
+    SwarmProtocolName extends string,
+    MachineName extends string,
+    MachineEventFactories extends MachineEvent.Factory.Any,
+  >(
+    m: AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>
+  ): Map<string, ProjectionStateInfo> => {
+    const projStateInfoMap: Map<string, ProjectionStateInfo> = new Map()
+
+    for (let t of m.projectionInfo.projection.transitions) {
+        const sourceOriginalName = m.projectionInfo.projToMachineStates[t.source][0]
+        const targetOriginalName = m.projectionInfo.projToMachineStates[t.target][0]
+
+        if (!projStateInfoMap.has(t.source)) {
+          projStateInfoMap.set(t.source, {projStateName: t.source, originalMStateName: sourceOriginalName, reactionLabels: [], commandLabels: []})
         }
-
-      }
-
-      return [states, fs]
+        if (!projStateInfoMap.has(t.target)) {
+          projStateInfoMap.set(t.target, {projStateName: t.target, originalMStateName: targetOriginalName, reactionLabels: [], commandLabels: []})
+        }
+        if (t.label.tag === 'Execute') {
+          projStateInfoMap.get(t.source)?.commandLabels.push(t as CommandLabel)
+        } else if (t.label.tag === 'Input') {
+          projStateInfoMap.get(t.source)?.reactionLabels.push(t as ReactionLabel)
+        }
     }
-
-    const [states, fs] = inner(s, initial, incomingEdgesMap, projStatesToStatePayload, new Set())
-
-    return [states, fs[Symbol.iterator]().next().value]
+    return projStateInfoMap
   }
 
-  export type SucceedingNonBranchingJoining = Record<string, Set<string>>;
-  export type ProjectionAndSucceedingMap = {
-    projection: ProjectionType,
-    branches: SucceedingNonBranchingJoining,
-    specialEventTypes: Set<string>,
+  // We assume single event type commands. map command names to event types as strings
+  const cmdNameToEventType = <
+    SwarmProtocolName extends string,
+    MachineName extends string,
+    MachineEventFactories extends MachineEvent.Factory.Any,
+  >(
+    m: AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>
+  ): Map<string, string> => {
+    const cmdToEventTypeString: Map<string, string> = new Map()
+    for (let t of m.projectionInfo.projection.transitions) {
+        if (t.label.tag === 'Execute' && !cmdToEventTypeString.has(t.label.cmd)) {
+          cmdToEventTypeString.set(t.label.cmd, t.label.logType[0])
+        }
+    }
+    return cmdToEventTypeString
+  }
+
+  // Map state names in a machine to a map from event type strings to reaction handler code
+  const mStateToReactions = <
+    SwarmProtocolName extends string,
+    MachineName extends string,
+    MachineEventFactories extends MachineEvent.Factory.Any,
+  >(
+    mState: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
+  ): Map<string, Map<string, any>> => {
+    const mStateToReactionsMap: Map<string, Map<string, any>> = new Map()
+    mState.mechanism.protocol.reactionMap.getAll().forEach((reactionMapPerMechanism: any, stateMechanism: any) => {
+      const mStateName = stateMechanism.name;
+      if (!mStateToReactionsMap.has(mStateName)) {
+        mStateToReactionsMap.set(mStateName, new Map())
+      }
+      reactionMapPerMechanism.forEach((eventTypeEntry: any, eventType: any) => {
+        mStateToReactionsMap.get(mStateName)?.set(eventType, eventTypeEntry.handler)
+      });
+    });
+
+    return mStateToReactionsMap
+  }
+
+  // Map state names in a machine to a map from command names to event type and command code
+  const mStateToCommands = <
+    SwarmProtocolName extends string,
+    MachineName extends string,
+    MachineEventFactories extends MachineEvent.Factory.Any,
+  >(
+    mState: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
+    cmdToEventTypeString: Map<string, string>
+  ): Map<string, Map<string, [string, any]>> => {
+    const mStateToCommandsMap: Map<string, Map<string, [string, any]>> = new Map()
+    for (const factory of mState.mechanism.protocol.states.allFactories) {
+      const mStateName = factory.mechanism.name;
+      for (let [cmd, cmdDef] of Object.entries(factory.mechanism.commandDefinitions)) {
+        let eventTypeString = cmdToEventTypeString.get(cmd)!
+        if (!mStateToCommandsMap.has(mStateName)) {
+          mStateToCommandsMap.set(mStateName, new Map())
+        }
+        mStateToCommandsMap.get(mStateName)?.set(cmd, [eventTypeString, cmdDef])
+      };
+    }
+
+    return mStateToCommandsMap
   }
 
   export const adaptMachine = <
     SwarmProtocolName extends string,
     MachineName extends string,
     MachineEventFactories extends MachineEvent.Factory.Any,
+    StateName extends string,
+    StatePayload,
+    Commands extends CommandDefinerMap<any, any, Contained.ContainedEvent<MachineEvent.Any>[]>,
   >(
-    mNew: Machine<SwarmProtocolName, MachineName, MachineEventFactories>,
-    projectionInfo: ProjectionAndSucceedingMap,
-    events: readonly MachineEvent.Factory<any, Record<never, never>>[],
+    mNew: AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>,
+    events: readonly MachineEventFactories[],
     mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
-  ): [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, any] => {
-    var projStatesToStates: Map<string, any> = new Map()
-    var projStatesToExec: Map<string, Transition[]> = new Map()
-    var projStatesToInput: Map<string, Transition[]> = new Map()
+    verbose?: boolean,
+  ): MachineResult<[AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>, StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>]> => {
+    // information about projection states, such as their labels incoming and outgoing and what state in old machine they may correspond to
+    const projStateInfoMap: Map<string, ProjectionStateInfo> = projStateInfo(mNew)
+
+    // map projection states to states in machine under constructions
+    const projStateToMachineState: Map<string, StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>> = new Map()
+
+    // we assume single event type commands. map command names to event types as strings
+    const cmdToEventTypeString: Map<string, string> = cmdNameToEventType(mNew)
+
+    // map state names in old machine to a map from command names to event type and command code
+    const mOldStateToCommands: Map<string, Map<string, [string, any]>> = mStateToCommands(mOldInitial, cmdToEventTypeString)
+
+    // map state names in old machine to a map from event type strings to reaction handler code
+    const mOldStateToReactions: Map<string, Map<string, any>> = mStateToReactions(mOldInitial)
+
     // map event type string to Event
-    const eventTypeStringToEvent: Map<string, MachineEvent.Factory<any, Record<never, never>>> =
-      new Map<string, MachineEvent.Factory<any, Record<never, never>>>(events.map(e => [e.type, e]))
-    var projStatesToStatePayload: Map<string, (...args: any[]) => any> = new Map()
-    const proj = projectionInfo.projection
-    var incomingMap = incomingEdgesOfStatesMap(proj)
-    var markedStates: Set<string> = new Set()
-    var fMap2: funMap = { commands: new Map(), reactions: new Map() }
-    var allProjStates: Set<string> = new Set()
+    const eventTypeStringToEvent: Map<string, MachineEventFactories> =
+      new Map<string, MachineEventFactories>(events.map(e => [e.type, e]))
 
-    mOldInitial.mechanism.protocol.reactionMap.getAll().forEach((reactionMapPerMechanism: any, stateMechanism: any) => {
-      reactionMapPerMechanism.forEach((eventTypeEntry: any, eventType: any) => {
-        fMap2.reactions.set(eventType, eventTypeEntry.handler)
-      });
-    });
-    for (const factory of mOldInitial.mechanism.protocol.states.allFactories) {
-      for (let [cmd, cmdDef] of Object.entries(factory.mechanism.commandDefinitions)) {
-        fMap2.commands.set(cmd, cmdDef)
-      };
-    }
-    proj.transitions.forEach((transition) => {
-      if (transition.label.tag === 'Execute') {
-        if (!projStatesToExec.has(transition.source)) {
-          projStatesToExec.set(transition.source, new Array())
-        }
-        projStatesToExec.get(transition.source)?.push(transition)
-
-      } else if (transition.label.tag === 'Input') {
-        if (!projStatesToInput.has(transition.source)) {
-          projStatesToInput.set(transition.source, new Array())
-        }
-        projStatesToInput.get(transition.source)?.push(transition)
-
-        // add target to projStatesToInput as well. in case no outgoing transitions.
-        if (!projStatesToInput.has(transition.target)) {
-          projStatesToInput.set(transition.target, new Array())
+    // add all states and self loops to machine
+    projStateInfoMap.forEach((value: ProjectionStateInfo, key: string) => {
+      if (value.commandLabels.length > 0) {
+        let cmdTriples = new Array()
+        for (const cLabel of value.commandLabels) {
+          let cmdName = cLabel.label.cmd
+          let eventTypes = cLabel.label.logType.map((et: string) => eventTypeStringToEvent.get(et))
+          const commandDef = verbose ? verboseCommandDef(cLabel, mOldStateToCommands.get(value.originalMStateName)?.get(cmdName)![1]) : mOldStateToCommands.get(value.originalMStateName)?.get(cmdName)![1]
+          cmdTriples.push([cmdName, eventTypes, commandDef])
         }
 
-        var e = transition.label.eventType
-        if (fMap2.reactions.has(e)) {
-          projStatesToStatePayload.set(transition.target, fMap2.reactions.get(e)!)
-        }
+        const newState = mNew.designState(value.projStateName).withPayload<any>().commandFromList(cmdTriples).finish() as StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>
+        projStateToMachineState.set(value.projStateName, newState)
+      } else {
+        const newState = mNew.designState(value.projStateName).withPayload<any>().finish() as StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>
+        projStateToMachineState.set(value.projStateName, newState)
       }
-      allProjStates.add(transition.source)
-      allProjStates.add(transition.target)
+    });
+
+    // add reactions
+    projStateInfoMap.forEach((value: ProjectionStateInfo, key: string) => {
+      for (const rLabel of value.reactionLabels) {
+        const eventType = rLabel.label.eventType
+        const event = eventTypeStringToEvent.get(eventType)!
+
+        const reactionHandler = mOldStateToReactions.get(value.originalMStateName)?.has(rLabel.label.eventType)
+          ? (verbose ? verboseReaction(mOldStateToReactions.get(value.originalMStateName)!.get(rLabel.label.eventType), mNew.machineName, rLabel.target, projStateInfoMap.get(rLabel.target)!.commandLabels) : mOldStateToReactions.get(value.originalMStateName)!.get(rLabel.label.eventType))
+          : (verbose ? verboseReaction((ctx: any, e: any) => { return projStateToMachineState.get(rLabel.target)!.make(ctx.self) }, mNew.machineName, rLabel.target, projStateInfoMap.get(rLabel.target)!.commandLabels) : (ctx: any, e: any) => { return projStateToMachineState.get(rLabel.target)!.make(ctx.self) })
+
+        const targetState = projStateToMachineState.get(rLabel.target)! as StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, string, unknown, any>
+        projStateToMachineState.get(rLabel.source)!.react([event], targetState, reactionHandler)
+      }
     })
 
-    const transitionToTriple = (transition: Transition) => {
-      return transition.label.tag === 'Execute' ? [transition.label.cmd, transition.label.logType.map((et: string) => eventTypeStringToEvent.get(et)), fMap2.commands.get(transition.label.cmd)!] : []
-    }
-
-    // add all states from projection as states to machine
-    // give them all payload type 'any'. Seems unsafe
-    // but the way it was done previously was more complicated, while not being safer.
-    for (var projState of allProjStates) {
-      // commands from this state
-      var cmdTriples: any[] = projStatesToExec.has(projState) ?
-        projStatesToExec.get(projState)!.map(transitionToTriple).filter(triple => triple.length === 3) : []
-
-      // get states to which we have to add a reaction propagating state payload
-      const [statesWithSamePayloadType, _] = payloadStates(projState, proj.initial, incomingMap, projStatesToStatePayload)
-      for (var samePayloadTypeState of statesWithSamePayloadType) {
-        markedStates.add(samePayloadTypeState)
-      }
-      // works because non-zero numbers are truthy. design all states as carrying payload.
-      if (cmdTriples.length) {
-        projStatesToStates.set(projState, mNew.designState(projState).withPayload<any>().commandFromList(cmdTriples).finish())
-      } else {
-        projStatesToStates.set(projState, mNew.designState(projState).withPayload<any>().finish())
-      }
-    }
-    for (var transition of proj.transitions) {
-      if (transition.label.tag === 'Input') {
-        const eventType = transition.label.eventType
-        const event = eventTypeStringToEvent.get(eventType)!
-        // a reaction like (s, e) => s3.make() does not create s3, it just creates the state payload. So calling it should be fine?
-        var f =
-          fMap2.reactions.has(eventType)
-            ? fMap2.reactions.get(eventType)!
-            : (markedStates.has(transition.target)
-              ? (s: any, _: any) => { return projStatesToStates.get(transition.target).make(s.self) } // propagate state payload
-              : (_: any[]) => projStatesToStates.get(transition.target).make({}))
-        projStatesToStates.get(transition.source).react([event], projStatesToStates.get(transition.target), f)
-      }
-    }
-
-    var initial = projStatesToStates.get(proj.initial)
-    return [mNew, initial]
+    const initial = projStateToMachineState.get(mNew.projectionInfo.projection.initial)!
+    return { type: 'OK', data: [mNew, initial] }
   }
 }

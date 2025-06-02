@@ -1,11 +1,13 @@
 use intern_arc::{global::hash_interner, InternedHash};
 use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, fmt, ops::Deref};
+use tsify::Tsify;
 
 macro_rules! decl_str {
     ($n:ident) => {
-        #[derive(Clone, PartialEq, PartialOrd, Ord, Eq, Hash, Deserialize)]
+        #[derive(Tsify, Clone, PartialEq, PartialOrd, Ord, Eq, Hash, Deserialize)]
         #[serde(from = "&str")]
+        #[tsify(from_wasm_abi)]
         pub struct $n(InternedHash<str>);
 
         impl<'a> From<&'a str> for $n {
@@ -62,28 +64,32 @@ decl_str!(Role);
 decl_str!(Command);
 decl_str!(EventType);
 
-#[derive(Serialize)]
+#[derive(Tsify, Serialize)]
 #[serde(tag = "type")]
+#[tsify(into_wasm_abi)]
 pub enum CheckResult {
     OK,
     ERROR { errors: Vec<String> },
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Protocol<L> {
+#[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct ProtocolType<L> {
     pub initial: State,
     pub transitions: Vec<Transition<L>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct Transition<L> {
     pub label: L,
     pub source: State,
     pub target: State,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(rename_all = "camelCase")]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct SwarmLabel {
     pub cmd: Command,
     pub log_type: Vec<EventType>,
@@ -98,8 +104,9 @@ impl fmt::Display for SwarmLabel {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(tag = "tag")]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum MachineLabel {
     #[serde(rename_all = "camelCase")]
     Execute {

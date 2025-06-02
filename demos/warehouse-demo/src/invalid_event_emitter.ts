@@ -6,7 +6,7 @@ async function main() {
     const tags = Composition.tagWithEntityId('warehouse')
     while(true) {
         await new Promise(f => setTimeout(f, 5000));
-        await app.publish(tags.apply(Events.closingTime.makeBT({timeOfDay: new Date().toLocaleString()}, "invalidPointer")))
+        await app.publish(tags.apply(Events.time.makeBT({timeOfDay: new Date().toLocaleString()}, "invalidPointer")))
         console.log('Publishing time event with invalid lbj pointer')
     }
     app.dispose()

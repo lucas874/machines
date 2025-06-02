@@ -22,17 +22,17 @@ fn full_run_bench_sub_sizes_general() {
         prepare_files_in_directory(input_dir);
     interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
-    let two_step_granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
+    let two_step_granularity = Granularity::TwoStep;
 
     for (_, bi) in interfacing_swarms_general.iter() {
-        let swarms = serde_json::to_string(&bi.interfacing_swarms).unwrap();
-        let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), two_step_granularity.clone())).unwrap() {
+        let swarms = &bi.interfacing_swarms;
+        let subscriptions = match overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), two_step_granularity.clone()) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
-        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), two_step_granularity.replace("\"", ""), &output_dir);
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), serde_json::to_string(&two_step_granularity).unwrap().replace("\"", ""), &output_dir);
 
-        let subscriptions = match serde_json::from_str(&exact_weak_well_formed_sub(swarms.clone(), subs.clone())).unwrap() {
+        let subscriptions = match exact_weak_well_formed_sub(swarms.clone(), subs.clone()) {
             DataResult::OK{data: subscriptions} => {
                 Some(subscriptions) },
             DataResult::ERROR{ .. } => None,
@@ -52,18 +52,18 @@ fn short_run_bench_sub_sizes_general() {
         prepare_files_in_directory(input_dir);
     interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
-    let two_step_granularity = serde_json::to_string(&Granularity::TwoStep).unwrap();
+    let two_step_granularity = Granularity::TwoStep;
     let step: usize = 120;
 
     for (_, bi) in interfacing_swarms_general.iter().step_by(step) {
-        let swarms = serde_json::to_string(&bi.interfacing_swarms).unwrap();
-        let subscriptions = match serde_json::from_str(&overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), two_step_granularity.clone())).unwrap() {
+        let swarms = &bi.interfacing_swarms;
+        let subscriptions = match overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), two_step_granularity.clone()) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
-        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), two_step_granularity.replace("\"", ""), &output_dir);
+        wrap_and_write_sub_out(&bi, subscriptions.unwrap(), serde_json::to_string(&two_step_granularity).unwrap().replace("\"", ""), &output_dir);
 
-        let subscriptions = match serde_json::from_str(&exact_weak_well_formed_sub(swarms.clone(), subs.clone())).unwrap() {
+        let subscriptions = match exact_weak_well_formed_sub(swarms.clone(), subs.clone()) {
             DataResult::OK{data: subscriptions} => {
                 Some(subscriptions) },
             DataResult::ERROR{ .. } => None,

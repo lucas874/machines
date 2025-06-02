@@ -39,11 +39,12 @@ import {
   makeEmitter,
   ActiveRunnerRegistryRegisterSymbol,
 } from './runner-utils.js'
-import { Machine, SwarmProtocol } from '../design/protocol.js'
+import { Machine, SwarmProtocol, AdaptedMachine } from '../design/protocol.js'
 import { deepEqual } from 'fast-equals'
 import { deepCopy } from '../utils/object-utils.js'
 import * as globals from '../globals.js'
 import { MachineRunnerFailure } from '../errors.js'
+import { ProjectionInfo } from '@actyx/machine-check'
 
 /**
  * Contains and manages the state of a machine by subscribing and publishing
@@ -295,8 +296,7 @@ export const createMachineRunnerBT = <
     any
   >,
   initialPayload: any,
-  succeedingNonBranchingJoining: Record<string, Set<string>>,
-  specialEvents: Set<string>
+  adaptedMachine: AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>
 ): MachineRunner<SwarmProtocolName, MachineName, StateUnion> => {
   const subscribeMonotonicQuery = {
     query: tags,
@@ -309,7 +309,7 @@ export const createMachineRunnerBT = <
   const subscribe: SubscribeFn<MachineEvents> = (callback, onCompleteOrErr) =>
     sdk.subscribeMonotonic<MachineEvents>(subscribeMonotonicQuery, callback, onCompleteOrErr)
 
-  return createMachineRunnerInternalBT(subscribe, persist, tags, initialFactory, initialPayload, succeedingNonBranchingJoining, specialEvents)
+  return createMachineRunnerInternalBT(subscribe, persist, tags, initialFactory, initialPayload, adaptedMachine.projectionInfo.branches, new Set(adaptedMachine.projectionInfo.specialEventTypes))
 }
 export const createMachineRunnerInternal = <
   SwarmProtocolName extends string,
@@ -691,7 +691,7 @@ export const createMachineRunnerInternalBT = <
     any
   >,
   initialPayload: Payload,
-  succeedingNonBranchingJoining: Record<string, Set<string>>,
+  succeedingNonBranchingJoining: Record<string, string[]>,
   specialEvents: Set<string>,
 ): MachineRunner<SwarmProtocolName, MachineName, StateUnion> => {
   type ThisStateOpaque = StateOpaque<SwarmProtocolName, MachineName, string, StateUnion>
@@ -1464,6 +1464,25 @@ export interface StateOpaque<
   cast(): State<StateName, Payload, Commands>
 
   /**
+   * Return true when all commands enabled in the factory are enabled in the StateOpaque. (and they have the same payload type? possible).
+   *
+   * @param factory - A StateFactory used to compare with the StateOpaque.
+   */
+  isLike<F extends StateFactory<SwarmProtocolName, any, any, any, any, any>>(
+    factory: F
+  ): this is StateOpaque.Of<F>
+
+  /**
+   * True if factory has a command named cmd
+   *
+   * @param cmd - The name of a command to look up in the StateOpaque.
+   */ //extends StateFactory<SwarmProtocolName, any, any, any, any, any>
+  /* hasCommand(//<F extends StateFactory<SwarmProtocolName, any, any, any, any, any>> (
+    cmd: string,
+    //factory: F
+  ): this is StateOpaque.Of<StateFactory.Any> */
+
+  /**
    * Return true when the commands of its state counterpart is available; otherwise return false.
    */
   commandsAvailable(): boolean
@@ -1591,12 +1610,19 @@ export namespace ImplStateOpaque {
         stateAtSnapshot,
       })
 
+    const isLike: ThisStateOpaque['isLike'] = (factory) => {
+      return Object.keys(factory.mechanism.commands).every((cmdName) => cmdName in factoryAtSnapshot.mechanism.commands) &&
+        Object.keys(factory.mechanism.commandDefinitions).every((cmdName) => cmdName in factoryAtSnapshot.mechanism.commandDefinitions) //&&
+          //factoryAtSnapshot.mechanism.commandDefinitions[cmdName as keyof typeof factoryAtSnapshot.mechanism.commandDefinitions]?.toString() === factory.mechanism.commandDefinitions[cmdName as keyof typeof factory.mechanism.commandDefinitions]?.toString())
+    }
+
     return {
       is,
       as,
       cast,
       payload: stateAtSnapshot.payload,
       type: stateAtSnapshot.type,
+      isLike,
       commandsAvailable: () =>
         commandEnabledAtSnapshot && CommandGeneratorCriteria.allOk(commandGeneratorCriteria),
       [InternalAccess]: () => ({ data: stateAtSnapshot, factory: factoryAtSnapshot }),

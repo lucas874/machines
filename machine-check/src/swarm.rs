@@ -1,6 +1,6 @@
 use crate::{
     types::{EventType, Role, State, StateName, SwarmLabel},
-    EdgeId, MapVec, NodeId, Subscriptions, SwarmProtocol,
+    EdgeId, MapVec, NodeId, Subscriptions, SwarmProtocolType,
 };
 use bitvec::{bitvec, vec::BitVec};
 use itertools::Itertools;
@@ -167,7 +167,7 @@ impl Variance {
 type Graph = petgraph::Graph<Node, SwarmLabel>;
 
 pub fn check(
-    proto: SwarmProtocol,
+    proto: SwarmProtocolType,
     subs: &Subscriptions,
 ) -> (super::Graph, Option<NodeId>, Vec<Error>) {
     let (graph, initial, mut errors) = match prepare_graph(proto, &subs) {
@@ -265,7 +265,7 @@ fn well_formed(graph: &Graph, initial: NodeId, subs: &Subscriptions) -> Vec<Erro
 }
 
 pub fn from_json(
-    proto: SwarmProtocol,
+    proto: SwarmProtocolType,
     subs: &Subscriptions,
 ) -> (super::Graph, Option<NodeId>, Vec<String>) {
     let (g, i, e) = prepare_graph(proto, subs);
@@ -295,7 +295,7 @@ impl Neighbors {
 }
 
 fn prepare_graph(
-    proto: SwarmProtocol,
+    proto: SwarmProtocolType,
     subs: &Subscriptions,
 ) -> (Graph, Option<NodeId>, Vec<Error>) {
     let mut errors = Vec::new();
@@ -481,7 +481,7 @@ mod tests {
     fn ev(e: &str) -> EventType {
         EventType::new(e)
     }
-    fn prep_graph(proto: SwarmProtocol, subs: &Subscriptions) -> (super::Graph, NodeId) {
+    fn prep_graph(proto: SwarmProtocolType, subs: &Subscriptions) -> (super::Graph, NodeId) {
         let (graph, initial, e) = prepare_graph(proto, &subs);
         assert_eq!(e.len(), 0);
         (graph, initial.unwrap())
@@ -493,7 +493,7 @@ mod tests {
         // (S0) --(C0@R1<R1>)--> (S1) --(C5@R6<R6>)--> (S4)
         // (S1) --(C1@R2<R2>)--> (S2) --(C2@R3<R3>)--> (S1)  [the first loop above S1]
         // (S2) --(C3@R4<R4>)--> (S3) --(C4@R5<R5>)--> (S2)  [the second loop atop the first]
-        let proto = serde_json::from_str::<SwarmProtocol>(
+        let proto = serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "S0",
                 "transitions": [
@@ -634,7 +634,7 @@ mod tests {
     fn basics() {
         setup_logger();
         // (S0) --(a@R1<A,B,C>)--> (S1) --(b@R2<D,E>)--> (S2)
-        let proto = serde_json::from_str::<SwarmProtocol>(
+        let proto = serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "S0",
                 "transitions": [
@@ -666,7 +666,7 @@ mod tests {
     #[test]
     fn deterministic() {
         setup_logger();
-        let proto = serde_json::from_str::<SwarmProtocol>(
+        let proto = serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "S0",
                 "transitions": [
@@ -704,7 +704,7 @@ mod tests {
     #[test]
     fn empty_log() {
         setup_logger();
-        let proto = serde_json::from_str::<SwarmProtocol>(
+        let proto = serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "S0",
                 "transitions": [
@@ -726,7 +726,7 @@ mod tests {
     #[test]
     fn disconnected_initial() {
         setup_logger();
-        let proto = serde_json::from_str::<SwarmProtocol>(
+        let proto = serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "S5",
                 "transitions": [

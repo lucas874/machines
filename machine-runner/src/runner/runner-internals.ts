@@ -363,16 +363,15 @@ export type RunnerInternalsBT<
 export namespace RunnerInternalsBT {
   export type Any = RunnerInternalsBT<any, any, any, any, any, any>
   export type BranchTracker = {
-    jbLast: Map<string, string>
-    specialEventTypes: Set<string>
-    branches: Record<string, Set<string>>
-
+    readonly jbLast: Map<string, string>
+    readonly specialEventTypes: Set<string>
+    readonly branches: Record<string, string[]>
   }
   // if event is branching or joining update jbLast accordingly otherwise return old
   const updateJBLast = (branchTracker: BranchTracker, event: ActyxEvent<MachineEvent.Any>): BranchTracker => {
     if (branchTracker.specialEventTypes.has(event.payload.type)) {
       const branchFromT = branchTracker.branches[event.payload.type]
-      var jbLastUpdated = structuredClone(branchTracker.jbLast)
+      const jbLastUpdated = structuredClone(branchTracker.jbLast)
       for (var et of branchFromT) {
         jbLastUpdated.set(et, event.meta.eventId)
       }
@@ -400,7 +399,7 @@ export namespace RunnerInternalsBT {
     >,
     payload: StatePayload,
     specialEventTypes: Set<string>,
-    branches: Record<string, Set<string>>,
+    branches: Record<string, string[]>,
     commandCallback: CommandCallback<MachineEventFactories>,
   ) => {
     const initial: StateAndFactory<
@@ -464,12 +463,8 @@ export namespace RunnerInternalsBT {
     const matchingReaction = reactions.get(firstEvent.payload.type)
 
     if (!matchingReaction) return { shouldQueue: false }
-    //console.log("in shouldEventBeEnqueued newEvent is: ", newEvent)
-    //console.log("in shouldEventBeEnqueued event type and event lbj: ", newEvent.payload.type, newEvent.payload.lbj)
-    //console.log("in shouldEventBeEnqueued state lbj: ", branchTracker.jbLast)
     if (newEvent.payload.lbj != branchTracker.jbLast.get(newEvent.payload.type) ) { console.log("event not enqueued\n"); return { shouldQueue: false } }
-    //console.log("event enqueued")
-    //console.log()
+
     // Asserted as non-nullish because it is impossible for `queue`'s length to
     // exceeed `matchingReaction.eventChainTrigger`'s length
     //

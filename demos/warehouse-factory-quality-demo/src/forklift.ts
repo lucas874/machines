@@ -1,13 +1,13 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, warehouse_factory_quality_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event } from './protocol'
-import { checkComposedProjection, projectionAndInformation } from '@actyx/machine-check'
+import { checkComposedProjection, projectionAndInformation, projectionAndInformationNew } from '@actyx/machine-check'
 
 // Using the machine runner DSL an implmentation of forklift in the warehouse protocol w.r.t. subs_warehouse is:
 const forklift = Composition.makeMachine('FL')
 export const s0 = forklift.designEmpty('s0') .finish()
 export const s1 = forklift.designState('s1').withPayload<{id: string}>()
-  .command('get', [Events.pos], (state: any, _: any) => {
+  .command('get', [Events.pos], (state: any) => {
     console.log("retrieved a", state.self.id, "at position x");
     return [Events.pos.make({position: "x", part: state.self.id})]})
   .finish()
@@ -27,8 +27,10 @@ if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join
 
 // Projection of warehouse || factory || quality over FL
 const projectionInfoResult = projectionAndInformation(warehouse_factory_quality_protocol, subs_composition, "FL")
+//const projectionInfoResult = projectionAndInformationNew(warehouse_factory_quality_protocol, subs_composition, "FL", forklift.createJSONForAnalysis(s0), 0)
 if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
 const projectionInfo = projectionInfoResult.data
+//console.log(JSON.stringify(projectionInfo1, null, 2))
 
 // Adapted machine
 const [forkliftAdapted, s0_] = Composition.adaptMachine("FL", projectionInfo, Events.allEvents, s0)
@@ -45,17 +47,14 @@ async function main() {
         console.log("State payload is:", state.payload)
       }
       console.log()
-      const s = state.cast()
-      for (var c in s.commands()) {
-          if (c === 'get') {
-            setTimeout(() => {
-              var s1 = machine.get()?.cast()?.commands() as any
-              if (Object.keys(s1 || {}).includes('get')) {
-                s1.get()
-              }
-            }, 1500)
-            break
+
+      if(state.isLike(s1)) {
+        setTimeout(() => {
+          const stateAfterTimeOut = machine.get()
+          if (stateAfterTimeOut?.isLike(s1)) {
+            stateAfterTimeOut?.cast().commands()?.get()
           }
+        }, getRandomInt(4000, 8000))
       }
     }
     app.dispose()

@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, Subscriptions, checkWWFSwarmProtocol, ResultData, InterfacingSwarms, exactWWFSubscriptions} from '../../..'
+import { SwarmProtocolType, Subscriptions, checkWWFSwarmProtocol, DataResult, InterfacingSwarms, exactWWFSubscriptions} from '../../..'
 import { Events } from './car-factory-protos.js'
 
 /*
@@ -101,8 +101,8 @@ const G1_: InterfacingSwarms = [{protocol: G1, interface: null}]
 const G2_: InterfacingSwarms = [{protocol: G2, interface: null}]
 const G3_: InterfacingSwarms = [{protocol: G3, interface: null}]
 
-const result_subscriptions2: ResultData<Subscriptions> = exactWWFSubscriptions(G2_, {})
-const result_subscriptions3: ResultData<Subscriptions> = exactWWFSubscriptions(G3_, {})
+const result_subscriptions2: DataResult<Subscriptions> = exactWWFSubscriptions(G2_, {})
+const result_subscriptions3: DataResult<Subscriptions> = exactWWFSubscriptions(G3_, {})
 
 describe('check confusion-ful protocols G2 and G3', () => {
   it('result should not be ok', () => {

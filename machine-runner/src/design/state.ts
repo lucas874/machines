@@ -241,7 +241,7 @@ export type StateMechanism<
   // come back to this remove any! come back to all uses of any regarding commandDefinitions
   readonly commandDefinitions:  Map<string, CommandDefiner<
     CommandContext<StatePayload, MachineEvent.Factory.Reduce<any>> | CommandContextBT<StatePayload, MachineEvent.Factory.Reduce<any>>,
-    any,
+    unknown[],
     MachineEvent.Factory.MapToPayloadOrContainedPayload<any>>>
 
   /**
@@ -273,7 +273,7 @@ export namespace StateMechanism {
     props?: {
       commands?: Commands
       commandDataForAnalytics: { commandName: string; events: string[] }[]
-      commandDefinitions?: any
+      commandDefinitions?: Map<string, any>
     },
   ): StateMechanism<
     SwarmProtocolName,
@@ -293,7 +293,7 @@ export namespace StateMechanism {
     >
 
     const commands: Self['commands'] = props?.commands || ({} as Commands)
-    const commandDefinitions: Self['commandDefinitions'] = props?.commandDefinitions || {}
+    const commandDefinitions: Self['commandDefinitions'] = props?.commandDefinitions || ({} as Map<any, any>)
 
     const command: Self['command'] = (name, factories, commandDefinition) => {
       // TODO: make this more sturdy
@@ -357,13 +357,13 @@ export namespace StateMechanism {
 
     const commandFromList: Self['commandFromList'] = (cmds) => {
       var acc: any;
-      var acc1 = new Array();
+      const mechanisms = new Array();
 
-      for (var cmd of cmds) {
-        acc = command(cmd[0], cmd[1], cmd[2])
-        acc1.push(acc.commands)
+      for (var [name, events, handler] of cmds) {
+        acc = command(name, events, handler)
+        mechanisms.push(acc.commands)
       }
-      let allcmds = acc1.reduce((acc, obj) => ({ ...acc, ...obj }), {});
+      let allcmds = mechanisms.reduce((acc, obj) => ({ ...acc, ...obj }), {});
       acc.commands = allcmds
 
       return acc;
