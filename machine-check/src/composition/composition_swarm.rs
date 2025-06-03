@@ -115,6 +115,7 @@ impl<'a, N: StateName> fmt::Display for Edge<'a, N> {
     }
 }
 
+// Container for errors accumulated while processing protocols
 #[derive(Debug)]
 pub struct ErrorReport(pub Vec<(petgraph::Graph<State, SwarmLabel>, Vec<Error>)>);
 
@@ -128,7 +129,7 @@ impl ErrorReport {
     }
 }
 
-// same as swarm::check, but for the new well-formedness conditions
+// Well-formedness check
 pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions) -> ErrorReport {
     let _span = tracing::info_span!("check").entered();
     let combined_proto_info = swarms_to_proto_info(protos, &subs);
@@ -136,17 +137,16 @@ pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptio
         return proto_info_to_error_report(combined_proto_info);
     }
 
-    // if we reach this point the protocols can interface and are all confusion free
-    // we construct a ProtoInfo with the composition as the only protocol and all the
+    // If we reach this point the protocols can interface and are all confusion free.
+    // We construct a ProtoInfo with the composition as the only protocol and all the
     // information about branches etc. from combined_proto_info
     let composition = explicit_composition_proto_info(combined_proto_info);
-
     let composition_checked = weak_well_formed_proto_info(composition, subs);
 
     proto_info_to_error_report(composition_checked)
 }
 
-// construct wwf subscription by constructing the composition of all protocols in protos and inspecting the result
+// Construct a wf-subscription by constructing the composition of all protocols in protos and analyzing the result
 pub fn exact_weak_well_formed_sub<T: SwarmInterface>(
     protos: InterfacingSwarms<T>,
     subs: &Subscriptions,
@@ -157,8 +157,8 @@ pub fn exact_weak_well_formed_sub<T: SwarmInterface>(
         return Err(proto_info_to_error_report(combined_proto_info));
     }
 
-    // if we reach this point the protocols can interface and are all confusion free
-    // we construct a ProtoInfo with the composition as the only protocol and all the
+    // If we reach this point the protocols can interface and are all confusion free.
+    // We construct a ProtoInfo with the composition as the only protocol and all the
     // information about branches etc. from combined_proto_info
     let composition = explicit_composition_proto_info(combined_proto_info);
     let sub = exact_wwf_sub(composition, 0, subs);
@@ -166,9 +166,8 @@ pub fn exact_weak_well_formed_sub<T: SwarmInterface>(
     Ok(sub)
 }
 
-// construct wwf sub by adding all branching events, joining events, events immediately preceding joins to
-// the subsription of each role. For each role also add the events emitted by the role to its sub and any
-// events immediately preceding these.
+// Construct wf-subscription compositionally.
+// Overapproximates the subscription one would obtain from exact_weak_well_formed_sub().
 pub fn overapprox_weak_well_formed_sub<T: SwarmInterface>(
     protos: InterfacingSwarms<T>,
     subs: &Subscriptions,
@@ -180,15 +179,16 @@ pub fn overapprox_weak_well_formed_sub<T: SwarmInterface>(
         return Err(proto_info_to_error_report(combined_proto_info));
     }
 
-    // if we reach this point the protocols can interface and are all confusion free
-    // we construct a ProtoInfo with the composition as the only protocol and all the
+    // If we reach this point the protocols can interface and are all confusion free.
+    // We construct a ProtoInfo with the composition as the only protocol and all the
     // information about branches etc. from combined_proto_info
     let sub = overapprox_wwf_sub(&mut combined_proto_info.clone(), subs, granularity);
     Ok(sub)
 }
 
-// set up combined proto info, one containing all protocols, all branching events, joining events etc.
-// then add any errors arising from confusion freeness to the proto info and return it
+// Construct a ProtoInfo containing all protocols, all branching events, joining events etc.
+// Then add any errors arising from confusion freeness to the proto info and return it.
+// Does not compute transitive closure of combined succeeding_events, simply takes union of component succeeding_events fields.
 pub fn swarms_to_proto_info<T: SwarmInterface>(
     protos: InterfacingSwarms<T>,
     subs: &Subscriptions,
@@ -198,6 +198,7 @@ pub fn swarms_to_proto_info<T: SwarmInterface>(
     confusion_free_proto_info(combined_proto_info, &subs)
 }
 
+// Construct a graph that is the 'expanded' composition of protos.
 pub fn compose_protocols<T: SwarmInterface>(
     protos: InterfacingSwarms<T>,
 ) -> Result<(Graph, NodeId), ErrorReport> {
@@ -213,7 +214,8 @@ pub fn compose_protocols<T: SwarmInterface>(
     Ok((p.graph, p.initial.unwrap()))
 }
 
-// perform wwf check on every protocol in a ProtoInfo
+// Perform wf checks on every protocol in a ProtoInfo.
+// Does not check confusion-freeness.
 fn weak_well_formed_proto_info(proto_info: ProtoInfo, subs: &Subscriptions) -> ProtoInfo {
     let _span = tracing::info_span!("weak_well_formed_proto_info").entered();
     let protocols: Vec<_> = proto_info
@@ -233,7 +235,7 @@ fn weak_well_formed_proto_info(proto_info: ProtoInfo, subs: &Subscriptions) -> P
     }
 }
 
-// perform confusion freeness check on every protocol in a ProtoInfo
+// Perform confusion freeness check on every protocol in a ProtoInfo.
 fn confusion_free_proto_info(proto_info: ProtoInfo, subs: &Subscriptions) -> ProtoInfo {
     let _span = tracing::info_span!("confusion_free_proto_info").entered();
     let protocols: Vec<_> = proto_info
@@ -254,11 +256,12 @@ fn confusion_free_proto_info(proto_info: ProtoInfo, subs: &Subscriptions) -> Pro
 }
 
 /*
+ * Check well-formedness of protocol at index proto_pointer in proto_info w.r.t. subs.
  * A graph that was constructed with prepare_graph with no errors will have one event type per command.
  * Similarly, such a graph will be weakly confusion free, which means we do not have to check for
  * command and log determinism like we do in swarm::well_formed.
  *
- * Does not check confusion freeness
+ * Does not check confusion freeness.
  */
 fn weak_well_formed(
     proto_info: &ProtoInfo,
@@ -285,29 +288,23 @@ fn weak_well_formed(
         None => return vec![Error::InvalidArg],
     };
 
-    // inital statements of loop copied from swarm::well_formed
-    // comment from there:
-    // "visit all reachable nodes of the graph to check their prescribed conditions; order doesn’t matter"
+    // Visit all transitions in protocol and perform causal consistency and determinacy checks.
     for node in Dfs::new(&graph, initial).iter(&graph) {
         for edge in graph.edges_directed(node, Outgoing) {
             let event_type = edge.weight().get_event_type();
 
-            // weak causal consistency
-            // corresponds to condition 1
-            // check if role subscribes to own emitted event.
+            // Causal consistency
+            // Check if role subscribes to own emitted event.
             if !sub(&edge.weight().role).contains(&event_type) {
                 errors.push(Error::SwarmError(
                     crate::swarm::Error::ActiveRoleNotSubscribed(edge.id()),
                 ));
             }
 
-            // weak causal consistency
-            // corresponds to condition 2
-            // subscribe to event immediately preceding
-            // unlike well-formed we do not need to check that later involved roles
-            // subscribes to fewer event in log than active -- only one event pr. log
-            // active transitions not conc gets the transitions going out of edge.target()
-            // and filters out the ones emitting events concurrent with event type of 'edge'
+            // Causal consistency
+            // Check if role subscribes to all events immediately preceding this command.
+            // Active transitions_not_conc gets the transitions going out of edge.target()
+            // and filters out the ones emitting events concurrent with event type of 'edge'.
             for successor in active_transitions_not_conc(
                 edge.target(),
                 &graph,
@@ -324,17 +321,19 @@ fn weak_well_formed(
                 }
             }
 
+            // Roles subscribing to event types emitted later in the protocol.
             let involved_roles = roles_on_path(event_type.clone(), &proto_info, subs);
-            // weak determinacy.
-            // corresponds to branching rule of weak determinacy.
+
+            // Determinacy.
+            // Corresponds to branching rule of weak determinacy.
             if proto_info
                 .branching_events
                 .iter()
                 .any(|branch_set| branch_set.contains(&event_type))
             {
-                // if event is branching get all branching event related to 'original' branch
-                // we could have multiple branching events from different protocols at node
-                // these are concurrent, we only worry about the original branches for this event_type
+                // If event is branching get all branching events related to 'original' branch.
+                // We could have multiple branching events from different protocols at node.
+                // These would be concurrent, we only worry about the original event types branching together with event_type.
                 let branching_with_this_event = proto_info
                     .branching_events
                     .iter()
@@ -346,13 +345,16 @@ fn weak_well_formed(
                     .map(|e| e.weight().get_event_type())
                     .filter(|e| branching_with_this_event.contains(e))
                     .collect();
-                // if only one event labeled as branching at this node, do not count it as an error if not subbed.
-                // could happen due to concurrency and loss of behavior.
+
+                // If only one event labeled as branching at this node, do not count it as an error if not subbed.
+                // Could happen due loss of behavior.
                 let branches = if branching_this_node.len() > 1 {
                     branching_this_node
                 } else {
                     BTreeSet::new()
                 };
+
+                // Find all, if any, roles that subscribe to event types emitted later in the protocol that do not subscribe to branches and accumulate errors.
                 let involved_not_subbed = involved_roles
                     .iter()
                     .filter(|r| !branches.is_subset(&sub(&r)));
@@ -373,8 +375,11 @@ fn weak_well_formed(
                 errors.append(&mut branching_errors);
             }
 
-            // corresponds to joining rule of weak determinacy.
+            // Determinacy.
+            // Corresponds to joining rule of weak determinacy.
             if proto_info.joining_events.contains(&event_type) {
+
+                // Find pairs of concurrent event types that are both emitted immediately before event_type (i.e. not concurrent with event_type).
                 let incoming_pairs_concurrent: Vec<UnordEventPair> =
                     event_pairs_from_node(node, &graph, Incoming)
                         .into_iter()
@@ -387,10 +392,14 @@ fn weak_well_formed(
                             })
                         })
                         .collect();
+
+                // Flatten events identified above and add event type. If no pairs join_set will be empty. Event type chained multiple times, but ok.
                 let join_set: BTreeSet<EventType> = incoming_pairs_concurrent
                     .into_iter()
                     .flat_map(|pair| pair.into_iter().chain([event_type.clone()]))
                     .collect();
+
+                // Find all, if any, roles that subscribe to event types emitted later in the protocol that do not subscribe to joins and prejoins and accumulate errors.
                 let involved_not_subbed = involved_roles
                     .iter()
                     .filter(|r| !join_set.is_subset(sub(r)));
@@ -415,6 +424,7 @@ fn weak_well_formed(
     errors
 }
 
+// Check confusion-freeness of protocol at index proto_pointer in proto_info.
 fn confusion_free(
     proto_info: &ProtoInfo,
     proto_pointer: usize,
@@ -959,6 +969,7 @@ fn two_step_overapprox_wwf_sub(
     subscription.clone()
 }
 
+// TODO: remove this. Update branching event type def.
 fn intra_concurrency(proto: &ProtoStruct) -> BTreeSet<UnordEventPair> {
     let _span = tracing::info_span!("intra_concurrency").entered();
     let mut conc = BTreeSet::new();
