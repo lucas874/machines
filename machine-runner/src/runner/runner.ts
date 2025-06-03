@@ -819,7 +819,7 @@ export const createMachineRunnerInternalBT = <
         try {
           if (d.type === MsgType.timetravel) {
             emitter.emit('log', 'Time travel')
-            RunnerInternals.reset(internals)
+            RunnerInternalsBT.reset(internals)
             emitter.emit('audit.reset')
 
             restartActyxSubscription()

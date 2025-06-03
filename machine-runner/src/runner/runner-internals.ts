@@ -367,6 +367,11 @@ export namespace RunnerInternalsBT {
     readonly specialEventTypes: Set<string>
     readonly branches: Record<string, string[]>
   }
+
+  const initBranchTracker = (eventTypes: string[], specialEventTypes: Set<string>, branches: Record<string, string[]>): BranchTracker => {
+    return { jbLast: new Map<string, string>(eventTypes.map(e => [e, 'null'])), specialEventTypes: specialEventTypes, branches: branches }
+  }
+
   // if event is branching or joining update jbLast accordingly otherwise return old
   const updateJBLast = (branchTracker: BranchTracker, event: ActyxEvent<MachineEvent.Any>): BranchTracker => {
     if (branchTracker.specialEventTypes.has(event.payload.type)) {
@@ -439,7 +444,7 @@ export namespace RunnerInternalsBT {
       commandLock: null,
       previouslyEmittedToNext: null,
       failure: null,
-      branchTracker: {jbLast: new Map<string, string>(factory.mechanism.protocol.registeredEvents.map(e => [e.type, 'null'])), specialEventTypes: specialEventTypes, branches: branches}
+      branchTracker: initBranchTracker(factory.mechanism.protocol.registeredEvents.map(e => e.type), specialEventTypes, branches)
     }
 
     return internals
@@ -499,6 +504,7 @@ export namespace RunnerInternalsBT {
     internals.caughtUp = false
     internals.caughtUpFirstTime = false
     internals.commandLock = null
+    internals.branchTracker = initBranchTracker(Array.from(internals.branchTracker.jbLast.keys()), internals.branchTracker.specialEventTypes, internals.branchTracker.branches)
   }
 
   export const pushEvent = <StatePayload>(
