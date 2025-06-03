@@ -909,7 +909,7 @@ export const createMachineRunnerInternalBT = <
         }
       },
       (err) => {
-        RunnerInternals.reset(internals)
+        RunnerInternalsBT.reset(internals)
         emitter.emit('audit.reset')
         emitter.emit('change', ImplStateOpaque.make(internals, internals.current))
 
