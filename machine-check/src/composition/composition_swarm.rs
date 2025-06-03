@@ -7,6 +7,7 @@ use super::{
     Graph,
 };
 use crate::composition::composition_types::ProtoLabel;
+use crate::types::Command;
 use crate::{
     types::{EventType, Role, State, StateName, SwarmLabel, Transition},
     EdgeId, NodeId, Subscriptions, SwarmProtocolType,
@@ -35,7 +36,8 @@ pub enum Error {
     RoleNotSubscribedToBranch(Vec<EventType>, EdgeId, NodeId, Role),
     RoleNotSubscribedToJoin(Vec<EventType>, EdgeId, Role),
     MoreThanOneEventTypeInCommand(EdgeId),
-    EventEmittedByDifferentCommands(EventType, EdgeId, EdgeId),
+    EventEmittedMultipleTimes(EventType, Vec<EdgeId>),
+    CommandOnMultipleTransitions(Command, Vec<EdgeId>),
     StateCanNotReachTerminal(NodeId),
     InvalidArg, // weird error. not related to shape of protocol, but ok.
 }
@@ -72,11 +74,18 @@ impl Error {
                     Edge(graph, *edge)
                 )
             }
-            Error::EventEmittedByDifferentCommands(event_type, edge1, edge2) => {
+            Error::EventEmittedMultipleTimes(event_type, edges) => {
+                let edges_pretty = edges.iter().map(|edge| Edge(graph, *edge)).join(", ");
                 format!(
-                    "event type {event_type} emitted by command in transition {} and command in transition {}",
-                    Edge(graph, *edge1),
-                    Edge(graph, *edge2)
+                    "event type {event_type} emitted in more than one transition: {}",
+                    edges_pretty
+                )
+            }
+            Error::CommandOnMultipleTransitions(command, edges) => {
+                let edges_pretty = edges.iter().map(|edge| Edge(graph, *edge)).join(", ");
+                format!(
+                    "command {command} enabled in more than one transition: {}",
+                    edges_pretty
                 )
             }
             Error::StateCanNotReachTerminal(node) => {
@@ -424,15 +433,15 @@ fn weak_well_formed(
     errors
 }
 
-// Check confusion-freeness of protocol at index proto_pointer in proto_info.
+// Check confusion-freeness of a concurrency-free protocol at index proto_pointer in proto_info.
 fn confusion_free(
     proto_info: &ProtoInfo,
     proto_pointer: usize,
     subs: &Subscriptions,
 ) -> Vec<Error> {
     let _span = tracing::info_span!("confusion_free").entered();
-    let mut event_to_command_map = BTreeMap::new();
-    let (graph, initial, _) = match proto_info.get_ith_proto(proto_pointer) {
+    //let mut event_to_command_map = BTreeMap::new();
+    let (graph, _, _) = match proto_info.get_ith_proto(proto_pointer) {
         Some(ProtoStruct {
             graph: g,
             initial: Some(i),
@@ -447,30 +456,33 @@ fn confusion_free(
         }) => return e,
         None => return vec![Error::InvalidArg],
     };
-    // make old confusion freeness check. requires us to call swarm::prepare_graph through swarm::from_json
-    // corresponds to rule 3 of concurrency freeness in Composing Swarm Protocols
-    let (graph, initial, mut errors) =
-        match crate::swarm::from_json(to_swarm_json(graph, initial), subs) {
-            (g, Some(i), e) => (
-                g,
-                i,
-                e.into_iter()
-                    .map(|s| Error::SwarmErrorString(s))
-                    .collect::<Vec<Error>>(),
-            ),
-            (_, None, e) => {
-                return e.into_iter().map(|s| Error::SwarmErrorString(s)).collect();
-            }
-        };
 
-    let mut walk = Dfs::new(&graph, initial);
+    // Check that each event type is only emitted in one transition.
+    // Create a map from event types to vec of edge id
+    // Create a map from commands to vec of edge id
+    let mut event_types: BTreeMap<EventType, Vec<EdgeId>> = BTreeMap::new();
+    let mut commands: BTreeMap<Command, Vec<EdgeId>> = BTreeMap::new();
+    let mut errors = vec![];
 
-    // add to set of branching and joining
-    // check for weak confusion freeness. confusion freeness does not depend on subscription.
-    // nice to whether graph is weakly confusion freeness before for instance generating wwf-subscription.
-    // for each node we pass three times over its outgoing edges... awkward find better way.
+
+    for edge in graph.edge_references() {
+        let weight = edge.weight();
+        event_types.entry(weight.get_event_type()).and_modify(|triples| triples.push(edge.id())).or_insert_with(|| vec![edge.id()]);
+        commands.entry(weight.cmd.clone()).and_modify(|triples| triples.push(edge.id())).or_insert_with(|| vec![edge.id()]);
+    }
+
+    for (event_type, edge_indices) in event_types.iter() {
+        if edge_indices.len() > 1 {
+            errors.push(Error::EventEmittedMultipleTimes(event_type.clone(), edge_indices.clone()));
+        }
+    }
+    for (command, edge_indices) in commands.iter() {
+        if edge_indices.len() > 1 {
+            errors.push(Error::CommandOnMultipleTransitions(command.clone(), edge_indices.clone()));
+        }
+    }
+    /* let mut walk = Dfs::new(&graph, initial);
     while let Some(node_id) = walk.next(&graph) {
-        // weak confusion freeness checks
         let mut target_map: BTreeMap<SwarmLabel, NodeId> = BTreeMap::new();
         for e in graph.edges_directed(node_id, Outgoing) {
             // rule 1 check. Event types only associated with one command role pair.
@@ -500,7 +512,7 @@ fn confusion_free(
 
         // weak confusion free rule 4 check.
         errors.append(&mut node_can_reach_zero(&graph, node_id));
-    }
+    } */
 
     errors
 }
@@ -1673,8 +1685,8 @@ mod tests {
             r#"{
                 "initial": "0",
                 "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "observe", "logType": ["report1"], "role": "QCR" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "observe", "logType": ["report2"], "role": "QCR" } },
+                    { "source": "0", "target": "1", "label": { "cmd": "observe1", "logType": ["report1"], "role": "QCR" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "observe2", "logType": ["report2"], "role": "QCR" } },
                     { "source": "2", "target": "3", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
                     { "source": "3", "target": "4", "label": { "cmd": "assess", "logType": ["report3"], "role": "QCR" } }
                 ]
@@ -2350,7 +2362,7 @@ mod tests {
         assert_eq!(errors, expected_errors);
     }
 
-    // pos event type associated with multiple commands and nondeterminism at 0, no terminal state can be reached from any state
+    // pos event type associated with multiple commands and nondeterminism at 0
     #[test]
     fn test_prepare_graph_confusionful() {
         setup_logger();
@@ -2367,7 +2379,7 @@ mod tests {
         .concat()
         .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
 
-        let mut expected_errors = vec![
+        /* let mut expected_errors = vec![
                 "non-deterministic event guard type partID in state 0",
                 "non-deterministic command request for role T in state 0",
                 "guard event type pos appears in transitions from multiple states",
@@ -2375,8 +2387,12 @@ mod tests {
                 "state 0 can not reach terminal node",
                 "state 1 can not reach terminal node",
                 "state 2 can not reach terminal node",
+            ]; */
+        let mut expected_errors = vec![
+                "command request enabled in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0), (2)--[request@T<pos>]-->(0)",
+                "event type partID emitted in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0)",
+                "event type pos emitted in more than one transition: (1)--[get@FL<pos>]-->(2), (2)--[request@T<pos>]-->(0)",
             ];
-
         errors.sort();
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
