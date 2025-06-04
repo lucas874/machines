@@ -141,7 +141,7 @@ impl ErrorReport {
 // Well-formedness check
 pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions) -> ErrorReport {
     let _span = tracing::info_span!("check").entered();
-    let combined_proto_info = swarms_to_proto_info(protos, &subs);
+    let combined_proto_info = swarms_to_proto_info(protos);
     if !combined_proto_info.no_errors() {
         return proto_info_to_error_report(combined_proto_info);
     }
@@ -161,7 +161,7 @@ pub fn exact_weak_well_formed_sub<T: SwarmInterface>(
     subs: &Subscriptions,
 ) -> Result<Subscriptions, ErrorReport> {
     let _span = tracing::info_span!("exact_weak_well_formed_sub").entered();
-    let combined_proto_info = swarms_to_proto_info(protos, &BTreeMap::new());
+    let combined_proto_info = swarms_to_proto_info(protos);
     if !combined_proto_info.no_errors() {
         return Err(proto_info_to_error_report(combined_proto_info));
     }
@@ -183,7 +183,7 @@ pub fn overapprox_weak_well_formed_sub<T: SwarmInterface>(
     granularity: Granularity,
 ) -> Result<Subscriptions, ErrorReport> {
     let _span = tracing::info_span!("overapprox_weak_well_formed_sub").entered();
-    let combined_proto_info = swarms_to_proto_info(protos, &BTreeMap::new());
+    let combined_proto_info = swarms_to_proto_info(protos);
     if !combined_proto_info.no_errors() {
         return Err(proto_info_to_error_report(combined_proto_info));
     }
@@ -200,11 +200,10 @@ pub fn overapprox_weak_well_formed_sub<T: SwarmInterface>(
 // Does not compute transitive closure of combined succeeding_events, simply takes union of component succeeding_events fields.
 pub fn swarms_to_proto_info<T: SwarmInterface>(
     protos: InterfacingSwarms<T>,
-    subs: &Subscriptions,
 ) -> ProtoInfo {
     let _span = tracing::info_span!("swarms_to_proto_info").entered();
     let combined_proto_info = combine_proto_infos_fold(prepare_proto_infos::<T>(protos));
-    confusion_free_proto_info(combined_proto_info, &subs)
+    confusion_free_proto_info(combined_proto_info)
 }
 
 // Construct a graph that is the 'expanded' composition of protos.
@@ -212,7 +211,7 @@ pub fn compose_protocols<T: SwarmInterface>(
     protos: InterfacingSwarms<T>,
 ) -> Result<(Graph, NodeId), ErrorReport> {
     let _span = tracing::info_span!("compose_protocols").entered();
-    let combined_proto_info = swarms_to_proto_info(protos, &BTreeMap::new());
+    let combined_proto_info = swarms_to_proto_info(protos);
     if !combined_proto_info.no_errors() {
         return Err(proto_info_to_error_report(combined_proto_info));
     }
@@ -245,7 +244,7 @@ fn weak_well_formed_proto_info(proto_info: ProtoInfo, subs: &Subscriptions) -> P
 }
 
 // Perform confusion freeness check on every protocol in a ProtoInfo.
-fn confusion_free_proto_info(proto_info: ProtoInfo, subs: &Subscriptions) -> ProtoInfo {
+fn confusion_free_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
     let _span = tracing::info_span!("confusion_free_proto_info").entered();
     let protocols: Vec<_> = proto_info
         .protocols
@@ -253,7 +252,7 @@ fn confusion_free_proto_info(proto_info: ProtoInfo, subs: &Subscriptions) -> Pro
         .into_iter()
         .enumerate()
         .map(|(i, p)| {
-            let errors = vec![p.errors, confusion_free(&proto_info, i, subs)].concat();
+            let errors = vec![p.errors, confusion_free(&proto_info, i)].concat();
             ProtoStruct { errors, ..p }
         })
         .collect();
@@ -437,10 +436,8 @@ fn weak_well_formed(
 fn confusion_free(
     proto_info: &ProtoInfo,
     proto_pointer: usize,
-    subs: &Subscriptions,
 ) -> Vec<Error> {
     let _span = tracing::info_span!("confusion_free").entered();
-    //let mut event_to_command_map = BTreeMap::new();
     let (graph, _, _) = match proto_info.get_ith_proto(proto_pointer) {
         Some(ProtoStruct {
             graph: g,
@@ -481,38 +478,6 @@ fn confusion_free(
             errors.push(Error::CommandOnMultipleTransitions(command.clone(), edge_indices.clone()));
         }
     }
-    /* let mut walk = Dfs::new(&graph, initial);
-    while let Some(node_id) = walk.next(&graph) {
-        let mut target_map: BTreeMap<SwarmLabel, NodeId> = BTreeMap::new();
-        for e in graph.edges_directed(node_id, Outgoing) {
-            // rule 1 check. Event types only associated with one command role pair.
-            let (role, command, e_id) = event_to_command_map
-                .entry(e.weight().get_event_type())
-                .or_insert((e.weight().role.clone(), e.weight().cmd.clone(), e.id()));
-            if (role.clone(), command.clone()) != (e.weight().role.clone(), e.weight().cmd.clone())
-            {
-                errors.push(Error::EventEmittedByDifferentCommands(
-                    e.weight().get_event_type(),
-                    *e_id,
-                    e.id(),
-                ));
-            }
-
-            // rule 2 check. Determinism.
-            let dst = target_map.entry(e.weight().clone()).or_insert(e.target());
-            if *dst != e.target() {
-                errors.push(Error::SwarmError(
-                    crate::swarm::Error::NonDeterministicGuard(e.id()),
-                ));
-                errors.push(Error::SwarmError(
-                    crate::swarm::Error::NonDeterministicCommand(e.id()),
-                ));
-            }
-        }
-
-        // weak confusion free rule 4 check.
-        errors.append(&mut node_can_reach_zero(&graph, node_id));
-    } */
 
     errors
 }
@@ -1409,15 +1374,6 @@ fn all_nodes_reachable(graph: &Graph, initial: NodeId) -> Vec<Error> {
         .filter(|node| !visited.contains(node))
         .map(|node| Error::SwarmError(crate::swarm::Error::StateUnreachable(node)))
         .collect()
-}
-
-fn node_can_reach_zero<N, E>(graph: &petgraph::Graph<N, E>, node: NodeId) -> Vec<Error> {
-    for n in Dfs::new(&graph, node).iter(&graph) {
-        if graph.edges_directed(n, Outgoing).count() == 0 {
-            return vec![];
-        }
-    }
-    vec![Error::StateCanNotReachTerminal(node)]
 }
 
 // all pairs of incoming/outgoing events from a node
@@ -2331,7 +2287,7 @@ mod tests {
             interface: None,
         }); //get_malformed_proto2(), None);
         let errors = vec![
-            confusion_free(&proto_info, 0, &BTreeMap::new()),
+            confusion_free(&proto_info, 0),
             proto_info.get_ith_proto(0).unwrap().errors,
         ]
         .concat()
@@ -2373,7 +2329,7 @@ mod tests {
             interface: None,
         }); //proto, None);
         let mut errors = vec![
-            confusion_free(&proto_info, 0, &BTreeMap::new()),
+            confusion_free(&proto_info, 0),
             proto_info.get_ith_proto(0).unwrap().errors,
         ]
         .concat()

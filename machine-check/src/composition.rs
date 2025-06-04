@@ -61,7 +61,7 @@ pub fn revised_projection(proto: SwarmProtocolType, subs: String, role: Role, mi
 #[wasm_bindgen]
 pub fn project_combine(protos: InterfacingSwarms<Role>, subs: String, role: Role, minimize: bool) -> DataResult<MachineType> {
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
-    let proto_info = swarms_to_proto_info(protos, &subs);
+    let proto_info = swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
         return DataResult::ERROR { errors: error_report_to_strings(proto_info_to_error_report(proto_info)) }//derr::<Machine>(error_report_to_strings(proto_info_to_error_report(proto_info)));
     }
@@ -73,7 +73,7 @@ pub fn project_combine(protos: InterfacingSwarms<Role>, subs: String, role: Role
 #[wasm_bindgen]
 pub fn projection_information(protos: InterfacingSwarms<Role>, subs: String, role: Role, minimize: bool) -> DataResult<ProjectionInfo> {
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
-    let proto_info = swarms_to_proto_info(protos, &subs);
+    let proto_info = swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
         return DataResult:: ERROR { errors: error_report_to_strings(proto_info_to_error_report(proto_info)) };
     }
@@ -87,7 +87,7 @@ pub fn projection_information(protos: InterfacingSwarms<Role>, subs: String, rol
 #[wasm_bindgen]
 pub fn projection_information_new(protos: InterfacingSwarms<Role>, subs: String, role: Role, machine: MachineType, k: usize, minimize: bool) -> DataResult<ProjectionInfo> {
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
-    let proto_info = swarms_to_proto_info(protos, &subs);
+    let proto_info = swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
         return DataResult:: ERROR { errors: error_report_to_strings(proto_info_to_error_report(proto_info)) };
     }
@@ -118,7 +118,7 @@ pub fn check_composed_projection(
     machine: MachineType,
 ) -> CheckResult {
     let subs = deserialize_subs!(subs, |e| CheckResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
-    let proto_info = swarms_to_proto_info(protos, &subs);
+    let proto_info = swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
         return CheckResult::ERROR { errors: error_report_to_strings(proto_info_to_error_report(proto_info)) };
     }

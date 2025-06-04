@@ -1810,7 +1810,7 @@ mod tests {
         );
         assert!(subs1.is_ok());
         let subs1 = subs1.unwrap();
-        let proto_info = swarms_to_proto_info(get_interfacing_swarms_1(), &subs1);
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_1());
         assert!(proto_info.no_errors());
 
         let (proj_combined1, proj_combined_initial1) =
@@ -1823,7 +1823,7 @@ mod tests {
         );
         assert!(subs2.is_ok());
         let subs2 = subs2.unwrap();
-        let proto_info = swarms_to_proto_info(get_interfacing_swarms_1_reversed(), &subs2);
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_1_reversed());
         assert!(proto_info.no_errors());
 
         let (proj_combined2, proj_combined_initial2) =
@@ -1908,7 +1908,7 @@ mod tests {
             );
             assert!(subs1.is_ok());
             let subs1 = subs1.unwrap();
-            let proto_info = swarms_to_proto_info(get_interfacing_swarms_2(), &subs1);
+            let proto_info = swarms_to_proto_info(get_interfacing_swarms_2());
             assert!(proto_info.no_errors());
 
             let (proj_combined1, proj_combined_initial1) =
@@ -1921,7 +1921,7 @@ mod tests {
             );
             assert!(subs2.is_ok());
             let subs2 = subs2.unwrap();
-            let proto_info = swarms_to_proto_info(get_interfacing_swarms_2_reversed(), &subs2);
+            let proto_info = swarms_to_proto_info(get_interfacing_swarms_2_reversed());
             assert!(proto_info.no_errors());
 
             let (proj_combined2, proj_combined_initial2) =
@@ -1962,7 +1962,7 @@ mod tests {
         );
         assert!(subs.is_ok());
         let subs = subs.unwrap();
-        let proto_info = swarms_to_proto_info(get_interfacing_swarms_3(), &subs);
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_3());
         assert!(proto_info.no_errors());
         let (proj, proj_initial) =
             project_combine(&proto_info.protocols, &subs, role.clone(), false);
@@ -2032,7 +2032,7 @@ mod tests {
             Role::new("F"),
             Role::new("QCR"),
         ];
-        let proto_info = swarms_to_proto_info(get_interfacing_swarms_333(), &subs);
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_333());
         assert!(proto_info.no_errors());
         //println!("conc: {:?}", proto_info.concurrent_events);
         for role in all_roles {
@@ -2067,7 +2067,7 @@ mod tests {
             Role::new("F"),
             Role::new("QCR"),
         ];
-        let proto_info = swarms_to_proto_info(get_interfacing_swarms_3(), &subs);
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_3());
         assert!(proto_info.no_errors());
         //println!("conc: {:?}", proto_info.concurrent_events);
         for role in all_roles {
@@ -2098,7 +2098,7 @@ mod tests {
         .unwrap();
         let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D")];
         println!("subs: {}", serde_json::to_string_pretty(&subs).unwrap());
-        let proto_info = swarms_to_proto_info(get_interfacing_swarms_whhhh(), &subs);
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_whhhh());
         assert!(proto_info.no_errors());
         //println!("conc: {:?}", proto_info.concurrent_events);
 
@@ -2308,7 +2308,7 @@ mod tests {
         assert!(subs1.is_ok());
         let subs1 = subs1.unwrap();
         println!("subs: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        let proto_info = swarms_to_proto_info(swarms.clone(), &subs1);
+        let proto_info = swarms_to_proto_info(swarms.clone());
         assert!(proto_info.no_errors());
 
         let adapted = adapted_projection(
@@ -2349,7 +2349,7 @@ mod tests {
         assert!(subs2.is_ok());
         let subs2 = subs2.unwrap();
         println!("subs: {}", serde_json::to_string_pretty(&subs2).unwrap());
-        let proto_info = swarms_to_proto_info(swarms.clone(), &subs2);
+        let proto_info = swarms_to_proto_info(swarms.clone());
         assert!(proto_info.no_errors());
 
         //let (adapted_proj, adapted_proj_initial) = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
@@ -2426,7 +2426,7 @@ mod tests {
         assert!(subs1.is_ok());
         let subs1 = subs1.unwrap();
         println!("subs: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        let proto_info = swarms_to_proto_info(swarms.clone(), &subs1);
+        let proto_info = swarms_to_proto_info(swarms.clone());
         assert!(proto_info.no_errors());
 
         let adapted = adapted_projection(
@@ -2467,7 +2467,7 @@ mod tests {
         assert!(subs2.is_ok());
         let subs2 = subs2.unwrap();
         println!("subs: {}", serde_json::to_string_pretty(&subs2).unwrap());
-        let proto_info = swarms_to_proto_info(swarms.clone(), &subs2);
+        let proto_info = swarms_to_proto_info(swarms.clone());
         assert!(proto_info.no_errors());
 
         let adapted = adapted_projection(
@@ -2808,7 +2808,7 @@ mod tests {
         assert!(subs1.is_ok());
         let subs1 = subs1.unwrap();
         //println!("subs: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        let proto_info = swarms_to_proto_info(swarms.clone(), &subs1);
+        let proto_info = swarms_to_proto_info(swarms.clone());
 
         let projection_info = projection_information(
             &proto_info,
@@ -2990,7 +2990,7 @@ mod tests {
         assert!(larger_than_necessary_sub.is_ok());
         let subs1 = larger_than_necessary_sub.unwrap();
         //println!("subs: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        let proto_info = swarms_to_proto_info(swarms.clone(), &subs1);
+        let proto_info = swarms_to_proto_info(swarms.clone());
 
         let projection_info = projection_information(
             &proto_info,
