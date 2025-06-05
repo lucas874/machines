@@ -350,7 +350,7 @@ export const createMachineRunnerTimeTravel = <
   const subscribe: SubscribeFn<MachineEvents> = (callback, onCompleteOrErr) =>
     sdk.subscribeMonotonic<MachineEvents>(subscribeMonotonicQuery, callback, onCompleteOrErr)
 
-  return createMachineRunnerInternal(subscribe, persist, tags, initialFactory, initialPayload)
+  return createMachineRunnerInternalTimeTravel(subscribe, persist, tags, initialFactory, initialPayload)
 }
 export const createMachineRunnerInternal = <
   SwarmProtocolName extends string,
@@ -1202,7 +1202,7 @@ export const createMachineRunnerInternalTimeTravel = <
   internals.destruction.addDestroyHook(unsubscribeFromActyx)
 
   var eventCounter = 0
-  var resetCount = 5
+  var resetCount = 3
 
   const restartActyxSubscription = () => {
     unsubscribeFromActyx()
@@ -1224,6 +1224,7 @@ export const createMachineRunnerInternalTimeTravel = <
           if (d.type === MsgType.timetravel || eventCounter == resetCount) {
             eventCounter = 0
             resetCount = resetCount + 1
+            console.log("TIMETRAVEL -- RESETTING!")
             emitter.emit('log', 'Time travel')
             RunnerInternals.reset(internals)
             emitter.emit('audit.reset')
