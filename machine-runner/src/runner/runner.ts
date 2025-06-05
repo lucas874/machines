@@ -337,8 +337,7 @@ export const createMachineRunnerTimeTravel = <
     Payload,
     any
   >,
-  initialPayload: any,
-  adaptedMachine: AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>
+  initialPayload: Payload,
 ): MachineRunner<SwarmProtocolName, MachineName, StateUnion> => {
   const subscribeMonotonicQuery = {
     query: tags,
@@ -351,7 +350,7 @@ export const createMachineRunnerTimeTravel = <
   const subscribe: SubscribeFn<MachineEvents> = (callback, onCompleteOrErr) =>
     sdk.subscribeMonotonic<MachineEvents>(subscribeMonotonicQuery, callback, onCompleteOrErr)
 
-  return createMachineRunnerInternalTimeTravel(subscribe, persist, tags, initialFactory, initialPayload, adaptedMachine.projectionInfo.branches, new Set(adaptedMachine.projectionInfo.specialEventTypes))
+  return createMachineRunnerInternal(subscribe, persist, tags, initialFactory, initialPayload)
 }
 export const createMachineRunnerInternal = <
   SwarmProtocolName extends string,
@@ -1095,8 +1094,6 @@ export const createMachineRunnerInternalTimeTravel = <
     any
   >,
   initialPayload: Payload,
-  succeedingNonBranchingJoining: Record<string, string[]>,
-  specialEvents: Set<string>,
 ): MachineRunner<SwarmProtocolName, MachineName, StateUnion> => {
   type ThisStateOpaque = StateOpaque<SwarmProtocolName, MachineName, string, StateUnion>
   type ThisMachineRunner = MachineRunner<SwarmProtocolName, MachineName, StateUnion>
@@ -1129,7 +1126,7 @@ export const createMachineRunnerInternalTimeTravel = <
     return publish(taggedEvents)
   }
 
-  const internals = RunnerInternalsBT.make(initialFactory, initialPayload, specialEvents, succeedingNonBranchingJoining, (props) => {
+  const internals = RunnerInternals.make(initialFactory, initialPayload, (props) => {
     const error = CommandGeneratorCriteria.produceError(props.commandGeneratorCriteria, () =>
       makeIdentityStringForCommandError(
         initialFactory.mechanism.protocol.swarmName,
@@ -1228,7 +1225,7 @@ export const createMachineRunnerInternalTimeTravel = <
             eventCounter = 0
             resetCount = resetCount + 1
             emitter.emit('log', 'Time travel')
-            RunnerInternalsBT.reset(internals)
+            RunnerInternals.reset(internals)
             emitter.emit('audit.reset')
 
             restartActyxSubscription()
@@ -1242,7 +1239,7 @@ export const createMachineRunnerInternalTimeTravel = <
               bootTimeLogger.incrementEventCount()
               emitter.emit('debug.eventHandlingPrevState', internals.current.data)
 
-              const pushEventResult = RunnerInternalsBT.pushEvent(internals, event)
+              const pushEventResult = RunnerInternals.pushEvent(internals, event)
 
               emitter.emit('debug.eventHandling', {
                 event,
@@ -1258,7 +1255,7 @@ export const createMachineRunnerInternalTimeTravel = <
                 if (emitter.listenerCount('audit.state') > 0) {
                   emitter.emit('audit.state', {
                     state: ImplStateOpaque.make<SwarmProtocolName, MachineName, StateUnion>(
-                      internals, // Should work because RunnerInternalsBT.Any is a subtype of RunnerInternals.Any?
+                      internals,
                       internals.current,
                     ),
                     events: pushEventResult.triggeringEvents,
@@ -1319,7 +1316,7 @@ export const createMachineRunnerInternalTimeTravel = <
         }
       },
       (err) => {
-        RunnerInternalsBT.reset(internals)
+        RunnerInternals.reset(internals)
         emitter.emit('audit.reset')
         emitter.emit('change', ImplStateOpaque.make(internals, internals.current))
 
