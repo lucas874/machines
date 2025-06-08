@@ -835,15 +835,12 @@ fn finer_approx_add_branches_and_joins(
     }
 }
 
-// safe overapproximated subscription generation as described in article.
+// Safe, overapproximating subscription generation as described in article.
 fn two_step_overapprox_wwf_sub(
     proto_info: &mut ProtoInfo,
     subscription: &mut Subscriptions,
 ) -> Subscriptions {
     let _span = tracing::info_span!("two_step_overapprox_wwf_sub").entered();
-    proto_info
-        .concurrent_events
-        .append(&mut intra_concurrency_proto_info(proto_info));
 
     // get concurrent event types preceding a join
     let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
@@ -946,45 +943,6 @@ fn two_step_overapprox_wwf_sub(
     }
 
     subscription.clone()
-}
-
-// TODO: remove this. Update branching event type def.
-fn intra_concurrency(proto: &ProtoStruct) -> BTreeSet<UnordEventPair> {
-    let _span = tracing::info_span!("intra_concurrency").entered();
-    let mut conc = BTreeSet::new();
-    let graph = &proto.graph;
-    let initial = if proto.initial.is_none() {
-        return conc;
-    } else {
-        proto.initial.unwrap()
-    };
-    for node in Dfs::new(&graph, initial).iter(&graph) {
-        let self_loop_events = graph
-            .edges_directed(node, Outgoing)
-            .filter(|e| e.target() == node)
-            .map(|e| e.weight().get_event_type())
-            .collect::<BTreeSet<EventType>>();
-        let mut pairs = self_loop_events
-            .clone()
-            .into_iter()
-            .cartesian_product(&self_loop_events)
-            .filter(|(e1, e2)| *e1 != **e2)
-            .map(|(e1, e2)| unord_event_pair(e1, e2.clone()))
-            .collect();
-        conc.append(&mut pairs);
-    }
-
-    conc
-}
-
-fn intra_concurrency_proto_info(proto_info1: &ProtoInfo) -> BTreeSet<UnordEventPair> {
-    let _span = tracing::info_span!("intra_concurrency_proto_info").entered();
-    let intra_conc_sets = proto_info1
-        .protocols
-        .iter()
-        .map(|p| intra_concurrency(p))
-        .collect::<Vec<_>>();
-    intra_conc_sets.into_iter().flatten().collect()
 }
 
 fn combine_proto_infos<T: SwarmInterface>(
@@ -1225,7 +1183,7 @@ fn prepare_proto_infos<T: SwarmInterface>(
         .collect()
 }
 
-// precondition: proto is a simple protocol, i.e. it does not contain concurrency.
+// Precondition: proto does not contain concurrency.
 fn prepare_proto_info<T: SwarmInterface>(proto: CompositionComponent<T>) -> ProtoInfo {
     let _span = tracing::info_span!("prepare_proto_info").entered();
     let mut role_event_map: RoleEventMap = BTreeMap::new();
@@ -1254,33 +1212,32 @@ fn prepare_proto_info<T: SwarmInterface>(proto: CompositionComponent<T>) -> Prot
 
     let mut walk = Dfs::new(&graph, initial.unwrap());
 
-    // add to set of branching and joining
-    while let Some(node_id) = walk.next(&graph) {
-        // should work even if two branches with same outgoing event type right?
-        let outgoing_event_types = graph
-            .edges_directed(node_id, Outgoing)
-            .map(|edge| edge.weight().get_event_type())
-            .collect::<BTreeSet<EventType>>();
-        if outgoing_event_types.len() > 1 {
-            branching_events.push(outgoing_event_types);
+    // Add to set of branching and joining.
+    // Graph contains no concurrency, so: 
+    //      Branching event types are all outgoing event types if more than one and if more than one distinct target.
+    //      Immediately preceding to each edge are all incoming event types 
+    while let Some(node_id) = walk.next(&graph) { 
+        let outgoing_labels: Vec<_> = graph.edges_directed(node_id, Outgoing).map(|edge| edge.weight()).collect();
+        let incoming_event_types: BTreeSet<EventType> = graph.edges_directed(node_id, Incoming).map(|edge| edge.weight().get_event_type()).collect();
+        
+        if outgoing_labels.len() > 1 && direct_successors(&graph, node_id).len() > 1 {
+            branching_events.push(outgoing_labels.iter().map(|edge| edge.get_event_type()).collect());
         }
 
-        for edge in graph.edges_directed(node_id, Outgoing) {
+        for label in outgoing_labels {
             role_event_map
-                .entry(edge.weight().role.clone())
+                .entry(label.role.clone())
                 .and_modify(|role_info| {
-                    role_info.insert(edge.weight().clone());
+                    role_info.insert(label.clone());
                 })
-                .or_insert(BTreeSet::from([edge.weight().clone()]));
-
-            // consider changing get_immediately_pre to not take concurrent events as argument. now that we do not consider swarms with concurrency here.
-            let mut pre = get_immediately_pre(&graph, edge, &BTreeSet::new());
+                .or_insert_with(|| BTreeSet::from([label.clone()]));
+            
             immediately_pre_map
-                .entry(edge.weight().get_event_type())
+                .entry(label.get_event_type())
                 .and_modify(|events| {
-                    events.append(&mut pre);
+                    events.append(&mut incoming_event_types.clone());
                 })
-                .or_insert(pre);
+                .or_insert_with(|| incoming_event_types.clone());
         }
     }
 
@@ -1295,6 +1252,11 @@ fn prepare_proto_info<T: SwarmInterface>(proto: CompositionComponent<T>) -> Prot
         immediately_pre_map,
         happens_after,
     )
+}
+
+// Set of direct successor nodes from node (those reachable in one step). 
+fn direct_successors(graph: &Graph, node: NodeId) -> BTreeSet<NodeId> {
+    graph.edges_directed(node, Outgoing).map(|e| e.target()).collect()
 }
 
 // turn a SwarmProtocol into a petgraph. perform some checks that are not strictly related to wwf, but must be successful for any further analysis to take place
@@ -1432,34 +1394,6 @@ fn event_pairs_from_node(
             )
         }) //BTreeSet::from([graph[pair[0]].get_event_type(), graph[pair[1]].get_event_type()]))
         .collect()
-}
-
-// get events that are immediately before some event and not concurrent.
-// backtrack if immediately preceding is concurrent. not sure if this is needed or ok though
-// do not think we should 'backtrack' outcommented now
-fn get_immediately_pre(
-    graph: &Graph,
-    edge: EdgeReference<'_, SwarmLabel>,
-    concurrent_events: &BTreeSet<BTreeSet<EventType>>,
-) -> BTreeSet<EventType> {
-    let node = edge.source();
-    let event_type = edge.weight().get_event_type();
-    //let mut visited = BTreeSet::from([node]);
-    let mut to_visit = Vec::from([node]);
-    let mut immediately_pre = BTreeSet::new();
-
-    while let Some(node) = to_visit.pop() {
-        for e in graph.edges_directed(node, Incoming) {
-            if !concurrent_events.contains(&unord_event_pair(
-                event_type.clone(),
-                e.weight().get_event_type(),
-            )) {
-                immediately_pre.insert(e.weight().get_event_type());
-            }
-        }
-    }
-
-    immediately_pre
 }
 
 // combine maps with sets as values
@@ -2007,21 +1941,6 @@ mod tests {
         .unwrap()
     }
 
-    fn get_intra_conc_proto() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "0", "label": { "cmd": "a", "logType": ["a"], "role": "R2" } },
-                    { "source": "0", "target": "1", "label": { "cmd": "b", "logType": ["b"], "role": "R1" } },
-                    { "source": "1", "target": "1", "label": { "cmd": "c", "logType": ["c"], "role": "R1" } },
-                    { "source": "1", "target": "1", "label": { "cmd": "d", "logType": ["d"], "role": "R1" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "e", "logType": ["e"], "role": "R2" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
     fn get_interfacing_swarms_diff_example() -> InterfacingSwarms<Role> {
         InterfacingSwarms(vec![
             CompositionComponent {
@@ -2167,12 +2086,6 @@ mod tests {
             },
         ])
     }
-    fn get_intra_conc_proto_swarm() -> InterfacingSwarms<Role> {
-        InterfacingSwarms(vec![CompositionComponent {
-            protocol: get_intra_conc_proto(),
-            interface: None,
-        }])
-    }
 
     // QCR subscribes to car and part because report1 is concurrent with part and they lead to a joining event car/event is joining bc of this.
     fn get_subs_composition_2() -> Subscriptions {
@@ -2311,12 +2224,14 @@ mod tests {
         assert!(proto_info.get_ith_proto(0).is_some());
         assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
         assert_eq!(proto_info.concurrent_events, BTreeSet::new());
+        
+        // Should not contain any branching event types since only state with two outgoing is 3 
+        // and both of these outgoing transitions go to state 4:
+        // { "source": "3", "target": "4", "label": { "cmd": "accept", "logType": ["ok"], "role": "QCR" } },
+        // { "source": "3", "target": "4", "label": { "cmd": "reject", "logType": ["notOk"], "role": "QCR" } }
         assert_eq!(
             proto_info.branching_events,
-            vec![BTreeSet::from([
-                EventType::new("notOk"),
-                EventType::new("ok")
-            ])]
+            vec![]
         );
         assert_eq!(proto_info.joining_events, BTreeSet::new());
     }
@@ -2995,22 +2910,6 @@ mod tests {
 
         let result = check(protos.clone(), &subs_composition);
         println!("errors is empty: {}", result.is_empty());
-    }
-
-    #[test]
-    #[ignore]
-    fn test_intra_conc() {
-        setup_logger();
-        let _ = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_2(),
-            &BTreeMap::new(),
-            Granularity::Fine,
-        );
-        let _ = overapprox_weak_well_formed_sub(
-            get_intra_conc_proto_swarm(),
-            &BTreeMap::new(),
-            Granularity::Fine,
-        );
     }
 
     #[test]
