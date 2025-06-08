@@ -14,7 +14,7 @@ use crate::{
 };
 use itertools::Itertools;
 use petgraph::algo::floyd_warshall;
-use petgraph::visit::DfsPostOrder;
+use petgraph::visit::{DfsPostOrder, Reversed};
 use petgraph::Directed;
 use petgraph::{
     graph::EdgeReference,
@@ -138,6 +138,26 @@ impl ErrorReport {
     }
 }
 
+macro_rules! get_ith_or_error {
+    ($proto_info:expr, $proto_pointer:expr) => {
+        match $proto_info.get_ith_proto($proto_pointer) {
+            Some(ProtoStruct {
+                graph: g,
+                initial: Some(i),
+                errors: e,
+                interface: _,
+            }) => (g, i, e),
+            Some(ProtoStruct {
+                graph: _,
+                initial: None,
+                errors: e,
+                interface: _,
+            }) => return e,
+            None => return vec![Error::InvalidArg],
+        }
+    };
+}
+
 // Well-formedness check
 pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptions) -> ErrorReport {
     let _span = tracing::info_span!("check").entered();
@@ -198,9 +218,7 @@ pub fn overapprox_weak_well_formed_sub<T: SwarmInterface>(
 // Construct a ProtoInfo containing all protocols, all branching events, joining events etc.
 // Then add any errors arising from confusion freeness to the proto info and return it.
 // Does not compute transitive closure of combined succeeding_events, simply takes union of component succeeding_events fields.
-pub fn swarms_to_proto_info<T: SwarmInterface>(
-    protos: InterfacingSwarms<T>,
-) -> ProtoInfo {
+pub fn swarms_to_proto_info<T: SwarmInterface>(protos: InterfacingSwarms<T>) -> ProtoInfo {
     let _span = tracing::info_span!("swarms_to_proto_info").entered();
     let combined_proto_info = combine_proto_infos_fold(prepare_proto_infos::<T>(protos));
     confusion_free_proto_info(combined_proto_info)
@@ -280,21 +298,7 @@ fn weak_well_formed(
     let mut errors = Vec::new();
     let empty = BTreeSet::new();
     let sub = |r: &Role| subs.get(r).unwrap_or(&empty);
-    let (graph, initial, _) = match proto_info.get_ith_proto(proto_pointer) {
-        Some(ProtoStruct {
-            graph: g,
-            initial: Some(i),
-            errors: e,
-            interface: _,
-        }) => (g, i, e),
-        Some(ProtoStruct {
-            graph: _,
-            initial: None,
-            errors: e,
-            interface: _,
-        }) => return e,
-        None => return vec![Error::InvalidArg],
-    };
+    let (graph, initial, _) = get_ith_or_error!(proto_info, proto_pointer);
 
     // Visit all transitions in protocol and perform causal consistency and determinacy checks.
     for node in Dfs::new(&graph, initial).iter(&graph) {
@@ -386,7 +390,6 @@ fn weak_well_formed(
             // Determinacy.
             // Corresponds to joining rule of weak determinacy.
             if proto_info.joining_events.contains(&event_type) {
-
                 // Find pairs of concurrent event types that are both emitted immediately before event_type (i.e. not concurrent with event_type).
                 let incoming_pairs_concurrent: Vec<UnordEventPair> =
                     event_pairs_from_node(node, &graph, Incoming)
@@ -433,52 +436,51 @@ fn weak_well_formed(
 }
 
 // Check confusion-freeness of a concurrency-free protocol at index proto_pointer in proto_info.
-fn confusion_free(
-    proto_info: &ProtoInfo,
-    proto_pointer: usize,
-) -> Vec<Error> {
+fn confusion_free(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> {
     let _span = tracing::info_span!("confusion_free").entered();
-    let (graph, _, _) = match proto_info.get_ith_proto(proto_pointer) {
-        Some(ProtoStruct {
-            graph: g,
-            initial: Some(i),
-            errors: e,
-            interface: _,
-        }) => (g, i, e),
-        Some(ProtoStruct {
-            graph: _,
-            initial: None,
-            errors: e,
-            interface: _,
-        }) => return e,
-        None => return vec![Error::InvalidArg],
-    };
+    let (graph, _, _) = get_ith_or_error!(proto_info, proto_pointer);
 
-    // Check that each event type is only emitted in one transition.
-    // Create a map from event types to vec of edge id
-    // Create a map from commands to vec of edge id
+    // Map from event types to vec of edge id
+    // Map from commands to vec of edge id
+    // Error accumulator
     let mut event_types: BTreeMap<EventType, Vec<EdgeId>> = BTreeMap::new();
     let mut commands: BTreeMap<Command, Vec<EdgeId>> = BTreeMap::new();
     let mut errors = vec![];
 
-
+    // Populate maps and check that each event type/command is only emitted/enabled in one transition.
     for edge in graph.edge_references() {
         let weight = edge.weight();
-        event_types.entry(weight.get_event_type()).and_modify(|triples| triples.push(edge.id())).or_insert_with(|| vec![edge.id()]);
-        commands.entry(weight.cmd.clone()).and_modify(|triples| triples.push(edge.id())).or_insert_with(|| vec![edge.id()]);
+        event_types
+            .entry(weight.get_event_type())
+            .and_modify(|edge_ids| edge_ids.push(edge.id()))
+            .or_insert_with(|| vec![edge.id()]);
+        commands
+            .entry(weight.cmd.clone())
+            .and_modify(|edge_ids| edge_ids.push(edge.id()))
+            .or_insert_with(|| vec![edge.id()]);
     }
 
     for (event_type, edge_indices) in event_types.iter() {
         if edge_indices.len() > 1 {
-            errors.push(Error::EventEmittedMultipleTimes(event_type.clone(), edge_indices.clone()));
+            errors.push(Error::EventEmittedMultipleTimes(
+                event_type.clone(),
+                edge_indices.clone(),
+            ));
         }
     }
     for (command, edge_indices) in commands.iter() {
         if edge_indices.len() > 1 {
-            errors.push(Error::CommandOnMultipleTransitions(command.clone(), edge_indices.clone()));
+            errors.push(Error::CommandOnMultipleTransitions(
+                command.clone(),
+                edge_indices.clone(),
+            ));
         }
     }
-
+    
+    // This requirement is not part of confusion-freeness. 
+    // Our check then is too strict. Prohibits the set of non-terminating swarm protocols. 
+    // We do this to not check for the looping condition in determinacy checks/subscription generation. 
+    errors.append(&mut all_nodes_reach_zero(&graph));
     errors
 }
 
@@ -1376,6 +1378,43 @@ fn all_nodes_reachable(graph: &Graph, initial: NodeId) -> Vec<Error> {
         .collect()
 }
 
+// Check that every node of a graph can reach a node with no outgoing transitions.
+fn all_nodes_reach_zero(graph: &Graph) -> Vec<Error> {
+    let _span = tracing::info_span!("all_nodes_reach_zero").entered();
+    // All terminal nodes
+    let zero_nodes: Vec<_> = graph
+        .node_indices()
+        .filter(|node| graph.edges_directed(*node, Outgoing).count() == 0)
+        .collect();
+    // Reversed adaptor -- all edges have the opposite direction.
+    let reversed = Reversed(&graph);
+    
+    // Collect all predecessors of from node using reversed adaptor.
+    let get_predecessors = |node: NodeId| -> BTreeSet<NodeId> {
+        let mut predecessors = BTreeSet::new();
+        let mut dfs = Dfs::new(&reversed, node);
+        while let Some(predecessor) = dfs.next(&reversed) {
+            predecessors.insert(predecessor);
+        }
+        predecessors
+    };
+
+    // Collect all nodes that can reach a terminal node. 
+    let can_reach_zero_nodes: BTreeSet<_> = zero_nodes
+        .into_iter()
+        .map(get_predecessors)
+        .flatten()
+        .collect();
+
+    // Collect nodes that can not reach a terminal node and transform to a vec of errors.
+    graph
+        .node_indices()
+        .into_iter()
+        .filter(|node| !can_reach_zero_nodes.contains(node))
+        .map(|node| Error::StateCanNotReachTerminal(node))
+        .collect()
+}
+
 // all pairs of incoming/outgoing events from a node
 fn event_pairs_from_node(
     node: NodeId,
@@ -1721,7 +1760,9 @@ mod tests {
         .unwrap()
     }
 
-    // pos event type associated with multiple commands and nondeterminism at 0, no terminal state can be reached from any state
+    // pos event type associated with multiple commands and nondeterminism at 0. 
+    // No terminal state can be reached from any state -- OK according to confusion freeness, but not according to our
+    // stricter-than-necessary checks
     fn get_confusionful_proto1() -> SwarmProtocolType {
         serde_json::from_str::<SwarmProtocolType>(
             r#"{
@@ -1732,6 +1773,24 @@ mod tests {
                     { "source": "1", "target": "2", "label": { "cmd": "get", "logType": ["pos"], "role": "FL" } },
                     { "source": "2", "target": "0", "label": { "cmd": "request", "logType": ["pos"], "role": "T" } },
                     { "source": "0", "target": "0", "label": { "cmd": "close", "logType": ["time"], "role": "D" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+    // No terminal state can be reached from any state -- OK according to confusion freeness, but not according to our
+    // stricter-than-necessary checks
+    fn get_some_nonterminating_proto() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "a", "logType": ["a"], "role": "a" } },
+                    { "source": "0", "target": "2", "label": { "cmd": "c", "logType": ["c"], "role": "c" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "b", "logType": ["b"], "role": "b" } },
+                    { "source": "1", "target": "4", "label": { "cmd": "d", "logType": ["d"], "role": "d" } },
+                    { "source": "4", "target": "5", "label": { "cmd": "e", "logType": ["e"], "role": "e" } },
+                    { "source": "5", "target": "1", "label": { "cmd": "f", "logType": ["f"], "role": "f" } }
                 ]
             }"#,
         )
@@ -2335,20 +2394,40 @@ mod tests {
         .concat()
         .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
 
-        /* let mut expected_errors = vec![
-                "non-deterministic event guard type partID in state 0",
-                "non-deterministic command request for role T in state 0",
-                "guard event type pos appears in transitions from multiple states",
-                "event type pos emitted by command in transition (1)--[get@FL<pos>]-->(2) and command in transition (2)--[request@T<pos>]-->(0)",
-                "state 0 can not reach terminal node",
-                "state 1 can not reach terminal node",
-                "state 2 can not reach terminal node",
-            ]; */
         let mut expected_errors = vec![
+            "command request enabled in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0), (2)--[request@T<pos>]-->(0)",
+            "event type partID emitted in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0)",
+            "event type pos emitted in more than one transition: (1)--[get@FL<pos>]-->(2), (2)--[request@T<pos>]-->(0)",
+            "state 0 can not reach terminal node",
+            "state 1 can not reach terminal node",
+            "state 2 can not reach terminal node",
+        ];
+        /* let mut expected_errors = vec![
                 "command request enabled in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0), (2)--[request@T<pos>]-->(0)",
                 "event type partID emitted in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0)",
                 "event type pos emitted in more than one transition: (1)--[get@FL<pos>]-->(2), (2)--[request@T<pos>]-->(0)",
-            ];
+            ]; */
+        errors.sort();
+        expected_errors.sort();
+        assert_eq!(errors, expected_errors);
+    
+        let proto = get_some_nonterminating_proto();
+        let proto_info = prepare_proto_info::<Role>(CompositionComponent {
+            protocol: proto,
+            interface: None,
+        }); //proto, None);
+        let mut errors = vec![
+            confusion_free(&proto_info, 0),
+            proto_info.get_ith_proto(0).unwrap().errors,
+        ]
+        .concat()
+        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
+
+        let mut expected_errors = vec![
+            "state 1 can not reach terminal node",
+            "state 4 can not reach terminal node",
+            "state 5 can not reach terminal node",
+        ];
         errors.sort();
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
@@ -3012,11 +3091,19 @@ mod tests {
         assert_eq!(expected_after, combined_proto_info.succeeding_events);
         assert_eq!(expected_concurrent, combined_proto_info.concurrent_events);
 
-        let (composition, composition_initial) = compose_protocols(interfacing_swarms.clone()).unwrap();
+        let (composition, composition_initial) =
+            compose_protocols(interfacing_swarms.clone()).unwrap();
 
-        let after_map = after_not_concurrent(&composition, composition_initial, &combined_proto_info.concurrent_events);
+        let after_map = after_not_concurrent(
+            &composition,
+            composition_initial,
+            &combined_proto_info.concurrent_events,
+        );
         assert_eq!(expected_after, after_map);
 
-        println!("{}", serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap()
+        );
     }
 }
