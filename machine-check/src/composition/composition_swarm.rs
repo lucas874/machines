@@ -168,7 +168,7 @@ pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptio
 
     // If we reach this point the protocols can interface and are all confusion free.
     // We construct a ProtoInfo with the composition as the only protocol and all the
-    // information about branches etc. from combined_proto_info 
+    // information about branches etc. from combined_proto_info
     // and the succeeding_events field updated using the expanded composition.
     let composition = explicit_composition_proto_info(combined_proto_info);
     let composition_checked = weak_well_formed_proto_info(composition, subs);
@@ -478,10 +478,10 @@ fn confusion_free(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> {
             ));
         }
     }
-    
-    // This requirement is not part of confusion-freeness. 
-    // Our check then is too strict. Prohibits the set of non-terminating swarm protocols. 
-    // We do this to not check for the looping condition in determinacy checks/subscription generation. 
+
+    // This requirement is not part of confusion-freeness.
+    // Our check then is too strict. Prohibits the set of non-terminating swarm protocols.
+    // We do this to not check for the looping condition in determinacy checks/subscription generation.
     errors.append(&mut all_nodes_reach_zero(&graph));
     errors
 }
@@ -543,14 +543,15 @@ fn exact_wwf_sub_step(
         //  Make an overapproximation of the roles in roles(e.G) subscribe to branching events.
         for edge in graph.edges_directed(node, Outgoing) {
             let event_type = edge.weight().get_event_type();
-            // weak causal consistency 1: a role subscribes to the events it emits
+
+            // Causal consistency 1: roles subscribe to the event types they emit
             is_stable = add_to_sub(
                 edge.weight().role.clone(),
                 BTreeSet::from([event_type.clone()]),
                 subscriptions,
             ) && is_stable;
 
-            // weak causal consistency 2: a role subscribes to events that immediately precedes its own commands
+            // Causal consistency 2: roles subscribe to the event types that immediately precede their own commands
             for active in active_transitions_not_conc(
                 edge.target(),
                 &graph,
@@ -564,41 +565,36 @@ fn exact_wwf_sub_step(
                 ) && is_stable;
             }
 
+            // Find all, if any, roles that subscribe to event types emitted later in the protocol.
             let involved_roles = roles_on_path(event_type.clone(), &proto_info, &subscriptions);
-            // weak determinacy 1: roles subscribe to branching events.
-            if proto_info
+
+            // Determinacy 1: roles subscribe to branching events.
+            // Events that are branching with event_type.
+            let branching_with_event_type: BTreeSet<_> = proto_info
                 .branching_events
                 .iter()
-                .any(|branch_set| branch_set.contains(&event_type))
-            {
-                let branching_with_this_event = proto_info
-                    .branching_events
-                    .iter()
-                    .find(|set| set.contains(&event_type))
-                    .cloned()
-                    .unwrap();
-                let branching_this_node: BTreeSet<EventType> = graph
-                    .edges_directed(node, Outgoing)
-                    .map(|e| e.weight().get_event_type())
-                    .filter(|e| branching_with_this_event.contains(e))
-                    .collect();
+                .filter(|set| set.contains(&event_type))
+                .flatten()
+                .cloned()
+                .collect();
+            
+            // The event types emitted at this node in the set of event types branching together with event_type.
+            let branching_this_node: BTreeSet<_> = graph
+                .edges_directed(node, Outgoing)
+                .map(|e| e.weight().get_event_type())
+                .filter(|t| branching_with_event_type.contains(t))
+                .collect();
 
-                // if only one event labeled as branching at this node, do not count it as an error if not subbed.
-                // could happen due to concurrency and loss of behavior. In such case we will encounter the 'original'
-                // branch and it will be checked there. nope do not do this... slight overapprox without if maybe?
-                let branches = if branching_this_node.len() > 1 {
-                    branching_this_node
-                } else {
-                    BTreeSet::new()
-                };
-
+            // If only one event labeled as branching at this node, do not add it to subscriptions.
+            // This could happen due to concurrency and loss of behavior on composition.
+            if branching_this_node.len() > 1 {
                 for r in involved_roles.iter() {
-                    is_stable = add_to_sub(r.clone(), branches.clone(), subscriptions) && is_stable;
+                    is_stable = add_to_sub(r.clone(), branching_this_node.clone(), subscriptions) && is_stable;
                 }
             }
 
-            // weak determinacy 2. joining events.
-            // With new strategy: the joining events are an overapproximation.
+            // Determinacy 2. joining events.
+            // The joining events field is an overapproximation.
             // so check if there are two or more incoming concurrent not concurrent with event type
             if proto_info.joining_events.contains(&event_type) {
                 let incoming_pairs_concurrent: Vec<UnordEventPair> =
@@ -1217,15 +1213,26 @@ fn prepare_proto_info<T: SwarmInterface>(proto: CompositionComponent<T>) -> Prot
     let mut walk = Dfs::new(&graph, initial.unwrap());
 
     // Add to set of branching and joining.
-    // Graph contains no concurrency, so: 
+    // Graph contains no concurrency, so:
     //      Branching event types are all outgoing event types if more than one and if more than one distinct target.
-    //      Immediately preceding to each edge are all incoming event types 
-    while let Some(node_id) = walk.next(&graph) { 
-        let outgoing_labels: Vec<_> = graph.edges_directed(node_id, Outgoing).map(|edge| edge.weight()).collect();
-        let incoming_event_types: BTreeSet<EventType> = graph.edges_directed(node_id, Incoming).map(|edge| edge.weight().get_event_type()).collect();
-        
+    //      Immediately preceding to each edge are all incoming event types
+    while let Some(node_id) = walk.next(&graph) {
+        let outgoing_labels: Vec<_> = graph
+            .edges_directed(node_id, Outgoing)
+            .map(|edge| edge.weight())
+            .collect();
+        let incoming_event_types: BTreeSet<EventType> = graph
+            .edges_directed(node_id, Incoming)
+            .map(|edge| edge.weight().get_event_type())
+            .collect();
+
         if outgoing_labels.len() > 1 && direct_successors(&graph, node_id).len() > 1 {
-            branching_events.push(outgoing_labels.iter().map(|edge| edge.get_event_type()).collect());
+            branching_events.push(
+                outgoing_labels
+                    .iter()
+                    .map(|edge| edge.get_event_type())
+                    .collect(),
+            );
         }
 
         for label in outgoing_labels {
@@ -1235,7 +1242,7 @@ fn prepare_proto_info<T: SwarmInterface>(proto: CompositionComponent<T>) -> Prot
                     role_info.insert(label.clone());
                 })
                 .or_insert_with(|| BTreeSet::from([label.clone()]));
-            
+
             immediately_pre_map
                 .entry(label.get_event_type())
                 .and_modify(|events| {
@@ -1258,9 +1265,12 @@ fn prepare_proto_info<T: SwarmInterface>(proto: CompositionComponent<T>) -> Prot
     )
 }
 
-// Set of direct successor nodes from node (those reachable in one step). 
+// Set of direct successor nodes from node (those reachable in one step).
 fn direct_successors(graph: &Graph, node: NodeId) -> BTreeSet<NodeId> {
-    graph.edges_directed(node, Outgoing).map(|e| e.target()).collect()
+    graph
+        .edges_directed(node, Outgoing)
+        .map(|e| e.target())
+        .collect()
 }
 
 // turn a SwarmProtocol into a petgraph. perform some checks that are not strictly related to wwf, but must be successful for any further analysis to take place
@@ -1354,7 +1364,7 @@ fn all_nodes_reach_zero(graph: &Graph) -> Vec<Error> {
         .collect();
     // Reversed adaptor -- all edges have the opposite direction.
     let reversed = Reversed(&graph);
-    
+
     // Collect all predecessors of from node using reversed adaptor.
     let get_predecessors = |node: NodeId| -> BTreeSet<NodeId> {
         let mut predecessors = BTreeSet::new();
@@ -1365,7 +1375,7 @@ fn all_nodes_reach_zero(graph: &Graph) -> Vec<Error> {
         predecessors
     };
 
-    // Collect all nodes that can reach a terminal node. 
+    // Collect all nodes that can reach a terminal node.
     let can_reach_zero_nodes: BTreeSet<_> = zero_nodes
         .into_iter()
         .map(get_predecessors)
@@ -1698,7 +1708,7 @@ mod tests {
         .unwrap()
     }
 
-    // pos event type associated with multiple commands and nondeterminism at 0. 
+    // pos event type associated with multiple commands and nondeterminism at 0.
     // No terminal state can be reached from any state -- OK according to confusion freeness, but not according to our
     // stricter-than-necessary checks
     fn get_confusionful_proto1() -> SwarmProtocolType {
@@ -2228,15 +2238,12 @@ mod tests {
         assert!(proto_info.get_ith_proto(0).is_some());
         assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
         assert_eq!(proto_info.concurrent_events, BTreeSet::new());
-        
-        // Should not contain any branching event types since only state with two outgoing is 3 
+
+        // Should not contain any branching event types since only state with two outgoing is 3
         // and both of these outgoing transitions go to state 4:
         // { "source": "3", "target": "4", "label": { "cmd": "accept", "logType": ["ok"], "role": "QCR" } },
         // { "source": "3", "target": "4", "label": { "cmd": "reject", "logType": ["notOk"], "role": "QCR" } }
-        assert_eq!(
-            proto_info.branching_events,
-            vec![]
-        );
+        assert_eq!(proto_info.branching_events, vec![]);
         assert_eq!(proto_info.joining_events, BTreeSet::new());
     }
 
@@ -2322,14 +2329,14 @@ mod tests {
             "state 2 can not reach terminal node",
         ];
         /* let mut expected_errors = vec![
-                "command request enabled in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0), (2)--[request@T<pos>]-->(0)",
-                "event type partID emitted in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0)",
-                "event type pos emitted in more than one transition: (1)--[get@FL<pos>]-->(2), (2)--[request@T<pos>]-->(0)",
-            ]; */
+            "command request enabled in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0), (2)--[request@T<pos>]-->(0)",
+            "event type partID emitted in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0)",
+            "event type pos emitted in more than one transition: (1)--[get@FL<pos>]-->(2), (2)--[request@T<pos>]-->(0)",
+        ]; */
         errors.sort();
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
-    
+
         let proto = get_some_nonterminating_proto();
         let proto_info = prepare_proto_info::<Role>(CompositionComponent {
             protocol: proto,
