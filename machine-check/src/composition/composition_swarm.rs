@@ -168,7 +168,8 @@ pub fn check<T: SwarmInterface>(protos: InterfacingSwarms<T>, subs: &Subscriptio
 
     // If we reach this point the protocols can interface and are all confusion free.
     // We construct a ProtoInfo with the composition as the only protocol and all the
-    // information about branches etc. from combined_proto_info
+    // information about branches etc. from combined_proto_info 
+    // and the succeeding_events field updated using the expanded composition.
     let composition = explicit_composition_proto_info(combined_proto_info);
     let composition_checked = weak_well_formed_proto_info(composition, subs);
 
@@ -189,6 +190,7 @@ pub fn exact_weak_well_formed_sub<T: SwarmInterface>(
     // If we reach this point the protocols can interface and are all confusion free.
     // We construct a ProtoInfo with the composition as the only protocol and all the
     // information about branches etc. from combined_proto_info
+    // and the succeeding_events field updated using the expanded composition.
     let composition = explicit_composition_proto_info(combined_proto_info);
     let sub = exact_wwf_sub(composition, 0, subs);
 
@@ -485,10 +487,8 @@ fn confusion_free(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> {
 }
 
 /*
- * given a swarm protocol return smallest wwf-subscription
- * assume that the protocol does not contain concurrency etc
- * assume graph was constructed from a prepare_graph call with an empty subscription -- empty roles and active fields
- * log and command determinism?
+ * Given a swarm protocol return smallest WF-subscription. WF according to new compositional definition.
+ * Expand composition and apply rules from definition of WF until subscription stabilizes.
  */
 fn exact_wwf_sub(
     proto_info: ProtoInfo,
@@ -513,6 +513,8 @@ fn exact_wwf_sub(
 
     subscriptions
 }
+
+// Apply rules from WF defintion to add event types to subscription.
 fn exact_wwf_sub_step(
     proto_info: &ProtoInfo,
     graph: &Graph,
@@ -534,11 +536,11 @@ fn exact_wwf_sub_step(
             false
         };
     for node in Dfs::new(&graph, initial).iter(&graph) {
-        // for each edge going out of node:
-        // extend subscriptions to satisfy conditions for weak causal consistency
-        // make role performing the command subscribe to the emitted event type
-        // make roles active in continuations subscribe to the event type
-        // make an overapproximation of the roles in roles(e.G) subscribe to branching events.
+        // For each edge going out of node:
+        //  Extend subscriptions to satisfy conditions for weak causal consistency
+        //  Make role performing the command subscribe to the emitted event type
+        //  Make roles active in continuations subscribe to the event type
+        //  Make an overapproximation of the roles in roles(e.G) subscribe to branching events.
         for edge in graph.edges_directed(node, Outgoing) {
             let event_type = edge.weight().get_event_type();
             // weak causal consistency 1: a role subscribes to the events it emits
@@ -1034,26 +1036,25 @@ fn combine_proto_infos_fold<T: SwarmInterface>(protos: Vec<(ProtoInfo, Option<T>
         })
 }
 
-// given some node, return the swarmlabels going out of that node that are not concurrent with 'event'
+// Given some node, return the swarmlabels going out of that node that are not concurrent with 'event_type'.
 fn active_transitions_not_conc(
     node: NodeId,
     graph: &Graph,
-    event: &EventType,
+    event_type: &EventType,
     concurrent_events: &BTreeSet<BTreeSet<EventType>>,
 ) -> Vec<SwarmLabel> {
     graph
         .edges_directed(node, Outgoing)
         .map(|e| e.weight().clone())
         .filter(|e| {
-            !concurrent_events.contains(&BTreeSet::from([event.clone(), e.get_event_type()]))
+            !concurrent_events.contains(&BTreeSet::from([event_type.clone(), e.get_event_type()]))
         })
         .collect()
 }
 
-// the involved roles on a path are those roles that subscribe (or perform) to one or
-// more of the events taking place in a transition reachable from the transition
-// represented by its emitted event 'event_type'
-// Remove event_type from succeeding...
+// The involved roles on a path are those roles that subscribe to one or
+// more of the event types emitted in a transition reachable from the transition
+// represented by its emitted event 'event_type'.
 fn roles_on_path(
     event_type: EventType,
     proto_info: &ProtoInfo,
@@ -1070,6 +1071,8 @@ fn roles_on_path(
         .collect()
 }
 
+// Compute a map mapping event types to the set of event types that follow it.
+// I.e. for each event type t all those event types t' that can be emitted after t.
 fn after_not_concurrent(
     graph: &Graph,
     initial: NodeId,
@@ -1086,6 +1089,10 @@ fn after_not_concurrent(
     succ_map
 }
 
+// For each event type t we get a set ('active_in_successor') of event types
+// that only contains event types that are immediately after t and not concurrent with t.
+// We then add each event type t' in active_in_successor and all the event types t''
+// that we already know are after t' to the set of event types succeeding t.
 fn after_not_concurrent_step(
     graph: &Graph,
     initial: NodeId,
@@ -1094,9 +1101,6 @@ fn after_not_concurrent_step(
 ) -> bool {
     let mut is_stable = true;
     let mut walk = DfsPostOrder::new(&graph, initial);
-    // we should not need the outcommented filter
-    // for each edge e we get a set of 'active_in_successor' edges
-    // that only contains events immediately after e and not concurrent with e
     while let Some(node) = walk.next(&graph) {
         for edge in graph.edges_directed(node, Outgoing) {
             let event_type = edge.weight().get_event_type();
