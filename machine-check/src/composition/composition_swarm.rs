@@ -109,7 +109,7 @@ impl Error {
 
 const INVALID_EDGE: &str = "[invalid EdgeId]";
 
-/// copied from swarm.rs helper for printing a transition
+/// Copied from swarm.rs helper for printing a transition
 struct Edge<'a, N: StateName>(&'a petgraph::Graph<N, SwarmLabel>, EdgeId);
 
 impl<'a, N: StateName> fmt::Display for Edge<'a, N> {
@@ -138,6 +138,7 @@ impl ErrorReport {
     }
 }
 
+// Retrieve a graph or return an error.
 macro_rules! get_ith_or_error {
     ($proto_info:expr, $proto_pointer:expr) => {
         match $proto_info.get_ith_proto($proto_pointer) {
