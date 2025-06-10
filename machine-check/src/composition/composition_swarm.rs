@@ -3124,7 +3124,7 @@ mod tests {
                     "initial": "0",
                     "transitions": [
                         { "source": "0", "target": "1", "label": { "cmd": "i3", "logType": ["i3"], "role": "IR2" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "i4", "logType": ["acc"], "role": "IR2" } }
+                        { "source": "1", "target": "2", "label": { "cmd": "i5", "logType": ["i4"], "role": "IR2" } }
                     ]
                 }"#,
             )
@@ -3150,12 +3150,13 @@ mod tests {
 
         // The IR1 not used as an interface refers to the composition of (p || proto3) where p = (proto1 || proto2)
         let expected_errors = vec![
-            "Role IR1 is not used as an interface, but the command i1 or the event type i1 appear in both protocols",
-            "Role R3 is not used as an interface, but the command c or the event type i1 appear in both protocols"];
+            "event type i2 does not appear in both protocols",
+            "event type i4 does not appear in both protocols",
+            "event type i4 does not appear in both protocols"];
         let mut errors =
             error_report_to_strings(proto_info_to_error_report(combined_proto_info));
         errors.sort();
-        //assert_eq!(expected_errors, errors);
+        assert_eq!(expected_errors, errors);
         println!("{:?}", errors);
 
     }
