@@ -33,6 +33,7 @@ pub enum Error {
     SwarmErrorString(String), // bit ugly but instead of making prepare graph public or making another from_json returning Error type in swarm.rs
     InvalidInterfaceRole(Role),
     InterfaceEventNotInBothProtocols(EventType),
+    SpuriousInterface(Command, EventType, Role),
     RoleNotSubscribedToBranch(Vec<EventType>, EdgeId, NodeId, Role),
     RoleNotSubscribedToJoin(Vec<EventType>, EdgeId, Role),
     MoreThanOneEventTypeInCommand(EdgeId),
@@ -52,6 +53,9 @@ impl Error {
             }
             Error::InterfaceEventNotInBothProtocols(event_type) => {
                 format!("event type {event_type} does not appear in both protocols")
+            }
+            Error::SpuriousInterface(command, event_type, role) => {
+                format!("Role {role} is not used as an interface, but the command {command} or the event type {event_type} appear in both protocols")
             }
             Error::RoleNotSubscribedToBranch(event_types, edge, node, role) => {
                 let events = event_types.join(", ");
@@ -578,7 +582,7 @@ fn exact_wwf_sub_step(
                 .flatten()
                 .cloned()
                 .collect();
-            
+
             // The event types emitted at this node in the set of event types branching together with event_type.
             let branching_this_node: BTreeSet<_> = graph
                 .edges_directed(node, Outgoing)
@@ -951,7 +955,7 @@ fn combine_proto_infos<T: SwarmInterface>(
 ) -> ProtoInfo {
     let _span = tracing::info_span!("combine_proto_infos").entered();
     let errors = interface.check_interface(&proto_info1, &proto_info2);
-    if !errors.is_empty() {
+    /* if !errors.is_empty() {
         let protocols = vec![
             proto_info1.protocols.clone(),
             proto_info2.protocols.clone(),
@@ -965,8 +969,8 @@ fn combine_proto_infos<T: SwarmInterface>(
         .concat();
         // Would work to construct it just like normally. but..
         return ProtoInfo::new_only_proto(protocols);
-    }
-    let interfacing_event_types = interface.interfacing_event_types(&proto_info1, &proto_info2);
+    } */
+    let interfacing_event_types = interface.interfacing_event_types_single(&proto_info2);
     let protocols = vec![proto_info1.protocols.clone(), proto_info2.protocols.clone()].concat();
     let role_event_map = combine_maps(
         proto_info1.role_event_map.clone(),
@@ -1006,6 +1010,7 @@ fn combine_proto_infos<T: SwarmInterface>(
         joining_events,
         immediately_pre,
         happens_after,
+        [proto_info1.interface_errors, proto_info2.interface_errors, errors].concat(),
     )
 }
 
@@ -1263,6 +1268,7 @@ fn prepare_proto_info<T: SwarmInterface>(proto: CompositionComponent<T>) -> Prot
         BTreeSet::new(),
         immediately_pre_map,
         happens_after,
+        vec![],
     )
 }
 
@@ -1336,6 +1342,7 @@ pub fn proto_info_to_error_report(proto_info: ProtoInfo) -> ErrorReport {
             .protocols
             .into_iter()
             .map(|p| (p.graph, p.errors))
+            .chain([(Graph::new(), proto_info.interface_errors)]) // NO!!!
             .collect(),
     )
 }
@@ -1435,6 +1442,7 @@ fn combine_maps<K: Ord + Clone, V: Ord + Clone>(
 }
 
 // overapproximate concurrent events. anything from different protocols that are not interfacing events is considered concurrent.
+// Pre: interface has been checked.
 fn get_concurrent_events<T: SwarmInterface>(
     proto_info1: &ProtoInfo,
     proto_info2: &ProtoInfo,
@@ -1446,7 +1454,7 @@ fn get_concurrent_events<T: SwarmInterface>(
         .union(&proto_info2.concurrent_events)
         .cloned()
         .collect();
-    let interfacing_events = interface.interfacing_event_types(proto_info1, &proto_info2);
+    let interfacing_events = interface.interfacing_event_types_single(proto_info2);
     let events_proto1: BTreeSet<EventType> = proto_info1
         .get_event_types()
         .difference(&interfacing_events)
@@ -3017,4 +3025,139 @@ mod tests {
             serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap()
         );
     }
+
+    #[test]
+    fn test_interface() {
+        let proto1: SwarmProtocolType =
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR1" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "a", "logType": ["a"], "role": "R1" } }
+                    ]
+                }"#,
+            )
+            .unwrap();
+
+        let proto2: SwarmProtocolType =
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR1" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR2" } }
+                    ]
+                }"#,
+            )
+            .unwrap();
+
+        let proto3: SwarmProtocolType =
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR2" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "c", "logType": ["i1"], "role": "R3" } }
+                    ]
+                }"#,
+            )
+            .unwrap();
+
+        let interfacing_swarms = InterfacingSwarms(vec![
+            CompositionComponent {
+                protocol: proto1,
+                interface: None,
+            },
+            CompositionComponent {
+                protocol: proto2,
+                interface: Some(Role::new("IR1")),
+            },
+            CompositionComponent {
+                protocol: proto3,
+                interface: Some(Role::new("IR2")),
+            },
+        ]);
+
+        let combined_proto_info =
+            combine_proto_infos_fold(prepare_proto_infos::<Role>(interfacing_swarms.clone()));
+
+        // The IR1 not used as an interface refers to the composition of (p || proto3) where p = (proto1 || proto2)
+        let expected_errors = vec![
+            "Role IR1 is not used as an interface, but the command i1 or the event type i1 appear in both protocols",
+            "Role R3 is not used as an interface, but the command c or the event type i1 appear in both protocols"];
+        let mut errors =
+            error_report_to_strings(proto_info_to_error_report(combined_proto_info));
+        errors.sort();
+        assert_eq!(expected_errors, errors);
+        println!("________________________________");
+
+        let proto1: SwarmProtocolType =
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR1" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "a", "logType": ["a"], "role": "R1" } }
+                    ]
+                }"#,
+            )
+            .unwrap();
+
+        let proto2: SwarmProtocolType =
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR1" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR1" } },
+                        { "source": "2", "target": "3", "label": { "cmd": "i3", "logType": ["i3"], "role": "IR2" } },
+                        { "source": "3", "target": "4", "label": { "cmd": "i4", "logType": ["i4"], "role": "IR2" } }
+                    ]
+                }"#,
+            )
+            .unwrap();
+
+        let proto3: SwarmProtocolType =
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "i3", "logType": ["i3"], "role": "IR2" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "i4", "logType": ["acc"], "role": "IR2" } }
+                    ]
+                }"#,
+            )
+            .unwrap();
+
+        let interfacing_swarms = InterfacingSwarms(vec![
+            CompositionComponent {
+                protocol: proto1,
+                interface: None,
+            },
+            CompositionComponent {
+                protocol: proto2,
+                interface: Some(Role::new("IR1")),
+            },
+            CompositionComponent {
+                protocol: proto3,
+                interface: Some(Role::new("IR2")),
+            },
+        ]);
+
+        let combined_proto_info =
+            combine_proto_infos_fold(prepare_proto_infos::<Role>(interfacing_swarms.clone()));
+
+        // The IR1 not used as an interface refers to the composition of (p || proto3) where p = (proto1 || proto2)
+        let expected_errors = vec![
+            "Role IR1 is not used as an interface, but the command i1 or the event type i1 appear in both protocols",
+            "Role R3 is not used as an interface, but the command c or the event type i1 appear in both protocols"];
+        let mut errors =
+            error_report_to_strings(proto_info_to_error_report(combined_proto_info));
+        errors.sort();
+        //assert_eq!(expected_errors, errors);
+        println!("{:?}", errors);
+
+    }
+
 }

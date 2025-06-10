@@ -1,7 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use tsify::{Tsify, declare};
+use std::collections::{BTreeMap, BTreeSet};
+use tsify::{declare, Tsify};
 
 use crate::{
     composition::composition_swarm::Error,
@@ -72,6 +72,7 @@ pub struct ProtoInfo {
     pub joining_events: BTreeSet<EventType>,
     pub immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
     pub succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
+    pub interface_errors: Vec<Error>,
 }
 
 impl ProtoInfo {
@@ -83,6 +84,7 @@ impl ProtoInfo {
         joining_events: BTreeSet<EventType>,
         immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
         succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
+        interface_errors: Vec<Error>,
     ) -> Self {
         Self {
             protocols,
@@ -92,6 +94,7 @@ impl ProtoInfo {
             joining_events,
             immediately_pre,
             succeeding_events,
+            interface_errors,
         }
     }
 
@@ -104,6 +107,7 @@ impl ProtoInfo {
             joining_events: BTreeSet::new(),
             immediately_pre: BTreeMap::new(),
             succeeding_events: BTreeMap::new(),
+            interface_errors: Vec::new(),
         }
     }
 
@@ -122,17 +126,35 @@ impl ProtoInfo {
 
 pub fn get_branching_joining_proto_info(proto_info: &ProtoInfo) -> BTreeSet<EventType> {
     let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
-        let pre = proto_info.immediately_pre.get(e).cloned().unwrap_or_default();
+        let pre = proto_info
+            .immediately_pre
+            .get(e)
+            .cloned()
+            .unwrap_or_default();
         let product = pre.clone().into_iter().cartesian_product(&pre);
-        product.filter(|(e1, e2)| *e1 != **e2 && proto_info.concurrent_events.contains(&unord_event_pair(e1.clone(), (*e2).clone())))
+        product
+            .filter(|(e1, e2)| {
+                *e1 != **e2
+                    && proto_info
+                        .concurrent_events
+                        .contains(&unord_event_pair(e1.clone(), (*e2).clone()))
+            })
             .map(|(e1, e2)| [e1, e2.clone()])
             .flatten()
             .collect()
     };
-    proto_info.branching_events.clone().into_iter()
+    proto_info
+        .branching_events
+        .clone()
+        .into_iter()
         .flatten()
-        .chain(proto_info.joining_events.clone().into_iter()
-            .filter(|e| !get_pre_joins(e).is_empty()))
+        .chain(
+            proto_info
+                .joining_events
+                .clone()
+                .into_iter()
+                .filter(|e| !get_pre_joins(e).is_empty()),
+        )
         .collect()
 }
 
@@ -273,7 +295,7 @@ impl SwarmInterface for Role {
             .intersection(&b.get_roles())
             .cloned()
             .collect();
-
+        println!("{:?}", role_intersection);
         // there should only be one role that appears in both protocols
         let mut errors =
             if role_intersection.contains(self) && role_intersection.iter().count() == 1 {
@@ -282,32 +304,41 @@ impl SwarmInterface for Role {
                 vec![Error::InvalidInterfaceRole(self.clone())]
             };
 
-        let if_commands_1: BTreeSet<(Command, EventType, Role)> = a
-            .get_labels()
-            .into_iter()
-            .filter(|(_, _, r)| *r == *self)
-            .collect();
-        let if_commands_2: BTreeSet<(Command, EventType, Role)> = b
-            .get_labels()
-            .into_iter()
-            .filter(|(_, _, r)| *r == *self)
-            .collect();
+        let triples_a: BTreeSet<(Command, EventType, Role)> = a.get_labels().into_iter().collect();
+        let triples_b: BTreeSet<(Command, EventType, Role)> = b.get_labels().into_iter().collect();
+        let event_types_a: BTreeSet<EventType> =
+            triples_a.iter().map(|(_, et, _)| et).cloned().collect();
+        let commands_a: BTreeSet<Command> = triples_a.iter().map(|(c, _, _)| c).cloned().collect();
+        let event_types_b: BTreeSet<EventType> =
+            triples_b.iter().map(|(_, et, _)| et).cloned().collect();
+        let commands_b: BTreeSet<Command> = triples_b.iter().map(|(c, _, _)| c).cloned().collect();
 
-        // R<e> in proto1 iff. R<e> in proto2
-        if if_commands_1 != if_commands_2 {
-            let mut not_in_proto2: Vec<Error> = if_commands_1
-                .difference(&if_commands_2)
-                .map(|(_, e, _)| e.clone())
-                .map(|event_type| Error::InterfaceEventNotInBothProtocols(event_type))
-                .collect();
-            let mut not_in_proto1: Vec<Error> = if_commands_2
-                .difference(&if_commands_1)
-                .map(|(_, e, _)| e.clone())
-                .map(|event_type| Error::InterfaceEventNotInBothProtocols(event_type))
-                .collect();
-            errors.append(&mut not_in_proto1);
-            errors.append(&mut not_in_proto2);
-        }
+        let matcher = |triple: &(Command, EventType, Role),
+                       reference_triples: &BTreeSet<(Command, EventType, Role)>,
+                       reference_event_types: &BTreeSet<EventType>,
+                       reference_commands: &BTreeSet<Command>| match triple {
+            (_, et, r) if *r == *self && !reference_triples.contains(triple) => {
+                Some(Error::InterfaceEventNotInBothProtocols(et.clone()))
+            }
+            (c, et, r)
+                if *r != *self
+                    && (reference_event_types.contains(et) || reference_commands.contains(c)) =>
+            {
+                Some(Error::SpuriousInterface(c.clone(), et.clone(), r.clone()))
+            }
+            _ => None,
+        };
+
+        errors.append(&mut triples_a
+            .iter()
+            .map(|triple| matcher(triple, &triples_b, &event_types_b, &commands_b))
+            .filter_map(|e| e)
+            .collect());
+        errors.append(&mut triples_b
+            .iter()
+            .map(|triple| matcher(triple, &triples_a, &event_types_a, &commands_a))
+            .filter_map(|e| e)
+            .collect());
 
         errors
     }
@@ -333,3 +364,15 @@ impl SwarmInterface for Role {
             .collect()
     }
 }
+
+/*
+    triples_a.
+    map(|triple|
+        match (c, et, r) {
+            (c, et, r) if *r == self && !triples_b.contains(triple) => Some(Not in both),
+            (c, et, r) if *r != self && (event_types_b.contains(et) || commands_b.contains(c)) => Some(Spurious event type)
+        }
+        )
+
+
+*/
