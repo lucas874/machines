@@ -72,7 +72,7 @@ pub struct ProtoInfo {
     pub joining_events: BTreeSet<EventType>,
     pub immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
     pub succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
-    pub interface_errors: Vec<Error>,
+    pub interface_errors: Vec<InterfaceError>,
 }
 
 impl ProtoInfo {
@@ -84,7 +84,7 @@ impl ProtoInfo {
         joining_events: BTreeSet<EventType>,
         immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
         succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
-        interface_errors: Vec<Error>,
+        interface_errors: Vec<InterfaceError>,
     ) -> Self {
         Self {
             protocols,
@@ -217,6 +217,30 @@ impl EventLabel for MachineLabel {
         match self {
             Self::Execute { log_type, .. } => log_type[0].clone(),
             Self::Input { event_type } => event_type.clone(),
+        }
+    }
+}
+
+/* Errors related to interfaces */
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum InterfaceError {
+    InvalidInterfaceRole(Role),
+    InterfaceEventNotInBothProtocols(EventType),
+    SpuriousInterface(Command, EventType, Role),
+}
+
+impl InterfaceError {
+    pub fn to_string(&self) -> String {
+        match self {
+            InterfaceError::InvalidInterfaceRole(role) => {
+                format!("role {role} can not be used as interface")
+            }
+            InterfaceError::InterfaceEventNotInBothProtocols(event_type) => {
+                format!("event type {event_type} does not appear in both protocols")
+            }
+            InterfaceError::SpuriousInterface(command, event_type, role) => {
+                format!("Role {role} is not used as an interface, but the command {command} or the event type {event_type} appear in both protocols")
+            }
         }
     }
 }

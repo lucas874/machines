@@ -3,8 +3,21 @@ use composition_types::{get_branching_joining_proto_info, DataResult, Granularit
 
 use super::*;
 
+pub mod types1 {
+    pub mod error;
+    pub mod projection;
+    pub mod proto_info;
+    pub mod util;
+}
+
+pub mod util {
+    pub mod compose;
+    pub mod project;
+}
+pub mod adaptation;
 mod composition_machine;
 mod composition_swarm;
+mod subscription_generation;
 pub mod composition_types;
 
 macro_rules! deserialize_subs {
@@ -162,9 +175,11 @@ pub fn compose_protocols(protos: InterfacingSwarms<Role>) -> DataResult<SwarmPro
 }
 
 fn error_report_to_strings(error_report: ErrorReport) -> Vec<String> {
-    error_report
-        .errors()
+   vec![error_report
+        .wf_errors()
         .into_iter()
         .flat_map(|(g, e)| e.map(composition::composition_swarm::Error::convert(&g)))
-        .collect()
+        .collect(),
+        error_report.if_errors().into_iter().map(|e| e.to_string()).collect()
+   ]
 }

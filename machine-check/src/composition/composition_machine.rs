@@ -25,11 +25,11 @@ type Graph = petgraph::Graph<State, MachineLabel>;
 type OptionGraph = petgraph::Graph<Option<State>, MachineLabel>;
 type ERef<'a> = <&'a super::Graph as IntoEdgeReferences>::EdgeRef;
 
-impl From<String> for State {
+/* impl From<String> for State {
     fn from(value: String) -> State {
         State::new(&value)
     }
-}
+} */
 
 // Used for creating adapted machine.
 // A composed state in an adapted machine contains some

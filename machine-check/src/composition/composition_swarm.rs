@@ -6,7 +6,7 @@ use super::{
     },
     Graph,
 };
-use crate::composition::composition_types::ProtoLabel;
+use crate::composition::composition_types::{InterfaceError, ProtoLabel};
 use crate::types::Command;
 use crate::{
     types::{EventType, Role, State, StateName, SwarmLabel, Transition},
@@ -130,15 +130,23 @@ impl<'a, N: StateName> fmt::Display for Edge<'a, N> {
 
 // Container for errors accumulated while processing protocols
 #[derive(Debug)]
-pub struct ErrorReport(pub Vec<(petgraph::Graph<State, SwarmLabel>, Vec<Error>)>);
+pub struct ErrorReport{
+    pub well_formedness_errors: Vec<(petgraph::Graph<State, SwarmLabel>, Vec<Error>)>,
+    pub interface_errors: Vec<InterfaceError>
+
+}//(pub Vec<(petgraph::Graph<State, SwarmLabel>, Vec<Error>)>);
 
 impl ErrorReport {
     pub fn is_empty(&self) -> bool {
-        self.0.iter().all(|(_, es)| es.is_empty())
+        self.well_formedness_errors.iter().all(|(_, es)| es.is_empty())
+        && self.interface_errors.is_empty()
     }
 
-    pub fn errors(&self) -> Vec<(petgraph::Graph<State, SwarmLabel>, Vec<Error>)> {
-        self.0.clone()
+    pub fn wf_errors(&self) -> Vec<(petgraph::Graph<State, SwarmLabel>, Vec<Error>)>  {
+        self.well_formedness_errors.clone()
+    }
+    pub fn if_errors(&self) -> Vec<InterfaceError>  {
+        self.interface_errors.clone()
     }
 }
 
@@ -1010,7 +1018,7 @@ fn combine_proto_infos<T: SwarmInterface>(
         joining_events,
         immediately_pre,
         happens_after,
-        [proto_info1.interface_errors, proto_info2.interface_errors, errors].concat(),
+        [proto_info1.interface_errors, proto_info2.interface_errors].concat(),
     )
 }
 
@@ -1337,14 +1345,14 @@ pub fn from_json(proto: SwarmProtocolType) -> (Graph, Option<NodeId>, Vec<String
 
 pub fn proto_info_to_error_report(proto_info: ProtoInfo) -> ErrorReport {
     let _span = tracing::info_span!("proto_info_to_error_report").entered();
-    ErrorReport(
+    let well_formedness_errors =
         proto_info
             .protocols
             .into_iter()
             .map(|p| (p.graph, p.errors))
-            .chain([(Graph::new(), proto_info.interface_errors)]) // NO!!!
-            .collect(),
-    )
+            .collect();
+    let interface_errors = proto_info.interface_errors;
+    ErrorReport { well_formedness_errors, interface_errors }
 }
 
 // copied from swarm::swarm.rs
