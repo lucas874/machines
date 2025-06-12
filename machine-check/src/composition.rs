@@ -68,7 +68,7 @@ pub fn project_combine(protos: InterfacingProtocols, subs: String, role: Role, m
         return DataResult::ERROR { errors: error_report_to_strings(proto_info_to_error_report(proto_info)) }//derr::<Machine>(error_report_to_strings(proto_info_to_error_report(proto_info)));
     }
 
-    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role, minimize);
+    let (proj, proj_initial) = composition_machine::project_combine(&proto_info, &subs, role, minimize);
     DataResult::OK { data: composition::composition_machine::from_option_to_machine(proj, proj_initial.unwrap()) }
 }
 
@@ -79,7 +79,7 @@ pub fn projection_information(protos: InterfacingProtocols, subs: String, role: 
     if !proto_info.no_errors() {
         return DataResult:: ERROR { errors: error_report_to_strings(proto_info_to_error_report(proto_info)) };
     }
-    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role, minimize);
+    let (proj, proj_initial) = composition_machine::project_combine(&proto_info, &subs, role, minimize);
     let branches = composition_machine::paths_from_event_types(&proj, &proto_info);
     let special_event_types = get_branching_joining_proto_info(&proto_info);
 
@@ -125,7 +125,7 @@ pub fn check_composed_projection(
         return CheckResult::ERROR { errors: error_report_to_strings(proto_info_to_error_report(proto_info)) };
     }
 
-    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role, false);
+    let (proj, proj_initial) = composition_machine::project_combine(&proto_info, &subs, role, false);
     let (machine, json_initial, m_errors) = machine::from_json(machine);
     let machine_problem = !m_errors.is_empty();
     let mut errors = vec![];

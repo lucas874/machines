@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use tsify::{declare, Tsify};
@@ -32,7 +31,7 @@ pub struct ProtoStruct {
     pub graph: Graph,
     pub initial: Option<NodeId>,
     pub errors: Vec<Error>,
-    pub interface: BTreeSet<EventType>,
+    pub roles: BTreeSet<Role>,
 }
 
 impl ProtoStruct {
@@ -40,13 +39,13 @@ impl ProtoStruct {
         graph: Graph,
         initial: Option<NodeId>,
         errors: Vec<Error>,
-        interface: BTreeSet<EventType>,
+        roles: BTreeSet<Role>,
     ) -> Self {
         Self {
             graph,
             initial,
             errors,
-            interface,
+            roles,
         }
     }
 
@@ -84,7 +83,7 @@ pub struct ProtoInfo {
     pub role_event_map: RoleEventMap,
     pub concurrent_events: BTreeSet<UnordEventPair>, // consider to make a more specific type. unordered pair.
     pub branching_events: Vec<BTreeSet<EventType>>,
-    pub joining_events: BTreeSet<EventType>,
+    pub joining_events: BTreeMap<EventType, BTreeSet<EventType>>,
     pub immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
     pub succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
     pub interfacing_events: BTreeSet<EventType>,
@@ -97,7 +96,7 @@ impl ProtoInfo {
         role_event_map: RoleEventMap,
         concurrent_events: BTreeSet<UnordEventPair>,
         branching_events: Vec<BTreeSet<EventType>>,
-        joining_events: BTreeSet<EventType>,
+        joining_events: BTreeMap<EventType, BTreeSet<EventType>>,
         immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
         succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
         interfacing_events: BTreeSet<EventType>,
@@ -122,7 +121,7 @@ impl ProtoInfo {
             role_event_map: BTreeMap::new(),
             concurrent_events: BTreeSet::new(),
             branching_events: Vec::new(),
-            joining_events: BTreeSet::new(),
+            joining_events: BTreeMap::new(),
             immediately_pre: BTreeMap::new(),
             succeeding_events: BTreeMap::new(),
             interfacing_events: BTreeSet::new(),
@@ -144,24 +143,6 @@ impl ProtoInfo {
 }
 
 pub fn get_branching_joining_proto_info(proto_info: &ProtoInfo) -> BTreeSet<EventType> {
-    let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
-        let pre = proto_info
-            .immediately_pre
-            .get(e)
-            .cloned()
-            .unwrap_or_default();
-        let product = pre.clone().into_iter().cartesian_product(&pre);
-        product
-            .filter(|(e1, e2)| {
-                *e1 != **e2
-                    && proto_info
-                        .concurrent_events
-                        .contains(&unord_event_pair(e1.clone(), (*e2).clone()))
-            })
-            .map(|(e1, e2)| [e1, e2.clone()])
-            .flatten()
-            .collect()
-    };
     proto_info
         .branching_events
         .clone()
@@ -170,9 +151,9 @@ pub fn get_branching_joining_proto_info(proto_info: &ProtoInfo) -> BTreeSet<Even
         .chain(
             proto_info
                 .joining_events
-                .clone()
-                .into_iter()
-                .filter(|e| !get_pre_joins(e).is_empty()),
+                .keys()
+                .cloned()
+                .collect::<BTreeSet<EventType>>()
         )
         .collect()
 }

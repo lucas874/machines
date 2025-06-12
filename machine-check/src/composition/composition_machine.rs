@@ -44,6 +44,14 @@ struct AdaptationNode {
 }
 type AdaptationGraph = petgraph::Graph<AdaptationNode, MachineLabel>;
 
+// Vec of triples of the form:
+//      (protocol_graph, initial_node, interfacing event types with vec[i-1])
+// Protocols linked together in a 'chain' by interfacing event types
+type ChainedProtos = Vec<(petgraph::Graph<State, SwarmLabel>, NodeId, BTreeSet<EventType>)>;
+
+// Same as type above, but for projections
+type ChainedProjections = Vec<(Graph, NodeId, BTreeSet<EventType>)>;
+
 // Similar to machine::project, except that transitions with event types
 // not subscribed to by role are skipped.
 pub fn project(
@@ -125,33 +133,54 @@ pub fn project(
     }
 }
 
+// Map the protocols of a proto_info to a ChainedProtos
+fn to_chained_protos(proto_info: &ProtoInfo) -> ChainedProtos {
+    let folder = |(acc, roles_prev): (ChainedProtos, BTreeSet<Role>), proto: ProtoStruct| -> (ChainedProtos, BTreeSet<Role>) {
+        let interfacing_event_types = roles_prev
+            .intersection(&proto.roles)
+            .flat_map(|role| proto_info
+                .role_event_map
+                .get(role)
+                .unwrap()
+                .iter()
+                .map(|swarm_label| swarm_label.get_event_type()))
+            .collect();
+        let acc = acc.into_iter().chain([(proto.graph, proto.initial.unwrap(), interfacing_event_types)]).collect();
+        (acc, proto.roles)
+    };
+    let (chained_protos, _) = proto_info
+        .protocols
+        .clone()
+        .into_iter()
+        .fold((vec![], BTreeSet::new()), folder);
+    chained_protos
+}
+
+// Map a ChainedProtos to a ChainedProjections
+fn to_chained_projections(chained_protos: ChainedProtos, subs: &Subscriptions, role: Role, minimize: bool) -> ChainedProjections {
+    let mapper = |(graph, initial, interface)| -> (Graph, NodeId, BTreeSet<EventType>) {
+        let (projection, projection_initial) =
+            project(&graph, initial, subs, role.clone(), minimize);
+        (projection, projection_initial, interface)
+    };
+
+    chained_protos
+        .into_iter()
+        .map(mapper)
+        .collect()
+}
+
 // precondition: the protocols interfaces on the supplied interfaces.
 // precondition: the composition of the protocols in swarms is wwf w.r.t. subs.
 pub fn project_combine(
-    swarms: &Vec<ProtoStruct>,
+    proto_info: &ProtoInfo,
     subs: &Subscriptions,
     role: Role,
     minimize: bool,
 ) -> (OptionGraph, Option<NodeId>) {
     let _span = tracing::info_span!("project_combine", %role).entered();
-    // check this anyway
-    if swarms.is_empty()
-        || !swarms[0].interface.is_empty()
-        || swarms[0].initial.is_none()
-        || swarms[1..]
-            .iter()
-            .any(|p| p.interface.is_empty() || p.initial.is_none())
-    {
-        return (OptionGraph::new(), None);
-    }
 
-    let mapper = |p: &ProtoStruct| -> (Graph, NodeId, BTreeSet<EventType>) {
-        let (projection, projection_initial) =
-            project(&p.graph, p.initial.unwrap(), subs, role.clone(), minimize);
-        (projection, projection_initial, p.interface.clone())
-    };
-
-    let projections: Vec<_> = swarms.into_iter().map(mapper).collect();
+    let projections = to_chained_projections(to_chained_protos(proto_info), subs, role, minimize);
 
     let (combined_projection, combined_initial) = combine_projs(projections, gen_state_name);
 
@@ -371,39 +400,9 @@ fn visit_successors_stop_on_branch(
 pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> BranchMap {
     let _span = tracing::info_span!("paths_from_event_types").entered();
     let mut m: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
-    let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
-        let pre = proto_info
-            .immediately_pre
-            .get(e)
-            .cloned()
-            .unwrap_or_default();
-        let product = pre.clone().into_iter().cartesian_product(&pre);
-        product
-            .filter(|(e1, e2)| {
-                *e1 != **e2
-                    && proto_info
-                        .concurrent_events
-                        .contains(&unord_event_pair(e1.clone(), (*e2).clone()))
-            })
-            .map(|(e1, e2)| [e1, e2.clone()])
-            .flatten()
-            .collect()
-    };
+    let special_events = get_branching_joining_proto_info(proto_info);
 
-    let special_events = proto_info
-        .branching_events
-        .clone()
-        .into_iter()
-        .flatten()
-        .chain(
-            proto_info
-                .joining_events
-                .clone()
-                .into_iter()
-                .filter(|e| !get_pre_joins(e).is_empty()),
-        )
-        .collect();
-
+    // The reason for making set of concurrent events smaller is?
     let after_pairs: BTreeSet<UnordEventPair> =
         transitive_closure_succeeding(proto_info.succeeding_events.clone())
             .into_iter()
@@ -650,7 +649,7 @@ pub fn equivalent(left: &OptionGraph, li: NodeId, right: &OptionGraph, ri: NodeI
 }
 
 fn adapted_projection(
-    swarms: &Vec<ProtoStruct>,
+    proto_info: &ProtoInfo,
     subs: &Subscriptions,
     role: Role,
     machine: (OptionGraph, NodeId),
@@ -658,14 +657,12 @@ fn adapted_projection(
     minimize: bool,
 ) -> Option<(AdaptationGraph, Option<NodeId>)> {
     let _span = tracing::info_span!("adapted_projection", %role).entered();
-    if k >= swarms.len() {
+    if k >= proto_info.protocols.len() {
         return None;
     }
 
     // project a protocol and turn the projection into an AdaptationGraph
-    let mapper = |ps: &ProtoStruct| {
-        let (proj, proj_initial) =
-            project(&ps.graph, ps.initial.unwrap(), subs, role.clone(), minimize);
+    let mapper = |(proj, proj_initial, interface): (Graph, NodeId, BTreeSet<EventType>)| {
         let proj = proj.map(
             |_, n| AdaptationNode {
                 state: n.clone(),
@@ -673,7 +670,7 @@ fn adapted_projection(
             },
             |_, label| label.clone(),
         );
-        (proj, proj_initial, ps.interface.clone())
+        (proj, proj_initial, interface)
     };
 
     let gen_node = |n1: &AdaptationNode, n2: &AdaptationNode| -> AdaptationNode {
@@ -699,7 +696,7 @@ fn adapted_projection(
     };
 
     let projections: Vec<(AdaptationGraph, NodeId, BTreeSet<EventType>)> =
-        swarms.iter().map(mapper).collect();
+        to_chained_projections(to_chained_protos(proto_info), subs, role, minimize).into_iter().map(mapper).collect();
 
     //AdaptationGraph{state: n.clone(), machine_state: Some(state.clone())}
     let (machine, machine_initial) = (from_option_graph_to_graph(&machine.0), machine.1);
@@ -763,7 +760,7 @@ pub fn projection_information(
     minimize: bool,
 ) -> Option<ProjectionInfo> {
     let (proj, proj_initial) =
-        match adapted_projection(&proto_info.protocols, subs, role, machine, k, minimize) {
+        match adapted_projection(&proto_info, subs, role, machine, k, minimize) {
             Some((proj, Some(proj_initial))) => (proj, proj_initial),
             _ => return None,
         };
@@ -1706,7 +1703,7 @@ mod tests {
         assert!(proto_info.no_errors());
 
         let (proj_combined1, proj_combined_initial1) =
-            project_combine(&proto_info.protocols, &subs1, role.clone(), false);
+            project_combine(&proto_info, &subs1, role.clone(), false);
 
         let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
             get_interfacing_swarms_1_reversed(),
@@ -1719,7 +1716,7 @@ mod tests {
         assert!(proto_info.no_errors());
 
         let (proj_combined2, proj_combined_initial2) =
-            project_combine(&proto_info.protocols, &subs2, role.clone(), false);
+            project_combine(&proto_info, &subs2, role.clone(), false);
 
         // compose(a, b) should be equal to compose(b, a)
         assert_eq!(subs1, subs2);
@@ -1804,7 +1801,7 @@ mod tests {
             assert!(proto_info.no_errors());
 
             let (proj_combined1, proj_combined_initial1) =
-                project_combine(&proto_info.protocols, &subs1, role.clone(), false);
+                project_combine(&proto_info, &subs1, role.clone(), false);
 
             let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
                 get_interfacing_swarms_2_reversed(),
@@ -1817,7 +1814,7 @@ mod tests {
             assert!(proto_info.no_errors());
 
             let (proj_combined2, proj_combined_initial2) =
-                project_combine(&proto_info.protocols, &subs2, role.clone(), false);
+                project_combine(&proto_info, &subs2, role.clone(), false);
 
             // compose(a, b) should be equal to compose(b, a)
             assert_eq!(subs1, subs2);
@@ -1857,7 +1854,7 @@ mod tests {
         let proto_info = swarms_to_proto_info(get_interfacing_swarms_3());
         assert!(proto_info.no_errors());
         let (proj, proj_initial) =
-            project_combine(&proto_info.protocols, &subs, role.clone(), false);
+            project_combine(&proto_info, &subs, role.clone(), false);
         println!(
             "projection of {}: {}",
             role.to_string(),
@@ -1929,7 +1926,7 @@ mod tests {
         //println!("conc: {:?}", proto_info.concurrent_events);
         for role in all_roles {
             let (proj, proj_initial) =
-                project_combine(&proto_info.protocols, &subs, role.clone(), false);
+                project_combine(&proto_info, &subs, role.clone(), false);
             //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
             let branch_thing = paths_from_event_types(&proj, &proto_info);
             println!(
@@ -1964,7 +1961,7 @@ mod tests {
         //println!("conc: {:?}", proto_info.concurrent_events);
         for role in all_roles {
             let (proj, proj_initial) =
-                project_combine(&proto_info.protocols, &subs, role.clone(), false);
+                project_combine(&proto_info, &subs, role.clone(), false);
             //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
             let branch_thing = paths_from_event_types(&proj, &proto_info);
             println!(
@@ -1996,7 +1993,7 @@ mod tests {
 
         for role in all_roles {
             let (proj, proj_initial) =
-                project_combine(&proto_info.protocols, &subs, role.clone(), false);
+                project_combine(&proto_info, &subs, role.clone(), false);
             //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
             if role.to_string() == "D" {
                 let branch_thing = paths_from_event_types(&proj, &proto_info);
@@ -2198,7 +2195,7 @@ mod tests {
         assert!(proto_info.no_errors());
 
         let adapted = adapted_projection(
-            &proto_info.protocols,
+            &proto_info,
             &subs1,
             role.clone(),
             (fl_m_graph.clone(), fl_m_graph_initial.unwrap()),
@@ -2240,7 +2237,7 @@ mod tests {
 
         //let (adapted_proj, adapted_proj_initial) = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
         let adapted = adapted_projection(
-            &proto_info.protocols,
+            &proto_info,
             &subs2,
             role.clone(),
             (fl_m_graph.clone(), fl_m_graph_initial.unwrap()),
@@ -2316,7 +2313,7 @@ mod tests {
         assert!(proto_info.no_errors());
 
         let adapted = adapted_projection(
-            &proto_info.protocols,
+            &proto_info,
             &subs1,
             role.clone(),
             (f_m_graph.clone(), f_m_graph_initial.unwrap()),
@@ -2357,7 +2354,7 @@ mod tests {
         assert!(proto_info.no_errors());
 
         let adapted = adapted_projection(
-            &proto_info.protocols,
+            &proto_info,
             &subs2,
             role.clone(),
             (f_m_graph.clone(), f_m_graph_initial.unwrap()),
