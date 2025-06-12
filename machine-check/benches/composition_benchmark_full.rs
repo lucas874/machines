@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use machine_check::composition::composition_types::Granularity;
+use machine_check::composition::composition_types::{Granularity, InterfacingProtocols};
 use machine_check::composition::{
     composition_types::InterfacingSwarms, exact_weak_well_formed_sub,
     overapproximated_weak_well_formed_sub,
@@ -32,7 +32,7 @@ pub struct BenchMarkInput {
     pub interfacing_swarms: InterfacingSwarms<Role>,
 }
 
-fn prepare_input(file_name: String) -> (usize, InterfacingSwarms<Role>) {
+fn prepare_input(file_name: String) -> (usize, InterfacingProtocols) {
     // Create a path to the desired file
     let path = Path::new(&file_name);
     let display = path.display();
@@ -57,12 +57,12 @@ fn prepare_input(file_name: String) -> (usize, InterfacingSwarms<Role>) {
 
     (
         state_space_size,
-        interfacing_swarms,//serde_json::to_string(&interfacing_swarms).unwrap(),
+        InterfacingProtocols(interfacing_swarms.0.into_iter().map(|cc| cc.protocol).collect()),
     )
 }
 
-fn prepare_files_in_directory(directory: String) -> Vec<(usize, InterfacingSwarms<Role>)> {
-    let mut inputs: Vec<(usize, InterfacingSwarms<Role>)> = vec![];
+fn prepare_files_in_directory(directory: String) -> Vec<(usize, InterfacingProtocols)> {
+    let mut inputs: Vec<(usize, InterfacingProtocols)> = vec![];
 
     for entry in WalkDir::new(directory) {
         match entry {

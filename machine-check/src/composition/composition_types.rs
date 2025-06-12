@@ -63,6 +63,21 @@ impl ProtoStruct {
     }
 }
 
+// I do not think this is the way to go. Set of event types suffices?
+#[derive(Debug, Clone)]
+pub struct InterfaceStruct {
+    pub interfacing_roles: BTreeSet<Role>,
+    pub interfacing_event_types: BTreeSet<EventType>,
+}
+
+impl InterfaceStruct {
+    // https://doc.rust-lang.org/src/alloc/vec/mod.rs.html#434
+    #[inline]
+    pub const fn new() -> Self {
+        InterfaceStruct { interfacing_roles: BTreeSet::new(), interfacing_event_types: BTreeSet::new() }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ProtoInfo {
     pub protocols: Vec<ProtoStruct>, // maybe weird to have an interface as if it was related to one protocol. but convenient. "a graph interfaces with rest on if"
@@ -72,6 +87,7 @@ pub struct ProtoInfo {
     pub joining_events: BTreeSet<EventType>,
     pub immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
     pub succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
+    pub interfacing_events: BTreeSet<EventType>,
     pub interface_errors: Vec<Error>,
 }
 
@@ -84,6 +100,7 @@ impl ProtoInfo {
         joining_events: BTreeSet<EventType>,
         immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
         succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
+        interfacing_events: BTreeSet<EventType>,
         interface_errors: Vec<Error>,
     ) -> Self {
         Self {
@@ -94,6 +111,7 @@ impl ProtoInfo {
             joining_events,
             immediately_pre,
             succeeding_events,
+            interfacing_events,
             interface_errors,
         }
     }
@@ -107,6 +125,7 @@ impl ProtoInfo {
             joining_events: BTreeSet::new(),
             immediately_pre: BTreeMap::new(),
             succeeding_events: BTreeMap::new(),
+            interfacing_events: BTreeSet::new(),
             interface_errors: Vec::new(),
         }
     }
@@ -168,6 +187,11 @@ pub struct CompositionComponent<T> {
 #[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct InterfacingSwarms<T>(pub Vec<CompositionComponent<T>>);
+
+
+#[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct InterfacingProtocols(pub Vec<SwarmProtocolType>);
 
 #[derive(Tsify, Serialize, Deserialize, Debug, Clone)]
 #[tsify(into_wasm_abi, from_wasm_abi)]

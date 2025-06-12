@@ -1,5 +1,7 @@
 use composition_swarm::{proto_info_to_error_report, swarms_to_proto_info, ErrorReport};
-use composition_types::{get_branching_joining_proto_info, DataResult, Granularity, InterfacingSwarms, ProjectionInfo};
+use composition_types::{get_branching_joining_proto_info, DataResult, Granularity, ProjectionInfo};
+
+use crate::composition::composition_types::InterfacingProtocols;
 
 use super::*;
 
@@ -17,7 +19,7 @@ macro_rules! deserialize_subs {
 }
 
 #[wasm_bindgen]
-pub fn check_wwf_swarm(protos: InterfacingSwarms<Role>, subs: String) -> CheckResult {
+pub fn check_wwf_swarm(protos: InterfacingProtocols, subs: String) -> CheckResult {
     let subs = deserialize_subs!(subs, |e| CheckResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
     let error_report = composition::composition_swarm::check(protos, &subs);
     if error_report.is_empty() {
@@ -28,7 +30,7 @@ pub fn check_wwf_swarm(protos: InterfacingSwarms<Role>, subs: String) -> CheckRe
 }
 
 #[wasm_bindgen]
-pub fn exact_weak_well_formed_sub(protos: InterfacingSwarms<Role>, subs: String) -> DataResult<Subscriptions> {
+pub fn exact_weak_well_formed_sub(protos: InterfacingProtocols, subs: String) -> DataResult<Subscriptions> {
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
     let result = composition_swarm::exact_weak_well_formed_sub(protos, &subs);
     match result {
@@ -38,7 +40,7 @@ pub fn exact_weak_well_formed_sub(protos: InterfacingSwarms<Role>, subs: String)
 }
 
 #[wasm_bindgen]
-pub fn overapproximated_weak_well_formed_sub(protos: InterfacingSwarms<Role>, subs: String, granularity: Granularity) -> DataResult<Subscriptions> {
+pub fn overapproximated_weak_well_formed_sub(protos: InterfacingProtocols, subs: String, granularity: Granularity) -> DataResult<Subscriptions> {
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
     let result = composition_swarm::overapprox_weak_well_formed_sub(protos, &subs, granularity);
     match result {
@@ -59,7 +61,7 @@ pub fn revised_projection(proto: SwarmProtocolType, subs: String, role: Role, mi
 }
 
 #[wasm_bindgen]
-pub fn project_combine(protos: InterfacingSwarms<Role>, subs: String, role: Role, minimize: bool) -> DataResult<MachineType> {
+pub fn project_combine(protos: InterfacingProtocols, subs: String, role: Role, minimize: bool) -> DataResult<MachineType> {
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
     let proto_info = swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
@@ -71,7 +73,7 @@ pub fn project_combine(protos: InterfacingSwarms<Role>, subs: String, role: Role
 }
 
 #[wasm_bindgen]
-pub fn projection_information(protos: InterfacingSwarms<Role>, subs: String, role: Role, minimize: bool) -> DataResult<ProjectionInfo> {
+pub fn projection_information(protos: InterfacingProtocols, subs: String, role: Role, minimize: bool) -> DataResult<ProjectionInfo> {
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
     let proto_info = swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
@@ -85,7 +87,7 @@ pub fn projection_information(protos: InterfacingSwarms<Role>, subs: String, rol
 }
 
 #[wasm_bindgen]
-pub fn projection_information_new(protos: InterfacingSwarms<Role>, subs: String, role: Role, machine: MachineType, k: usize, minimize: bool) -> DataResult<ProjectionInfo> {
+pub fn projection_information_new(protos: InterfacingProtocols, subs: String, role: Role, machine: MachineType, k: usize, minimize: bool) -> DataResult<ProjectionInfo> {
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
     let proto_info = swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
@@ -112,7 +114,7 @@ pub fn projection_information_new(protos: InterfacingSwarms<Role>, subs: String,
 // consider also offering one projecting over explicit projection?
 #[wasm_bindgen]
 pub fn check_composed_projection(
-    protos: InterfacingSwarms<Role>,
+    protos: InterfacingProtocols,
     subs: String,
     role: Role,
     machine: MachineType,
@@ -150,7 +152,7 @@ pub fn check_composed_projection(
 }
 
 #[wasm_bindgen]
-pub fn compose_protocols(protos: InterfacingSwarms<Role>) -> DataResult<SwarmProtocolType> {
+pub fn compose_protocols(protos: InterfacingProtocols) -> DataResult<SwarmProtocolType> {
     let composition = composition_swarm::compose_protocols(protos);
 
     match composition {

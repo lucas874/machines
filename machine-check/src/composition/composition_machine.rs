@@ -869,7 +869,7 @@ mod tests {
                 compose_protocols, exact_weak_well_formed_sub, from_json,
                 overapprox_weak_well_formed_sub, swarms_to_proto_info,
             },
-            composition_types::{CompositionComponent, Granularity, InterfacingSwarms},
+            composition_types::{Granularity, InterfacingProtocols},
         },
         machine::{self},
         types::{Command, EventType, Role, Transition},
@@ -964,106 +964,19 @@ mod tests {
         )
         .unwrap()
     }
-    fn get_interfacing_swarms_1() -> InterfacingSwarms<Role> {
-        InterfacingSwarms(vec![
-            CompositionComponent {
-                protocol: get_proto1(),
-                interface: None,
-            },
-            CompositionComponent {
-                protocol: get_proto2(),
-                interface: Some(Role::new("T")),
-            },
-        ])
-    }
+    fn get_interfacing_swarms_1() -> InterfacingProtocols { InterfacingProtocols(vec![get_proto1(), get_proto2()]) }
 
-    fn get_interfacing_swarms_1_reversed() -> InterfacingSwarms<Role> {
-        InterfacingSwarms(vec![
-            CompositionComponent {
-                protocol: get_proto2(),
-                interface: None,
-            },
-            CompositionComponent {
-                protocol: get_proto1(),
-                interface: Some(Role::new("T")),
-            },
-        ])
-    }
+    fn get_interfacing_swarms_1_reversed() -> InterfacingProtocols { InterfacingProtocols(vec![get_proto2(), get_proto1()]) }
 
-    fn get_interfacing_swarms_2() -> InterfacingSwarms<Role> {
-        InterfacingSwarms(vec![
-            CompositionComponent {
-                protocol: get_proto1(),
-                interface: None,
-            },
-            CompositionComponent {
-                protocol: get_proto2(),
-                interface: Some(Role::new("T")),
-            },
-            CompositionComponent {
-                protocol: get_proto3(),
-                interface: Some(Role::new("F")),
-            },
-        ])
-    }
+    fn get_interfacing_swarms_2() -> InterfacingProtocols { InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto3()]) }
 
-    fn get_interfacing_swarms_2_reversed() -> InterfacingSwarms<Role> {
-        InterfacingSwarms(vec![
-            CompositionComponent {
-                protocol: get_proto3(),
-                interface: None,
-            },
-            CompositionComponent {
-                protocol: get_proto2(),
-                interface: Some(Role::new("F")),
-            },
-            CompositionComponent {
-                protocol: get_proto1(),
-                interface: Some(Role::new("T")),
-            },
-        ])
-    }
+    fn get_interfacing_swarms_2_reversed() -> InterfacingProtocols { InterfacingProtocols(vec![get_proto3(), get_proto2(), get_proto1()]) }
 
-    fn get_interfacing_swarms_3() -> InterfacingSwarms<Role> {
-        InterfacingSwarms(vec![
-            CompositionComponent {
-                protocol: get_proto1(),
-                interface: None,
-            },
-            CompositionComponent {
-                protocol: get_proto2(),
-                interface: Some(Role::new("T")),
-            },
-            CompositionComponent {
-                protocol: get_proto32(),
-                interface: Some(Role::new("F")),
-            },
-        ])
-    }
+    fn get_interfacing_swarms_3() -> InterfacingProtocols { InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto32()]) }
 
-    fn get_interfacing_swarms_333() -> InterfacingSwarms<Role> {
-        InterfacingSwarms(vec![
-            CompositionComponent {
-                protocol: get_proto1(),
-                interface: None,
-            },
-            CompositionComponent {
-                protocol: get_proto2(),
-                interface: Some(Role::new("T")),
-            },
-            CompositionComponent {
-                protocol: get_proto333(),
-                interface: Some(Role::new("F")),
-            },
-        ])
-    }
+    fn get_interfacing_swarms_333() -> InterfacingProtocols { InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto333()]) }
 
-    fn get_interfacing_swarms_whhhh() -> InterfacingSwarms<Role> {
-        InterfacingSwarms(vec![CompositionComponent {
-            protocol: get_proto1(),
-            interface: None,
-        }])
-    }
+    fn get_interfacing_swarms_whhhh() -> InterfacingProtocols { InterfacingProtocols(vec![get_proto1()]) }
 
     #[test]
     fn test_projection_1() {
@@ -1146,13 +1059,7 @@ mod tests {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let result_subs = exact_weak_well_formed_sub(
-            InterfacingSwarms(vec![CompositionComponent::<Role> {
-                protocol: proto.clone(),
-                interface: None,
-            }]),
-            &BTreeMap::new(),
-        );
+        let result_subs = exact_weak_well_formed_sub( InterfacingProtocols(vec![proto.clone()]),&BTreeMap::new());
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
@@ -1241,10 +1148,7 @@ mod tests {
         // car factory from coplaws example
         let proto = get_proto2();
         let result_subs = exact_weak_well_formed_sub(
-            InterfacingSwarms(vec![CompositionComponent::<Role> {
-                protocol: proto.clone(),
-                interface: None,
-            }]),
+            InterfacingProtocols(vec![proto.clone()]),
             &BTreeMap::new(),
         );
         assert!(result_subs.is_ok());
@@ -1406,10 +1310,7 @@ mod tests {
         // warehouse example from coplaws slides
         let proto = get_proto1();
         let result_subs = exact_weak_well_formed_sub(
-            InterfacingSwarms(vec![CompositionComponent::<Role> {
-                protocol: proto.clone(),
-                interface: None,
-            }]),
+            InterfacingProtocols(vec![proto.clone()]),
             &BTreeMap::new(),
         );
         assert!(result_subs.is_ok());
@@ -1507,10 +1408,7 @@ mod tests {
         // warehouse example from coplaws slides
         let proto = get_proto1();
         let result_subs = exact_weak_well_formed_sub(
-            InterfacingSwarms(vec![CompositionComponent::<Role> {
-                protocol: proto.clone(),
-                interface: None,
-            }]),
+            InterfacingProtocols(vec![proto.clone()]),
             &BTreeMap::new(),
         );
         assert!(result_subs.is_ok());
@@ -1608,10 +1506,7 @@ mod tests {
         // warehouse example from coplaws slides
         let proto = get_proto1();
         let result_subs = exact_weak_well_formed_sub(
-            InterfacingSwarms(vec![CompositionComponent::<Role> {
-                protocol: proto.clone(),
-                interface: None,
-            }]),
+            InterfacingProtocols(vec![proto.clone()]),
             &BTreeMap::new(),
         );
         assert!(result_subs.is_ok());
@@ -1710,10 +1605,7 @@ mod tests {
         // warehouse example from coplaws slides
         let proto = get_proto1();
         let result_subs = exact_weak_well_formed_sub(
-            InterfacingSwarms(vec![CompositionComponent::<Role> {
-                protocol: proto.clone(),
-                interface: None,
-            }]),
+            InterfacingProtocols(vec![proto.clone()]),
             &BTreeMap::new(),
         );
         assert!(result_subs.is_ok());
@@ -2126,15 +2018,9 @@ mod tests {
 
         let proto = get_proto1();
         let result_subs = overapprox_weak_well_formed_sub(
-            InterfacingSwarms(vec![
-                CompositionComponent::<Role> {
-                    protocol: proto.clone(),
-                    interface: None,
-                },
-                CompositionComponent::<Role> {
-                    protocol: get_proto2(),
-                    interface: Some(Role::new("T")),
-                },
+            InterfacingProtocols(vec![
+                proto.clone(),
+                get_proto2(),
             ]),
             &BTreeMap::new(),
             Granularity::TwoStep,
@@ -2976,10 +2862,7 @@ mod tests {
 
         let (fl_m_graph, fl_m_graph_initial, _) = crate::machine::from_json(fl_m.clone());
         let role = Role::new("FL");
-        let swarms: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent {
-            protocol: get_proto1(),
-            interface: None,
-        }]);
+        let swarms: InterfacingProtocols = InterfacingProtocols(vec![get_proto1()]);
         let swarms_for_sub = get_interfacing_swarms_1();
         let larger_than_necessary_sub =
             crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
