@@ -1054,7 +1054,6 @@ fn get_interfacing_event_types(
 }
 
 // Construct map from joining event types to concurrent events preceding joining event types.
-// Todo add test -- for instance empty pre and pre containing three event types.
 #[inline]
 fn joining_event_types_map(proto_info: &ProtoInfo) -> BTreeMap<EventType, BTreeSet<EventType>> {
     let pre_joins = |e: &EventType| -> BTreeSet<EventType> {
@@ -3104,5 +3103,24 @@ mod tests {
         errors.sort();
         assert_eq!(expected_errors, errors);
         println!("{:?}", errors);
+    }
+
+    #[test]
+    fn test_joining_event_types() {
+        // e_r0
+        // e_ir
+        let preceding_events = |range: std::ops::Range<usize>| -> BTreeSet<EventType>{
+            range.into_iter().map(|u| EventType::new(&format!("e_r{}", u))).collect()
+        };
+        setup_logger();
+        for i in 1..6 {
+            let index = i as usize;
+            let proto_info = swarms_to_proto_info(InterfacingProtocols(get_interfacing_swarms_pat_4().0[..index].to_vec()));
+            if i == 1 {
+                assert_eq!(proto_info.joining_events, BTreeMap::new());
+            } else {
+                assert_eq!(proto_info.joining_events, BTreeMap::from([(EventType::new("e_ir"), preceding_events(0..i))]));
+            }
+        }
     }
 }
