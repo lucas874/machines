@@ -210,6 +210,9 @@ fn combine_projs<N: Clone, E: Clone + EventLabel>(
     gen_node: fn(&N, &N) -> N,
 ) -> (petgraph::Graph<N, E>, NodeId) {
     let _span = tracing::info_span!("combine_projs").entered();
+    if projections.is_empty() {
+        unimplemented!()
+    }
     let (acc_machine, acc_initial, _) = projections[0].clone();
     let (combined_projection, combined_initial) = projections[1..].to_vec().into_iter().fold(
         (acc_machine, acc_initial),

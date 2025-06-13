@@ -865,6 +865,8 @@ fn add_to_sub(role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subsc
     false
 }
 
+// Return all values from a ProtoInfo.role_event_map field as a set of triples:
+// (Command, EventType, Role)
 fn get_labels(proto_info: &ProtoInfo) -> BTreeSet<(Command, EventType, Role)> {
     proto_info
         .role_event_map
@@ -1075,21 +1077,6 @@ fn flatten_joining_map(
 fn combine_two_proto_infos(proto_info1: ProtoInfo, proto_info2: ProtoInfo) -> ProtoInfo {
     let _span = tracing::info_span!("combine_proto_infos").entered();
     let interface_errors = check_interface(&proto_info1, &proto_info2);
-    /* if !errors.is_empty() {
-        let protocols = vec![
-            proto_info1.protocols.clone(),
-            proto_info2.protocols.clone(),
-            vec![ProtoStruct::new(
-                Graph::new(),
-                None,
-                errors,
-                BTreeSet::new(),
-            )],
-        ]
-        .concat();
-        // Would work to construct it just like normally. but..
-        return ProtoInfo::new_only_proto(protocols);
-    } */
     let interfacing_event_types = get_interfacing_event_types(&proto_info1, &proto_info2);
     let protocols = vec![proto_info1.protocols.clone(), proto_info2.protocols.clone()].concat();
     let role_event_map = combine_maps(
@@ -1144,6 +1131,9 @@ fn combine_two_proto_infos(proto_info1: ProtoInfo, proto_info2: ProtoInfo) -> Pr
 
 fn combine_proto_infos(protos: Vec<ProtoInfo>) -> ProtoInfo {
     let _span = tracing::info_span!("combine_proto_infos_fold").entered();
+    if protos.is_empty() {
+        return ProtoInfo::new_only_proto(vec![]);
+    }
     // if empty protoinfos return None change signature
     let proto = protos[0].clone();
 
@@ -3100,5 +3090,11 @@ mod tests {
                 assert_eq!(proto_info.joining_events, BTreeMap::from([(EventType::new("e_ir"), preceding_events(0..i))]));
             }
         }
+    }
+
+    #[test]
+    fn test_thinggg() {
+        let error_report = proto_info_to_error_report(ProtoInfo::new_only_proto(vec![]));
+        assert!(error_report.is_empty());
     }
 }
