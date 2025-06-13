@@ -325,7 +325,7 @@ fn weak_well_formed(
             }
 
             // Causal consistency
-            // Check if role subscribes to all events immediately preceding this command.
+            // Check if roles with an enabled command in direct successor subscribe to event_type.
             // Active transitions_not_conc gets the transitions going out of edge.target()
             // and filters out the ones emitting events concurrent with event type of 'edge'.
             for successor in active_transitions_not_conc(
@@ -349,43 +349,36 @@ fn weak_well_formed(
 
             // Determinacy.
             // Corresponds to branching rule of weak determinacy.
-            if proto_info
+            // For some event type t, different protocols could have different sets event types branching with t.
+            // Flattening here is okay because we check the event types that actually go out of the node.
+            // Could you something go wrong here because of flattening?
+            let branching_with_event_type: BTreeSet<_> = proto_info
                 .branching_events
                 .iter()
-                .any(|branch_set| branch_set.contains(&event_type))
-            {
-                // If event is branching get all branching events related to 'original' branch.
-                // We could have multiple branching events from different protocols at node.
-                // These would be concurrent, we only worry about the original event types branching together with event_type.
-                let branching_with_this_event = proto_info
-                    .branching_events
-                    .iter()
-                    .find(|set| set.contains(&event_type))
-                    .cloned()
-                    .unwrap();
-                let branching_this_node: BTreeSet<EventType> = graph
-                    .edges_directed(node, Outgoing)
-                    .map(|e| e.weight().get_event_type())
-                    .filter(|e| branching_with_this_event.contains(e))
-                    .collect();
+                .filter(|set| set.contains(&event_type))
+                .flatten()
+                .cloned()
+                .collect();
 
-                // If only one event labeled as branching at this node, do not count it as an error if not subbed.
-                // Could happen due loss of behavior.
-                let branches = if branching_this_node.len() > 1 {
-                    branching_this_node
-                } else {
-                    BTreeSet::new()
-                };
+            // The event types emitted at this node in the set of event types branching together with event_type.
+            let branching_this_node: BTreeSet<_> = graph
+                .edges_directed(node, Outgoing)
+                .map(|e| e.weight().get_event_type())
+                .filter(|t| branching_with_event_type.contains(t))
+                .collect();
 
+            // If only one event labeled as branching at this node, do not count it as an error if not subbed.
+            // Could happen due loss of behavior.
+            if branching_this_node.len() > 1 {
                 // Find all, if any, roles that subscribe to event types emitted later in the protocol that do not subscribe to branches and accumulate errors.
                 let involved_not_subbed = involved_roles
                     .iter()
-                    .filter(|r| !branches.is_subset(&sub(&r)));
+                    .filter(|r| !branching_this_node.is_subset(&sub(&r)));
                 let mut branching_errors: Vec<_> = involved_not_subbed
                     .map(|r| {
                         (
                             r,
-                            branches
+                            branching_this_node
                                 .difference(&sub(&r))
                                 .cloned()
                                 .collect::<Vec<EventType>>(),
@@ -399,7 +392,7 @@ fn weak_well_formed(
             }
 
             // Determinacy.
-            // Corresponds to joining rule of weak determinacy.
+            // Corresponds to joining rule of determinacy.
             if proto_info.interfacing_events.contains(&event_type) {
                 // Find pairs of concurrent event types that are both emitted immediately before event_type (i.e. not concurrent with event_type).
                 // Inspect graph to find the immediately preceding -- exact analysis.
@@ -444,6 +437,8 @@ fn weak_well_formed(
             }
         }
     }
+
+    // We do not check looping errors since we only accept terminating protocols.
     errors
 }
 
