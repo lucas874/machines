@@ -195,30 +195,34 @@ pub fn project_combine(
 
     let projections = to_chained_projections(to_chained_protos(proto_info), subs, role, minimize);
 
-    let (combined_projection, combined_initial) = combine_projs(projections, gen_state_name);
-
-    //let (combined_projection, combined_initial) = minimal_machine(&combined_projection, combined_initial);
-    // option because used in equivalent. Consider changing.
-    (
-        to_option_machine(&combined_projection),
-        Some(combined_initial),
-    )
+    match combine_projs(projections, gen_state_name) {
+        Some((combined_projection, combined_initial)) =>
+        //let (combined_projection, combined_initial) = minimal_machine(&combined_projection, combined_initial);
+        // option because used in equivalent. Consider changing.
+        {
+            (
+                to_option_machine(&combined_projection),
+                Some(combined_initial),
+            )
+        }
+        None => (OptionGraph::new(), Some(NodeId::end())),
+    }
 }
 
 fn combine_projs<N: Clone, E: Clone + EventLabel>(
     projections: Vec<(petgraph::Graph<N, E>, NodeId, BTreeSet<EventType>)>,
     gen_node: fn(&N, &N) -> N,
-) -> (petgraph::Graph<N, E>, NodeId) {
+) -> Option<(petgraph::Graph<N, E>, NodeId)> {
     let _span = tracing::info_span!("combine_projs").entered();
     if projections.is_empty() {
-        unimplemented!()
+        return None;
     }
     let (acc_machine, acc_initial, _) = projections[0].clone();
     let (combined_projection, combined_initial) = projections[1..].to_vec().into_iter().fold(
         (acc_machine, acc_initial),
         |(acc, acc_i), (m, i, interface)| compose(acc, acc_i, m, i, interface, gen_node),
     );
-    (combined_projection, combined_initial)
+    Some((combined_projection, combined_initial))
 }
 
 // nfa to dfa using subset construction. Hopcroft, Motwani and Ullman section 2.3.5
@@ -673,7 +677,7 @@ fn adapted_projection(
     minimize: bool,
 ) -> Option<(AdaptationGraph, Option<NodeId>)> {
     let _span = tracing::info_span!("adapted_projection", %role).entered();
-    if k >= proto_info.protocols.len() {
+    if proto_info.protocols.is_empty() || k >= proto_info.protocols.len() {
         return None;
     }
 
@@ -764,10 +768,13 @@ fn adapted_projection(
         .chain([(machine_and_proj, machine_and_proj_initial, kth_interface)])
         .chain(projections[k + 1..].iter().cloned())
         .collect();
-    let (combined_projection, combined_initial) = combine_projs(projections, gen_node);
 
-    // should we minimize here? not done to keep original shape of input machine as much as possible?
-    Some((combined_projection, Some(combined_initial)))
+    match combine_projs(projections, gen_node) {
+        Some((combined_projection, combined_initial)) => {
+            Some((combined_projection, Some(combined_initial)))
+        } // should we minimize here? not done to keep original shape of input machine as much as possible?
+        None => None,
+    }
 }
 
 pub fn projection_information(

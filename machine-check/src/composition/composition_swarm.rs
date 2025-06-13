@@ -738,10 +738,7 @@ fn finer_overapprox_wwf_sub(
     subscription
 }
 
-fn finer_approx_add_branches_and_joins(
-    proto_info: &ProtoInfo,
-    subscription: &mut Subscriptions,
-) {
+fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mut Subscriptions) {
     let _span = tracing::info_span!("finer_approx_add_branches_and_joins").entered();
     let mut is_stable = false;
 
@@ -750,15 +747,13 @@ fn finer_approx_add_branches_and_joins(
 
         // Determinacy: joins
         for (joining_event, pre_joining_event) in &proto_info.joining_events {
-            let interested_roles =
-                roles_on_path(joining_event.clone(), proto_info, &subscription);
+            let interested_roles = roles_on_path(joining_event.clone(), proto_info, &subscription);
             let join_and_prejoin: BTreeSet<EventType> = [joining_event.clone()]
                 .into_iter()
                 .chain(pre_joining_event.clone().into_iter())
                 .collect();
             for role in interested_roles {
-                is_stable =
-                    add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
+                is_stable = add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
             }
         }
 
@@ -3077,17 +3072,25 @@ mod tests {
     fn test_joining_event_types() {
         // e_r0
         // e_ir
-        let preceding_events = |range: std::ops::Range<usize>| -> BTreeSet<EventType>{
-            range.into_iter().map(|u| EventType::new(&format!("e_r{}", u))).collect()
+        let preceding_events = |range: std::ops::Range<usize>| -> BTreeSet<EventType> {
+            range
+                .into_iter()
+                .map(|u| EventType::new(&format!("e_r{}", u)))
+                .collect()
         };
         setup_logger();
         for i in 1..6 {
             let index = i as usize;
-            let proto_info = swarms_to_proto_info(InterfacingProtocols(get_interfacing_swarms_pat_4().0[..index].to_vec()));
+            let proto_info = swarms_to_proto_info(InterfacingProtocols(
+                get_interfacing_swarms_pat_4().0[..index].to_vec(),
+            ));
             if i == 1 {
                 assert_eq!(proto_info.joining_events, BTreeMap::new());
             } else {
-                assert_eq!(proto_info.joining_events, BTreeMap::from([(EventType::new("e_ir"), preceding_events(0..i))]));
+                assert_eq!(
+                    proto_info.joining_events,
+                    BTreeMap::from([(EventType::new("e_ir"), preceding_events(0..i))])
+                );
             }
         }
     }
