@@ -400,7 +400,7 @@ fn weak_well_formed(
 
             // Determinacy.
             // Corresponds to joining rule of weak determinacy.
-            if proto_info.joining_events.contains_key(&event_type) {
+            if proto_info.interfacing_events.contains(&event_type) {
                 // Find pairs of concurrent event types that are both emitted immediately before event_type (i.e. not concurrent with event_type).
                 // Inspect graph to find the immediately preceding -- exact analysis.
                 let incoming_pairs_concurrent: Vec<UnordEventPair> =
@@ -605,9 +605,9 @@ fn exact_wwf_sub_step(
             }
 
             // Determinacy 2. joining events.
-            // The joining events field is an overapproximation.
-            // so check if there are two or more incoming concurrent not concurrent with event type
-            if proto_info.joining_events.contains_key(&event_type) {
+            // All joining event types are interfacing event types, but not the other way around.
+            // So check if there are two or more incoming concurrent not concurrent with event type
+            if proto_info.interfacing_events.contains(&event_type) {
                 let incoming_pairs_concurrent: Vec<UnordEventPair> =
                     event_pairs_from_node(node, &graph, Incoming)
                         .into_iter()
