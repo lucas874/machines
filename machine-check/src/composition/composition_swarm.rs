@@ -1472,7 +1472,7 @@ pub fn proto_info_to_error_report(proto_info: ProtoInfo) -> ErrorReport {
             .protocols
             .into_iter()
             .map(|p| (p.graph, p.errors))
-            .chain([(Graph::new(), proto_info.interface_errors)]) // NO!!!
+            .chain([(Graph::new(), proto_info.interface_errors)]) // NO!!! Why not?
             .collect(),
     )
 }

@@ -141,7 +141,7 @@ impl ProtoInfo {
     }
 
     pub fn no_errors(&self) -> bool {
-        self.protocols.iter().all(|p| p.no_errors())
+        self.protocols.iter().all(|p| p.no_errors()) && self.interface_errors.is_empty()
     }
 }
 
