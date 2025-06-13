@@ -745,19 +745,6 @@ fn finer_approx_add_branches_and_joins(
     let _span = tracing::info_span!("finer_approx_add_branches_and_joins").entered();
     let mut is_stable = false;
 
-    let add_to_sub =
-        |role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subscriptions| -> bool {
-            if subs.contains_key(&role) && event_types.iter().all(|e| subs[&role].contains(e)) {
-                return true;
-            }
-            subs.entry(role)
-                .and_modify(|curr| {
-                    curr.append(&mut event_types);
-                })
-                .or_insert(event_types);
-            false
-        };
-
     while !is_stable {
         is_stable = true;
 
@@ -790,28 +777,13 @@ fn finer_approx_add_branches_and_joins(
     }
 }
 
-// Safe, overapproximating subscription generation as described in article.
+// Safe, overapproximating subscription generation as described in paper (Algorithm 1).
 fn two_step_overapprox_wwf_sub(
     proto_info: &mut ProtoInfo,
     subscription: &mut Subscriptions,
 ) -> Subscriptions {
     let _span = tracing::info_span!("two_step_overapprox_wwf_sub").entered();
-
-    // Add events to a subscription, return true of they were already in the subscription and false otherwise
-    let add_to_sub =
-        |role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subscriptions| -> bool {
-            if subs.contains_key(&role) && event_types.iter().all(|e| subs[&role].contains(e)) {
-                return true;
-            }
-            subs.entry(role)
-                .and_modify(|curr| {
-                    curr.append(&mut event_types);
-                })
-                .or_insert(event_types);
-            false
-        };
-
-    // causal consistency
+    // Causal consistency
     for (role, labels) in &proto_info.role_event_map {
         let event_types: BTreeSet<_> = labels.iter().map(|label| label.get_event_type()).collect();
         let preceding_event_types: BTreeSet<_> = event_types
@@ -839,7 +811,7 @@ fn two_step_overapprox_wwf_sub(
     let mut is_stable = false;
     while !is_stable {
         is_stable = true;
-        // determinacy: branches
+        // Determinacy: branches
         for branching_events in &proto_info.branching_events {
             let interested_roles = branching_events
                 .iter()
@@ -850,7 +822,7 @@ fn two_step_overapprox_wwf_sub(
             }
         }
 
-        // determinacy: joins. the joining_events field of proto_info really holds all interfacing events so filter them to get joins
+        // Determinacy: joins. the joining_events field of proto_info really holds all interfacing events so filter them to get joins
         for (joining_event, pre_joining_event) in &proto_info.joining_events {
             let interested_roles = roles_on_path(joining_event.clone(), proto_info, &subscription);
             let join_and_prejoin: BTreeSet<EventType> = [joining_event.clone()]
@@ -877,6 +849,20 @@ fn two_step_overapprox_wwf_sub(
     }
 
     subscription.clone()
+}
+
+// Add events to a subscription, return true of they were already in the subscription and false otherwise
+// Mutates subs.
+fn add_to_sub(role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subscriptions) -> bool {
+    if subs.contains_key(&role) && event_types.iter().all(|e| subs[&role].contains(e)) {
+        return true;
+    }
+    subs.entry(role)
+        .and_modify(|curr| {
+            curr.append(&mut event_types);
+        })
+        .or_insert(event_types);
+    false
 }
 
 fn get_labels(proto_info: &ProtoInfo) -> BTreeSet<(Command, EventType, Role)> {
