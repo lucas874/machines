@@ -1164,15 +1164,15 @@ fn combine_two_proto_infos(proto_info1: ProtoInfo, proto_info2: ProtoInfo) -> Pr
     )
 }
 
-fn combine_proto_infos(protos: Vec<(ProtoInfo, Option<Role>)>) -> ProtoInfo {
+fn combine_proto_infos(protos: Vec<ProtoInfo>) -> ProtoInfo {
     let _span = tracing::info_span!("combine_proto_infos_fold").entered();
     // if empty protoinfos return None change signature
-    let (proto, _) = protos[0].clone();
+    let proto = protos[0].clone();
 
     let mut combined = protos[1..]
         .to_vec()
         .into_iter()
-        .fold(proto, |acc, (p, _)| combine_two_proto_infos(acc, p));
+        .fold(proto, |acc, p| combine_two_proto_infos(acc, p));
 
     combined.joining_events = joining_event_types_map(&combined);
     combined
@@ -1318,12 +1318,12 @@ pub fn transitive_closure_succeeding(
     combine_maps(succ_map, succ_map_new, None)
 }
 
-fn prepare_proto_infos(protos: InterfacingProtocols) -> Vec<(ProtoInfo, Option<Role>)> {
+fn prepare_proto_infos(protos: InterfacingProtocols) -> Vec<ProtoInfo> {
     let _span = tracing::info_span!("prepare_proto_infos").entered();
     protos
         .0
         .iter()
-        .map(|p| (prepare_proto_info(p.clone()), None))
+        .map(|p| prepare_proto_info(p.clone()))
         .collect()
 }
 
