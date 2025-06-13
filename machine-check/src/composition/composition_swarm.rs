@@ -779,7 +779,7 @@ fn finer_approx_add_branches_and_joins(
 
 // Safe, overapproximating subscription generation as described in paper (Algorithm 1).
 fn two_step_overapprox_wwf_sub(
-    proto_info: &mut ProtoInfo,
+    proto_info: &ProtoInfo,
     subscription: &mut Subscriptions,
 ) -> Subscriptions {
     let _span = tracing::info_span!("two_step_overapprox_wwf_sub").entered();
@@ -822,7 +822,7 @@ fn two_step_overapprox_wwf_sub(
             }
         }
 
-        // Determinacy: joins. the joining_events field of proto_info really holds all interfacing events so filter them to get joins
+        // Determinacy: joins.
         for (joining_event, pre_joining_event) in &proto_info.joining_events {
             let interested_roles = roles_on_path(joining_event.clone(), proto_info, &subscription);
             let join_and_prejoin: BTreeSet<EventType> = [joining_event.clone()]
@@ -834,7 +834,7 @@ fn two_step_overapprox_wwf_sub(
             }
         }
 
-        // interfacing rule from algorithm in article
+        // Interfacing rule from algorithm in paper
         for interfacing_event in &proto_info.interfacing_events {
             let interested_roles =
                 roles_on_path(interfacing_event.clone(), proto_info, &subscription);
