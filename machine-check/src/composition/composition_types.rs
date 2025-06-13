@@ -73,7 +73,10 @@ impl InterfaceStruct {
     // https://doc.rust-lang.org/src/alloc/vec/mod.rs.html#434
     #[inline]
     pub const fn new() -> Self {
-        InterfaceStruct { interfacing_roles: BTreeSet::new(), interfacing_event_types: BTreeSet::new() }
+        InterfaceStruct {
+            interfacing_roles: BTreeSet::new(),
+            interfacing_event_types: BTreeSet::new(),
+        }
     }
 }
 
@@ -153,7 +156,7 @@ pub fn get_branching_joining_proto_info(proto_info: &ProtoInfo) -> BTreeSet<Even
                 .joining_events
                 .keys()
                 .cloned()
-                .collect::<BTreeSet<EventType>>()
+                .collect::<BTreeSet<EventType>>(),
         )
         .collect()
 }
@@ -168,7 +171,6 @@ pub struct CompositionComponent<T> {
 #[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct InterfacingSwarms<T>(pub Vec<CompositionComponent<T>>);
-
 
 #[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
@@ -334,16 +336,20 @@ impl SwarmInterface for Role {
             _ => None,
         };
 
-        errors.append(&mut triples_a
-            .iter()
-            .map(|triple| matcher(triple, &triples_b, &event_types_b, &commands_b))
-            .filter_map(|e| e)
-            .collect());
-        errors.append(&mut triples_b
-            .iter()
-            .map(|triple| matcher(triple, &triples_a, &event_types_a, &commands_a))
-            .filter_map(|e| e)
-            .collect());
+        errors.append(
+            &mut triples_a
+                .iter()
+                .map(|triple| matcher(triple, &triples_b, &event_types_b, &commands_b))
+                .filter_map(|e| e)
+                .collect(),
+        );
+        errors.append(
+            &mut triples_b
+                .iter()
+                .map(|triple| matcher(triple, &triples_a, &event_types_a, &commands_a))
+                .filter_map(|e| e)
+                .collect(),
+        );
 
         errors
     }

@@ -1,9 +1,7 @@
 use super::composition_types::{Granularity, ProtoStruct};
 use super::MapVec;
 use super::{
-    composition_types::{
-        unord_event_pair, EventLabel, ProtoInfo, RoleEventMap, UnordEventPair,
-    },
+    composition_types::{unord_event_pair, EventLabel, ProtoInfo, RoleEventMap, UnordEventPair},
     Graph,
 };
 use crate::composition::composition_types::{InterfacingProtocols, ProtoLabel};
@@ -240,9 +238,7 @@ pub fn swarms_to_proto_info(protos: InterfacingProtocols) -> ProtoInfo {
 }
 
 // Construct a graph that is the 'expanded' composition of protos.
-pub fn compose_protocols(
-    protos: InterfacingProtocols,
-) -> Result<(Graph, NodeId), ErrorReport> {
+pub fn compose_protocols(protos: InterfacingProtocols) -> Result<(Graph, NodeId), ErrorReport> {
     let _span = tracing::info_span!("compose_protocols").entered();
     let combined_proto_info = swarms_to_proto_info(protos);
     if !combined_proto_info.no_errors() {
@@ -603,7 +599,8 @@ fn exact_wwf_sub_step(
             // This could happen due to concurrency and loss of behavior on composition.
             if branching_this_node.len() > 1 {
                 for r in involved_roles.iter() {
-                    is_stable = add_to_sub(r.clone(), branching_this_node.clone(), subscriptions) && is_stable;
+                    is_stable = add_to_sub(r.clone(), branching_this_node.clone(), subscriptions)
+                        && is_stable;
                 }
             }
 
@@ -760,9 +757,13 @@ fn finer_approx_add_branches_and_joins(
     // Come back and fix this!!! now joining events actually only contain joining events so if we want all interfacing do something else here.
     if with_all_interfacing {
         let interested_roles: Vec<Role> = subscription.keys().cloned().collect();
-        let joins_and_prejoins: BTreeSet<EventType> = flatten_joining_map(&proto_info.joining_events).into_iter().chain(proto_info.interfacing_events.clone()).collect();
+        let joins_and_prejoins: BTreeSet<EventType> =
+            flatten_joining_map(&proto_info.joining_events)
+                .into_iter()
+                .chain(proto_info.interfacing_events.clone())
+                .collect();
         for role in &interested_roles {
-                add_to_sub(role.clone(), joins_and_prejoins.clone(), subscription);
+            add_to_sub(role.clone(), joins_and_prejoins.clone(), subscription);
         }
     }
 
@@ -774,9 +775,9 @@ fn finer_approx_add_branches_and_joins(
                 let interested_roles =
                     roles_on_path(joining_event.clone(), proto_info, &subscription);
                 let join_and_prejoin: BTreeSet<EventType> = [joining_event.clone()]
-                        .into_iter()
-                        .chain(pre_joining_event.clone().into_iter())
-                        .collect();
+                    .into_iter()
+                    .chain(pre_joining_event.clone().into_iter())
+                    .collect();
                 for role in interested_roles {
                     is_stable =
                         add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
@@ -861,9 +862,9 @@ fn two_step_overapprox_wwf_sub(
         for (joining_event, pre_joining_event) in &proto_info.joining_events {
             let interested_roles = roles_on_path(joining_event.clone(), proto_info, &subscription);
             let join_and_prejoin: BTreeSet<EventType> = [joining_event.clone()]
-                        .into_iter()
-                        .chain(pre_joining_event.clone().into_iter())
-                        .collect();
+                .into_iter()
+                .chain(pre_joining_event.clone().into_iter())
+                .collect();
             for role in interested_roles {
                 is_stable = add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
             }
@@ -871,10 +872,14 @@ fn two_step_overapprox_wwf_sub(
 
         // interfacing rule from algorithm in article
         for interfacing_event in &proto_info.interfacing_events {
-            let interested_roles = roles_on_path(interfacing_event.clone(), proto_info, &subscription);
+            let interested_roles =
+                roles_on_path(interfacing_event.clone(), proto_info, &subscription);
             for role in interested_roles {
-                is_stable = add_to_sub(role, BTreeSet::from([interfacing_event.clone()]), subscription)
-                    && is_stable;
+                is_stable = add_to_sub(
+                    role,
+                    BTreeSet::from([interfacing_event.clone()]),
+                    subscription,
+                ) && is_stable;
             }
         }
     }
@@ -883,7 +888,8 @@ fn two_step_overapprox_wwf_sub(
 }
 
 fn get_labels(proto_info: &ProtoInfo) -> BTreeSet<(Command, EventType, Role)> {
-    proto_info.role_event_map
+    proto_info
+        .role_event_map
         .values()
         .flat_map(|role_info| {
             role_info
@@ -896,20 +902,23 @@ fn get_labels(proto_info: &ProtoInfo) -> BTreeSet<(Command, EventType, Role)> {
 // If we accumulate errors this map should really map to a set of (Command, Role)...
 fn event_type_map(proto_info: &ProtoInfo) -> BTreeMap<EventType, (Command, Role)> {
     get_labels(proto_info)
-    .into_iter()
-    .map(|(c, t, r)| (t, (c, r)))
-    .collect()
+        .into_iter()
+        .map(|(c, t, r)| (t, (c, r)))
+        .collect()
 }
 // If we accumulate errors this map should really map to a set of (EvenType, Role)...
 fn command_map(proto_info: &ProtoInfo) -> BTreeMap<Command, (EventType, Role)> {
     get_labels(proto_info)
-    .into_iter()
-    .map(|(c, t, r)| (c, (t, r)))
-    .collect()
+        .into_iter()
+        .map(|(c, t, r)| (c, (t, r)))
+        .collect()
 }
 
 // Check that for any c@R<t> in proto_info1, c'@R'<t> in proto_info2 c = c' and R = R'
-fn cross_protocol_event_type_errors(proto_info1: &ProtoInfo, proto_info2: &ProtoInfo) -> Vec<Error> {
+fn cross_protocol_event_type_errors(
+    proto_info1: &ProtoInfo,
+    proto_info2: &ProtoInfo,
+) -> Vec<Error> {
     // Map event types to the their associated (command, role) pairs in their protocol.
     let event_type_map1 = event_type_map(proto_info1);
     let event_type_map2 = event_type_map(proto_info2);
@@ -917,10 +926,12 @@ fn cross_protocol_event_type_errors(proto_info1: &ProtoInfo, proto_info2: &Proto
         .keys()
         .cloned()
         .collect::<BTreeSet<EventType>>()
-        .intersection(&event_type_map2
-            .keys()
-            .cloned()
-            .collect::<BTreeSet<EventType>>())
+        .intersection(
+            &event_type_map2
+                .keys()
+                .cloned()
+                .collect::<BTreeSet<EventType>>(),
+        )
         .cloned()
         .collect();
 
@@ -928,7 +939,7 @@ fn cross_protocol_event_type_errors(proto_info1: &ProtoInfo, proto_info2: &Proto
     let event_type_violation_filter = |t: &EventType| -> bool {
         match (event_type_map1.get(t), event_type_map2.get(t)) {
             (Some((c1, r1)), Some((c2, r2))) if *c1 != *c2 || *r1 != *r2 => true,
-            _ => false
+            _ => false,
         }
     };
 
@@ -939,7 +950,14 @@ fn cross_protocol_event_type_errors(proto_info1: &ProtoInfo, proto_info2: &Proto
         .map(|t| {
             let (c1, r1) = event_type_map1.get(&t).unwrap();
             let (c2, r2) = event_type_map2.get(&t).unwrap();
-            Error::EventTypeOnDifferentLabels(t.clone(), c1.clone(), r1.clone(), c2.clone(), r2.clone())})
+            Error::EventTypeOnDifferentLabels(
+                t.clone(),
+                c1.clone(),
+                r1.clone(),
+                c2.clone(),
+                r2.clone(),
+            )
+        })
         .collect();
 
     event_type_errors
@@ -954,10 +972,7 @@ fn cross_protocol_command_errors(proto_info1: &ProtoInfo, proto_info2: &ProtoInf
         .keys()
         .cloned()
         .collect::<BTreeSet<Command>>()
-        .intersection(&command_map2
-            .keys()
-            .cloned()
-            .collect::<BTreeSet<Command>>())
+        .intersection(&command_map2.keys().cloned().collect::<BTreeSet<Command>>())
         .cloned()
         .collect();
 
@@ -965,7 +980,7 @@ fn cross_protocol_command_errors(proto_info1: &ProtoInfo, proto_info2: &ProtoInf
     let command_violation_filter = |c: &Command| -> bool {
         match (command_map1.get(c), command_map2.get(c)) {
             (Some((t1, r1)), Some((t2, r2))) if *t1 != *t2 || *r1 != *r2 => true,
-            _ => false
+            _ => false,
         }
     };
 
@@ -976,7 +991,14 @@ fn cross_protocol_command_errors(proto_info1: &ProtoInfo, proto_info2: &ProtoInf
         .map(|c| {
             let (t1, r1) = command_map1.get(&c).unwrap();
             let (t2, r2) = command_map2.get(&c).unwrap();
-            Error::CommandOnDifferentLabels(c.clone(), t1.clone(), r1.clone(), t2.clone(), r2.clone())})
+            Error::CommandOnDifferentLabels(
+                c.clone(),
+                t1.clone(),
+                r1.clone(),
+                t2.clone(),
+                r2.clone(),
+            )
+        })
         .collect();
 
     command_errors
@@ -984,7 +1006,11 @@ fn cross_protocol_command_errors(proto_info1: &ProtoInfo, proto_info2: &ProtoInf
 
 // Checks that event types (commands) appearing in different swarm protocols are associated with the same commands (event types) and roles
 fn check_interface(proto_info1: &ProtoInfo, proto_info2: &ProtoInfo) -> Vec<Error> {
-    vec![cross_protocol_event_type_errors(proto_info1, proto_info2), cross_protocol_command_errors(proto_info1, proto_info2)].concat()
+    vec![
+        cross_protocol_event_type_errors(proto_info1, proto_info2),
+        cross_protocol_command_errors(proto_info1, proto_info2),
+    ]
+    .concat()
 }
 
 // Set of interfacing roles between two protocols
@@ -995,11 +1021,13 @@ fn get_interfacing_roles(proto_info1: &ProtoInfo, proto_info2: &ProtoInfo) -> BT
         .iter()
         .flat_map(|protostruct| protostruct.roles.clone())
         .collect::<BTreeSet<Role>>()
-        .intersection(&proto_info2
-            .protocols
-            .iter()
-            .flat_map(|protostruct| protostruct.roles.clone())
-            .collect::<BTreeSet<Role>>())
+        .intersection(
+            &proto_info2
+                .protocols
+                .iter()
+                .flat_map(|protostruct| protostruct.roles.clone())
+                .collect::<BTreeSet<Role>>(),
+        )
         .cloned()
         .collect()
 }
@@ -1008,10 +1036,19 @@ fn get_interfacing_roles(proto_info1: &ProtoInfo, proto_info2: &ProtoInfo) -> BT
 // The interfacing event types are those emitted by the interfacing role in either proto_info1 or proto_info2.
 // Assumes that proto_info1 and proto_info2 interface correctly.
 #[inline]
-fn get_interfacing_event_types(proto_info1: &ProtoInfo, proto_info2: &ProtoInfo) -> BTreeSet<EventType> {
+fn get_interfacing_event_types(
+    proto_info1: &ProtoInfo,
+    proto_info2: &ProtoInfo,
+) -> BTreeSet<EventType> {
     get_interfacing_roles(proto_info1, proto_info2)
         .iter()
-        .flat_map(|r| proto_info1.role_event_map.get(r).unwrap().union(&proto_info1.role_event_map.get(r).unwrap()))
+        .flat_map(|r| {
+            proto_info1
+                .role_event_map
+                .get(r)
+                .unwrap()
+                .union(&proto_info1.role_event_map.get(r).unwrap())
+        })
         .map(|swarm_label| swarm_label.get_event_type())
         .collect()
 }
@@ -1039,10 +1076,17 @@ fn joining_event_types_map(proto_info: &ProtoInfo) -> BTreeMap<EventType, BTreeS
             .collect()
     };
     // Get those interfacing event types with immediately preceding conucurrent event types and turn it into a map
-    proto_info.interfacing_events.iter().map(|e| (e.clone(), pre_joins(e))).filter(|(_, pre)| !pre.is_empty()).collect()
+    proto_info
+        .interfacing_events
+        .iter()
+        .map(|e| (e.clone(), pre_joins(e)))
+        .filter(|(_, pre)| !pre.is_empty())
+        .collect()
 }
 
-fn flatten_joining_map(joining_event_types: &BTreeMap<EventType, BTreeSet<EventType>>) -> BTreeSet<EventType> {
+fn flatten_joining_map(
+    joining_event_types: &BTreeMap<EventType, BTreeSet<EventType>>,
+) -> BTreeSet<EventType> {
     joining_event_types
         .iter()
         .flat_map(|(join, pre)| pre.clone().into_iter().chain([join.clone()]))
@@ -1051,10 +1095,7 @@ fn flatten_joining_map(joining_event_types: &BTreeMap<EventType, BTreeSet<EventT
 
 // Combine fields of two proto infos.
 // Do not compute transitive closure of happens after and do not compute joining event types.
-fn combine_two_proto_infos(
-    proto_info1: ProtoInfo,
-    proto_info2: ProtoInfo,
-) -> ProtoInfo {
+fn combine_two_proto_infos(proto_info1: ProtoInfo, proto_info2: ProtoInfo) -> ProtoInfo {
     let _span = tracing::info_span!("combine_proto_infos").entered();
     let interface_errors = check_interface(&proto_info1, &proto_info2);
     /* if !errors.is_empty() {
@@ -1080,7 +1121,8 @@ fn combine_two_proto_infos(
         None,
     );
     // get concurrent event types based on current set of interfacing event types.
-    let concurrent_events = get_concurrent_events(&proto_info1, &proto_info2, &interfacing_event_types);
+    let concurrent_events =
+        get_concurrent_events(&proto_info1, &proto_info2, &interfacing_event_types);
     let branching_events: Vec<BTreeSet<EventType>> = proto_info1
         .branching_events
         .into_iter()
@@ -1097,7 +1139,14 @@ fn combine_two_proto_infos(
         None,
     );
 
-    let interfacing_event_types = [proto_info1.interfacing_events, proto_info2.interfacing_events, interfacing_event_types].into_iter().flatten().collect();
+    let interfacing_event_types = [
+        proto_info1.interfacing_events,
+        proto_info2.interfacing_events,
+        interfacing_event_types,
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
     ProtoInfo::new(
         protocols,
         role_event_map,
@@ -1107,7 +1156,12 @@ fn combine_two_proto_infos(
         immediately_pre,
         happens_after,
         interfacing_event_types,
-        [proto_info1.interface_errors, proto_info2.interface_errors, interface_errors].concat(),
+        [
+            proto_info1.interface_errors,
+            proto_info2.interface_errors,
+            interface_errors,
+        ]
+        .concat(),
     )
 }
 
@@ -1119,9 +1173,7 @@ fn combine_proto_infos(protos: Vec<(ProtoInfo, Option<Role>)>) -> ProtoInfo {
     let mut combined = protos[1..]
         .to_vec()
         .into_iter()
-        .fold(proto, |acc, (p, _)| {
-            combine_two_proto_infos(acc, p)
-        });
+        .fold(proto, |acc, (p, _)| combine_two_proto_infos(acc, p));
 
     combined.joining_events = joining_event_types_map(&combined);
     combined
@@ -1267,9 +1319,7 @@ pub fn transitive_closure_succeeding(
     combine_maps(succ_map, succ_map_new, None)
 }
 
-fn prepare_proto_infos(
-    protos: InterfacingProtocols,
-) -> Vec<(ProtoInfo, Option<Role>)> {
+fn prepare_proto_infos(protos: InterfacingProtocols) -> Vec<(ProtoInfo, Option<Role>)> {
     let _span = tracing::info_span!("prepare_proto_infos").entered();
     protos
         .0
@@ -1339,7 +1389,12 @@ fn prepare_proto_info(proto: SwarmProtocolType) -> ProtoInfo {
     // consider changing after_not_concurrent to not take concurrent events as argument. now that we do not consider swarms with concurrency here.
     let happens_after = after_not_concurrent(&graph, initial.unwrap(), &BTreeSet::new());
     ProtoInfo::new(
-        vec![ProtoStruct::new(graph, initial, errors, role_event_map.keys().cloned().collect())],
+        vec![ProtoStruct::new(
+            graph,
+            initial,
+            errors,
+            role_event_map.keys().cloned().collect(),
+        )],
         role_event_map,
         BTreeSet::new(),
         branching_events,
@@ -1578,9 +1633,17 @@ fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
 
     let (g, i, _) = proto_info.protocols[0].get_triple();
     let g_event_types = g.get_event_types();
-    let folder = |(acc_g, acc_i, acc_event_types): (Graph, NodeId, BTreeSet<EventType>), p: ProtoStruct| -> (Graph, NodeId, BTreeSet<EventType>) {
-        let interface = acc_event_types.intersection(&p.graph.get_event_types()).cloned().collect();
-        let acc_event_types = acc_event_types.into_iter().chain(p.graph.get_event_types()).collect();
+    let folder = |(acc_g, acc_i, acc_event_types): (Graph, NodeId, BTreeSet<EventType>),
+                  p: ProtoStruct|
+     -> (Graph, NodeId, BTreeSet<EventType>) {
+        let interface = acc_event_types
+            .intersection(&p.graph.get_event_types())
+            .cloned()
+            .collect();
+        let acc_event_types = acc_event_types
+            .into_iter()
+            .chain(p.graph.get_event_types())
+            .collect();
         let (graph, initial) = crate::composition::composition_machine::compose(
             acc_g,
             acc_i,
@@ -1624,11 +1687,7 @@ pub fn to_swarm_json(graph: crate::Graph, initial: NodeId) -> SwarmProtocolType 
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        composition::error_report_to_strings,
-        types::Command,
-        MapVec,
-    };
+    use crate::{composition::error_report_to_strings, types::Command, MapVec};
 
     use super::*;
     use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
@@ -2044,20 +2103,46 @@ mod tests {
         .unwrap()
     }
 
-    fn get_interfacing_swarms_diff_example() -> InterfacingProtocols { InterfacingProtocols(vec![diff_example_proto_0(), diff_example_proto_1()]) }
+    fn get_interfacing_swarms_diff_example() -> InterfacingProtocols {
+        InterfacingProtocols(vec![diff_example_proto_0(), diff_example_proto_1()])
+    }
 
-    fn get_ref_pat_protos() -> InterfacingProtocols { InterfacingProtocols(vec![ref_pat_proto_0(), ref_pat_proto_1(), ref_pat_proto_2()])}
+    fn get_ref_pat_protos() -> InterfacingProtocols {
+        InterfacingProtocols(vec![
+            ref_pat_proto_0(),
+            ref_pat_proto_1(),
+            ref_pat_proto_2(),
+        ])
+    }
 
-    fn get_interfacing_swarms_1() -> InterfacingProtocols { InterfacingProtocols(vec![get_proto1(), get_proto2()]) }
+    fn get_interfacing_swarms_1() -> InterfacingProtocols {
+        InterfacingProtocols(vec![get_proto1(), get_proto2()])
+    }
 
-    fn get_interfacing_swarms_2() -> InterfacingProtocols { InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto3()]) }
+    fn get_interfacing_swarms_2() -> InterfacingProtocols {
+        InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto3()])
+    }
 
-    fn get_interfacing_swarms_3() -> InterfacingProtocols { InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto31()]) }
+    fn get_interfacing_swarms_3() -> InterfacingProtocols {
+        InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto31()])
+    }
 
-    fn get_interfacing_swarms_4() -> InterfacingProtocols { InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto32()]) }
+    fn get_interfacing_swarms_4() -> InterfacingProtocols {
+        InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto32()])
+    }
 
-    fn get_interfacing_swarms_pat_4() -> InterfacingProtocols { InterfacingProtocols(vec![pattern_4_proto_0(), pattern_4_proto_1(), pattern_4_proto_2(), pattern_4_proto_3(), pattern_4_proto_4()]) }
-    fn get_fail_1_swarms() -> InterfacingProtocols { InterfacingProtocols(vec![get_fail_1_component_1(), get_fail_1_component_2()]) }
+    fn get_interfacing_swarms_pat_4() -> InterfacingProtocols {
+        InterfacingProtocols(vec![
+            pattern_4_proto_0(),
+            pattern_4_proto_1(),
+            pattern_4_proto_2(),
+            pattern_4_proto_3(),
+            pattern_4_proto_4(),
+        ])
+    }
+    fn get_fail_1_swarms() -> InterfacingProtocols {
+        InterfacingProtocols(vec![get_fail_1_component_1(), get_fail_1_component_2()])
+    }
 
     // QCR subscribes to car and part because report1 is concurrent with part and they lead to a joining event car/event is joining bc of this.
     fn get_subs_composition_2() -> Subscriptions {
@@ -2117,10 +2202,7 @@ mod tests {
                 EventType::new("partID")
             ])]
         );
-        assert_eq!(
-            proto_info.joining_events,
-            BTreeMap::new()
-        );
+        assert_eq!(proto_info.joining_events, BTreeMap::new());
         let expected_role_event_map = BTreeMap::from([
             (
                 Role::from("T"),
@@ -2810,10 +2892,7 @@ mod tests {
         assert!(composition.is_ok());
         let protos = get_ref_pat_protos();
         for p in protos.0.iter() {
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&p.clone()).unwrap()
-            );
+            println!("{}", serde_json::to_string_pretty(&p.clone()).unwrap());
         }
         let (g, i) = composition.unwrap();
         let swarm = to_swarm_json(g, i);
@@ -2970,11 +3049,8 @@ mod tests {
             combine_proto_infos(prepare_proto_infos(interfacing_swarms.clone()));
 
         // The IR1 not used as an interface refers to the composition of (p || proto3) where p = (proto1 || proto2)
-        let expected_errors = vec![
-            "Event type i1 appears as i1@IR1<i1> and as c@R3<i1>",
-            ];
-        let mut errors =
-            error_report_to_strings(proto_info_to_error_report(combined_proto_info));
+        let expected_errors = vec!["Event type i1 appears as i1@IR1<i1> and as c@R3<i1>"];
+        let mut errors = error_report_to_strings(proto_info_to_error_report(combined_proto_info));
         errors.sort();
         assert_eq!(expected_errors, errors);
         println!("________________________________");
@@ -3023,14 +3099,10 @@ mod tests {
             combine_proto_infos(prepare_proto_infos(interfacing_swarms.clone()));
 
         // The IR1 not used as an interface refers to the composition of (p || proto3) where p = (proto1 || proto2)
-        let expected_errors = vec![
-            "Event type i4 appears as i4@IR2<i4> and as i5@IR2<i4>"];
-        let mut errors =
-            error_report_to_strings(proto_info_to_error_report(combined_proto_info));
+        let expected_errors = vec!["Event type i4 appears as i4@IR2<i4> and as i5@IR2<i4>"];
+        let mut errors = error_report_to_strings(proto_info_to_error_report(combined_proto_info));
         errors.sort();
         assert_eq!(expected_errors, errors);
         println!("{:?}", errors);
-
     }
-
 }
