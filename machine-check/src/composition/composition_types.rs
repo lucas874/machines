@@ -1,7 +1,6 @@
-use std::collections::{BTreeMap, BTreeSet};
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use tsify::{Tsify, declare};
+use std::collections::{BTreeMap, BTreeSet};
+use tsify::{declare, Tsify};
 
 use crate::{
     composition::composition_swarm::Error,
@@ -32,7 +31,7 @@ pub struct ProtoStruct {
     pub graph: Graph,
     pub initial: Option<NodeId>,
     pub errors: Vec<Error>,
-    pub interface: BTreeSet<EventType>,
+    pub roles: BTreeSet<Role>,
 }
 
 impl ProtoStruct {
@@ -40,13 +39,13 @@ impl ProtoStruct {
         graph: Graph,
         initial: Option<NodeId>,
         errors: Vec<Error>,
-        interface: BTreeSet<EventType>,
+        roles: BTreeSet<Role>,
     ) -> Self {
         Self {
             graph,
             initial,
             errors,
-            interface,
+            roles,
         }
     }
 
@@ -63,15 +62,35 @@ impl ProtoStruct {
     }
 }
 
+// I do not think this is the way to go. Set of event types suffices?
+#[derive(Debug, Clone)]
+pub struct InterfaceStruct {
+    pub interfacing_roles: BTreeSet<Role>,
+    pub interfacing_event_types: BTreeSet<EventType>,
+}
+
+impl InterfaceStruct {
+    // https://doc.rust-lang.org/src/alloc/vec/mod.rs.html#434
+    #[inline]
+    pub const fn new() -> Self {
+        InterfaceStruct {
+            interfacing_roles: BTreeSet::new(),
+            interfacing_event_types: BTreeSet::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ProtoInfo {
     pub protocols: Vec<ProtoStruct>, // maybe weird to have an interface as if it was related to one protocol. but convenient. "a graph interfaces with rest on if"
     pub role_event_map: RoleEventMap,
     pub concurrent_events: BTreeSet<UnordEventPair>, // consider to make a more specific type. unordered pair.
     pub branching_events: Vec<BTreeSet<EventType>>,
-    pub joining_events: BTreeSet<EventType>,
+    pub joining_events: BTreeMap<EventType, BTreeSet<EventType>>,
     pub immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
     pub succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
+    pub interfacing_events: BTreeSet<EventType>,
+    pub interface_errors: Vec<Error>,
 }
 
 impl ProtoInfo {
@@ -80,9 +99,11 @@ impl ProtoInfo {
         role_event_map: RoleEventMap,
         concurrent_events: BTreeSet<UnordEventPair>,
         branching_events: Vec<BTreeSet<EventType>>,
-        joining_events: BTreeSet<EventType>,
+        joining_events: BTreeMap<EventType, BTreeSet<EventType>>,
         immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
         succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
+        interfacing_events: BTreeSet<EventType>,
+        interface_errors: Vec<Error>,
     ) -> Self {
         Self {
             protocols,
@@ -92,6 +113,8 @@ impl ProtoInfo {
             joining_events,
             immediately_pre,
             succeeding_events,
+            interfacing_events,
+            interface_errors,
         }
     }
 
@@ -101,9 +124,11 @@ impl ProtoInfo {
             role_event_map: BTreeMap::new(),
             concurrent_events: BTreeSet::new(),
             branching_events: Vec::new(),
-            joining_events: BTreeSet::new(),
+            joining_events: BTreeMap::new(),
             immediately_pre: BTreeMap::new(),
             succeeding_events: BTreeMap::new(),
+            interfacing_events: BTreeSet::new(),
+            interface_errors: Vec::new(),
         }
     }
 
@@ -116,23 +141,23 @@ impl ProtoInfo {
     }
 
     pub fn no_errors(&self) -> bool {
-        self.protocols.iter().all(|p| p.no_errors())
+        self.protocols.iter().all(|p| p.no_errors()) && self.interface_errors.is_empty()
     }
 }
 
 pub fn get_branching_joining_proto_info(proto_info: &ProtoInfo) -> BTreeSet<EventType> {
-    let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
-        let pre = proto_info.immediately_pre.get(e).cloned().unwrap_or_default();
-        let product = pre.clone().into_iter().cartesian_product(&pre);
-        product.filter(|(e1, e2)| *e1 != **e2 && proto_info.concurrent_events.contains(&unord_event_pair(e1.clone(), (*e2).clone())))
-            .map(|(e1, e2)| [e1, e2.clone()])
-            .flatten()
-            .collect()
-    };
-    proto_info.branching_events.clone().into_iter()
+    proto_info
+        .branching_events
+        .clone()
+        .into_iter()
         .flatten()
-        .chain(proto_info.joining_events.clone().into_iter()
-            .filter(|e| !get_pre_joins(e).is_empty()))
+        .chain(
+            proto_info
+                .joining_events
+                .keys()
+                .cloned()
+                .collect::<BTreeSet<EventType>>(),
+        )
         .collect()
 }
 
@@ -146,6 +171,10 @@ pub struct CompositionComponent<T> {
 #[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct InterfacingSwarms<T>(pub Vec<CompositionComponent<T>>);
+
+#[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct InterfacingProtocols(pub Vec<SwarmProtocolType>);
 
 #[derive(Tsify, Serialize, Deserialize, Debug, Clone)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
@@ -273,7 +302,7 @@ impl SwarmInterface for Role {
             .intersection(&b.get_roles())
             .cloned()
             .collect();
-
+        println!("{:?}", role_intersection);
         // there should only be one role that appears in both protocols
         let mut errors =
             if role_intersection.contains(self) && role_intersection.iter().count() == 1 {
@@ -282,32 +311,45 @@ impl SwarmInterface for Role {
                 vec![Error::InvalidInterfaceRole(self.clone())]
             };
 
-        let if_commands_1: BTreeSet<(Command, EventType, Role)> = a
-            .get_labels()
-            .into_iter()
-            .filter(|(_, _, r)| *r == *self)
-            .collect();
-        let if_commands_2: BTreeSet<(Command, EventType, Role)> = b
-            .get_labels()
-            .into_iter()
-            .filter(|(_, _, r)| *r == *self)
-            .collect();
+        let triples_a: BTreeSet<(Command, EventType, Role)> = a.get_labels().into_iter().collect();
+        let triples_b: BTreeSet<(Command, EventType, Role)> = b.get_labels().into_iter().collect();
+        let event_types_a: BTreeSet<EventType> =
+            triples_a.iter().map(|(_, et, _)| et).cloned().collect();
+        let commands_a: BTreeSet<Command> = triples_a.iter().map(|(c, _, _)| c).cloned().collect();
+        let event_types_b: BTreeSet<EventType> =
+            triples_b.iter().map(|(_, et, _)| et).cloned().collect();
+        let commands_b: BTreeSet<Command> = triples_b.iter().map(|(c, _, _)| c).cloned().collect();
 
-        // R<e> in proto1 iff. R<e> in proto2
-        if if_commands_1 != if_commands_2 {
-            let mut not_in_proto2: Vec<Error> = if_commands_1
-                .difference(&if_commands_2)
-                .map(|(_, e, _)| e.clone())
-                .map(|event_type| Error::InterfaceEventNotInBothProtocols(event_type))
-                .collect();
-            let mut not_in_proto1: Vec<Error> = if_commands_2
-                .difference(&if_commands_1)
-                .map(|(_, e, _)| e.clone())
-                .map(|event_type| Error::InterfaceEventNotInBothProtocols(event_type))
-                .collect();
-            errors.append(&mut not_in_proto1);
-            errors.append(&mut not_in_proto2);
-        }
+        let matcher = |triple: &(Command, EventType, Role),
+                       reference_triples: &BTreeSet<(Command, EventType, Role)>,
+                       reference_event_types: &BTreeSet<EventType>,
+                       reference_commands: &BTreeSet<Command>| match triple {
+            (_, et, r) if *r == *self && !reference_triples.contains(triple) => {
+                Some(Error::InterfaceEventNotInBothProtocols(et.clone()))
+            }
+            (c, et, r)
+                if *r != *self
+                    && (reference_event_types.contains(et) || reference_commands.contains(c)) =>
+            {
+                Some(Error::SpuriousInterface(c.clone(), et.clone(), r.clone()))
+            }
+            _ => None,
+        };
+
+        errors.append(
+            &mut triples_a
+                .iter()
+                .map(|triple| matcher(triple, &triples_b, &event_types_b, &commands_b))
+                .filter_map(|e| e)
+                .collect(),
+        );
+        errors.append(
+            &mut triples_b
+                .iter()
+                .map(|triple| matcher(triple, &triples_a, &event_types_a, &commands_a))
+                .filter_map(|e| e)
+                .collect(),
+        );
 
         errors
     }
@@ -333,3 +375,15 @@ impl SwarmInterface for Role {
             .collect()
     }
 }
+
+/*
+    triples_a.
+    map(|triple|
+        match (c, et, r) {
+            (c, et, r) if *r == self && !triples_b.contains(triple) => Some(Not in both),
+            (c, et, r) if *r != self && (event_types_b.contains(et) || commands_b.contains(c)) => Some(Spurious event type)
+        }
+        )
+
+
+*/

@@ -1,5 +1,5 @@
 use machine_check::{
-    composition::{composition_types::{DataResult, Granularity, InterfacingSwarms}, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub}, types::{EventType, Role}, Subscriptions
+    composition::{composition_types::{DataResult, Granularity, InterfacingProtocols, InterfacingSwarms}, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub}, types::{EventType, Role}, Subscriptions
 };
 
 use serde::{Deserialize, Serialize};
@@ -11,6 +11,14 @@ use walkdir::WalkDir;
 
 const BENCHMARK_DIR: &str = "./bench_and_results";
 const SPECIAL_SYMBOL: &str = "done-special-symbol";
+
+fn to_interfacing_protocols(interfacing_swarms: InterfacingSwarms<Role>) -> InterfacingProtocols {
+    InterfacingProtocols(interfacing_swarms
+        .0
+        .into_iter()
+        .map(|cc| cc.protocol)
+        .collect())
+}
 
 #[test]
 #[ignore]
@@ -26,13 +34,13 @@ fn full_run_bench_sub_sizes_general() {
 
     for (_, bi) in interfacing_swarms_general.iter() {
         let swarms = &bi.interfacing_swarms;
-        let subscriptions = match overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), two_step_granularity.clone()) {
+        let subscriptions = match overapproximated_weak_well_formed_sub(to_interfacing_protocols(swarms.clone()), subs.clone(), two_step_granularity.clone()) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
         wrap_and_write_sub_out(&bi, subscriptions.unwrap(), serde_json::to_string(&two_step_granularity).unwrap().replace("\"", ""), &output_dir);
 
-        let subscriptions = match exact_weak_well_formed_sub(swarms.clone(), subs.clone()) {
+        let subscriptions = match exact_weak_well_formed_sub(to_interfacing_protocols(swarms.clone()), subs.clone()) {
             DataResult::OK{data: subscriptions} => {
                 Some(subscriptions) },
             DataResult::ERROR{ .. } => None,
@@ -57,13 +65,13 @@ fn short_run_bench_sub_sizes_general() {
 
     for (_, bi) in interfacing_swarms_general.iter().step_by(step) {
         let swarms = &bi.interfacing_swarms;
-        let subscriptions = match overapproximated_weak_well_formed_sub(swarms.clone(), subs.clone(), two_step_granularity.clone()) {
+        let subscriptions = match overapproximated_weak_well_formed_sub(to_interfacing_protocols(swarms.clone()), subs.clone(), two_step_granularity.clone()) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
         wrap_and_write_sub_out(&bi, subscriptions.unwrap(), serde_json::to_string(&two_step_granularity).unwrap().replace("\"", ""), &output_dir);
 
-        let subscriptions = match exact_weak_well_formed_sub(swarms.clone(), subs.clone()) {
+        let subscriptions = match exact_weak_well_formed_sub(to_interfacing_protocols(swarms.clone()), subs.clone()) {
             DataResult::OK{data: subscriptions} => {
                 Some(subscriptions) },
             DataResult::ERROR{ .. } => None,

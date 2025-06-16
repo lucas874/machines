@@ -1,5 +1,9 @@
 use composition_swarm::{proto_info_to_error_report, swarms_to_proto_info, ErrorReport};
-use composition_types::{get_branching_joining_proto_info, DataResult, Granularity, InterfacingSwarms, ProjectionInfo};
+use composition_types::{
+    get_branching_joining_proto_info, DataResult, Granularity, ProjectionInfo,
+};
+
+use crate::composition::composition_types::InterfacingProtocols;
 
 use super::*;
 
@@ -17,79 +21,155 @@ macro_rules! deserialize_subs {
 }
 
 #[wasm_bindgen]
-pub fn check_wwf_swarm(protos: InterfacingSwarms<Role>, subs: String) -> CheckResult {
-    let subs = deserialize_subs!(subs, |e| CheckResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
+pub fn check_wwf_swarm(protos: InterfacingProtocols, subs: String) -> CheckResult {
+    let subs = deserialize_subs!(subs, |e| CheckResult::ERROR {
+        errors: vec![format!("parsing subscriptions: {}", e)]
+    });
     let error_report = composition::composition_swarm::check(protos, &subs);
     if error_report.is_empty() {
         CheckResult::OK
     } else {
-        CheckResult::ERROR { errors: error_report_to_strings(error_report) }
+        CheckResult::ERROR {
+            errors: error_report_to_strings(error_report),
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn exact_weak_well_formed_sub(protos: InterfacingSwarms<Role>, subs: String) -> DataResult<Subscriptions> {
-    let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
+pub fn exact_weak_well_formed_sub(
+    protos: InterfacingProtocols,
+    subs: String,
+) -> DataResult<Subscriptions> {
+    let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
+        errors: vec![format!("parsing subscriptions: {}", e)]
+    });
     let result = composition_swarm::exact_weak_well_formed_sub(protos, &subs);
     match result {
-        Ok(subscriptions) => DataResult::OK { data: subscriptions },//dok(subscriptions),
-        Err(error_report) => DataResult::ERROR { errors: error_report_to_strings(error_report) }//derr::<Subscriptions>(error_report_to_strings(error_report)),
+        Ok(subscriptions) => DataResult::OK {
+            data: subscriptions,
+        }, //dok(subscriptions),
+        Err(error_report) => DataResult::ERROR {
+            errors: error_report_to_strings(error_report),
+        }, //derr::<Subscriptions>(error_report_to_strings(error_report)),
     }
 }
 
 #[wasm_bindgen]
-pub fn overapproximated_weak_well_formed_sub(protos: InterfacingSwarms<Role>, subs: String, granularity: Granularity) -> DataResult<Subscriptions> {
-    let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
+pub fn overapproximated_weak_well_formed_sub(
+    protos: InterfacingProtocols,
+    subs: String,
+    granularity: Granularity,
+) -> DataResult<Subscriptions> {
+    let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
+        errors: vec![format!("parsing subscriptions: {}", e)]
+    });
     let result = composition_swarm::overapprox_weak_well_formed_sub(protos, &subs, granularity);
     match result {
-        Ok(subscriptions) => DataResult::OK { data: subscriptions },
-        Err(error_report) => DataResult::ERROR { errors: error_report_to_strings(error_report)},
+        Ok(subscriptions) => DataResult::OK {
+            data: subscriptions,
+        },
+        Err(error_report) => DataResult::ERROR {
+            errors: error_report_to_strings(error_report),
+        },
     }
 }
 
 #[wasm_bindgen]
-pub fn revised_projection(proto: SwarmProtocolType, subs: String, role: Role, minimize: bool) -> DataResult<MachineType> {
-    let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
+pub fn revised_projection(
+    proto: SwarmProtocolType,
+    subs: String,
+    role: Role,
+    minimize: bool,
+) -> DataResult<MachineType> {
+    let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
+        errors: vec![format!("parsing subscriptions: {}", e)]
+    });
     let (swarm, initial, errors) = composition_swarm::from_json(proto);
     let Some(initial) = initial else {
         return DataResult::ERROR { errors };
     };
-    let (proj, initial) = composition::composition_machine::project(&swarm, initial, &subs, role, minimize);
-    DataResult::OK { data: composition::composition_machine::to_json_machine(proj, initial) }
+    let (proj, initial) =
+        composition::composition_machine::project(&swarm, initial, &subs, role, minimize);
+    DataResult::OK {
+        data: composition::composition_machine::to_json_machine(proj, initial),
+    }
 }
 
 #[wasm_bindgen]
-pub fn project_combine(protos: InterfacingSwarms<Role>, subs: String, role: Role, minimize: bool) -> DataResult<MachineType> {
-    let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
-    let proto_info = swarms_to_proto_info(protos, &subs);
+pub fn project_combine(
+    protos: InterfacingProtocols,
+    subs: String,
+    role: Role,
+    minimize: bool,
+) -> DataResult<MachineType> {
+    let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
+        errors: vec![format!("parsing subscriptions: {}", e)]
+    });
+    let proto_info = swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
-        return DataResult::ERROR { errors: error_report_to_strings(proto_info_to_error_report(proto_info)) }//derr::<Machine>(error_report_to_strings(proto_info_to_error_report(proto_info)));
+        return DataResult::ERROR {
+            errors: error_report_to_strings(proto_info_to_error_report(proto_info)),
+        }; //derr::<Machine>(error_report_to_strings(proto_info_to_error_report(proto_info)));
     }
 
-    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role, minimize);
-    DataResult::OK { data: composition::composition_machine::from_option_to_machine(proj, proj_initial.unwrap()) }
+    let (proj, proj_initial) =
+        composition_machine::project_combine(&proto_info, &subs, role, minimize);
+    DataResult::OK {
+        data: composition::composition_machine::from_option_to_machine(proj, proj_initial.unwrap()),
+    }
 }
 
 #[wasm_bindgen]
-pub fn projection_information(protos: InterfacingSwarms<Role>, subs: String, role: Role, minimize: bool) -> DataResult<ProjectionInfo> {
-    let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
-    let proto_info = swarms_to_proto_info(protos, &subs);
+pub fn projection_information(
+    protos: InterfacingProtocols,
+    subs: String,
+    role: Role,
+    minimize: bool,
+) -> DataResult<ProjectionInfo> {
+    let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
+        errors: vec![format!("parsing subscriptions: {}", e)]
+    });
+    let proto_info = swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
-        return DataResult:: ERROR { errors: error_report_to_strings(proto_info_to_error_report(proto_info)) };
+        return DataResult::ERROR {
+            errors: error_report_to_strings(proto_info_to_error_report(proto_info)),
+        };
     }
-    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role, minimize);
+    let (proj, proj_initial) =
+        composition_machine::project_combine(&proto_info, &subs, role, minimize);
     let branches = composition_machine::paths_from_event_types(&proj, &proto_info);
     let special_event_types = get_branching_joining_proto_info(&proto_info);
 
-    DataResult::OK { data: ProjectionInfo {projection: composition::composition_machine::from_option_to_machine(proj, proj_initial.unwrap()), branches, special_event_types, proj_to_machine_states: BTreeMap::new()} }
+    DataResult::OK {
+        data: ProjectionInfo {
+            projection: composition::composition_machine::from_option_to_machine(
+                proj,
+                proj_initial.unwrap(),
+            ),
+            branches,
+            special_event_types,
+            proj_to_machine_states: BTreeMap::new(),
+        },
+    }
 }
 
 #[wasm_bindgen]
-pub fn projection_information_new(protos: InterfacingSwarms<Role>, subs: String, role: Role, machine: MachineType, k: usize, minimize: bool) -> DataResult<ProjectionInfo> {
-    let subs = deserialize_subs!(subs, |e| DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
-    let proto_info = swarms_to_proto_info(protos, &subs);
+pub fn projection_information_new(
+    protos: InterfacingProtocols,
+    subs: String,
+    role: Role,
+    machine: MachineType,
+    k: usize,
+    minimize: bool,
+) -> DataResult<ProjectionInfo> {
+    let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
+        errors: vec![format!("parsing subscriptions: {}", e)]
+    });
+    let proto_info = swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
-        return DataResult:: ERROR { errors: error_report_to_strings(proto_info_to_error_report(proto_info)) };
+        return DataResult::ERROR {
+            errors: error_report_to_strings(proto_info_to_error_report(proto_info)),
+        };
     }
     let (machine, initial, m_errors) = machine::from_json(machine);
     let machine_problem = !m_errors.is_empty();
@@ -97,14 +177,25 @@ pub fn projection_information_new(protos: InterfacingSwarms<Role>, subs: String,
     errors.extend(m_errors);
     let Some(initial) = initial else {
         errors.push(format!("initial machine state has no transitions"));
-        return DataResult:: ERROR { errors }
+        return DataResult::ERROR { errors };
     };
     if machine_problem {
-        return DataResult:: ERROR { errors }
+        return DataResult::ERROR { errors };
     }
-    match composition::composition_machine::projection_information(&proto_info, &subs, role, (machine, initial), k, minimize) {
-        Some(projection_info) => DataResult::OK { data: projection_info },
-        None => DataResult::ERROR { errors:  vec![format!("invalid index {}", k)]}
+    match composition::composition_machine::projection_information(
+        &proto_info,
+        &subs,
+        role,
+        (machine, initial),
+        k,
+        minimize,
+    ) {
+        Some(projection_info) => DataResult::OK {
+            data: projection_info,
+        },
+        None => DataResult::ERROR {
+            errors: vec![format!("invalid index {}", k)],
+        },
     }
 }
 
@@ -112,18 +203,23 @@ pub fn projection_information_new(protos: InterfacingSwarms<Role>, subs: String,
 // consider also offering one projecting over explicit projection?
 #[wasm_bindgen]
 pub fn check_composed_projection(
-    protos: InterfacingSwarms<Role>,
+    protos: InterfacingProtocols,
     subs: String,
     role: Role,
     machine: MachineType,
 ) -> CheckResult {
-    let subs = deserialize_subs!(subs, |e| CheckResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)]});
-    let proto_info = swarms_to_proto_info(protos, &subs);
+    let subs = deserialize_subs!(subs, |e| CheckResult::ERROR {
+        errors: vec![format!("parsing subscriptions: {}", e)]
+    });
+    let proto_info = swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
-        return CheckResult::ERROR { errors: error_report_to_strings(proto_info_to_error_report(proto_info)) };
+        return CheckResult::ERROR {
+            errors: error_report_to_strings(proto_info_to_error_report(proto_info)),
+        };
     }
 
-    let (proj, proj_initial) = composition_machine::project_combine(&proto_info.protocols, &subs, role, false);
+    let (proj, proj_initial) =
+        composition_machine::project_combine(&proto_info, &subs, role, false);
     let (machine, json_initial, m_errors) = machine::from_json(machine);
     let machine_problem = !m_errors.is_empty();
     let mut errors = vec![];
@@ -150,14 +246,16 @@ pub fn check_composed_projection(
 }
 
 #[wasm_bindgen]
-pub fn compose_protocols(protos: InterfacingSwarms<Role>) -> DataResult<SwarmProtocolType> {
+pub fn compose_protocols(protos: InterfacingProtocols) -> DataResult<SwarmProtocolType> {
     let composition = composition_swarm::compose_protocols(protos);
 
     match composition {
-        Ok((graph, initial)) => {
-            DataResult::OK { data: composition_swarm::to_swarm_json(graph, initial) }
-        }
-        Err(errors) => DataResult::ERROR { errors: error_report_to_strings(errors) },
+        Ok((graph, initial)) => DataResult::OK {
+            data: composition_swarm::to_swarm_json(graph, initial),
+        },
+        Err(errors) => DataResult::ERROR {
+            errors: error_report_to_strings(errors),
+        },
     }
 }
 

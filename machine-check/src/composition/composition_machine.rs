@@ -44,6 +44,18 @@ struct AdaptationNode {
 }
 type AdaptationGraph = petgraph::Graph<AdaptationNode, MachineLabel>;
 
+// Vec of triples of the form:
+//      (protocol_graph, initial_node, interfacing event types with vec[i-1])
+// Protocols linked together in a 'chain' by interfacing event types
+type ChainedProtos = Vec<(
+    petgraph::Graph<State, SwarmLabel>,
+    NodeId,
+    BTreeSet<EventType>,
+)>;
+
+// Same as type above, but for projections
+type ChainedProjections = Vec<(Graph, NodeId, BTreeSet<EventType>)>;
+
 // Similar to machine::project, except that transitions with event types
 // not subscribed to by role are skipped.
 pub fn project(
@@ -125,55 +137,92 @@ pub fn project(
     }
 }
 
+// Map the protocols of a proto_info to a ChainedProtos
+fn to_chained_protos(proto_info: &ProtoInfo) -> ChainedProtos {
+    let folder = |(acc, roles_prev): (ChainedProtos, BTreeSet<Role>),
+                  proto: ProtoStruct|
+     -> (ChainedProtos, BTreeSet<Role>) {
+        let interfacing_event_types = roles_prev
+            .intersection(&proto.roles)
+            .flat_map(|role| {
+                proto_info
+                    .role_event_map
+                    .get(role)
+                    .unwrap()
+                    .iter()
+                    .map(|swarm_label| swarm_label.get_event_type())
+            })
+            .collect();
+        let acc = acc
+            .into_iter()
+            .chain([(proto.graph, proto.initial.unwrap(), interfacing_event_types)])
+            .collect();
+        (acc, proto.roles)
+    };
+    let (chained_protos, _) = proto_info
+        .protocols
+        .clone()
+        .into_iter()
+        .fold((vec![], BTreeSet::new()), folder);
+    chained_protos
+}
+
+// Map a ChainedProtos to a ChainedProjections
+fn to_chained_projections(
+    chained_protos: ChainedProtos,
+    subs: &Subscriptions,
+    role: Role,
+    minimize: bool,
+) -> ChainedProjections {
+    let mapper = |(graph, initial, interface)| -> (Graph, NodeId, BTreeSet<EventType>) {
+        let (projection, projection_initial) =
+            project(&graph, initial, subs, role.clone(), minimize);
+        (projection, projection_initial, interface)
+    };
+
+    chained_protos.into_iter().map(mapper).collect()
+}
+
 // precondition: the protocols interfaces on the supplied interfaces.
 // precondition: the composition of the protocols in swarms is wwf w.r.t. subs.
 pub fn project_combine(
-    swarms: &Vec<ProtoStruct>,
+    proto_info: &ProtoInfo,
     subs: &Subscriptions,
     role: Role,
     minimize: bool,
 ) -> (OptionGraph, Option<NodeId>) {
     let _span = tracing::info_span!("project_combine", %role).entered();
-    // check this anyway
-    if swarms.is_empty()
-        || !swarms[0].interface.is_empty()
-        || swarms[0].initial.is_none()
-        || swarms[1..]
-            .iter()
-            .any(|p| p.interface.is_empty() || p.initial.is_none())
-    {
-        return (OptionGraph::new(), None);
+
+    let projections = to_chained_projections(to_chained_protos(proto_info), subs, role, minimize);
+
+    match combine_projs(projections, gen_state_name) {
+        Some((combined_projection, combined_initial)) =>
+        //let (combined_projection, combined_initial) = minimal_machine(&combined_projection, combined_initial);
+        // option because used in equivalent. Consider changing.
+        {
+            (
+                to_option_machine(&combined_projection),
+                Some(combined_initial),
+            )
+        }
+        None => (OptionGraph::new(), Some(NodeId::end())),
     }
-
-    let mapper = |p: &ProtoStruct| -> (Graph, NodeId, BTreeSet<EventType>) {
-        let (projection, projection_initial) =
-            project(&p.graph, p.initial.unwrap(), subs, role.clone(), minimize);
-        (projection, projection_initial, p.interface.clone())
-    };
-
-    let projections: Vec<_> = swarms.into_iter().map(mapper).collect();
-
-    let (combined_projection, combined_initial) = combine_projs(projections, gen_state_name);
-
-    //let (combined_projection, combined_initial) = minimal_machine(&combined_projection, combined_initial);
-    // option because used in equivalent. Consider changing.
-    (
-        to_option_machine(&combined_projection),
-        Some(combined_initial),
-    )
 }
 
 fn combine_projs<N: Clone, E: Clone + EventLabel>(
     projections: Vec<(petgraph::Graph<N, E>, NodeId, BTreeSet<EventType>)>,
     gen_node: fn(&N, &N) -> N,
-) -> (petgraph::Graph<N, E>, NodeId) {
+) -> Option<(petgraph::Graph<N, E>, NodeId)> {
     let _span = tracing::info_span!("combine_projs").entered();
+    if projections.is_empty() {
+        return None;
+    }
     let (acc_machine, acc_initial, _) = projections[0].clone();
     let (combined_projection, combined_initial) = projections[1..].to_vec().into_iter().fold(
         (acc_machine, acc_initial),
         |(acc, acc_i), (m, i, interface)| compose(acc, acc_i, m, i, interface, gen_node),
     );
-    (combined_projection, combined_initial)
+    Some((combined_projection, combined_initial))
 }
 
 // nfa to dfa using subset construction. Hopcroft, Motwani and Ullman section 2.3.5
@@ -371,39 +420,9 @@ fn visit_successors_stop_on_branch(
 pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> BranchMap {
     let _span = tracing::info_span!("paths_from_event_types").entered();
     let mut m: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
-    let get_pre_joins = |e: &EventType| -> BTreeSet<EventType> {
-        let pre = proto_info
-            .immediately_pre
-            .get(e)
-            .cloned()
-            .unwrap_or_default();
-        let product = pre.clone().into_iter().cartesian_product(&pre);
-        product
-            .filter(|(e1, e2)| {
-                *e1 != **e2
-                    && proto_info
-                        .concurrent_events
-                        .contains(&unord_event_pair(e1.clone(), (*e2).clone()))
-            })
-            .map(|(e1, e2)| [e1, e2.clone()])
-            .flatten()
-            .collect()
-    };
+    let special_events = get_branching_joining_proto_info(proto_info);
 
-    let special_events = proto_info
-        .branching_events
-        .clone()
-        .into_iter()
-        .flatten()
-        .chain(
-            proto_info
-                .joining_events
-                .clone()
-                .into_iter()
-                .filter(|e| !get_pre_joins(e).is_empty()),
-        )
-        .collect();
-
+    // The reason for making set of concurrent events smaller is?
     let after_pairs: BTreeSet<UnordEventPair> =
         transitive_closure_succeeding(proto_info.succeeding_events.clone())
             .into_iter()
@@ -650,7 +669,7 @@ pub fn equivalent(left: &OptionGraph, li: NodeId, right: &OptionGraph, ri: NodeI
 }
 
 fn adapted_projection(
-    swarms: &Vec<ProtoStruct>,
+    proto_info: &ProtoInfo,
     subs: &Subscriptions,
     role: Role,
     machine: (OptionGraph, NodeId),
@@ -658,14 +677,12 @@ fn adapted_projection(
     minimize: bool,
 ) -> Option<(AdaptationGraph, Option<NodeId>)> {
     let _span = tracing::info_span!("adapted_projection", %role).entered();
-    if k >= swarms.len() {
+    if proto_info.protocols.is_empty() || k >= proto_info.protocols.len() {
         return None;
     }
 
     // project a protocol and turn the projection into an AdaptationGraph
-    let mapper = |ps: &ProtoStruct| {
-        let (proj, proj_initial) =
-            project(&ps.graph, ps.initial.unwrap(), subs, role.clone(), minimize);
+    let mapper = |(proj, proj_initial, interface): (Graph, NodeId, BTreeSet<EventType>)| {
         let proj = proj.map(
             |_, n| AdaptationNode {
                 state: n.clone(),
@@ -673,7 +690,7 @@ fn adapted_projection(
             },
             |_, label| label.clone(),
         );
-        (proj, proj_initial, ps.interface.clone())
+        (proj, proj_initial, interface)
     };
 
     let gen_node = |n1: &AdaptationNode, n2: &AdaptationNode| -> AdaptationNode {
@@ -699,7 +716,10 @@ fn adapted_projection(
     };
 
     let projections: Vec<(AdaptationGraph, NodeId, BTreeSet<EventType>)> =
-        swarms.iter().map(mapper).collect();
+        to_chained_projections(to_chained_protos(proto_info), subs, role, minimize)
+            .into_iter()
+            .map(mapper)
+            .collect();
 
     //AdaptationGraph{state: n.clone(), machine_state: Some(state.clone())}
     let (machine, machine_initial) = (from_option_graph_to_graph(&machine.0), machine.1);
@@ -748,10 +768,13 @@ fn adapted_projection(
         .chain([(machine_and_proj, machine_and_proj_initial, kth_interface)])
         .chain(projections[k + 1..].iter().cloned())
         .collect();
-    let (combined_projection, combined_initial) = combine_projs(projections, gen_node);
 
-    // should we minimize here? not done to keep original shape of input machine as much as possible?
-    Some((combined_projection, Some(combined_initial)))
+    match combine_projs(projections, gen_node) {
+        Some((combined_projection, combined_initial)) => {
+            Some((combined_projection, Some(combined_initial)))
+        } // should we minimize here? not done to keep original shape of input machine as much as possible?
+        None => None,
+    }
 }
 
 pub fn projection_information(
@@ -763,7 +786,7 @@ pub fn projection_information(
     minimize: bool,
 ) -> Option<ProjectionInfo> {
     let (proj, proj_initial) =
-        match adapted_projection(&proto_info.protocols, subs, role, machine, k, minimize) {
+        match adapted_projection(&proto_info, subs, role, machine, k, minimize) {
             Some((proj, Some(proj_initial))) => (proj, proj_initial),
             _ => return None,
         };
@@ -869,7 +892,7 @@ mod tests {
                 compose_protocols, exact_weak_well_formed_sub, from_json,
                 overapprox_weak_well_formed_sub, swarms_to_proto_info,
             },
-            composition_types::{CompositionComponent, Granularity, InterfacingSwarms},
+            composition_types::{Granularity, InterfacingProtocols},
         },
         machine::{self},
         types::{Command, EventType, Role, Transition},
@@ -964,105 +987,32 @@ mod tests {
         )
         .unwrap()
     }
-    fn get_interfacing_swarms_1() -> InterfacingSwarms<Role> {
-        InterfacingSwarms(vec![
-            CompositionComponent {
-                protocol: get_proto1(),
-                interface: None,
-            },
-            CompositionComponent {
-                protocol: get_proto2(),
-                interface: Some(Role::new("T")),
-            },
-        ])
+    fn get_interfacing_swarms_1() -> InterfacingProtocols {
+        InterfacingProtocols(vec![get_proto1(), get_proto2()])
     }
 
-    fn get_interfacing_swarms_1_reversed() -> InterfacingSwarms<Role> {
-        InterfacingSwarms(vec![
-            CompositionComponent {
-                protocol: get_proto2(),
-                interface: None,
-            },
-            CompositionComponent {
-                protocol: get_proto1(),
-                interface: Some(Role::new("T")),
-            },
-        ])
+    fn get_interfacing_swarms_1_reversed() -> InterfacingProtocols {
+        InterfacingProtocols(vec![get_proto2(), get_proto1()])
     }
 
-    fn get_interfacing_swarms_2() -> InterfacingSwarms<Role> {
-        InterfacingSwarms(vec![
-            CompositionComponent {
-                protocol: get_proto1(),
-                interface: None,
-            },
-            CompositionComponent {
-                protocol: get_proto2(),
-                interface: Some(Role::new("T")),
-            },
-            CompositionComponent {
-                protocol: get_proto3(),
-                interface: Some(Role::new("F")),
-            },
-        ])
+    fn get_interfacing_swarms_2() -> InterfacingProtocols {
+        InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto3()])
     }
 
-    fn get_interfacing_swarms_2_reversed() -> InterfacingSwarms<Role> {
-        InterfacingSwarms(vec![
-            CompositionComponent {
-                protocol: get_proto3(),
-                interface: None,
-            },
-            CompositionComponent {
-                protocol: get_proto2(),
-                interface: Some(Role::new("F")),
-            },
-            CompositionComponent {
-                protocol: get_proto1(),
-                interface: Some(Role::new("T")),
-            },
-        ])
+    fn get_interfacing_swarms_2_reversed() -> InterfacingProtocols {
+        InterfacingProtocols(vec![get_proto3(), get_proto2(), get_proto1()])
     }
 
-    fn get_interfacing_swarms_3() -> InterfacingSwarms<Role> {
-        InterfacingSwarms(vec![
-            CompositionComponent {
-                protocol: get_proto1(),
-                interface: None,
-            },
-            CompositionComponent {
-                protocol: get_proto2(),
-                interface: Some(Role::new("T")),
-            },
-            CompositionComponent {
-                protocol: get_proto32(),
-                interface: Some(Role::new("F")),
-            },
-        ])
+    fn get_interfacing_swarms_3() -> InterfacingProtocols {
+        InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto32()])
     }
 
-    fn get_interfacing_swarms_333() -> InterfacingSwarms<Role> {
-        InterfacingSwarms(vec![
-            CompositionComponent {
-                protocol: get_proto1(),
-                interface: None,
-            },
-            CompositionComponent {
-                protocol: get_proto2(),
-                interface: Some(Role::new("T")),
-            },
-            CompositionComponent {
-                protocol: get_proto333(),
-                interface: Some(Role::new("F")),
-            },
-        ])
+    fn get_interfacing_swarms_333() -> InterfacingProtocols {
+        InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto333()])
     }
 
-    fn get_interfacing_swarms_whhhh() -> InterfacingSwarms<Role> {
-        InterfacingSwarms(vec![CompositionComponent {
-            protocol: get_proto1(),
-            interface: None,
-        }])
+    fn get_interfacing_swarms_whhhh() -> InterfacingProtocols {
+        InterfacingProtocols(vec![get_proto1()])
     }
 
     #[test]
@@ -1146,13 +1096,8 @@ mod tests {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let result_subs = exact_weak_well_formed_sub(
-            InterfacingSwarms(vec![CompositionComponent::<Role> {
-                protocol: proto.clone(),
-                interface: None,
-            }]),
-            &BTreeMap::new(),
-        );
+        let result_subs =
+            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
@@ -1240,13 +1185,8 @@ mod tests {
         setup_logger();
         // car factory from coplaws example
         let proto = get_proto2();
-        let result_subs = exact_weak_well_formed_sub(
-            InterfacingSwarms(vec![CompositionComponent::<Role> {
-                protocol: proto.clone(),
-                interface: None,
-            }]),
-            &BTreeMap::new(),
-        );
+        let result_subs =
+            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("F");
@@ -1405,13 +1345,8 @@ mod tests {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let result_subs = exact_weak_well_formed_sub(
-            InterfacingSwarms(vec![CompositionComponent::<Role> {
-                protocol: proto.clone(),
-                interface: None,
-            }]),
-            &BTreeMap::new(),
-        );
+        let result_subs =
+            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
@@ -1506,13 +1441,8 @@ mod tests {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let result_subs = exact_weak_well_formed_sub(
-            InterfacingSwarms(vec![CompositionComponent::<Role> {
-                protocol: proto.clone(),
-                interface: None,
-            }]),
-            &BTreeMap::new(),
-        );
+        let result_subs =
+            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
@@ -1607,13 +1537,8 @@ mod tests {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let result_subs = exact_weak_well_formed_sub(
-            InterfacingSwarms(vec![CompositionComponent::<Role> {
-                protocol: proto.clone(),
-                interface: None,
-            }]),
-            &BTreeMap::new(),
-        );
+        let result_subs =
+            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
@@ -1709,13 +1634,8 @@ mod tests {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let result_subs = exact_weak_well_formed_sub(
-            InterfacingSwarms(vec![CompositionComponent::<Role> {
-                protocol: proto.clone(),
-                interface: None,
-            }]),
-            &BTreeMap::new(),
-        );
+        let result_subs =
+            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
@@ -1810,11 +1730,11 @@ mod tests {
         );
         assert!(subs1.is_ok());
         let subs1 = subs1.unwrap();
-        let proto_info = swarms_to_proto_info(get_interfacing_swarms_1(), &subs1);
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_1());
         assert!(proto_info.no_errors());
 
         let (proj_combined1, proj_combined_initial1) =
-            project_combine(&proto_info.protocols, &subs1, role.clone(), false);
+            project_combine(&proto_info, &subs1, role.clone(), false);
 
         let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
             get_interfacing_swarms_1_reversed(),
@@ -1823,11 +1743,11 @@ mod tests {
         );
         assert!(subs2.is_ok());
         let subs2 = subs2.unwrap();
-        let proto_info = swarms_to_proto_info(get_interfacing_swarms_1_reversed(), &subs2);
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_1_reversed());
         assert!(proto_info.no_errors());
 
         let (proj_combined2, proj_combined_initial2) =
-            project_combine(&proto_info.protocols, &subs2, role.clone(), false);
+            project_combine(&proto_info, &subs2, role.clone(), false);
 
         // compose(a, b) should be equal to compose(b, a)
         assert_eq!(subs1, subs2);
@@ -1908,11 +1828,11 @@ mod tests {
             );
             assert!(subs1.is_ok());
             let subs1 = subs1.unwrap();
-            let proto_info = swarms_to_proto_info(get_interfacing_swarms_2(), &subs1);
+            let proto_info = swarms_to_proto_info(get_interfacing_swarms_2());
             assert!(proto_info.no_errors());
 
             let (proj_combined1, proj_combined_initial1) =
-                project_combine(&proto_info.protocols, &subs1, role.clone(), false);
+                project_combine(&proto_info, &subs1, role.clone(), false);
 
             let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
                 get_interfacing_swarms_2_reversed(),
@@ -1921,11 +1841,11 @@ mod tests {
             );
             assert!(subs2.is_ok());
             let subs2 = subs2.unwrap();
-            let proto_info = swarms_to_proto_info(get_interfacing_swarms_2_reversed(), &subs2);
+            let proto_info = swarms_to_proto_info(get_interfacing_swarms_2_reversed());
             assert!(proto_info.no_errors());
 
             let (proj_combined2, proj_combined_initial2) =
-                project_combine(&proto_info.protocols, &subs2, role.clone(), false);
+                project_combine(&proto_info, &subs2, role.clone(), false);
 
             // compose(a, b) should be equal to compose(b, a)
             assert_eq!(subs1, subs2);
@@ -1962,10 +1882,9 @@ mod tests {
         );
         assert!(subs.is_ok());
         let subs = subs.unwrap();
-        let proto_info = swarms_to_proto_info(get_interfacing_swarms_3(), &subs);
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_3());
         assert!(proto_info.no_errors());
-        let (proj, proj_initial) =
-            project_combine(&proto_info.protocols, &subs, role.clone(), false);
+        let (proj, proj_initial) = project_combine(&proto_info, &subs, role.clone(), false);
         println!(
             "projection of {}: {}",
             role.to_string(),
@@ -2032,12 +1951,11 @@ mod tests {
             Role::new("F"),
             Role::new("QCR"),
         ];
-        let proto_info = swarms_to_proto_info(get_interfacing_swarms_333(), &subs);
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_333());
         assert!(proto_info.no_errors());
         //println!("conc: {:?}", proto_info.concurrent_events);
         for role in all_roles {
-            let (proj, proj_initial) =
-                project_combine(&proto_info.protocols, &subs, role.clone(), false);
+            let (proj, proj_initial) = project_combine(&proto_info, &subs, role.clone(), false);
             //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
             let branch_thing = paths_from_event_types(&proj, &proto_info);
             println!(
@@ -2067,12 +1985,11 @@ mod tests {
             Role::new("F"),
             Role::new("QCR"),
         ];
-        let proto_info = swarms_to_proto_info(get_interfacing_swarms_3(), &subs);
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_3());
         assert!(proto_info.no_errors());
         //println!("conc: {:?}", proto_info.concurrent_events);
         for role in all_roles {
-            let (proj, proj_initial) =
-                project_combine(&proto_info.protocols, &subs, role.clone(), false);
+            let (proj, proj_initial) = project_combine(&proto_info, &subs, role.clone(), false);
             //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
             let branch_thing = paths_from_event_types(&proj, &proto_info);
             println!(
@@ -2098,13 +2015,12 @@ mod tests {
         .unwrap();
         let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D")];
         println!("subs: {}", serde_json::to_string_pretty(&subs).unwrap());
-        let proto_info = swarms_to_proto_info(get_interfacing_swarms_whhhh(), &subs);
+        let proto_info = swarms_to_proto_info(get_interfacing_swarms_whhhh());
         assert!(proto_info.no_errors());
         //println!("conc: {:?}", proto_info.concurrent_events);
 
         for role in all_roles {
-            let (proj, proj_initial) =
-                project_combine(&proto_info.protocols, &subs, role.clone(), false);
+            let (proj, proj_initial) = project_combine(&proto_info, &subs, role.clone(), false);
             //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
             if role.to_string() == "D" {
                 let branch_thing = paths_from_event_types(&proj, &proto_info);
@@ -2126,16 +2042,7 @@ mod tests {
 
         let proto = get_proto1();
         let result_subs = overapprox_weak_well_formed_sub(
-            InterfacingSwarms(vec![
-                CompositionComponent::<Role> {
-                    protocol: proto.clone(),
-                    interface: None,
-                },
-                CompositionComponent::<Role> {
-                    protocol: get_proto2(),
-                    interface: Some(Role::new("T")),
-                },
-            ]),
+            InterfacingProtocols(vec![proto.clone(), get_proto2()]),
             &BTreeMap::new(),
             Granularity::TwoStep,
         );
@@ -2308,11 +2215,11 @@ mod tests {
         assert!(subs1.is_ok());
         let subs1 = subs1.unwrap();
         println!("subs: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        let proto_info = swarms_to_proto_info(swarms.clone(), &subs1);
+        let proto_info = swarms_to_proto_info(swarms.clone());
         assert!(proto_info.no_errors());
 
         let adapted = adapted_projection(
-            &proto_info.protocols,
+            &proto_info,
             &subs1,
             role.clone(),
             (fl_m_graph.clone(), fl_m_graph_initial.unwrap()),
@@ -2349,12 +2256,12 @@ mod tests {
         assert!(subs2.is_ok());
         let subs2 = subs2.unwrap();
         println!("subs: {}", serde_json::to_string_pretty(&subs2).unwrap());
-        let proto_info = swarms_to_proto_info(swarms.clone(), &subs2);
+        let proto_info = swarms_to_proto_info(swarms.clone());
         assert!(proto_info.no_errors());
 
         //let (adapted_proj, adapted_proj_initial) = adapted_projection(&proto_info.protocols, &subs2, role.clone(), (fl_m_graph.clone(), fl_m_graph_initial.unwrap()), 0);
         let adapted = adapted_projection(
-            &proto_info.protocols,
+            &proto_info,
             &subs2,
             role.clone(),
             (fl_m_graph.clone(), fl_m_graph_initial.unwrap()),
@@ -2426,11 +2333,11 @@ mod tests {
         assert!(subs1.is_ok());
         let subs1 = subs1.unwrap();
         println!("subs: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        let proto_info = swarms_to_proto_info(swarms.clone(), &subs1);
+        let proto_info = swarms_to_proto_info(swarms.clone());
         assert!(proto_info.no_errors());
 
         let adapted = adapted_projection(
-            &proto_info.protocols,
+            &proto_info,
             &subs1,
             role.clone(),
             (f_m_graph.clone(), f_m_graph_initial.unwrap()),
@@ -2467,11 +2374,11 @@ mod tests {
         assert!(subs2.is_ok());
         let subs2 = subs2.unwrap();
         println!("subs: {}", serde_json::to_string_pretty(&subs2).unwrap());
-        let proto_info = swarms_to_proto_info(swarms.clone(), &subs2);
+        let proto_info = swarms_to_proto_info(swarms.clone());
         assert!(proto_info.no_errors());
 
         let adapted = adapted_projection(
-            &proto_info.protocols,
+            &proto_info,
             &subs2,
             role.clone(),
             (f_m_graph.clone(), f_m_graph_initial.unwrap()),
@@ -2808,7 +2715,7 @@ mod tests {
         assert!(subs1.is_ok());
         let subs1 = subs1.unwrap();
         //println!("subs: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        let proto_info = swarms_to_proto_info(swarms.clone(), &subs1);
+        let proto_info = swarms_to_proto_info(swarms.clone());
 
         let projection_info = projection_information(
             &proto_info,
@@ -2976,10 +2883,7 @@ mod tests {
 
         let (fl_m_graph, fl_m_graph_initial, _) = crate::machine::from_json(fl_m.clone());
         let role = Role::new("FL");
-        let swarms: InterfacingSwarms<Role> = InterfacingSwarms(vec![CompositionComponent {
-            protocol: get_proto1(),
-            interface: None,
-        }]);
+        let swarms: InterfacingProtocols = InterfacingProtocols(vec![get_proto1()]);
         let swarms_for_sub = get_interfacing_swarms_1();
         let larger_than_necessary_sub =
             crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
@@ -2990,7 +2894,7 @@ mod tests {
         assert!(larger_than_necessary_sub.is_ok());
         let subs1 = larger_than_necessary_sub.unwrap();
         //println!("subs: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        let proto_info = swarms_to_proto_info(swarms.clone(), &subs1);
+        let proto_info = swarms_to_proto_info(swarms.clone());
 
         let projection_info = projection_information(
             &proto_info,

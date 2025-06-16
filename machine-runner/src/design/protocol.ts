@@ -2,7 +2,7 @@
 import { ActyxEvent, Tag, Tags } from '@actyx/sdk'
 import { StateMechanism, MachineProtocol, ReactionMap, StateFactory, CommandDefinerMap, ReactionHandler } from './state.js'
 import { Contained, MachineEvent } from './event.js'
-import { Subscriptions, InterfacingSwarms, projectionInformation, ProjectionInfo, projectionInformationNew } from '@actyx/machine-check'
+import { Subscriptions, InterfacingSwarms, projectionInformation, ProjectionInfo, projectionInformationNew, InterfacingProtocols } from '@actyx/machine-check'
 import chalk = require('chalk');
 import * as readline from 'readline';
 
@@ -33,7 +33,7 @@ export type SwarmProtocol<
   >(
     machineName: MachineName,
     role: MachineName,
-    protocols: InterfacingSwarms,
+    protocols: InterfacingProtocols,
     subscriptions: Subscriptions,
     k: number,
     mType: ProjectionType,
