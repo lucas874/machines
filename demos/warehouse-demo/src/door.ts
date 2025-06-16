@@ -29,7 +29,7 @@ const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehou
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Adapted machine. Adapting here has no effect. Except that we can make a verbose machine.
-const [doorAdapted, s0Adapted] = Composition.adaptMachine('Door', 'D', warehouse_protocol, subs_warehouse, 0, door.createJSONForAnalysis(s0), s0, true).data!
+const [doorAdapted, s0Adapted] = Composition.adaptMachine('D', warehouse_protocol, subs_warehouse, 0, [door, s0], true).data!
 
 // Run the adapted machine
 async function main() {
