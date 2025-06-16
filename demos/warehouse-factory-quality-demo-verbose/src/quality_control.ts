@@ -1,7 +1,7 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, warehouse_factory_quality_protocol, subs_composition, quality_protocol, subs_quality, getRandomInt, print_event, printState  } from './protocol'
-import { checkComposedProjection, projectionAndInformation, projectionAndInformationNew } from '@actyx/machine-check'
+import { checkComposedProjection } from '@actyx/machine-check'
 import chalk from 'chalk'
 import * as readline from 'readline';
 
@@ -34,22 +34,14 @@ s2.react([Events.report], s3, (_, e) => { return s3.make() })
 const checkProjResult = checkComposedProjection(quality_protocol, subs_quality, "QCR", qcr.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
-// Projection of warehouse || factory || quality over QCR
-const projectionInfoResult = projectionAndInformation(warehouse_factory_quality_protocol, subs_composition, "QCR")
-//const projectionInfoResult = projectionAndInformationNew(warehouse_factory_quality_protocol, subs_composition, "QCR", qcr.createJSONForAnalysis(s0), 2)
-
-if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
-const projectionInfo = projectionInfoResult.data
-//console.log(JSON.stringify(projectionInfo1, null, 2))
-
 // Adapted  machine
-const [qcrAdapted, s0Adapted] = Composition.adaptMachine("Quality Control", projectionInfo, Events.allEvents, s0, true)
+const [qcrAdapted, s0Adapted] = Composition.adaptMachine('QCR', warehouse_factory_quality_protocol, subs_composition, 2, [qcr, s0], true).data!
 
 // Run the extended machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('warehouse-factory-quality')
-    const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
+    const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, qcrAdapted)
     printState(qcrAdapted.machineName, s0Adapted.mechanism.name, undefined)
     console.log(chalk.bgBlack.red.dim`    obs!`);
 

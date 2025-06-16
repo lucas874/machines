@@ -1,7 +1,7 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, warehouse_factory_quality_protocol, subs_composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event, printState } from './protocol'
-import { checkComposedProjection, projectionAndInformation, projectionAndInformationNew } from '@actyx/machine-check'
+import { checkComposedProjection } from '@actyx/machine-check'
 import * as readline from 'readline';
 
 const rl = readline.createInterface({
@@ -27,21 +27,15 @@ s0.react([Events.closingTime], s2, (_, e) => { return s2.make() })
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "FL", forklift.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
-// Projection of warehouse || factory || quality over FL
-const projectionInfoResult = projectionAndInformation(warehouse_factory_quality_protocol, subs_composition, "FL")
-//const projectionInfoResult = projectionAndInformationNew(warehouse_factory_quality_protocol, subs_composition, "FL", forklift.createJSONForAnalysis(s0), 0)
-if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
-const projectionInfo = projectionInfoResult.data
-//console.log(JSON.stringify(projectionInfo1, null, 2))
-
 // Adapted machine
-const [forkliftAdapted, s0Adapted] = Composition.adaptMachine("Forklift", projectionInfo, Events.allEvents, s0, true)
+const [forkliftAdapted, s0Adapted] = Composition.adaptMachine('FL', warehouse_factory_quality_protocol, subs_composition, 0, [forklift, s0], true).data!
 
 // Run the adapted machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('warehouse-factory-quality')
-    const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
+    const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, forkliftAdapted)
+
     printState(forkliftAdapted.machineName, s0Adapted.mechanism.name, undefined)
 
     for await (const state of machine) {

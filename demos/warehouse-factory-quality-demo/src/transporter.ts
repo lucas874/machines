@@ -1,7 +1,7 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunner, createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, getRandomInt, warehouse_protocol, subs_warehouse, print_event, warehouse_factory_quality_protocol, subs_composition } from './protocol'
-import { checkComposedProjection, ResultData, ProjectionAndSucceedingMap, projectionAndInformation, projectionAndInformationNew } from '@actyx/machine-check'
+import { checkComposedProjection, projectionInformation } from '@actyx/machine-check'
 
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 
@@ -34,23 +34,14 @@ s2.react([Events.partOK], s0, (_, e) => { print_event(e); return s0.make() })
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "T", transporter.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", "))
 
-// Projection of warehouse || factory || quality over T
-//const projectionInfoResult = projectionAndInformationNew(warehouse_factory_quality_protocol, subs_composition, "T", transporter.createJSONForAnalysis(s0), 0)
-const projectionInfoResult = projectionAndInformation(warehouse_factory_quality_protocol, subs_composition, "T")
-
-if (projectionInfoResult.type == 'ERROR') throw new Error('error getting projection')
-const projectionInfo = projectionInfoResult.data
-//console.log(JSON.stringify(projectionInfo1, null, 2))
-
 // Adapted machine
-//const [transporterAdapted, s0_] = Composition.adaptMachineNew("T", projectionInfo, Events.allEvents, s0)
-const [transporterAdapted, s0_] = Composition.adaptMachine("T", projectionInfo, Events.allEvents, s0)
+const [transportAdapted, s0Adapted] = Composition.adaptMachine('T', warehouse_factory_quality_protocol, subs_composition, 0, [transporter, s0]).data!
 
 // Run the adapted machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('warehouse-factory-quality')
-    const machine = createMachineRunnerBT(app, tags, s0_, undefined, projectionInfo.branches, projectionInfo.specialEventTypes)
+    const machine = createMachineRunnerBT(app, tags, s0Adapted, undefined, transportAdapted)
     //const machine = createMachineRunner(app, tags, s0, undefined)
     for await (const state of machine) {
       console.log("Transporter. State is:", state.type)
