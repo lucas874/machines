@@ -27,19 +27,18 @@ export type SwarmProtocol<
   tagWithEntityId: (id: string) => Tags<MachineEvents>
   adaptMachine: <
     MachineName extends string,
+    ProjectionName extends string,
     StateName extends string,
     StatePayload,
     Commands extends CommandDefinerMap<any, any, Contained.ContainedEvent<MachineEvent.Any>[]>,
   >(
-    machineName: MachineName,
-    role: MachineName,
+    role: ProjectionName,
     protocols: InterfacingProtocols,
     subscriptions: Subscriptions,
     k: number,
-    mType: ProjectionType,
-    mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
+    mOld: [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>],
     verbose?: boolean
-  ) => MachineResult<[AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>, StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>]>
+  ) => MachineResult<[AdaptedMachine<SwarmProtocolName, ProjectionName, MachineEventFactories>, StateFactory<SwarmProtocolName, ProjectionName, MachineEventFactories, StateName, StatePayload, Commands>]>
 }
 
 /**
@@ -86,12 +85,13 @@ export namespace SwarmProtocol {
     return {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
-      adaptMachine: (machineName, role, protocols, subscriptions, k, mType, mOldInitial, verbose?) => {
-        const projectionInfo = projectionInformation(protocols, subscriptions, role, mType, k, true)
+      adaptMachine: (role, protocols, subscriptions, k, oldMachine, verbose?) => {
+        const [mOld, mOldInitial] = oldMachine
+        const projectionInfo = projectionInformation(protocols, subscriptions, role, mOld.createJSONForAnalysis(mOldInitial), k, true)
         if (projectionInfo.type == 'ERROR') {
           return {data: undefined, ... projectionInfo}
         }
-        return MachineAdaptation.adaptMachine(ImplMachine.makeAdapted(swarmName, machineName, eventFactories, projectionInfo.data), eventFactories, mOldInitial, verbose)
+        return MachineAdaptation.adaptMachine(ImplMachine.makeAdapted(swarmName, role, eventFactories, projectionInfo.data), eventFactories, mOldInitial, verbose)
       }
     }
   }
@@ -639,6 +639,7 @@ export namespace MachineAdaptation {
   export const adaptMachine = <
     SwarmProtocolName extends string,
     MachineName extends string,
+    ProjectionName extends MachineName,
     MachineEventFactories extends MachineEvent.Factory.Any,
     StateName extends string,
     StatePayload,
