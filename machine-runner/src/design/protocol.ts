@@ -639,22 +639,22 @@ export namespace MachineAdaptation {
   export const adaptMachine = <
     SwarmProtocolName extends string,
     MachineName extends string,
-    ProjectionName extends MachineName,
+    ProjectionName extends string,
     MachineEventFactories extends MachineEvent.Factory.Any,
     StateName extends string,
     StatePayload,
     Commands extends CommandDefinerMap<any, any, Contained.ContainedEvent<MachineEvent.Any>[]>,
   >(
-    mNew: AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>,
+    mNew: AdaptedMachine<SwarmProtocolName, ProjectionName, MachineEventFactories>,
     events: readonly MachineEventFactories[],
     mOldInitial: StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>,
     verbose?: boolean,
-  ): MachineResult<[AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories>, StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>]> => {
+  ): MachineResult<[AdaptedMachine<SwarmProtocolName, ProjectionName, MachineEventFactories>, StateFactory<SwarmProtocolName, ProjectionName, MachineEventFactories, StateName, StatePayload, Commands>]> => {
     // information about projection states, such as their labels incoming and outgoing and what state in old machine they may correspond to
     const projStateInfoMap: Map<string, ProjectionStateInfo> = projStateInfo(mNew)
 
     // map projection states to states in machine under constructions
-    const projStateToMachineState: Map<string, StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, StateName, StatePayload, Commands>> = new Map()
+    const projStateToMachineState: Map<string, StateFactory<SwarmProtocolName, ProjectionName, MachineEventFactories, StateName, StatePayload, Commands>> = new Map()
 
     // we assume single event type commands. map command names to event types as strings
     const cmdToEventTypeString: Map<string, string> = cmdNameToEventType(mNew)
