@@ -2,7 +2,7 @@
 import { ActyxEvent, Tag, Tags } from '@actyx/sdk'
 import { StateMechanism, MachineProtocol, ReactionMap, StateFactory, CommandDefinerMap, ReactionHandler } from './state.js'
 import { Contained, MachineEvent } from './event.js'
-import { Subscriptions, InterfacingSwarms, projectionInformation, ProjectionInfo, projectionInformationNew, InterfacingProtocols } from '@actyx/machine-check'
+import { Subscriptions, projectionInformation, ProjectionInfo, InterfacingProtocols } from '@actyx/machine-check'
 import chalk = require('chalk');
 import * as readline from 'readline';
 
@@ -87,7 +87,7 @@ export namespace SwarmProtocol {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
       adaptMachine: (machineName, role, protocols, subscriptions, k, mType, mOldInitial, verbose?) => {
-        const projectionInfo = projectionInformationNew(protocols, subscriptions, role, mType, k, true)
+        const projectionInfo = projectionInformation(protocols, subscriptions, role, mType, k, true)
         if (projectionInfo.type == 'ERROR') {
           return {data: undefined, ... projectionInfo}
         }

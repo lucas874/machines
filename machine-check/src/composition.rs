@@ -1,6 +1,6 @@
 use composition_swarm::{proto_info_to_error_report, swarms_to_proto_info, ErrorReport};
 use composition_types::{
-    get_branching_joining_proto_info, DataResult, Granularity, ProjectionInfo,
+    DataResult, Granularity, ProjectionInfo,
 };
 
 use crate::composition::composition_types::InterfacingProtocols;
@@ -121,40 +121,6 @@ pub fn project_combine(
 
 #[wasm_bindgen]
 pub fn projection_information(
-    protos: InterfacingProtocols,
-    subs: String,
-    role: Role,
-    minimize: bool,
-) -> DataResult<ProjectionInfo> {
-    let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
-        errors: vec![format!("parsing subscriptions: {}", e)]
-    });
-    let proto_info = swarms_to_proto_info(protos);
-    if !proto_info.no_errors() {
-        return DataResult::ERROR {
-            errors: error_report_to_strings(proto_info_to_error_report(proto_info)),
-        };
-    }
-    let (proj, proj_initial) =
-        composition_machine::project_combine(&proto_info, &subs, role, minimize);
-    let branches = composition_machine::paths_from_event_types(&proj, &proto_info);
-    let special_event_types = get_branching_joining_proto_info(&proto_info);
-
-    DataResult::OK {
-        data: ProjectionInfo {
-            projection: composition::composition_machine::from_option_to_machine(
-                proj,
-                proj_initial.unwrap(),
-            ),
-            branches,
-            special_event_types,
-            proj_to_machine_states: BTreeMap::new(),
-        },
-    }
-}
-
-#[wasm_bindgen]
-pub fn projection_information_new(
     protos: InterfacingProtocols,
     subs: String,
     role: Role,

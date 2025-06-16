@@ -1,5 +1,5 @@
 import { check_swarm, check_projection, check_wwf_swarm, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, check_composed_projection,
-  revised_projection, project_combine, compose_protocols, projection_information, projection_information_new,
+  revised_projection, project_combine, compose_protocols, projection_information,
   CheckResult, MachineType, SwarmProtocolType, Subscriptions, InterfacingSwarms as InterfacingSwarmsInner, CompositionComponent as CompositionComponentInner, Role, DataResult, Granularity,
   ProjectionInfo, InterfacingProtocols } from '../pkg/machine_check.js'
 export { MachineType, SwarmProtocolType, Subscriptions, Role, CheckResult as Result, DataResult, Granularity, ProjectionInfo, InterfacingProtocols }
@@ -64,10 +64,6 @@ export function composeProtocols(protos: InterfacingProtocols): DataResult<Swarm
   return compose_protocols(protos)
 }
 
-export function projectionInformation(protos: InterfacingProtocols, subscriptions: Subscriptions, role: Role, minimize: boolean): DataResult<ProjectionInfo> {
-  return projection_information(protos, JSON.stringify(subscriptions), role, minimize);
-}
-
-export function projectionInformationNew(protos: InterfacingProtocols, subscriptions: Subscriptions, role: Role, machine: MachineType, k: number, minimize: boolean): DataResult<ProjectionInfo> {
-  return projection_information_new(protos, JSON.stringify(subscriptions), role, machine, k, minimize);
+export function projectionInformation(protos: InterfacingProtocols, subscriptions: Subscriptions, role: Role, machine: MachineType, k: number, minimize: boolean): DataResult<ProjectionInfo> {
+  return projection_information(protos, JSON.stringify(subscriptions), role, machine, k, minimize);
 }
