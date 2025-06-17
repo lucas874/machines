@@ -3274,4 +3274,60 @@ mod tests {
             Err(e) => println!("errors generating sub: {:?}", error_report_to_strings(e)),
         }
     }
+
+    #[test]
+    fn inference_example_4() {
+        fn subs() -> Subscriptions {
+        serde_json::from_str::<Subscriptions>(
+            r#"{
+                "R1": ["c1", "a1"],
+                "R2": ["a1", "b1"],
+                "R3": ["b1", "c1"]
+            }"#,
+        )
+        .unwrap()
+        }
+        fn proto1() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } },
+                    { "source": "0", "target": "3", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
+                    { "source": "3", "target": "4", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
+                    { "source": "4", "target": "0", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R3" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+        }
+        fn proto2() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } }
+                    ]
+                }"#,
+            )
+            .unwrap()
+        }
+        fn as_interfacing_protocols() -> InterfacingProtocols {
+            InterfacingProtocols(vec![proto1(), proto2()])
+        }
+        let (composition, composition_initial) = compose_protocols(as_interfacing_protocols()).unwrap();
+
+        println!("proto 1: {}", serde_json::to_string_pretty(&proto1()).unwrap());
+        println!("proto 2: {}", serde_json::to_string_pretty(&proto2()).unwrap());
+        println!("composition: {}", serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap());
+        println!("subs: {}", serde_json::to_string_pretty(&subs()).unwrap());
+        println!("subs-wf? empty list means yes {:?}", error_report_to_strings(check(as_interfacing_protocols(), &subs())));
+        let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
+        match smalles_sub {
+            Ok(sub) => { println!("smallest sub: {}", serde_json::to_string_pretty(&sub).unwrap()); println!("smallest == manual?: {}", subs() == sub); },
+            Err(e) => println!("errors generating sub: {:?}", error_report_to_strings(e)),
+        }
+    }
 }
