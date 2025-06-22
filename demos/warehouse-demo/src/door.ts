@@ -1,5 +1,5 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunnerBT} from '@actyx/machine-runner'
+import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, warehouse_protocol, subs_warehouse, printState, getRandomInt } from './protocol'
 import * as readline from 'readline';
 import chalk from "chalk";
@@ -13,10 +13,11 @@ const rl = readline.createInterface({
 // Using the machine runner DSL an implmentation of door in warehouse w.r.t. subs_warehouse is:
 const door = Composition.makeMachine('Door')
 export const s0 = door.designEmpty('s0')
-    .command('close', [Events.time], () => {
-        var dateString = new Date().toLocaleString();
-        return [Events.time.make({timeOfDay: dateString})]})
-    .finish()
+  .command('close', [Events.time], () => {
+    //var dateString = new Date().toLocaleString();
+    //return [Events.time.make({timeOfDay: new Date().toLocaleString() })]})
+    return [Events.time.make({ timeOfDay: new Date().toString() })]
+  }).finish()
 export const s1 = door.designEmpty('s1').finish()
 export const s2 = door.designEmpty('s2').finish()
 
