@@ -10,6 +10,7 @@ use crate::{
     types::{EventType, Role, State, StateName, SwarmLabel, Transition},
     EdgeId, NodeId, Subscriptions, SwarmProtocolType,
 };
+use graph_cycles::Cycles;
 use hashbrown::HashMap;
 use itertools::Itertools;
 use petgraph::algo::floyd_warshall;
@@ -1492,6 +1493,31 @@ fn all_nodes_reach_zero(graph: &Graph) -> Vec<Error> {
         .into_iter()
         .filter(|node| !can_reach_zero_nodes.contains(node))
         .map(|node| Error::StateCanNotReachTerminal(node))
+        .collect()
+}
+
+// Not it.
+// If cycles in cycles, may add event types that are not part of some cycle, but happens to connect nodes in cycle...
+// Does this only happen when there are cycles in cycles? If so might be ok?
+// Alternative way of doing this that 'backtracks' to find cycle using all nodes exactly once in such a set?
+fn cycles_as_event_types(graph: Graph) -> Vec<BTreeSet<EventType>> {
+    Cycles::cycles(&graph)
+        .into_iter()
+        .map(|cycle_nodes| edges_connecting(&graph, &cycle_nodes.into_iter().collect()))
+        .map(|cycle_edges| {
+            cycle_edges
+                .into_iter()
+                .map(|e| graph[e].get_event_type())
+                .collect()
+        })
+        .collect()
+}
+
+fn edges_connecting(graph: &Graph, nodes: &BTreeSet<NodeId>) -> Vec<EdgeId> {
+    graph
+        .edge_references()
+        .filter(|e| nodes.contains(&e.source()) && nodes.contains(&e.target()))
+        .map(|e| e.id())
         .collect()
 }
 
@@ -3499,6 +3525,12 @@ mod tests {
                 println!("n: {}", graph[n].state_name());
             }
         }
+        let expected = Vec::from([BTreeSet::from([
+            EventType::new("partID"),
+            EventType::new("pos"),
+            EventType::new("part"),
+        ])]);
+        assert_eq!(expected, cycles_as_event_types(graph));
         fn proto1() -> SwarmProtocolType {
             serde_json::from_str::<SwarmProtocolType>(
             r#"{
@@ -3515,7 +3547,7 @@ mod tests {
                     { "source": "7", "target": "5", "label": { "cmd": "cmd_i", "logType": ["i"], "role": "R" } },
                     { "source": "7", "target": "8", "label": { "cmd": "cmd_j", "logType": ["j"], "role": "R" } },
                     { "source": "8", "target": "6", "label": { "cmd": "cmd_k", "logType": ["k"], "role": "R" } },
-                    { "source": "3", "target": "0", "label": { "cmd": "cmd_m", "logType": ["l"], "role": "R" } }
+                    { "source": "3", "target": "0", "label": { "cmd": "cmd_l", "logType": ["l"], "role": "R" } }
 
 
                 ]
@@ -3529,14 +3561,42 @@ mod tests {
         );
         let (graph, _, _) = from_json(proto1());
         let cycles = Cycles::cycles(&graph);
-        //let thing = Cycles::visit_all_cycles(&self, |e| println!("e: ", e));
-        //let g: petgraph::Graph<usize, (), Directed> = petgraph::Graph::new();
-        //let cycles = Cycles::cycles(&g);
         for c in cycles {
             for n in c {
                 print!("{} ", graph[n].state_name());
             }
             println!("");
         }
+
+        let expected = Vec::from([
+            BTreeSet::from([
+                EventType::new("a"),
+                EventType::new("b"),
+                EventType::new("c"),
+                EventType::new("d"),
+                EventType::new("e"),
+                EventType::new("f"),
+            ]),
+            BTreeSet::from([
+                EventType::new("a"),
+                EventType::new("b"),
+                EventType::new("c"),
+                EventType::new("l")
+            ]),
+            BTreeSet::from([
+                EventType::new("a"),
+                EventType::new("b"),
+                EventType::new("g"),
+                EventType::new("h"),
+                EventType::new("i"),
+                EventType::new("f")
+            ]),
+            BTreeSet::from([
+                EventType::new("h"),
+                EventType::new("j"),
+                EventType::new("k")
+            ]),
+        ]);
+    assert_eq!(expected, cycles_as_event_types(graph));
     }
 }
