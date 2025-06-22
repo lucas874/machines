@@ -23,7 +23,7 @@ export const s1 = robot.designState('s1').withPayload<{partName: string}>()
 
 export const s2 = robot.designEmpty('s2').finish()
 
-s0.react([Events.part], s1, (_, e) => {
+s0.react([Events.partOK], s1, (_, e) => {
   return s1.make({partName: e.payload.partName})})
 s1.react([Events.car], s2, (_, e) => { return s2.make()})
 

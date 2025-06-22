@@ -18,11 +18,11 @@ export const s1 = forklift.designState('s1').withPayload<{partName: string}>()
   .finish()
 export const s2 = forklift.designEmpty('s2').finish()
 
-s0.react([Events.partID], s1, (_, e) => {
+s0.react([Events.partReq], s1, (_, e) => {
     if (getRandomInt(0, 10) >= 9) { return { partName: "broken part" } }
     return s1.make({partName: e.payload.partName}) })
 s1.react([Events.pos], s0, (_, e) => { return s0.make() })
-s0.react([Events.time], s2, (_, e) => { return s2.make() })
+s0.react([Events.closingTime], s2, (_, e) => { return s2.make() })
 
 // Check that the original machine is a correct implementation. A prerequisite for reusing it.
 const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "FL", forklift.createJSONForAnalysis(s0))
