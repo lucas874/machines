@@ -1169,7 +1169,10 @@ fn roles_on_path(
         .succeeding_events
         .get(&event_type)
         .cloned()
-        .unwrap_or_default();
+        .unwrap_or_default()
+        .into_iter()
+        .chain([event_type])
+        .collect();
     subs.iter()
         .filter(|(_, events)| events.intersection(&succeeding_events).count() != 0)
         .map(|(r, _)| r.clone())
@@ -2739,10 +2742,12 @@ mod tests {
         subs_composition.entry(Role::new("F")).and_modify(|s| {
             s.remove(&EventType::new("report1"));
         });
-        let error_report = check(composition, &subs_composition);
+        let error_report = check(composition.clone(), &subs_composition);
         let mut errors = error_report_to_strings(error_report);
-
+        //let (expanded, initial) = compose_protocols(composition.clone()).unwrap();
+        //println!("{}", serde_json::to_string_pretty(&to_swarm_json(expanded, initial)).unwrap());
         let mut expected_errors = vec![
+            "role F does not subscribe to event types report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)", 
             "subsequently active role F does not subscribe to events in transition (0 || 2 || 0)--[observe@TR<report1>]-->(0 || 2 || 1)",
             "subsequently active role F does not subscribe to events in transition (3 || 2 || 0)--[observe@TR<report1>]-->(3 || 2 || 1)",
             "role QCR does not subscribe to event types car, part, report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)"];
