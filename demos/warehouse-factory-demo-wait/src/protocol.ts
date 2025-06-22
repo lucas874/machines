@@ -44,34 +44,34 @@ export const Gfactory: SwarmProtocolType = {
     {source: '2', target: '3', label: { cmd: 'build', role: 'R', logType: [Events.car.type] }},
   ]}
 
-export const warehouse_protocol: InterfacingProtocols = [Gwarehouse]
-export const factory_protocol: InterfacingProtocols = [Gfactory]
-export const warehouse_factory_protocol: InterfacingProtocols = [Gwarehouse, Gfactory]
+export const warehouseProtocol: InterfacingProtocols = [Gwarehouse]
+export const factoryProtocol: InterfacingProtocols = [Gfactory]
+export const warehouseFactoryProtocol: InterfacingProtocols = [Gwarehouse, Gfactory]
 
 // Well-formed subscription for the warehouse protocol
-const result_subs_warehouse: DataResult<Subscriptions>
-  = overapproxWWFSubscriptions(warehouse_protocol, {}, 'TwoStep')
-if (result_subs_warehouse.type === 'ERROR') throw new Error(result_subs_warehouse.errors.join(', '))
-export var subs_warehouse: Subscriptions = result_subs_warehouse.data
+const resultSubsWarehouse: DataResult<Subscriptions>
+  = overapproxWWFSubscriptions(warehouseProtocol, {}, 'TwoStep')
+if (resultSubsWarehouse.type === 'ERROR') throw new Error(resultSubsWarehouse.errors.join(', '))
+export var subsWarehouse: Subscriptions = resultSubsWarehouse.data
 
 // Well-formed subscription for the factory protocol
-const result_subs_factory: DataResult<Subscriptions>
-  = overapproxWWFSubscriptions(factory_protocol, {}, 'TwoStep')
-if (result_subs_factory.type === 'ERROR') throw new Error(result_subs_factory.errors.join(', '))
-export var subs_factory: Subscriptions = result_subs_factory.data
+const resultSubsFactory: DataResult<Subscriptions>
+  = overapproxWWFSubscriptions(factoryProtocol, {}, 'TwoStep')
+if (resultSubsFactory.type === 'ERROR') throw new Error(resultSubsFactory.errors.join(', '))
+export var subsFactory: Subscriptions = resultSubsFactory.data
 
 // Well-formed subscription for the warehouse || factory protocol
-const result_subs_composition: DataResult<Subscriptions>
-  = overapproxWWFSubscriptions(warehouse_factory_protocol, {}, 'TwoStep')
-if (result_subs_composition.type === 'ERROR') throw new Error(result_subs_composition.errors.join(', '))
-export var subs_composition: Subscriptions = result_subs_composition.data
+const resultSubsComposition: DataResult<Subscriptions>
+  = overapproxWWFSubscriptions(warehouseFactoryProtocol, {}, 'TwoStep')
+if (resultSubsComposition.type === 'ERROR') throw new Error(resultSubsComposition.errors.join(', '))
+export var subsComposition: Subscriptions = resultSubsComposition.data
 
 // outcomment the line below to make well-formedness check fail
 //subs_composition['FL'] = ['pos']
 
 // check that the subscription generated for the composition is indeed well-formed
-const result_check_wf: Result = checkWWFSwarmProtocol(warehouse_factory_protocol, subs_composition)
-if (result_check_wf.type === 'ERROR') throw new Error(result_check_wf.errors.join(', \n'))
+const resultCheckWF: Result = checkWWFSwarmProtocol(warehouseFactoryProtocol, subsComposition)
+if (resultCheckWF.type === 'ERROR') throw new Error(resultCheckWF.errors.join(', \n'))
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
 export function getRandomInt(min: number, max: number) {

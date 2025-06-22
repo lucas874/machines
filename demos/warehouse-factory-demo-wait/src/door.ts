@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT} from '@actyx/machine-runner'
-import { Events, manifest, Composition, warehouse_factory_protocol, subs_composition, warehouse_protocol, subs_warehouse, printState } from './protocol'
+import { Events, manifest, Composition, warehouseFactoryProtocol, subsComposition, warehouseProtocol, subsWarehouse, printState } from './protocol'
 import * as readline from 'readline';
 import chalk from "chalk";
 import { checkComposedProjection } from '@actyx/machine-check';
@@ -25,11 +25,11 @@ s1.react([Events.partOK], s0, (_, e) => { return s0.make() })
 s0.react([Events.closingTime], s2, (_, e) => { return s2.make() })
 
 // Check that the original machine is a correct implementation. A prerequisite for reusing it.
-const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehouse, "D", door.createJSONForAnalysis(s0))
+const checkProjResult = checkComposedProjection(warehouseProtocol, subsWarehouse, "D", door.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Adapted machine
-const [doorAdapted, s0Adapted] = Composition.adaptMachine('D', warehouse_factory_protocol, subs_composition, 0, [door, s0], true).data!
+const [doorAdapted, s0Adapted] = Composition.adaptMachine('D', warehouseFactoryProtocol, subsComposition, 0, [door, s0], true).data!
 
 // Run the adapted machine
 async function main() {
