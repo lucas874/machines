@@ -40,9 +40,47 @@ s2.react([Events.partOK], s0, (_, e) => { return s0.make() })
 const checkProjResult = checkComposedProjection(warehouseProtocol, subsWarehouse, "T", transporter.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Adapted machine
 //const [transportAdapted, s0Adapted] = Composition.adaptMachine('T', warehouse_factory_protocol, subs_composition, 0, [transporter, s0], true).data!
-const [transportAdapted, s0Adapted] = Composition.adaptMachine('T', warehouseFactoryProtocol, subsComposition, 0, [transporter, s0], true).data!
+//const [transportAdapted, s0Adapted] = Composition.adaptMachine('T', warehouseFactoryProtocol, subsComposition, 0, [transporter, s0], true).data!
+const [transportAdapted, s0Adapted] = Composition.adaptMachine('T', warehouseFactoryProtocol, 0, subsComposition, [transporter, s0], true).data!
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Run the machine
 async function main() {

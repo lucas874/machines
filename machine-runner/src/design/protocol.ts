@@ -34,8 +34,8 @@ export type SwarmProtocol<
   >(
     role: ProjectionName,
     protocols: InterfacingProtocols,
-    subscriptions: Subscriptions,
     k: number,
+    subscriptions: Subscriptions,
     mOld: [Machine<SwarmProtocolName, MachineName, MachineEventFactories>, StateFactory<SwarmProtocolName, MachineName, MachineEventFactories, any, any, any>],
     verbose?: boolean
   ) => MachineResult<[AdaptedMachine<SwarmProtocolName, ProjectionName, MachineEventFactories>, StateFactory<SwarmProtocolName, ProjectionName, MachineEventFactories, StateName, StatePayload, Commands>]>
@@ -85,7 +85,7 @@ export namespace SwarmProtocol {
     return {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
-      adaptMachine: (role, protocols, subscriptions, k, oldMachine, verbose?) => {
+      adaptMachine: (role, protocols, k, subscriptions, oldMachine, verbose?) => {
         const [mOld, mOldInitial] = oldMachine
         const projectionInfo = projectionInformation(protocols, subscriptions, role, mOld.createJSONForAnalysis(mOldInitial), k, true)
         if (projectionInfo.type == 'ERROR') {
