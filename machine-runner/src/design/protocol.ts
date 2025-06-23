@@ -5,6 +5,7 @@ import { Contained, MachineEvent } from './event.js'
 import { Subscriptions, projectionInformation, ProjectionInfo, InterfacingProtocols } from '@actyx/machine-check'
 import chalk = require('chalk');
 import * as readline from 'readline';
+import { ProjToMachineStates } from '../../../machine-check/lib/pkg/machine_check.js';
 
 /**
  * SwarmProtocol is the entry point of designing a swarm of MachineRunners. A
@@ -86,12 +87,13 @@ export namespace SwarmProtocol {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
       adaptMachine: (role, protocols, k, subscriptions, oldMachine, verbose?) => {
+        const minimize = false
         const [mOld, mOldInitial] = oldMachine
-        const projectionInfo = projectionInformation(protocols, subscriptions, role, mOld.createJSONForAnalysis(mOldInitial), k, true)
+        const projectionInfo = projectionInformation(protocols, subscriptions, role, mOld.createJSONForAnalysis(mOldInitial), k, minimize)
         if (projectionInfo.type == 'ERROR') {
           return {data: undefined, ... projectionInfo}
         }
-        return MachineAdaptation.adaptMachine(ImplMachine.makeAdapted(swarmName, role, eventFactories, projectionInfo.data), eventFactories, mOldInitial, verbose)
+        return MachineAdaptation.adaptMachine(ImplMachine.makeAdapted(swarmName, role, eventFactories, projectionInfo.data, verbose && !minimize), eventFactories, mOldInitial, verbose)
       }
     }
   }
@@ -296,7 +298,8 @@ namespace ImplMachine {
     swarmName: SwarmProtocolName,
     machineName: MachineName,
     registeredEventFactories: MachineEventFactories[],
-    projectionInfo: ProjectionInfo
+    projectionInfo: ProjectionInfo,
+    verbose?: boolean
   ): AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories> => {
     type Self = Machine<SwarmProtocolName, MachineName, MachineEventFactories>
     type Protocol = MachineProtocol<SwarmProtocolName, MachineName, MachineEventFactories>
@@ -341,13 +344,38 @@ namespace ImplMachine {
     const createJSONForAnalysis: Self['createJSONForAnalysis'] = (initial) =>
       MachineAnalysisResource.fromMachineInternals(protocol, initial)
 
+    const mapStateNameVerbose = (stateName: string): string => {
+      const regex = /^(?<prefix>.*?)\((?<embedded>\S*)\s*\|{2}\s*(?<projState>\S*?)\)(?<suffix>.*)/;
+      const match = regex.exec(stateName);
+      if (match?.groups) {
+        const { prefix, _, projState, suffix } = match.groups;
+        return `${prefix}${projState}${suffix}`
+  }
+
+      return stateName
+    }
+
+    const mapProjectionVerbose = (projection: ProjectionType): ProjectionType => {
+      const transitionMapper = (transition: {source: string, target: string, label: any}): {source: string, target: string, label: any} => {
+        return {source: mapStateNameVerbose(transition.source), target: mapStateNameVerbose(transition.target), label: transition.label}
+      }
+      return {initial: mapStateNameVerbose(projection.initial), transitions: projection.transitions.map(transition => transitionMapper(transition))}
+    }
+    const mapProjStateToMachineStatesVerbose = (projToMachineStates: ProjToMachineStates): ProjToMachineStates => {
+      return Object.fromEntries(
+        Object.entries(projToMachineStates).map(([projState, machineStates]) => [mapStateNameVerbose(projState), machineStates]));
+    }
+    const mapProjectionInfoVerbose = (projectionInfo: ProjectionInfo): ProjectionInfo => {
+      return {... projectionInfo, projection: mapProjectionVerbose(projectionInfo.projection), projToMachineStates: mapProjStateToMachineStatesVerbose(projectionInfo.projToMachineStates)}
+    }
+
     return {
       swarmName,
       machineName,
       designState,
       designEmpty,
       createJSONForAnalysis,
-      projectionInfo
+      projectionInfo: verbose ? mapProjectionInfoVerbose(projectionInfo) : projectionInfo
     }
   }
 }
