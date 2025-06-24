@@ -1513,12 +1513,36 @@ fn cycles_as_event_types(graph: Graph) -> Vec<BTreeSet<EventType>> {
         .collect()
 }
 
+// Precondition: nodes form a cycle.
 fn edges_connecting(graph: &Graph, nodes: &BTreeSet<NodeId>) -> Vec<EdgeId> {
-    graph
-        .edge_references()
-        .filter(|e| nodes.contains(&e.source()) && nodes.contains(&e.target()))
-        .map(|e| e.id())
-        .collect()
+    let mut visited = BTreeSet::new();
+    let mut to_visit = Vec::new();
+    let mut edges = Vec::new();
+    let initial = match nodes.first() {
+        None => return vec![],
+        Some(node) => node.clone(),
+    };
+
+    to_visit.push(initial.clone());
+
+    while let Some(node) = to_visit.pop() {
+        visited.insert(node);
+        for e in graph.edges_directed(node, Outgoing) {
+            if nodes.contains(&e.target()) {
+                if visited.contains(&e.target()) && !(visited == *nodes) {
+                    continue
+                }
+                edges.push(e.id());
+                if !visited.contains(&e.target()) {
+                    to_visit.push(e.target());
+                }
+
+
+            }
+        }
+    }
+
+    edges
 }
 
 // all pairs of incoming/outgoing events from a node
@@ -3568,7 +3592,7 @@ mod tests {
             println!("");
         }
 
-        let expected = Vec::from([
+        let mut expected = Vec::from([
             BTreeSet::from([
                 EventType::new("a"),
                 EventType::new("b"),
@@ -3597,6 +3621,103 @@ mod tests {
                 EventType::new("k")
             ]),
         ]);
-    assert_eq!(expected, cycles_as_event_types(graph));
+        let mut cycles = cycles_as_event_types(graph);
+        expected.sort();
+        cycles.sort();
+        assert_eq!(expected, cycles);
+
+        fn proto2() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R" } },
+                    { "source": "3", "target": "4", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R" } },
+                    { "source": "4", "target": "5", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R" } },
+                    { "source": "5", "target": "0", "label": { "cmd": "cmd_f", "logType": ["f"], "role": "R" } },
+                    { "source": "2", "target": "6", "label": { "cmd": "cmd_g", "logType": ["g"], "role": "R" } },
+                    { "source": "6", "target": "7", "label": { "cmd": "cmd_h", "logType": ["h"], "role": "R" } },
+                    { "source": "7", "target": "5", "label": { "cmd": "cmd_i", "logType": ["i"], "role": "R" } },
+                    { "source": "7", "target": "8", "label": { "cmd": "cmd_j", "logType": ["j"], "role": "R" } },
+                    { "source": "8", "target": "6", "label": { "cmd": "cmd_k", "logType": ["k"], "role": "R" } },
+                    { "source": "3", "target": "0", "label": { "cmd": "cmd_l", "logType": ["l"], "role": "R" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "cmd_m", "logType": ["m"], "role": "R" } }
+
+
+                ]
+            }"#,
+        )
+        .unwrap()
+        }
+        println!(
+            "proto 2: {}",
+            serde_json::to_string_pretty(&proto2()).unwrap()
+        );
+        let (graph, _, _) = from_json(proto2());
+        let cycles = Cycles::cycles(&graph);
+        for c in cycles {
+            for n in c {
+                print!("{} ", graph[n].state_name());
+            }
+            println!("");
+        }
+
+        let mut expected = Vec::from([
+            BTreeSet::from([
+                EventType::new("a"),
+                EventType::new("b"),
+                EventType::new("c"),
+                EventType::new("d"),
+                EventType::new("e"),
+                EventType::new("f"),
+            ]),
+            BTreeSet::from([
+                EventType::new("a"),
+                EventType::new("m"),
+                EventType::new("c"),
+                EventType::new("d"),
+                EventType::new("e"),
+                EventType::new("f"),
+            ]),
+            BTreeSet::from([
+                EventType::new("a"),
+                EventType::new("b"),
+                EventType::new("c"),
+                EventType::new("l")
+            ]),
+            BTreeSet::from([
+                EventType::new("a"),
+                EventType::new("m"),
+                EventType::new("c"),
+                EventType::new("l")
+            ]),
+            BTreeSet::from([
+                EventType::new("a"),
+                EventType::new("b"),
+                EventType::new("g"),
+                EventType::new("h"),
+                EventType::new("i"),
+                EventType::new("f")
+            ]),
+            BTreeSet::from([
+                EventType::new("a"),
+                EventType::new("m"),
+                EventType::new("g"),
+                EventType::new("h"),
+                EventType::new("i"),
+                EventType::new("f")
+            ]),
+            BTreeSet::from([
+                EventType::new("h"),
+                EventType::new("j"),
+                EventType::new("k")
+            ]),
+        ]);
+        let mut cycles = cycles_as_event_types(graph);
+        expected.sort();
+        cycles.sort();
+        assert_eq!(expected, cycles);
     }
 }
