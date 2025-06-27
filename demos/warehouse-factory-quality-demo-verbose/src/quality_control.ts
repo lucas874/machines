@@ -35,7 +35,7 @@ const checkProjResult = checkComposedProjection(quality_protocol, subs_quality, 
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Adapted  machine
-const [qcrAdapted, s0Adapted] = Composition.adaptMachine('QCR', warehouse_factory_quality_protocol, subs_composition, 2, [qcr, s0], true).data!
+const [qcrAdapted, s0Adapted] = Composition.adaptMachine('QCR', warehouse_factory_quality_protocol, 2, subs_composition, [qcr, s0], true).data!
 
 // Run the extended machine
 async function main() {
