@@ -25,7 +25,7 @@ const checkProjResult = checkComposedProjection(factory_protocol, subs_factory, 
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Adapt machine
-const [factoryRobotAdapted, s0Adapted] = Composition.adaptMachine('R', warehouse_factory_quality_protocol, subs_composition, 1, [robot, s0]).data!
+const [factoryRobotAdapted, s0Adapted] = Composition.adaptMachine('R', warehouse_factory_quality_protocol, 1, subs_composition, [robot, s0]).data!
 
 // Run the adapted machine
 async function main() {
