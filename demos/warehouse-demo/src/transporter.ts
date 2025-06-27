@@ -41,7 +41,7 @@ const checkProjResult = checkComposedProjection(warehouse_protocol, subs_warehou
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Adapted machine. Adapting here has no effect. Except that we can make a verbose machine.
-const [transportAdapted, s0Adapted] = Composition.adaptMachine('T', warehouse_protocol, subs_warehouse, 0, [transporter, s0], true).data!
+const [transportAdapted, s0Adapted] = Composition.adaptMachine('T', warehouse_protocol, 0, subs_warehouse, [transporter, s0], true).data!
 
 // Run the machine
 async function main() {
