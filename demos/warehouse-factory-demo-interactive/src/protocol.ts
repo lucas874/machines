@@ -46,7 +46,7 @@ export const Gfactory: SwarmProtocolType = {
 
 export const warehouseProtocol: InterfacingProtocols = [Gwarehouse]
 export const factoryProtocol: InterfacingProtocols = [Gfactory]
-export const warehouseFactoryProtocol: InterfacingProtocols = [Gwarehouse, Gfactory]
+export const warehouseFactoryProtocols: InterfacingProtocols = [Gwarehouse, Gfactory]
 
 // Well-formed subscription for the warehouse protocol
 const resultSubsWarehouse: DataResult<Subscriptions>
@@ -62,7 +62,7 @@ export var subsFactory: Subscriptions = resultSubsFactory.data
 
 // Well-formed subscription for the warehouse || factory protocol
 const resultSubsComposition: DataResult<Subscriptions>
-  = overapproxWWFSubscriptions(warehouseFactoryProtocol, {}, 'TwoStep')
+  = overapproxWWFSubscriptions(warehouseFactoryProtocols, {}, 'TwoStep')
 if (resultSubsComposition.type === 'ERROR') throw new Error(resultSubsComposition.errors.join(', '))
 export var subsComposition: Subscriptions = resultSubsComposition.data
 
@@ -70,7 +70,7 @@ export var subsComposition: Subscriptions = resultSubsComposition.data
 //subs_composition['FL'] = ['pos']
 
 // check that the subscription generated for the composition is indeed well-formed
-const resultCheckWF: Result = checkWWFSwarmProtocol(warehouseFactoryProtocol, subsComposition)
+const resultCheckWF: Result = checkWWFSwarmProtocol(warehouseFactoryProtocols, subsComposition)
 if (resultCheckWF.type === 'ERROR') throw new Error(resultCheckWF.errors.join(', \n'))
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
