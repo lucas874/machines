@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT} from '@actyx/machine-runner'
-import { Events, manifest, Composition, warehouseFactoryProtocols, subsComposition, warehouseProtocol, subsWarehouse, printState } from './protocol'
+import { Events, manifest, Composition, listOfProtocols, subscriptions, warehouseProtocol, subsWarehouse, printState } from './protocol'
 import * as readline from 'readline';
 import chalk from "chalk";
 import { checkComposedProjection } from '@actyx/machine-check';
@@ -29,7 +29,7 @@ const checkProjResult = checkComposedProjection(warehouseProtocol, subsWarehouse
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Adapted machine
-const [doorAdapted, s0Adapted] = Composition.adaptMachine('D', warehouseFactoryProtocols, 0, subsComposition, [door, s0], true).data!
+const [doorAdapted, s0Adapted] = Composition.adaptMachine('D', listOfProtocols, 0, subscriptions, [door, s0], true).data!
 
 // Run the adapted machine
 async function main() {
