@@ -487,7 +487,7 @@ fn confusion_free(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> {
     // This requirement is not part of confusion-freeness.
     // Our check then is too strict. Prohibits the set of non-terminating swarm protocols.
     // We do this to not check for the looping condition in determinacy checks/subscription generation.
-    errors.append(&mut all_nodes_reach_zero(&graph));
+    errors.append(&mut all_nodes_reach_terminal(&graph));
     errors
 }
 
@@ -1459,18 +1459,18 @@ fn all_nodes_reachable(graph: &Graph, initial: NodeId) -> Vec<Error> {
 }
 
 // Check that every node of a graph can reach a node with no outgoing transitions.
-fn all_nodes_reach_zero(graph: &Graph) -> Vec<Error> {
-    let _span = tracing::info_span!("all_nodes_reach_zero").entered();
-    nodes_not_reaching_zero(graph)
+fn all_nodes_reach_terminal(graph: &Graph) -> Vec<Error> {
+    let _span = tracing::info_span!("all_nodes_reach_terminal").entered();
+    nodes_not_reaching_terminal(graph)
         .into_iter()
         .map(|node| Error::StateCanNotReachTerminal(node))
         .collect()
 }
 
-fn nodes_not_reaching_zero(graph: &Graph) -> Vec<NodeId> {
-    let _span = tracing::info_span!("nodes_not_reaching_zero").entered();
+fn nodes_not_reaching_terminal(graph: &Graph) -> Vec<NodeId> {
+    let _span = tracing::info_span!("nodes_not_reaching_terminal").entered();
     // All terminal nodes
-    let zero_nodes: Vec<_> = graph
+    let terminal_nodes: Vec<_> = graph
         .node_indices()
         .filter(|node| graph.edges_directed(*node, Outgoing).count() == 0)
         .collect();
@@ -1488,7 +1488,7 @@ fn nodes_not_reaching_zero(graph: &Graph) -> Vec<NodeId> {
     };
 
     // Collect all nodes that can reach a terminal node.
-    let can_reach_zero_nodes: BTreeSet<_> = zero_nodes
+    let can_reach_terminal_nodes: BTreeSet<_> = terminal_nodes
         .into_iter()
         .map(get_predecessors)
         .flatten()
@@ -1498,7 +1498,7 @@ fn nodes_not_reaching_zero(graph: &Graph) -> Vec<NodeId> {
     graph
         .node_indices()
         .into_iter()
-        .filter(|node| !can_reach_zero_nodes.contains(node))
+        .filter(|node| !can_reach_terminal_nodes.contains(node))
         .collect()
 }
 
@@ -3418,7 +3418,7 @@ mod tests {
         println!("proto1: {}", serde_json::to_string_pretty(&proto1()).unwrap());
         let (graph, _, e) = swarm_to_graph(&proto1());
         println!("e: {:?}", e);
-        let errors = all_nodes_reach_zero(&graph);
+        let errors = all_nodes_reach_terminal(&graph);
         let errors = errors.into_iter().map(|e| Error::convert(&graph)(e)).collect::<Vec<_>>();
         println!("errors:\n {}", errors.join("\n"));
         assert_eq!(
