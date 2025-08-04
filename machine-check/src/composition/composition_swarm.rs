@@ -1406,11 +1406,13 @@ fn prepare_proto_info(proto: SwarmProtocolType) -> ProtoInfo {
                 .or_insert_with(|| incoming_event_types.clone());
         }
     }
-    // Nodes that can not reach a terminal node.
-    let interminably_looping_events = interminably_looping_event_types(&graph);
 
     // Consider changing after_not_concurrent to not take concurrent events as argument. now that we do not consider swarms with concurrency here.
     let happens_after = after_not_concurrent(&graph, initial.unwrap(), &BTreeSet::new());
+
+    // Nodes that can not reach a terminal node.
+    let interminably_looping_events = interminably_looping_event_types(&graph, &happens_after);
+
     ProtoInfo::new(
         vec![ProtoStruct::new(
             graph,
@@ -1552,8 +1554,8 @@ fn nodes_not_reaching_terminal(graph: &Graph) -> Vec<NodeId> {
         .collect()
 }
 
-// Return all event types that are emitted on transitions from nodes that can not reach a terminal node.
-fn interminably_looping_event_types(graph: &Graph) -> BTreeSet<EventType> {
+// Return all event types that are part of an infinte loop in a graph (according to succ_map).
+fn interminably_looping_event_types(graph: &Graph, succ_map: &BTreeMap<EventType, BTreeSet<EventType>>) -> BTreeSet<EventType> {
     let _span = tracing::info_span!("interminably_looping_event_types").entered();
     let nodes = nodes_not_reaching_terminal(graph);
     nodes
@@ -1562,6 +1564,7 @@ fn interminably_looping_event_types(graph: &Graph) -> BTreeSet<EventType> {
             graph
                 .edges_directed(n, Outgoing)
                 .map(|e| e.weight().get_event_type())
+                .filter(|t| succ_map.contains_key(t) && succ_map[t].contains(t))
         })
         .collect()
 }
@@ -1648,7 +1651,7 @@ fn explicit_composition_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
     let (composed, composed_initial) = explicit_composition(&proto_info);
     let succeeding_events =
         after_not_concurrent(&composed, composed_initial, &proto_info.concurrent_events);
-    let interminably_looping_events = interminably_looping_event_types(&composed);
+    let interminably_looping_events = interminably_looping_event_types(&composed, &succeeding_events);
     ProtoInfo {
         protocols: vec![ProtoStruct::new(
             composed,
@@ -3729,5 +3732,206 @@ mod tests {
         );
 
         assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
+    }
+
+    #[test]
+    fn looping_4() {
+        fn proto1() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
+                        { "source": "2", "target": "3", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R3" } },
+                        { "source": "3", "target": "4", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R4" } },
+                        { "source": "4", "target": "5", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R5" } },
+                        { "source": "5", "target": "6", "label": { "cmd": "cmd_f", "logType": ["f"], "role": "R6" } },
+                        { "source": "6", "target": "7", "label": { "cmd": "cmd_g", "logType": ["g"], "role": "R7" } },
+                        { "source": "7", "target": "2", "label": { "cmd": "cmd_h", "logType": ["h"], "role": "R8" } }
+                    ]
+                }"#,
+            )
+            .unwrap()
+        }
+        println!(
+            "proto1: {}",
+            serde_json::to_string_pretty(&proto1()).unwrap()
+        );
+        let (graph, _, _) = swarm_to_graph(&proto1());
+        let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+        let state_names: Vec<String> = states_not_reaching_terminal
+            .into_iter()
+            .map(|n| graph[n].state_name().to_string())
+            .collect::<Vec<_>>();
+        println!(
+            "states not reaching a terminal state:\n {}",
+            state_names.join("\n")
+        );
+        assert_eq!(state_names, ["0", "1", "2", "3", "4", "5", "6", "7"]);
+        let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
+        let errors = proto_info_to_error_report(proto_info.clone());
+        let errors = error_report_to_strings(errors);
+        println!("errors:\n {}", errors.join("\n"));
+        assert_eq!(errors, Vec::<String>::new());
+        assert_eq!(
+            proto_info
+                .interminably_looping_events
+                .clone()
+                .into_iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>(),
+            vec!["c", "d", "e", "f", "g", "h"]
+        );
+        println!(
+            "interminably looping events: {:?}",
+            proto_info
+                .interminably_looping_events
+                .into_iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>()
+        );
+        let sub =
+            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+                .unwrap();
+        println!(
+            "exact wf subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
+
+        assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty())
+    }
+
+    #[test]
+    fn looping_5() {
+        fn proto1() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
+                        { "source": "2", "target": "3", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R3" } },
+                        { "source": "3", "target": "0", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R4" } },
+                        { "source": "0", "target": "4", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R5" } },
+                        { "source": "4", "target": "5", "label": { "cmd": "cmd_f", "logType": ["f"], "role": "R6" } },
+                        { "source": "5", "target": "6", "label": { "cmd": "cmd_g", "logType": ["g"], "role": "R7" } },
+                        { "source": "6", "target": "0", "label": { "cmd": "cmd_h", "logType": ["h"], "role": "R8" } }
+                    ]
+                }"#,
+            )
+            .unwrap()
+        }
+        println!(
+            "proto1: {}",
+            serde_json::to_string_pretty(&proto1()).unwrap()
+        );
+        let (graph, _, _) = swarm_to_graph(&proto1());
+        let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+        let state_names: Vec<String> = states_not_reaching_terminal
+            .into_iter()
+            .map(|n| graph[n].state_name().to_string())
+            .collect::<Vec<_>>();
+        println!(
+            "states not reaching a terminal state:\n {}",
+            state_names.join("\n")
+        );
+        assert_eq!(state_names, ["0", "1", "2", "3", "4", "5", "6"]);
+        let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
+        let errors = proto_info_to_error_report(proto_info.clone());
+        let errors = error_report_to_strings(errors);
+        println!("errors:\n {}", errors.join("\n"));
+        assert_eq!(errors, Vec::<String>::new());
+        assert_eq!(
+            proto_info
+                .interminably_looping_events
+                .clone()
+                .into_iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>(),
+            vec!["a", "b", "c", "d", "e", "f", "g", "h"]
+        );
+        println!(
+            "interminably looping events: {:?}",
+            proto_info
+                .interminably_looping_events
+                .into_iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>()
+        );
+        let sub =
+            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+                .unwrap();
+        println!(
+            "exact wf subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
+
+        assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty())
+    }
+    #[test]
+    fn looping_6() {
+        fn proto1() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
+                        { "source": "1", "target": "0", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R3" } },
+                        { "source": "2", "target": "3", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R4" } },
+                        { "source": "3", "target": "4", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R5" } },
+                        { "source": "4", "target": "0", "label": { "cmd": "cmd_f", "logType": ["f"], "role": "R6" } }
+                    ]
+                }"#,
+            )
+            .unwrap()
+        }
+        println!(
+            "proto1: {}",
+            serde_json::to_string_pretty(&proto1()).unwrap()
+        );
+        let (graph, _, _) = swarm_to_graph(&proto1());
+        let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+        let state_names: Vec<String> = states_not_reaching_terminal
+            .into_iter()
+            .map(|n| graph[n].state_name().to_string())
+            .collect::<Vec<_>>();
+        println!(
+            "states not reaching a terminal state:\n {}",
+            state_names.join("\n")
+        );
+        assert_eq!(state_names, ["0", "1", "2", "3", "4"]);
+        let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
+        let errors = proto_info_to_error_report(proto_info.clone());
+        let errors = error_report_to_strings(errors);
+        println!("errors:\n {}", errors.join("\n"));
+        assert_eq!(errors, Vec::<String>::new());
+        assert_eq!(
+            proto_info
+                .interminably_looping_events
+                .clone()
+                .into_iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>(),
+            vec!["a", "b", "c", "d", "e", "f"]
+        );
+        println!(
+            "interminably looping events: {:?}",
+            proto_info
+                .interminably_looping_events
+                .into_iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>()
+        );
+        let sub =
+            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+                .unwrap();
+        println!(
+            "exact wf subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
+
+        assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty())
     }
 }
