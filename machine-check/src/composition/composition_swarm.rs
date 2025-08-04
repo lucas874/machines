@@ -512,6 +512,9 @@ fn exact_wwf_sub(
         is_stable = exact_wwf_sub_step(&proto_info, &graph, initial, &mut subscriptions);
     }
 
+    // Handle looping event types
+    exact_wwf_looping_event_types(&proto_info, &mut subscriptions);
+
     subscriptions
 }
 
@@ -624,6 +627,56 @@ fn exact_wwf_sub_step(
     }
 
     is_stable
+}
+
+// Handle looping event types.
+// For each event type t that does not lead to a terminal state, check looping condition from determinacy:
+// if t is not in subscriptions, add it to all roles in roles(t, G).
+fn exact_wwf_looping_event_types(proto_info: &ProtoInfo, subscriptions: &mut Subscriptions) {
+    let _span = tracing::info_span!("exact_wwf_looping_event_types").entered();
+    let empty = BTreeSet::new();
+
+    // True if we have a loop (contained in set event_types), but no event type t in the loop such that all roles in the loop subscribe to t.
+    let predicate = |event_types: BTreeSet<EventType>,
+                     involved_roles: &BTreeSet<Role>,
+                     subs: &Subscriptions| {
+        event_types
+            .into_iter()
+            .filter(|t_| {
+                involved_roles
+                    .iter()
+                    .all(|r| subs.get(r).unwrap_or(&empty).contains(t_))
+            })
+            .next()
+            .is_none()
+    };
+
+    // For each event type t in the set of event types that can not reach a terminal state, check predicate adding t to subs of all involved roles if false.
+    for t in &proto_info.interminably_looping_events {
+        let t_and_after_t: BTreeSet<EventType> = [t.clone()]
+            .into_iter()
+            .chain(
+                proto_info
+                    .succeeding_events
+                    .get(t)
+                    .cloned()
+                    .unwrap_or_else(|| BTreeSet::new()),
+            )
+            .collect();
+        let involved_roles = roles_on_path(t.clone(), proto_info, subscriptions);
+
+        // If t is not in the subscriptions of all involved roles, add it.
+        if predicate(t_and_after_t, &involved_roles, &subscriptions) {
+            for r in involved_roles.iter() {
+                subscriptions
+                    .entry(r.clone())
+                    .and_modify(|set| {
+                        set.insert(t.clone());
+                    })
+                    .or_insert_with(|| BTreeSet::from([t.clone()]));
+            }
+        }
+    }
 }
 
 fn overapprox_wwf_sub(
@@ -3618,5 +3671,64 @@ mod tests {
             "exact wf subs: {}",
             serde_json::to_string_pretty(&sub).unwrap()
         );
+
+        assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty())
+    }
+
+    #[test]
+    fn looping_3() {
+        fn proto1() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
+                        { "source": "0", "target": "2", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
+                        { "source": "2", "target": "3", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R3" } },
+                        { "source": "3", "target": "4", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R4" } },
+                        { "source": "4", "target": "2", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R5" } },
+                        { "source": "1", "target": "5", "label": { "cmd": "cmd_f", "logType": ["f"], "role": "R5" } },
+                        { "source": "5", "target": "6", "label": { "cmd": "cmd_g", "logType": ["g"], "role": "R6" } },
+                        { "source": "6", "target": "7", "label": { "cmd": "cmd_h", "logType": ["h"], "role": "R6" } },
+                        { "source": "7", "target": "1", "label": { "cmd": "cmd_i", "logType": ["i"], "role": "R7" } }
+                    ]
+                }"#,
+            )
+            .unwrap()
+        }
+        println!(
+            "proto1: {}",
+            serde_json::to_string_pretty(&proto1()).unwrap()
+        );
+        let (graph, _, _) = swarm_to_graph(&proto1());
+        let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+        let state_names: Vec<String> = states_not_reaching_terminal
+            .into_iter()
+            .map(|n| graph[n].state_name().to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(state_names, ["0", "1", "2", "3", "4", "5", "6", "7"]);
+        let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
+        let errors = proto_info_to_error_report(proto_info.clone());
+        let errors = error_report_to_strings(errors);
+        println!("errors:\n {}", errors.join("\n"));
+        assert_eq!(errors, Vec::<String>::new());
+        assert_eq!(
+            proto_info
+                .interminably_looping_events
+                .clone()
+                .into_iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>(),
+            vec!["a", "b", "c", "d", "e", "f", "g", "h", "i"]
+        );
+        let sub =
+            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+                .unwrap();
+        println!(
+            "exact wf subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
+
+        assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
     }
 }
