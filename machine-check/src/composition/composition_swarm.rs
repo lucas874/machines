@@ -634,22 +634,6 @@ fn exact_wwf_sub_step(
 // if t is not in subscriptions, add it to all roles in roles(t, G).
 fn exact_wwf_looping_event_types(proto_info: &ProtoInfo, subscriptions: &mut Subscriptions) {
     let _span = tracing::info_span!("exact_wwf_looping_event_types").entered();
-    let empty = BTreeSet::new();
-
-    // True if we have a loop (contained in set event_types), but no event type t in the loop such that all roles in the loop subscribe to t.
-    let predicate = |event_types: BTreeSet<EventType>,
-                     involved_roles: &BTreeSet<Role>,
-                     subs: &Subscriptions| {
-        event_types
-            .into_iter()
-            .filter(|t_| {
-                involved_roles
-                    .iter()
-                    .all(|r| subs.get(r).unwrap_or(&empty).contains(t_))
-            })
-            .next()
-            .is_none()
-    };
 
     // For each event type t in the set of event types that can not reach a terminal state, check predicate adding t to subs of all involved roles if false.
     for t in &proto_info.interminably_looping_events {
@@ -665,8 +649,8 @@ fn exact_wwf_looping_event_types(proto_info: &ProtoInfo, subscriptions: &mut Sub
             .collect();
         let involved_roles = roles_on_path(t.clone(), proto_info, subscriptions);
 
-        // If t is not in the subscriptions of all involved roles, add it.
-        if predicate(t_and_after_t, &involved_roles, &subscriptions) {
+        // If there is not an event type among t_and_after_t such that all roles subscribe to this event type, add t to the subscription of all involved roles.
+        if !all_roles_sub_to_same(t_and_after_t, &involved_roles, &subscriptions) {
             for r in involved_roles.iter() {
                 subscriptions
                     .entry(r.clone())
@@ -677,6 +661,21 @@ fn exact_wwf_looping_event_types(proto_info: &ProtoInfo, subscriptions: &mut Sub
             }
         }
     }
+}
+
+// True if there exists an event type in event_types such that all roles in involved_roles subscribe to it.
+fn all_roles_sub_to_same(
+    event_types: BTreeSet<EventType>,
+    involved_roles: &BTreeSet<Role>,
+    subs: &Subscriptions,
+) -> bool {
+    let _span = tracing::info_span!("all_roles_sub_to_same").entered();
+    let empty = BTreeSet::new();
+    event_types
+        .into_iter()
+        .any(|t_|  involved_roles
+            .iter()
+            .all(|r| subs.get(r).unwrap_or(&empty).contains(&t_)))
 }
 
 fn overapprox_wwf_sub(
