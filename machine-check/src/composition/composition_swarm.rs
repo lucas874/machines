@@ -1461,6 +1461,14 @@ fn all_nodes_reachable(graph: &Graph, initial: NodeId) -> Vec<Error> {
 // Check that every node of a graph can reach a node with no outgoing transitions.
 fn all_nodes_reach_zero(graph: &Graph) -> Vec<Error> {
     let _span = tracing::info_span!("all_nodes_reach_zero").entered();
+    nodes_not_reaching_zero(graph)
+        .into_iter()
+        .map(|node| Error::StateCanNotReachTerminal(node))
+        .collect()
+}
+
+fn nodes_not_reaching_zero(graph: &Graph) -> Vec<NodeId> {
+    let _span = tracing::info_span!("nodes_not_reaching_zero").entered();
     // All terminal nodes
     let zero_nodes: Vec<_> = graph
         .node_indices()
@@ -1491,7 +1499,6 @@ fn all_nodes_reach_zero(graph: &Graph) -> Vec<Error> {
         .node_indices()
         .into_iter()
         .filter(|node| !can_reach_zero_nodes.contains(node))
-        .map(|node| Error::StateCanNotReachTerminal(node))
         .collect()
 }
 
@@ -2747,7 +2754,7 @@ mod tests {
         //let (expanded, initial) = compose_protocols(composition.clone()).unwrap();
         //println!("{}", serde_json::to_string_pretty(&to_swarm_json(expanded, initial)).unwrap());
         let mut expected_errors = vec![
-            "role F does not subscribe to event types report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)", 
+            "role F does not subscribe to event types report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)",
             "subsequently active role F does not subscribe to events in transition (0 || 2 || 0)--[observe@TR<report1>]-->(0 || 2 || 1)",
             "subsequently active role F does not subscribe to events in transition (3 || 2 || 0)--[observe@TR<report1>]-->(3 || 2 || 1)",
             "role QCR does not subscribe to event types car, part, report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)"];
@@ -3389,5 +3396,47 @@ mod tests {
             Ok(sub) => { println!("smallest sub: {}", serde_json::to_string_pretty(&sub).unwrap()); println!("smallest == manual?: {}", subs() == sub); },
             Err(e) => println!("errors generating sub: {:?}", error_report_to_strings(e)),
         }
+    }
+
+    #[test]
+    fn looping_1() {
+        fn proto1() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
+                        { "source": "0", "target": "2", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
+                        { "source": "2", "target": "3", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R1" } },
+                        { "source": "3", "target": "4", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R2" } },
+                        { "source": "4", "target": "2", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R2" } }
+                    ]
+                }"#,
+            )
+            .unwrap()
+        }
+        println!("proto1: {}", serde_json::to_string_pretty(&proto1()).unwrap());
+        let (graph, _, e) = swarm_to_graph(&proto1());
+        println!("e: {:?}", e);
+        let errors = all_nodes_reach_zero(&graph);
+        let errors = errors.into_iter().map(|e| Error::convert(&graph)(e)).collect::<Vec<_>>();
+        println!("errors:\n {}", errors.join("\n"));
+        assert_eq!(
+            errors,
+            ["state 2 can not reach terminal node",
+            "state 3 can not reach terminal node",
+            "state 4 can not reach terminal node"]
+        );
+
+        let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
+        let errors = proto_info_to_error_report(proto_info);
+        let errors = error_report_to_strings(errors);
+        println!("errors:\n {}", errors.join("\n"));
+        assert_eq!(
+            errors,
+            ["state 2 can not reach terminal node",
+            "state 3 can not reach terminal node",
+            "state 4 can not reach terminal node"]
+        );
     }
 }
