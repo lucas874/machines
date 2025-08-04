@@ -1596,6 +1596,7 @@ fn explicit_composition_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
     let (composed, composed_initial) = explicit_composition(&proto_info);
     let succeeding_events =
         after_not_concurrent(&composed, composed_initial, &proto_info.concurrent_events);
+    let interminably_looping_events = interminably_looping_event_types(&composed);
     ProtoInfo {
         protocols: vec![ProtoStruct::new(
             composed,
@@ -1604,6 +1605,7 @@ fn explicit_composition_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
             BTreeSet::new(),
         )],
         succeeding_events,
+        interminably_looping_events,
         ..proto_info
     }
 }
@@ -2327,15 +2329,7 @@ mod tests {
             "command request enabled in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0), (2)--[request@T<pos>]-->(0)",
             "event type partID emitted in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0)",
             "event type pos emitted in more than one transition: (1)--[get@FL<pos>]-->(2), (2)--[request@T<pos>]-->(0)",
-            "state 0 can not reach terminal node",
-            "state 1 can not reach terminal node",
-            "state 2 can not reach terminal node",
         ];
-        /* let mut expected_errors = vec![
-            "command request enabled in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0), (2)--[request@T<pos>]-->(0)",
-            "event type partID emitted in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0)",
-            "event type pos emitted in more than one transition: (1)--[get@FL<pos>]-->(2), (2)--[request@T<pos>]-->(0)",
-        ]; */
         errors.sort();
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
@@ -2349,11 +2343,7 @@ mod tests {
         .concat()
         .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
 
-        let mut expected_errors = vec![
-            "state 1 can not reach terminal node",
-            "state 4 can not reach terminal node",
-            "state 5 can not reach terminal node",
-        ];
+        let mut expected_errors: Vec<String> = vec![];
         errors.sort();
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
