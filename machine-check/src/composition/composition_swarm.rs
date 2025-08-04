@@ -484,10 +484,6 @@ fn confusion_free(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> {
         }
     }
 
-    // This requirement is not part of confusion-freeness.
-    // Our check then is too strict. Prohibits the set of non-terminating swarm protocols.
-    // We do this to not check for the looping condition in determinacy checks/subscription generation.
-    //errors.append(&mut all_nodes_reach_terminal(&graph));
     errors
 }
 
@@ -1469,15 +1465,6 @@ fn all_nodes_reachable(graph: &Graph, initial: NodeId) -> Vec<Error> {
         .collect()
 }
 
-// Check that every node of a graph can reach a node with no outgoing transitions.
-fn all_nodes_reach_terminal(graph: &Graph) -> Vec<Error> {
-    let _span = tracing::info_span!("all_nodes_reach_terminal").entered();
-    nodes_not_reaching_terminal(graph)
-        .into_iter()
-        .map(|node| Error::StateCanNotReachTerminal(node))
-        .collect()
-}
-
 fn nodes_not_reaching_terminal(graph: &Graph) -> Vec<NodeId> {
     let _span = tracing::info_span!("nodes_not_reaching_terminal").entered();
     // All terminal nodes
@@ -1519,8 +1506,11 @@ fn interminably_looping_event_types(graph: &Graph) -> BTreeSet<EventType> {
     let nodes = nodes_not_reaching_terminal(graph);
     nodes
         .into_iter()
-        .flat_map(|n|
-            graph.edges_directed(n, Outgoing).map(|e| e.weight().get_event_type()))
+        .flat_map(|n| {
+            graph
+                .edges_directed(n, Outgoing)
+                .map(|e| e.weight().get_event_type())
+        })
         .collect()
 }
 
@@ -3140,17 +3130,17 @@ mod tests {
     #[test]
     fn inference_example_1() {
         fn subs() -> Subscriptions {
-        serde_json::from_str::<Subscriptions>(
-            r#"{
+            serde_json::from_str::<Subscriptions>(
+                r#"{
                 "R1": ["a1", "a2", "b1"],
                 "R2": ["b1", "b2", "a1"],
                 "R3": ["c1", "c2"]
             }"#,
-        )
-        .unwrap()
+            )
+            .unwrap()
         }
         fn proto1() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
+            serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -3178,36 +3168,54 @@ mod tests {
         fn as_interfacing_protocols() -> InterfacingProtocols {
             InterfacingProtocols(vec![proto1(), proto2()])
         }
-        let (composition, composition_initial) = compose_protocols(as_interfacing_protocols()).unwrap();
+        let (composition, composition_initial) =
+            compose_protocols(as_interfacing_protocols()).unwrap();
 
-        println!("proto 1: {}", serde_json::to_string_pretty(&proto1()).unwrap());
-        println!("proto 2: {}", serde_json::to_string_pretty(&proto2()).unwrap());
-        println!("composition: {}", serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap());
+        println!(
+            "proto 1: {}",
+            serde_json::to_string_pretty(&proto1()).unwrap()
+        );
+        println!(
+            "proto 2: {}",
+            serde_json::to_string_pretty(&proto2()).unwrap()
+        );
+        println!(
+            "composition: {}",
+            serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap()
+        );
         println!("subs: {}", serde_json::to_string_pretty(&subs()).unwrap());
-        println!("subs-wf? empty list means yes {:?}", error_report_to_strings(check(as_interfacing_protocols(), &subs())));
+        println!(
+            "subs-wf? empty list means yes {:?}",
+            error_report_to_strings(check(as_interfacing_protocols(), &subs()))
+        );
         let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
         match smalles_sub {
-            Ok(sub) => { println!("smallest sub: {}", serde_json::to_string_pretty(&sub).unwrap()); println!("smallest == manual?: {}", subs() == sub); },
+            Ok(sub) => {
+                println!(
+                    "smallest sub: {}",
+                    serde_json::to_string_pretty(&sub).unwrap()
+                );
+                println!("smallest == manual?: {}", subs() == sub);
+            }
             Err(e) => println!("errors generating sub: {:?}", error_report_to_strings(e)),
         }
-
     }
 
     #[test]
     fn inference_example_2() {
         fn subs() -> Subscriptions {
-        serde_json::from_str::<Subscriptions>(
-            r#"{
+            serde_json::from_str::<Subscriptions>(
+                r#"{
                 "R1": ["a1", "a2", "b1"],
                 "R2": ["b1", "b2", "a1"],
                 "R3": ["c1", "c2"],
                 "IR": ["i1", "a1", "a2", "b1", "c2"]
             }"#,
-        )
-        .unwrap()
+            )
+            .unwrap()
         }
         fn proto1() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
+            serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -3237,16 +3245,35 @@ mod tests {
         fn as_interfacing_protocols() -> InterfacingProtocols {
             InterfacingProtocols(vec![proto1(), proto2()])
         }
-        let (composition, composition_initial) = compose_protocols(as_interfacing_protocols()).unwrap();
+        let (composition, composition_initial) =
+            compose_protocols(as_interfacing_protocols()).unwrap();
 
-        println!("proto 1: {}", serde_json::to_string_pretty(&proto1()).unwrap());
-        println!("proto 2: {}", serde_json::to_string_pretty(&proto2()).unwrap());
-        println!("composition: {}", serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap());
+        println!(
+            "proto 1: {}",
+            serde_json::to_string_pretty(&proto1()).unwrap()
+        );
+        println!(
+            "proto 2: {}",
+            serde_json::to_string_pretty(&proto2()).unwrap()
+        );
+        println!(
+            "composition: {}",
+            serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap()
+        );
         println!("subs: {}", serde_json::to_string_pretty(&subs()).unwrap());
-        println!("subs-wf? empty list means yes {:?}", error_report_to_strings(check(as_interfacing_protocols(), &subs())));
+        println!(
+            "subs-wf? empty list means yes {:?}",
+            error_report_to_strings(check(as_interfacing_protocols(), &subs()))
+        );
         let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
         match smalles_sub {
-            Ok(sub) => { println!("smallest sub: {}", serde_json::to_string_pretty(&sub).unwrap()); println!("smallest == manual?: {}", subs() == sub); },
+            Ok(sub) => {
+                println!(
+                    "smallest sub: {}",
+                    serde_json::to_string_pretty(&sub).unwrap()
+                );
+                println!("smallest == manual?: {}", subs() == sub);
+            }
             Err(e) => println!("errors generating sub: {:?}", error_report_to_strings(e)),
         }
     }
@@ -3254,18 +3281,18 @@ mod tests {
     #[test]
     fn inference_example_3() {
         fn subs() -> Subscriptions {
-        serde_json::from_str::<Subscriptions>(
-            r#"{
+            serde_json::from_str::<Subscriptions>(
+                r#"{
                 "R1": ["i1", "a1", "a2", "b1"],
                 "R2": ["i1", "b1", "b2", "a1"],
                 "R3": ["i1", "c1", "c2"],
                 "IR": ["i1"]
             }"#,
-        )
-        .unwrap()
+            )
+            .unwrap()
         }
         fn proto1() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
+            serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -3295,16 +3322,35 @@ mod tests {
         fn as_interfacing_protocols() -> InterfacingProtocols {
             InterfacingProtocols(vec![proto1(), proto2()])
         }
-        let (composition, composition_initial) = compose_protocols(as_interfacing_protocols()).unwrap();
+        let (composition, composition_initial) =
+            compose_protocols(as_interfacing_protocols()).unwrap();
 
-        println!("proto 1: {}", serde_json::to_string_pretty(&proto1()).unwrap());
-        println!("proto 2: {}", serde_json::to_string_pretty(&proto2()).unwrap());
-        println!("composition: {}", serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap());
+        println!(
+            "proto 1: {}",
+            serde_json::to_string_pretty(&proto1()).unwrap()
+        );
+        println!(
+            "proto 2: {}",
+            serde_json::to_string_pretty(&proto2()).unwrap()
+        );
+        println!(
+            "composition: {}",
+            serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap()
+        );
         println!("subs: {}", serde_json::to_string_pretty(&subs()).unwrap());
-        println!("subs-wf? empty list means yes {:?}", error_report_to_strings(check(as_interfacing_protocols(), &subs())));
+        println!(
+            "subs-wf? empty list means yes {:?}",
+            error_report_to_strings(check(as_interfacing_protocols(), &subs()))
+        );
         let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
         match smalles_sub {
-            Ok(sub) => { println!("smallest sub: {}", serde_json::to_string_pretty(&sub).unwrap()); println!("smallest == manual?: {}", subs() == sub); },
+            Ok(sub) => {
+                println!(
+                    "smallest sub: {}",
+                    serde_json::to_string_pretty(&sub).unwrap()
+                );
+                println!("smallest == manual?: {}", subs() == sub);
+            }
             Err(e) => println!("errors generating sub: {:?}", error_report_to_strings(e)),
         }
     }
@@ -3312,17 +3358,17 @@ mod tests {
     #[test]
     fn inference_example_4() {
         fn subs() -> Subscriptions {
-        serde_json::from_str::<Subscriptions>(
-            r#"{
+            serde_json::from_str::<Subscriptions>(
+                r#"{
                 "R1": ["c1", "a1"],
                 "R2": ["a1", "b1"],
                 "R3": ["b1", "c1"]
             }"#,
-        )
-        .unwrap()
+            )
+            .unwrap()
         }
         fn proto1() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
+            serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -3351,16 +3397,35 @@ mod tests {
         fn as_interfacing_protocols() -> InterfacingProtocols {
             InterfacingProtocols(vec![proto1(), proto2()])
         }
-        let (composition, composition_initial) = compose_protocols(as_interfacing_protocols()).unwrap();
+        let (composition, composition_initial) =
+            compose_protocols(as_interfacing_protocols()).unwrap();
 
-        println!("proto 1: {}", serde_json::to_string_pretty(&proto1()).unwrap());
-        println!("proto 2: {}", serde_json::to_string_pretty(&proto2()).unwrap());
-        println!("composition: {}", serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap());
+        println!(
+            "proto 1: {}",
+            serde_json::to_string_pretty(&proto1()).unwrap()
+        );
+        println!(
+            "proto 2: {}",
+            serde_json::to_string_pretty(&proto2()).unwrap()
+        );
+        println!(
+            "composition: {}",
+            serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap()
+        );
         println!("subs: {}", serde_json::to_string_pretty(&subs()).unwrap());
-        println!("subs-wf? empty list means yes {:?}", error_report_to_strings(check(as_interfacing_protocols(), &subs())));
+        println!(
+            "subs-wf? empty list means yes {:?}",
+            error_report_to_strings(check(as_interfacing_protocols(), &subs()))
+        );
         let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
         match smalles_sub {
-            Ok(sub) => { println!("smallest sub: {}", serde_json::to_string_pretty(&sub).unwrap()); println!("smallest == manual?: {}", subs() == sub); },
+            Ok(sub) => {
+                println!(
+                    "smallest sub: {}",
+                    serde_json::to_string_pretty(&sub).unwrap()
+                );
+                println!("smallest == manual?: {}", subs() == sub);
+            }
             Err(e) => println!("errors generating sub: {:?}", error_report_to_strings(e)),
         }
     }
@@ -3368,16 +3433,16 @@ mod tests {
     #[test]
     fn inference_example_5() {
         fn subs() -> Subscriptions {
-        serde_json::from_str::<Subscriptions>(
-            r#"{
+            serde_json::from_str::<Subscriptions>(
+                r#"{
                 "R1": ["a1", "c1"],
                 "R2": ["a1", "b1", "c1"]
             }"#,
-        )
-        .unwrap()
+            )
+            .unwrap()
         }
         fn proto1() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
+            serde_json::from_str::<SwarmProtocolType>(
             r#"{
                 "initial": "0",
                 "transitions": [
@@ -3406,16 +3471,35 @@ mod tests {
         fn as_interfacing_protocols() -> InterfacingProtocols {
             InterfacingProtocols(vec![proto1(), proto2()])
         }
-        let (composition, composition_initial) = compose_protocols(as_interfacing_protocols()).unwrap();
+        let (composition, composition_initial) =
+            compose_protocols(as_interfacing_protocols()).unwrap();
 
-        println!("proto 1: {}", serde_json::to_string_pretty(&proto1()).unwrap());
-        println!("proto 2: {}", serde_json::to_string_pretty(&proto2()).unwrap());
-        println!("composition: {}", serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap());
+        println!(
+            "proto 1: {}",
+            serde_json::to_string_pretty(&proto1()).unwrap()
+        );
+        println!(
+            "proto 2: {}",
+            serde_json::to_string_pretty(&proto2()).unwrap()
+        );
+        println!(
+            "composition: {}",
+            serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap()
+        );
         println!("subs: {}", serde_json::to_string_pretty(&subs()).unwrap());
-        println!("subs-wf? empty list means yes {:?}", error_report_to_strings(check(as_interfacing_protocols(), &subs())));
+        println!(
+            "subs-wf? empty list means yes {:?}",
+            error_report_to_strings(check(as_interfacing_protocols(), &subs()))
+        );
         let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
         match smalles_sub {
-            Ok(sub) => { println!("smallest sub: {}", serde_json::to_string_pretty(&sub).unwrap()); println!("smallest == manual?: {}", subs() == sub); },
+            Ok(sub) => {
+                println!(
+                    "smallest sub: {}",
+                    serde_json::to_string_pretty(&sub).unwrap()
+                );
+                println!("smallest == manual?: {}", subs() == sub);
+            }
             Err(e) => println!("errors generating sub: {:?}", error_report_to_strings(e)),
         }
     }
@@ -3437,28 +3521,50 @@ mod tests {
             )
             .unwrap()
         }
-        println!("proto1: {}", serde_json::to_string_pretty(&proto1()).unwrap());
-        let (graph, _, e) = swarm_to_graph(&proto1());
-        println!("e: {:?}", e);
-        let errors = all_nodes_reach_terminal(&graph);
-        let errors = errors.into_iter().map(|e| Error::convert(&graph)(e)).collect::<Vec<_>>();
-        println!("errors:\n {}", errors.join("\n"));
-        assert_eq!(
-            errors,
-            ["state 2 can not reach terminal node",
-            "state 3 can not reach terminal node",
-            "state 4 can not reach terminal node"]
+        println!(
+            "proto1: {}",
+            serde_json::to_string_pretty(&proto1()).unwrap()
         );
-
+        let (graph, _, _) = swarm_to_graph(&proto1());
+        let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+        let state_names: Vec<String> = states_not_reaching_terminal
+            .into_iter()
+            .map(|n| graph[n].state_name().to_string())
+            .collect::<Vec<_>>();
+        println!(
+            "states not reaching a terminal state:\n {}",
+            state_names.join("\n")
+        );
+        assert_eq!(state_names, ["2", "3", "4"]);
         let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
         let errors = proto_info_to_error_report(proto_info.clone());
         let errors = error_report_to_strings(errors);
         println!("errors:\n {}", errors.join("\n"));
         assert_eq!(errors, Vec::<String>::new());
-        assert_eq!(proto_info.interminably_looping_events.clone().into_iter().map(|e| e.to_string()).collect::<Vec<_>>(), vec!["c", "d", "e"]);
-        println!("interminably looping events: {:?}", proto_info.interminably_looping_events.into_iter().map(|e| e.to_string()).collect::<Vec<_>>());
-        let sub = exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new()).unwrap();
-        println!("exact wf subs: {}", serde_json::to_string_pretty(&sub).unwrap());
+        assert_eq!(
+            proto_info
+                .interminably_looping_events
+                .clone()
+                .into_iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>(),
+            vec!["c", "d", "e"]
+        );
+        println!(
+            "interminably looping events: {:?}",
+            proto_info
+                .interminably_looping_events
+                .into_iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>()
+        );
+        let sub =
+            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+                .unwrap();
+        println!(
+            "exact wf subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
     }
 
     #[test]
@@ -3478,26 +3584,49 @@ mod tests {
             )
             .unwrap()
         }
-        println!("proto1: {}", serde_json::to_string_pretty(&proto1()).unwrap());
-        let (graph, _, e) = swarm_to_graph(&proto1());
-        println!("e: {:?}", e);
-        let errors = all_nodes_reach_terminal(&graph);
-        let errors = errors.into_iter().map(|e| Error::convert(&graph)(e)).collect::<Vec<_>>();
-        println!("errors:\n {}", errors.join("\n"));
-        assert_eq!(
-            errors,
-            ["state 2 can not reach terminal node",
-            "state 3 can not reach terminal node",
-            "state 4 can not reach terminal node"]
+        println!(
+            "proto1: {}",
+            serde_json::to_string_pretty(&proto1()).unwrap()
         );
+        let (graph, _, _) = swarm_to_graph(&proto1());
+        let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+        let state_names: Vec<String> = states_not_reaching_terminal
+            .into_iter()
+            .map(|n| graph[n].state_name().to_string())
+            .collect::<Vec<_>>();
+        println!(
+            "states not reaching a terminal state:\n {}",
+            state_names.join("\n")
+        );
+        assert_eq!(state_names, ["2", "3", "4"]);
         let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
         let errors = proto_info_to_error_report(proto_info.clone());
         let errors = error_report_to_strings(errors);
         println!("errors:\n {}", errors.join("\n"));
         assert_eq!(errors, Vec::<String>::new());
-        assert_eq!(proto_info.interminably_looping_events.clone().into_iter().map(|e| e.to_string()).collect::<Vec<_>>(), vec!["c", "d", "e"]);
-        println!("interminably looping events: {:?}", proto_info.interminably_looping_events.into_iter().map(|e| e.to_string()).collect::<Vec<_>>());
-        let sub = exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new()).unwrap();
-        println!("exact wf subs: {}", serde_json::to_string_pretty(&sub).unwrap());
+        assert_eq!(
+            proto_info
+                .interminably_looping_events
+                .clone()
+                .into_iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>(),
+            vec!["c", "d", "e"]
+        );
+        println!(
+            "interminably looping events: {:?}",
+            proto_info
+                .interminably_looping_events
+                .into_iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>()
+        );
+        let sub =
+            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+                .unwrap();
+        println!(
+            "exact wf subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
     }
 }
