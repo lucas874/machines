@@ -487,7 +487,7 @@ fn confusion_free(proto_info: &ProtoInfo, proto_pointer: usize) -> Vec<Error> {
     // This requirement is not part of confusion-freeness.
     // Our check then is too strict. Prohibits the set of non-terminating swarm protocols.
     // We do this to not check for the looping condition in determinacy checks/subscription generation.
-    errors.append(&mut all_nodes_reach_terminal(&graph));
+    //errors.append(&mut all_nodes_reach_terminal(&graph));
     errors
 }
 
@@ -1106,6 +1106,13 @@ fn combine_two_proto_infos(proto_info1: ProtoInfo, proto_info2: ProtoInfo) -> Pr
     .into_iter()
     .flatten()
     .collect();
+
+    let interminably_looping_events = proto_info1
+        .interminably_looping_events
+        .into_iter()
+        .chain(proto_info2.interminably_looping_events.into_iter())
+        .collect();
+
     ProtoInfo::new(
         protocols,
         role_event_map,
@@ -1115,6 +1122,7 @@ fn combine_two_proto_infos(proto_info1: ProtoInfo, proto_info2: ProtoInfo) -> Pr
         immediately_pre,
         happens_after,
         interfacing_event_types,
+        interminably_looping_events,
         [
             proto_info1.interface_errors,
             proto_info2.interface_errors,
@@ -1350,8 +1358,10 @@ fn prepare_proto_info(proto: SwarmProtocolType) -> ProtoInfo {
                 .or_insert_with(|| incoming_event_types.clone());
         }
     }
+    // Nodes that can not reach a terminal node.
+    let interminably_looping_events = interminably_looping_event_types(&graph);
 
-    // consider changing after_not_concurrent to not take concurrent events as argument. now that we do not consider swarms with concurrency here.
+    // Consider changing after_not_concurrent to not take concurrent events as argument. now that we do not consider swarms with concurrency here.
     let happens_after = after_not_concurrent(&graph, initial.unwrap(), &BTreeSet::new());
     ProtoInfo::new(
         vec![ProtoStruct::new(
@@ -1367,6 +1377,7 @@ fn prepare_proto_info(proto: SwarmProtocolType) -> ProtoInfo {
         immediately_pre_map,
         happens_after,
         BTreeSet::new(),
+        interminably_looping_events,
         vec![],
     )
 }
@@ -1499,6 +1510,17 @@ fn nodes_not_reaching_terminal(graph: &Graph) -> Vec<NodeId> {
         .node_indices()
         .into_iter()
         .filter(|node| !can_reach_terminal_nodes.contains(node))
+        .collect()
+}
+
+// Return all event types that are emitted on transitions from nodes that can not reach a terminal node.
+fn interminably_looping_event_types(graph: &Graph) -> BTreeSet<EventType> {
+    let _span = tracing::info_span!("interminably_looping_event_types").entered();
+    let nodes = nodes_not_reaching_terminal(graph);
+    nodes
+        .into_iter()
+        .flat_map(|n|
+            graph.edges_directed(n, Outgoing).map(|e| e.weight().get_event_type()))
         .collect()
 }
 
@@ -3409,7 +3431,7 @@ mod tests {
                         { "source": "0", "target": "2", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
                         { "source": "2", "target": "3", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R1" } },
                         { "source": "3", "target": "4", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R2" } },
-                        { "source": "4", "target": "2", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R2" } }
+                        { "source": "4", "target": "2", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R1" } }
                     ]
                 }"#,
             )
@@ -3429,8 +3451,38 @@ mod tests {
         );
 
         let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
-        let errors = proto_info_to_error_report(proto_info);
+        let errors = proto_info_to_error_report(proto_info.clone());
         let errors = error_report_to_strings(errors);
+        println!("errors:\n {}", errors.join("\n"));
+        assert_eq!(errors, Vec::<String>::new());
+        assert_eq!(proto_info.interminably_looping_events.clone().into_iter().map(|e| e.to_string()).collect::<Vec<_>>(), vec!["c", "d", "e"]);
+        println!("interminably looping events: {:?}", proto_info.interminably_looping_events.into_iter().map(|e| e.to_string()).collect::<Vec<_>>());
+        let sub = exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new()).unwrap();
+        println!("exact wf subs: {}", serde_json::to_string_pretty(&sub).unwrap());
+    }
+
+    #[test]
+    fn looping_2() {
+        fn proto1() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
+                        { "source": "0", "target": "2", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
+                        { "source": "2", "target": "3", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R3" } },
+                        { "source": "3", "target": "4", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R4" } },
+                        { "source": "4", "target": "2", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R5" } }
+                    ]
+                }"#,
+            )
+            .unwrap()
+        }
+        println!("proto1: {}", serde_json::to_string_pretty(&proto1()).unwrap());
+        let (graph, _, e) = swarm_to_graph(&proto1());
+        println!("e: {:?}", e);
+        let errors = all_nodes_reach_terminal(&graph);
+        let errors = errors.into_iter().map(|e| Error::convert(&graph)(e)).collect::<Vec<_>>();
         println!("errors:\n {}", errors.join("\n"));
         assert_eq!(
             errors,
@@ -3438,5 +3490,14 @@ mod tests {
             "state 3 can not reach terminal node",
             "state 4 can not reach terminal node"]
         );
+        let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
+        let errors = proto_info_to_error_report(proto_info.clone());
+        let errors = error_report_to_strings(errors);
+        println!("errors:\n {}", errors.join("\n"));
+        assert_eq!(errors, Vec::<String>::new());
+        assert_eq!(proto_info.interminably_looping_events.clone().into_iter().map(|e| e.to_string()).collect::<Vec<_>>(), vec!["c", "d", "e"]);
+        println!("interminably looping events: {:?}", proto_info.interminably_looping_events.into_iter().map(|e| e.to_string()).collect::<Vec<_>>());
+        let sub = exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new()).unwrap();
+        println!("exact wf subs: {}", serde_json::to_string_pretty(&sub).unwrap());
     }
 }
