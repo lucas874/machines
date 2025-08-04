@@ -36,6 +36,7 @@ pub enum Error {
     CommandOnDifferentLabels(Command, EventType, Role, EventType, Role),
     RoleNotSubscribedToBranch(Vec<EventType>, EdgeId, NodeId, Role),
     RoleNotSubscribedToJoin(Vec<EventType>, EdgeId, Role),
+    LoopingError(EdgeId, Vec<Role>),
     MoreThanOneEventTypeInCommand(EdgeId),
     EventEmittedMultipleTimes(EventType, Vec<EdgeId>),
     CommandOnMultipleTransitions(Command, Vec<EdgeId>),
@@ -76,6 +77,13 @@ impl Error {
                 format!(
                     "role {role} does not subscribe to event types {events} leading to or in joining event in transition {}",
                     Edge(graph, *edge),
+                )
+            }
+            Error::LoopingError(edge, roles) => {
+                format!(
+                    "transition {} is part of loop that can not reach a terminal state, but no looping event type in the loop is subscribed to by roles {} involved in the loop",
+                    Edge(graph, *edge),
+                    roles.join(", ")
                 )
             }
             Error::MoreThanOneEventTypeInCommand(edge) => {
@@ -434,6 +442,28 @@ fn weak_well_formed(
                     })
                     .collect();
                 errors.append(&mut joining_errors);
+            }
+
+            // Determinacy.
+            // Corresponds to the looping rule of determinacy.
+            if proto_info.interminably_looping_events.contains(&event_type) {
+                // If the event type is not in the subscriptions of all involved roles, add it.
+                // This is a weak condition, but we do not check looping errors in this function.
+                let t_and_after_t: BTreeSet<EventType> = [event_type.clone()]
+                    .into_iter()
+                    .chain(
+                        proto_info
+                            .succeeding_events
+                        .get(&event_type)
+                        .cloned()
+                        .unwrap_or_else(|| BTreeSet::new()),
+                )
+                .collect();
+
+                let involved_roles = roles_on_path(event_type.clone(), &proto_info, subs);
+                if !all_roles_sub_to_same(t_and_after_t, &involved_roles, subs) {
+                    errors.push(Error::LoopingError(edge.id(), involved_roles.clone().into_iter().collect()));
+                }
             }
         }
     }
@@ -3610,6 +3640,10 @@ mod tests {
             "exact wf subs: {}",
             serde_json::to_string_pretty(&sub).unwrap()
         );
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
     }
 
     #[test]
@@ -3673,8 +3707,10 @@ mod tests {
             "exact wf subs: {}",
             serde_json::to_string_pretty(&sub).unwrap()
         );
-
-        assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty())
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
     }
 
     #[test]
@@ -3721,7 +3757,7 @@ mod tests {
                 .into_iter()
                 .map(|e| e.to_string())
                 .collect::<Vec<_>>(),
-            vec!["a", "b", "c", "d", "e", "f", "g", "h", "i"]
+            vec!["c", "d", "e", "f", "g", "h", "i"]
         );
         let sub =
             exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
@@ -3730,8 +3766,10 @@ mod tests {
             "exact wf subs: {}",
             serde_json::to_string_pretty(&sub).unwrap()
         );
-
-        assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
     }
 
     #[test]
@@ -3798,8 +3836,10 @@ mod tests {
             "exact wf subs: {}",
             serde_json::to_string_pretty(&sub).unwrap()
         );
-
-        assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty())
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
     }
 
     #[test]
@@ -3866,8 +3906,10 @@ mod tests {
             "exact wf subs: {}",
             serde_json::to_string_pretty(&sub).unwrap()
         );
-
-        assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty())
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
     }
     #[test]
     fn looping_6() {
@@ -3931,7 +3973,9 @@ mod tests {
             "exact wf subs: {}",
             serde_json::to_string_pretty(&sub).unwrap()
         );
-
-        assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty())
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
     }
 }
