@@ -1932,8 +1932,7 @@ mod tests {
     }
 
     // pos event type associated with multiple commands and nondeterminism at 0.
-    // No terminal state can be reached from any state -- OK according to confusion freeness, but not according to our
-    // stricter-than-necessary checks
+    // No terminal state can be reached from any state -- OK according to confusion freeness
     fn get_confusionful_proto1() -> SwarmProtocolType {
         serde_json::from_str::<SwarmProtocolType>(
             r#"{
@@ -1949,8 +1948,7 @@ mod tests {
         )
         .unwrap()
     }
-    // No terminal state can be reached from any state -- OK according to confusion freeness, but not according to our
-    // stricter-than-necessary checks
+    // No terminal state can be reached from any state -- OK according to confusion freeness
     fn get_some_nonterminating_proto() -> SwarmProtocolType {
         serde_json::from_str::<SwarmProtocolType>(
             r#"{
@@ -2656,7 +2654,7 @@ mod tests {
 
         // Tests relating to subscription generation.
         #[test]
-        fn test_weak_well_formed_sub() {
+        fn test_well_formed_sub() {
             setup_logger();
 
             // Test interfacing_swarms_1
@@ -2814,7 +2812,7 @@ mod tests {
     }
 
         #[test]
-        fn test_weak_well_formed_sub_1() {
+        fn test_well_formed_sub_1() {
             setup_logger();
             let result = exact_weak_well_formed_sub(get_interfacing_swarms_4(), &BTreeMap::new());
             assert!(result.is_ok());
@@ -2867,6 +2865,52 @@ mod tests {
         }
 
         #[test]
+        fn test_diff_example() {
+            setup_logger();
+            let composition = compose_protocols(get_interfacing_swarms_diff_example());
+            assert!(composition.is_ok());
+            let (graph, initial) = composition.unwrap();
+            println!(
+                "composition:\n {}",
+                serde_json::to_string_pretty(&to_swarm_json(graph, initial)).unwrap()
+            );
+            let protos = get_interfacing_swarms_diff_example();
+            let result_composition = exact_weak_well_formed_sub(protos.clone(), &BTreeMap::new());
+            assert!(result_composition.is_ok());
+            let subs_composition = result_composition.unwrap();
+            let result = check(protos.clone(), &subs_composition);
+            assert!(result.is_empty());
+            let result_composition =
+                overapprox_weak_well_formed_sub(protos.clone(), &BTreeMap::new(), Granularity::Fine);
+            assert!(result_composition.is_ok());
+            let subs_composition = result_composition.unwrap();
+            let result = check(protos.clone(), &subs_composition);
+            assert!(result.is_empty());
+        }
+
+        #[test]
+        fn test_refinement_pattern() {
+            setup_logger();
+            let composition = compose_protocols(get_ref_pat_protos());
+            assert!(composition.is_ok());
+            let protos = get_ref_pat_protos();
+            let result_composition = exact_weak_well_formed_sub(protos.clone(), &BTreeMap::new());
+            assert!(result_composition.is_ok());
+            let subs_composition = result_composition.unwrap();
+            assert!(check(protos.clone(), &subs_composition).is_empty());
+            let result_composition =
+                overapprox_weak_well_formed_sub(protos.clone(), &BTreeMap::new(), Granularity::Fine);
+            assert!(result_composition.is_ok());
+            let subs_composition = result_composition.unwrap();
+            assert!(check(protos.clone(), &subs_composition).is_empty());
+            let result_composition =
+                overapprox_weak_well_formed_sub(protos.clone(), &BTreeMap::new(), Granularity::TwoStep);
+            assert!(result_composition.is_ok());
+            let subs_composition = result_composition.unwrap();
+            assert!(check(protos.clone(), &subs_composition).is_empty());
+        }
+
+        #[test]
         fn test_extend_subs() {
             setup_logger();
             let sub_to_extend = BTreeMap::from([
@@ -2912,62 +2956,6 @@ mod tests {
             assert!(subs2[&Role::new("D")].contains(&EventType::new("pos")));
             assert!(subs2[&Role::new("TR")].contains(&EventType::new("ok")));
         }
-    }
-
-    #[test]
-    #[ignore]
-    fn test_diff_example() {
-        setup_logger();
-        let composition = compose_protocols(get_interfacing_swarms_diff_example());
-        assert!(composition.is_ok());
-        let protos = get_interfacing_swarms_diff_example();
-        let result_composition = exact_weak_well_formed_sub(protos.clone(), &BTreeMap::new());
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-        let result = check(protos.clone(), &subs_composition);
-        assert!(result.is_empty());
-        let result_composition =
-            overapprox_weak_well_formed_sub(protos.clone(), &BTreeMap::new(), Granularity::Fine);
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-        let result = check(protos.clone(), &subs_composition);
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    #[ignore]
-    fn test_ref_example() {
-        setup_logger();
-        let composition = compose_protocols(get_ref_pat_protos());
-        assert!(composition.is_ok());
-        let protos = get_ref_pat_protos();
-        for p in protos.0.iter() {
-            println!("{}", serde_json::to_string_pretty(&p.clone()).unwrap());
-        }
-        let (g, i) = composition.unwrap();
-        let swarm = to_swarm_json(g, i);
-        println!(
-            "composition:\n {}",
-            serde_json::to_string_pretty(&swarm).unwrap()
-        );
-        let result_composition = exact_weak_well_formed_sub(protos.clone(), &BTreeMap::new());
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-        println!(
-            "subs exact: {}",
-            serde_json::to_string_pretty(&subs_composition).unwrap()
-        );
-        let result_composition =
-            overapprox_weak_well_formed_sub(protos.clone(), &BTreeMap::new(), Granularity::Fine);
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-        println!(
-            "subs approx: {}",
-            serde_json::to_string_pretty(&subs_composition).unwrap()
-        );
-
-        let result = check(protos.clone(), &subs_composition);
-        println!("errors is empty: {}", result.is_empty());
     }
 
     #[test]
@@ -3573,8 +3561,6 @@ mod tests {
         use super::*;
 
         // This module contains tests for relating to looping event types.
-        // The tests check if the protocol is correctly identified as having
-        // such event types and if the generated subscriptions are well-formed.
 
         #[test]
         fn looping_1() {
