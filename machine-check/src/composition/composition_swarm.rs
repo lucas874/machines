@@ -2254,678 +2254,663 @@ mod tests {
         true
     }
 
-    #[test]
-    fn test_prepare_graph_confusionfree() {
-        setup_logger();
-        let composition = get_interfacing_swarms_1();
-        let proto_info = combine_proto_infos(prepare_proto_infos(composition));
-        let proto_info = explicit_composition_proto_info(proto_info);
+    mod confusion_freeness_tests {
+        use super::*;
 
-        assert!(proto_info.get_ith_proto(0).is_some());
-        assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
-        assert_eq!(
-            proto_info.concurrent_events,
-            BTreeSet::from([
-                unord_event_pair(EventType::new("time"), EventType::new("car")),
-                unord_event_pair(EventType::new("pos"), EventType::new("car"))
-            ])
-        );
-        assert_eq!(
-            proto_info.branching_events,
-            vec![BTreeSet::from([
-                EventType::new("time"),
-                EventType::new("partID")
-            ])]
-        );
-        assert_eq!(proto_info.joining_events, BTreeMap::new());
-        let expected_role_event_map = BTreeMap::from([
-            (
-                Role::from("T"),
+        // Tests relating to confusion-freeness of protocols.
+
+        #[test]
+        fn test_prepare_graph_confusionfree() {
+            setup_logger();
+            let composition = get_interfacing_swarms_1();
+            let proto_info = combine_proto_infos(prepare_proto_infos(composition));
+            let proto_info = explicit_composition_proto_info(proto_info);
+
+            assert!(proto_info.get_ith_proto(0).is_some());
+            assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
+            assert_eq!(
+                proto_info.concurrent_events,
                 BTreeSet::from([
-                    SwarmLabel {
-                        cmd: Command::new("deliver"),
-                        log_type: vec![EventType::new("part")],
-                        role: Role::new("T"),
-                    },
-                    SwarmLabel {
-                        cmd: Command::new("request"),
-                        log_type: vec![EventType::new("partID")],
-                        role: Role::new("T"),
-                    },
-                ]),
-            ),
-            (
-                Role::from("FL"),
-                BTreeSet::from([SwarmLabel {
-                    cmd: Command::new("get"),
-                    log_type: vec![EventType::new("pos")],
-                    role: Role::new("FL"),
-                }]),
-            ),
-            (
-                Role::from("D"),
-                BTreeSet::from([SwarmLabel {
-                    cmd: Command::new("close"),
-                    log_type: vec![EventType::new("time")],
-                    role: Role::new("D"),
-                }]),
-            ),
-            (
-                Role::from("F"),
-                BTreeSet::from([SwarmLabel {
-                    cmd: Command::new("build"),
-                    log_type: vec![EventType::new("car")],
-                    role: Role::new("F"),
-                }]),
-            ),
-        ]);
-        assert_eq!(proto_info.role_event_map, expected_role_event_map);
-        let proto_info = prepare_proto_info(get_proto1());
-        assert!(proto_info.get_ith_proto(0).is_some());
-        assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
-        assert_eq!(proto_info.concurrent_events, BTreeSet::new());
-        assert_eq!(
-            proto_info.branching_events,
-            vec![BTreeSet::from([
-                EventType::new("time"),
-                EventType::new("partID")
-            ])]
-        );
-        assert_eq!(proto_info.joining_events, BTreeMap::new());
+                    unord_event_pair(EventType::new("time"), EventType::new("car")),
+                    unord_event_pair(EventType::new("pos"), EventType::new("car"))
+                ])
+            );
+            assert_eq!(
+                proto_info.branching_events,
+                vec![BTreeSet::from([
+                    EventType::new("time"),
+                    EventType::new("partID")
+                ])]
+            );
+            assert_eq!(proto_info.joining_events, BTreeMap::new());
+            let expected_role_event_map = BTreeMap::from([
+                (
+                    Role::from("T"),
+                    BTreeSet::from([
+                        SwarmLabel {
+                            cmd: Command::new("deliver"),
+                            log_type: vec![EventType::new("part")],
+                            role: Role::new("T"),
+                        },
+                        SwarmLabel {
+                            cmd: Command::new("request"),
+                            log_type: vec![EventType::new("partID")],
+                            role: Role::new("T"),
+                        },
+                    ]),
+                ),
+                (
+                    Role::from("FL"),
+                    BTreeSet::from([SwarmLabel {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                        role: Role::new("FL"),
+                    }]),
+                ),
+                (
+                    Role::from("D"),
+                    BTreeSet::from([SwarmLabel {
+                        cmd: Command::new("close"),
+                        log_type: vec![EventType::new("time")],
+                        role: Role::new("D"),
+                    }]),
+                ),
+                (
+                    Role::from("F"),
+                    BTreeSet::from([SwarmLabel {
+                        cmd: Command::new("build"),
+                        log_type: vec![EventType::new("car")],
+                        role: Role::new("F"),
+                    }]),
+                ),
+            ]);
+            assert_eq!(proto_info.role_event_map, expected_role_event_map);
+            let proto_info = prepare_proto_info(get_proto1());
+            assert!(proto_info.get_ith_proto(0).is_some());
+            assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
+            assert_eq!(proto_info.concurrent_events, BTreeSet::new());
+            assert_eq!(
+                proto_info.branching_events,
+                vec![BTreeSet::from([
+                    EventType::new("time"),
+                    EventType::new("partID")
+                ])]
+            );
+            assert_eq!(proto_info.joining_events, BTreeMap::new());
 
-        let proto_info = prepare_proto_info(get_proto2()); //get_proto2(), None);
-        assert!(proto_info.get_ith_proto(0).is_some());
-        assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
-        assert_eq!(proto_info.concurrent_events, BTreeSet::new());
-        assert_eq!(proto_info.branching_events, Vec::new());
-        assert_eq!(proto_info.joining_events, BTreeMap::new());
+            let proto_info = prepare_proto_info(get_proto2());
+            assert!(proto_info.get_ith_proto(0).is_some());
+            assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
+            assert_eq!(proto_info.concurrent_events, BTreeSet::new());
+            assert_eq!(proto_info.branching_events, Vec::new());
+            assert_eq!(proto_info.joining_events, BTreeMap::new());
 
-        let proto_info = prepare_proto_info(get_proto3()); //get_proto2(), None);//get_proto3(), None);
-        assert!(proto_info.get_ith_proto(0).is_some());
-        assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
-        assert_eq!(proto_info.concurrent_events, BTreeSet::new());
+            let proto_info = prepare_proto_info(get_proto3());
+            assert!(proto_info.get_ith_proto(0).is_some());
+            assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
+            assert_eq!(proto_info.concurrent_events, BTreeSet::new());
 
-        // Should not contain any branching event types since only state with two outgoing is 3
-        // and both of these outgoing transitions go to state 4:
-        // { "source": "3", "target": "4", "label": { "cmd": "accept", "logType": ["ok"], "role": "QCR" } },
-        // { "source": "3", "target": "4", "label": { "cmd": "reject", "logType": ["notOk"], "role": "QCR" } }
-        assert_eq!(proto_info.branching_events, vec![]);
-        assert_eq!(proto_info.joining_events, BTreeMap::new());
-    }
+            // Should not contain any branching event types since only state with two outgoing is 3
+            // and both of these outgoing transitions go to state 4:
+            // { "source": "3", "target": "4", "label": { "cmd": "accept", "logType": ["ok"], "role": "QCR" } },
+            // { "source": "3", "target": "4", "label": { "cmd": "reject", "logType": ["notOk"], "role": "QCR" } }
+            assert_eq!(proto_info.branching_events, vec![]);
+            assert_eq!(proto_info.joining_events, BTreeMap::new());
+        }
 
-    #[test]
-    fn test_prepare_graph_malformed() {
-        setup_logger();
-        let proto1 = get_malformed_proto1();
-        let proto_info = prepare_proto_info(proto1.clone()); //proto1.clone(), None);
-        let mut errors = vec![proto_info.get_ith_proto(0).unwrap().errors]
+        #[test]
+        fn test_prepare_graph_malformed() {
+            setup_logger();
+            let proto1 = get_malformed_proto1();
+            let proto_info = prepare_proto_info(proto1.clone()); //proto1.clone(), None);
+            let mut errors = vec![proto_info.get_ith_proto(0).unwrap().errors]
+                .concat()
+                .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
+
+            let mut expected_erros = vec![
+                "transition (0)--[close@D<time,time2>]-->(0) emits more than one event type",
+                "log type must not be empty (1)--[get@FL<>]-->(2)",
+            ];
+            errors.sort();
+            expected_erros.sort();
+            assert_eq!(errors, expected_erros);
+
+            let proto_info = prepare_proto_info(get_malformed_proto2()); //get_malformed_proto2(), None);
+            let errors = vec![
+                confusion_free(&proto_info, 0),
+                proto_info.get_ith_proto(0).unwrap().errors,
+            ]
             .concat()
             .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
 
-        let mut expected_erros = vec![
-            "transition (0)--[close@D<time,time2>]-->(0) emits more than one event type",
-            "log type must not be empty (1)--[get@FL<>]-->(2)",
-        ];
-        errors.sort();
-        expected_erros.sort();
-        assert_eq!(errors, expected_erros);
+            let expected_errors = vec![
+                "initial swarm protocol state has no transitions",
+                "initial swarm protocol state has no transitions",
+            ];
+            assert_eq!(errors, expected_errors);
 
-        let proto_info = prepare_proto_info(get_malformed_proto2()); //get_malformed_proto2(), None);
-        let errors = vec![
-            confusion_free(&proto_info, 0),
-            proto_info.get_ith_proto(0).unwrap().errors,
-        ]
-        .concat()
-        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
+            let proto_info = prepare_proto_info(get_malformed_proto3()); //get_malformed_proto3(), None);
+            let errors = proto_info
+                .get_ith_proto(0)
+                .unwrap()
+                .errors
+                .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
 
-        let expected_errors = vec![
-            "initial swarm protocol state has no transitions",
-            "initial swarm protocol state has no transitions",
-        ];
-        assert_eq!(errors, expected_errors);
+            let expected_errors = vec![
+                "state 2 is unreachable from initial state",
+                "state 3 is unreachable from initial state",
+                "state 4 is unreachable from initial state",
+                "state 5 is unreachable from initial state",
+            ];
+            assert_eq!(errors, expected_errors);
+        }
 
-        let proto_info = prepare_proto_info(get_malformed_proto3()); //get_malformed_proto3(), None);
-        let errors = proto_info
-            .get_ith_proto(0)
-            .unwrap()
-            .errors
+        // pos event type associated with multiple commands and nondeterminism at 0
+        #[test]
+        fn test_prepare_graph_confusionful() {
+            setup_logger();
+            let proto = get_confusionful_proto1();
+
+            let proto_info = prepare_proto_info(proto); //proto, None);
+            let mut errors = vec![
+                confusion_free(&proto_info, 0),
+                proto_info.get_ith_proto(0).unwrap().errors,
+            ]
+            .concat()
             .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
 
-        let expected_errors = vec![
-            "state 2 is unreachable from initial state",
-            "state 3 is unreachable from initial state",
-            "state 4 is unreachable from initial state",
-            "state 5 is unreachable from initial state",
-        ];
-        assert_eq!(errors, expected_errors);
+            let mut expected_errors = vec![
+                "command request enabled in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0), (2)--[request@T<pos>]-->(0)",
+                "event type partID emitted in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0)",
+                "event type pos emitted in more than one transition: (1)--[get@FL<pos>]-->(2), (2)--[request@T<pos>]-->(0)",
+            ];
+            errors.sort();
+            expected_errors.sort();
+            assert_eq!(errors, expected_errors);
+
+            let proto = get_some_nonterminating_proto();
+            let proto_info = prepare_proto_info(proto);
+            let mut errors = vec![
+                confusion_free(&proto_info, 0),
+                proto_info.get_ith_proto(0).unwrap().errors,
+            ]
+            .concat()
+            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
+
+            let mut expected_errors: Vec<String> = vec![];
+            errors.sort();
+            expected_errors.sort();
+            assert_eq!(errors, expected_errors);
+        }
     }
 
-    // pos event type associated with multiple commands and nondeterminism at 0
-    #[test]
-    fn test_prepare_graph_confusionful() {
-        setup_logger();
-        let proto = get_confusionful_proto1();
+    mod well_formedness_check {
+        use super::*;
+        // Tests relating to well-formedness checking.
 
-        let proto_info = prepare_proto_info(proto); //proto, None);
-        let mut errors = vec![
-            confusion_free(&proto_info, 0),
-            proto_info.get_ith_proto(0).unwrap().errors,
-        ]
-        .concat()
-        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
+        #[test]
+        fn test_wwf_ok() {
+            setup_logger();
+            let proto1: InterfacingProtocols = InterfacingProtocols(vec![get_proto1()]);
+            let result1 = exact_weak_well_formed_sub(proto1.clone(), &BTreeMap::new());
+            assert!(result1.is_ok());
+            let subs1 = result1.unwrap();
+            let error_report = check(proto1, &subs1);
+            assert!(error_report.is_empty());
+            assert_eq!(get_subs1(), subs1);
 
-        let mut expected_errors = vec![
-            "command request enabled in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0), (2)--[request@T<pos>]-->(0)",
-            "event type partID emitted in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0)",
-            "event type pos emitted in more than one transition: (1)--[get@FL<pos>]-->(2), (2)--[request@T<pos>]-->(0)",
-        ];
-        errors.sort();
-        expected_errors.sort();
-        assert_eq!(errors, expected_errors);
+            let proto2: InterfacingProtocols = InterfacingProtocols(vec![get_proto2()]);
+            let result2 = exact_weak_well_formed_sub(proto2.clone(), &BTreeMap::new());
+            assert!(result2.is_ok());
+            let subs2 = result2.unwrap();
+            let error_report = check(proto2, &subs2);
+            assert!(error_report.is_empty());
+            assert_eq!(get_subs2(), subs2);
 
-        let proto = get_some_nonterminating_proto();
-        let proto_info = prepare_proto_info(proto);
-        let mut errors = vec![
-            confusion_free(&proto_info, 0),
-            proto_info.get_ith_proto(0).unwrap().errors,
-        ]
-        .concat()
-        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
+            let proto3: InterfacingProtocols = InterfacingProtocols(vec![get_proto3()]);
+            let result3 = exact_weak_well_formed_sub(proto3.clone(), &BTreeMap::new());
+            assert!(result3.is_ok());
+            let subs3 = result3.unwrap();
+            let error_report = check(proto3, &subs3);
+            assert!(error_report.is_empty());
+            assert_eq!(get_subs3(), subs3);
 
-        let mut expected_errors: Vec<String> = vec![];
-        errors.sort();
-        expected_errors.sort();
-        assert_eq!(errors, expected_errors);
+            let composition1: InterfacingProtocols = get_interfacing_swarms_1();
+            let result_composition1 =
+                exact_weak_well_formed_sub(composition1.clone(), &BTreeMap::new());
+            assert!(result_composition1.is_ok());
+            let subs_composition = result_composition1.unwrap();
+            let error_report = check(composition1, &subs_composition);
+            assert!(error_report.is_empty());
+            assert_eq!(get_subs_composition_1(), subs_composition);
+
+            let composition2: InterfacingProtocols = get_interfacing_swarms_2();
+            let result_composition2 =
+                exact_weak_well_formed_sub(composition2.clone(), &BTreeMap::new());
+            assert!(result_composition2.is_ok());
+            let subs_composition = result_composition2.unwrap();
+            let error_report = check(composition2, &subs_composition);
+            assert!(error_report.is_empty());
+            assert_eq!(get_subs_composition_2(), subs_composition);
+        }
+
+        #[test]
+        fn test_wwf_fail() {
+            setup_logger();
+            let input: InterfacingProtocols = InterfacingProtocols(vec![get_proto1()]);
+            let subs = BTreeMap::from([
+                (Role::new("T"), BTreeSet::from([EventType::new("pos")])),
+                (Role::new("D"), BTreeSet::from([EventType::new("pos")])),
+                (Role::new("FL"), BTreeSet::from([EventType::new("partID")])),
+            ]);
+            let error_report = check(input, &subs);
+            let mut errors = error_report_to_strings(error_report);
+            errors.sort();
+            let mut expected_errors = vec![
+                "active role does not subscribe to any of its emitted event types in transition (0)--[close@D<time>]-->(3)",
+                "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
+                "active role does not subscribe to any of its emitted event types in transition (2)--[deliver@T<part>]-->(0)",
+                "active role does not subscribe to any of its emitted event types in transition (1)--[get@FL<pos>]-->(2)",
+                "role T does not subscribe to event types partID, time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
+                "role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
+                "role FL does not subscribe to event types time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
+                "subsequently active role D does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
+                "subsequently active role T does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
+            ];
+
+            expected_errors.sort();
+            assert_eq!(errors, expected_errors);
+
+            let input: InterfacingProtocols = InterfacingProtocols(vec![get_proto2()]);
+            let error_report = check(input, &get_subs3());
+            let mut errors = error_report_to_strings(error_report);
+            errors.sort();
+            let mut expected_errors = vec![
+                "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
+                "subsequently active role T does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
+                "active role does not subscribe to any of its emitted event types in transition (1)--[deliver@T<part>]-->(2)",
+                "subsequently active role F does not subscribe to events in transition (1)--[deliver@T<part>]-->(2)"
+            ];
+
+            expected_errors.sort();
+            assert_eq!(errors, expected_errors);
+
+            let input: InterfacingProtocols = InterfacingProtocols(vec![get_proto3()]);
+
+            let error_report = check(input, &get_subs1());
+            let mut errors = error_report_to_strings(error_report);
+            errors.sort();
+            let mut expected_errors = vec![
+                "active role does not subscribe to any of its emitted event types in transition (0)--[observe@TR<report1>]-->(1)",
+                "active role does not subscribe to any of its emitted event types in transition (1)--[build@F<car>]-->(2)",
+                "active role does not subscribe to any of its emitted event types in transition (2)--[test@TR<report2>]-->(3)",
+                "active role does not subscribe to any of its emitted event types in transition (3)--[accept@QCR<ok>]-->(4)",
+                "active role does not subscribe to any of its emitted event types in transition (3)--[reject@QCR<notOk>]-->(4)",
+                "subsequently active role F does not subscribe to events in transition (0)--[observe@TR<report1>]-->(1)",
+                "subsequently active role QCR does not subscribe to events in transition (2)--[test@TR<report2>]-->(3)",
+                "subsequently active role QCR does not subscribe to events in transition (2)--[test@TR<report2>]-->(3)",
+                "subsequently active role TR does not subscribe to events in transition (1)--[build@F<car>]-->(2)"
+            ];
+
+            expected_errors.sort();
+            assert_eq!(errors, expected_errors);
+        }
+
+        #[test]
+        fn test_compose_non_wwf_swarms() {
+            setup_logger();
+            let input = get_interfacing_swarms_1();
+            let subs = BTreeMap::from([
+                (Role::new("T"), BTreeSet::from([EventType::new("part")])),
+                (Role::new("D"), BTreeSet::from([EventType::new("part")])),
+                (Role::new("FL"), BTreeSet::from([EventType::new("part")])),
+                (Role::new("F"), BTreeSet::from([EventType::new("part")])),
+            ]);
+            let error_report = check(input, &subs);
+            let mut errors = error_report_to_strings(error_report);
+            errors.sort();
+            let mut expected_errors = vec![
+                "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+                "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[close@D<time>]-->(3 || 0)",
+                "active role does not subscribe to any of its emitted event types in transition (1 || 1)--[get@FL<pos>]-->(2 || 1)",
+                "active role does not subscribe to any of its emitted event types in transition (0 || 2)--[build@F<car>]-->(0 || 3)",
+                "active role does not subscribe to any of its emitted event types in transition (0 || 3)--[close@D<time>]-->(3 || 3)",
+                "active role does not subscribe to any of its emitted event types in transition (0 || 2)--[close@D<time>]-->(3 || 2)",
+                "active role does not subscribe to any of its emitted event types in transition (3 || 2)--[build@F<car>]-->(3 || 3)",
+                "role D does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+                "role T does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+                "role FL does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+                "role F does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+                "subsequently active role FL does not subscribe to events in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+                "subsequently active role T does not subscribe to events in transition (1 || 1)--[get@FL<pos>]-->(2 || 1)",
+            ];
+            expected_errors.sort();
+            assert_eq!(errors, expected_errors);
+        }
+
+        #[test]
+        fn test_fail1() {
+            setup_logger();
+            let result = exact_weak_well_formed_sub(get_fail_1_swarms(), &BTreeMap::new());
+            assert!(result.is_ok());
+            let subs1 = result.unwrap();
+            let error_report = check(get_fail_1_swarms(), &subs1);
+            assert!(error_report.is_empty());
+
+            let error_report = check(get_fail_1_swarms(), &BTreeMap::new());
+            let mut errors = error_report_to_strings(error_report);
+            errors.sort();
+            let mut expected_errors = vec![
+                "active role does not subscribe to any of its emitted event types in transition (456 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(456 || 460)",
+                "subsequently active role R455 does not subscribe to events in transition (456 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(456 || 460)",
+                "active role does not subscribe to any of its emitted event types in transition (456 || 459)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 459)",
+                "subsequently active role R454 does not subscribe to events in transition (456 || 459)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 459)",
+                "active role does not subscribe to any of its emitted event types in transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
+                "active role does not subscribe to any of its emitted event types in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
+                "subsequently active role R455 does not subscribe to events in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
+                "active role does not subscribe to any of its emitted event types in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
+                "subsequently active role R454 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
+                "subsequently active role R455 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
+                "active role does not subscribe to any of its emitted event types in transition (456 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(456 || 459)",
+                "subsequently active role R455 does not subscribe to events in transition (456 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(456 || 459)",
+                "active role does not subscribe to any of its emitted event types in transition (456 || 460)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 460)"
+            ];
+            expected_errors.sort();
+            assert_eq!(errors, expected_errors);
+        }
+
+        #[test]
+        fn test_join_errors() {
+            setup_logger();
+            let composition: InterfacingProtocols = get_interfacing_swarms_2();
+            let result_composition = exact_weak_well_formed_sub(composition.clone(), &BTreeMap::new());
+            assert!(result_composition.is_ok());
+            let mut subs_composition = result_composition.unwrap();
+            subs_composition.entry(Role::new("QCR")).and_modify(|s| {
+                *s = BTreeSet::from([
+                    EventType::new("report2"),
+                    EventType::new("ok"),
+                    EventType::new("notOk"),
+                    EventType::new("partID"),
+                    EventType::new("time"),
+                ])
+            });
+            subs_composition.entry(Role::new("F")).and_modify(|s| {
+                s.remove(&EventType::new("report1"));
+            });
+            let error_report = check(composition.clone(), &subs_composition);
+            let mut errors = error_report_to_strings(error_report);
+            let mut expected_errors = vec![
+                "role F does not subscribe to event types report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)",
+                "subsequently active role F does not subscribe to events in transition (0 || 2 || 0)--[observe@TR<report1>]-->(0 || 2 || 1)",
+                "subsequently active role F does not subscribe to events in transition (3 || 2 || 0)--[observe@TR<report1>]-->(3 || 2 || 1)",
+                "role QCR does not subscribe to event types car, part, report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)"];
+            errors.sort();
+            expected_errors.sort();
+            assert_eq!(errors, expected_errors);
+        }
     }
 
-    #[test]
-    fn test_wwf_ok() {
-        setup_logger();
-        let proto1: InterfacingProtocols = InterfacingProtocols(vec![get_proto1()]);
-        let result1 = exact_weak_well_formed_sub(proto1.clone(), &BTreeMap::new());
-        assert!(result1.is_ok());
-        let subs1 = result1.unwrap();
-        let error_report = check(proto1, &subs1);
-        assert!(error_report.is_empty());
-        assert_eq!(get_subs1(), subs1);
+    mod subscription_generation_tests {
+        use super::*;
 
-        let proto2: InterfacingProtocols = InterfacingProtocols(vec![get_proto2()]);
-        let result2 = exact_weak_well_formed_sub(proto2.clone(), &BTreeMap::new());
-        assert!(result2.is_ok());
-        let subs2 = result2.unwrap();
-        let error_report = check(proto2, &subs2);
-        assert!(error_report.is_empty());
-        assert_eq!(get_subs2(), subs2);
+        // Tests relating to subscription generation.
+        #[test]
+        fn test_weak_well_formed_sub() {
+            setup_logger();
 
-        let proto3: InterfacingProtocols = InterfacingProtocols(vec![get_proto3()]);
-        let result3 = exact_weak_well_formed_sub(proto3.clone(), &BTreeMap::new());
-        assert!(result3.is_ok());
-        let subs3 = result3.unwrap();
-        let error_report = check(proto3, &subs3);
-        assert!(error_report.is_empty());
-        assert_eq!(get_subs3(), subs3);
+            // Test interfacing_swarms_1
+            let result = exact_weak_well_formed_sub(get_interfacing_swarms_1(), &BTreeMap::new());
+            assert!(result.is_ok());
+            let subs1 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_1(), &subs1);
+            assert!(error_report.is_empty());
 
-        let composition1: InterfacingProtocols = get_interfacing_swarms_1();
-        let result_composition1 =
-            exact_weak_well_formed_sub(composition1.clone(), &BTreeMap::new());
-        assert!(result_composition1.is_ok());
-        let subs_composition = result_composition1.unwrap();
-        let (g, i) = compose_protocols(composition1.clone()).unwrap();
-        let thing = to_swarm_json(g, i);
-        println!("{}", serde_json::to_string_pretty(&thing).unwrap());
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&subs_composition).unwrap()
-        );
-        let error_report = check(composition1, &subs_composition);
-        assert!(error_report.is_empty());
-        assert_eq!(get_subs_composition_1(), subs_composition);
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_1(),
+                &BTreeMap::new(),
+                Granularity::Coarse,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_1(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
 
-        let composition2: InterfacingProtocols = get_interfacing_swarms_2();
-        let result_composition2 =
-            exact_weak_well_formed_sub(composition2.clone(), &BTreeMap::new());
-        assert!(result_composition2.is_ok());
-        let subs_composition = result_composition2.unwrap();
-        let error_report = check(composition2, &subs_composition);
-        assert!(error_report.is_empty());
-        assert_eq!(get_subs_composition_2(), subs_composition);
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_1(),
+                &BTreeMap::new(),
+                Granularity::Medium,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_1(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_1(),
+                &BTreeMap::new(),
+                Granularity::Fine,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_1(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_1(),
+                &BTreeMap::new(),
+                Granularity::TwoStep,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_1(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            // Test interfacing_swarms_2
+            let result = exact_weak_well_formed_sub(get_interfacing_swarms_2(), &BTreeMap::new());
+            assert!(result.is_ok());
+            let subs1 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_2(), &subs1);
+            assert!(error_report.is_empty());
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_2(),
+                &BTreeMap::new(),
+                Granularity::Coarse,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_2(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_2(),
+                &BTreeMap::new(),
+                Granularity::Medium,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_2(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_2(),
+                &BTreeMap::new(),
+                Granularity::Fine,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_2(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_2(),
+                &BTreeMap::new(),
+                Granularity::TwoStep,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_2(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            // Test interfacing_swarms_3
+            let result = exact_weak_well_formed_sub(get_interfacing_swarms_3(), &BTreeMap::new());
+            assert!(result.is_ok());
+            let subs1 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_3(), &subs1);
+            assert!(error_report.is_empty());
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_3(),
+                &BTreeMap::new(),
+                Granularity::Coarse,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_3(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_3(),
+                &BTreeMap::new(),
+                Granularity::Medium,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_3(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_3(),
+                &BTreeMap::new(),
+                Granularity::Fine,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_3(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_3(),
+                &BTreeMap::new(),
+                Granularity::TwoStep,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_3(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
     }
 
-    #[test]
-    fn test_wwf_fail() {
-        setup_logger();
-        let input: InterfacingProtocols = InterfacingProtocols(vec![get_proto1()]);
-        let subs = BTreeMap::from([
-            (Role::new("T"), BTreeSet::from([EventType::new("pos")])),
-            (Role::new("D"), BTreeSet::from([EventType::new("pos")])),
-            (Role::new("FL"), BTreeSet::from([EventType::new("partID")])),
-        ]);
-        let error_report = check(input, &subs);
-        let mut errors = error_report_to_strings(error_report);
-        errors.sort();
-        let mut expected_errors = vec![
-            "active role does not subscribe to any of its emitted event types in transition (0)--[close@D<time>]-->(3)",
-            "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
-            "active role does not subscribe to any of its emitted event types in transition (2)--[deliver@T<part>]-->(0)",
-            "active role does not subscribe to any of its emitted event types in transition (1)--[get@FL<pos>]-->(2)",
-            "role T does not subscribe to event types partID, time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
-            "role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
-            "role FL does not subscribe to event types time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
-            "subsequently active role D does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
-            "subsequently active role T does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
-        ];
+        #[test]
+        fn test_weak_well_formed_sub_1() {
+            setup_logger();
+            let result = exact_weak_well_formed_sub(get_interfacing_swarms_4(), &BTreeMap::new());
+            assert!(result.is_ok());
+            let subs1 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_4(), &subs1);
+            assert!(error_report.is_empty());
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_4(),
+                &BTreeMap::new(),
+                Granularity::Coarse,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_4(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
 
-        expected_errors.sort();
-        assert_eq!(errors, expected_errors);
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_4(),
+                &BTreeMap::new(),
+                Granularity::Medium,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_4(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
 
-        let input: InterfacingProtocols = InterfacingProtocols(vec![get_proto2()]);
-        let error_report = check(input, &get_subs3());
-        let mut errors = error_report_to_strings(error_report);
-        errors.sort();
-        let mut expected_errors = vec![
-            "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
-            "subsequently active role T does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
-            "active role does not subscribe to any of its emitted event types in transition (1)--[deliver@T<part>]-->(2)",
-            "subsequently active role F does not subscribe to events in transition (1)--[deliver@T<part>]-->(2)"
-        ];
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_4(),
+                &BTreeMap::new(),
+                Granularity::Fine,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_4(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
 
-        expected_errors.sort();
-        assert_eq!(errors, expected_errors);
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_4(),
+                &BTreeMap::new(),
+                Granularity::TwoStep,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_4(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+        }
 
-        let input: InterfacingProtocols = InterfacingProtocols(vec![get_proto3()]);
+        #[test]
+        fn test_extend_subs() {
+            setup_logger();
+            let sub_to_extend = BTreeMap::from([
+                (Role::new("D"), BTreeSet::from([EventType::new("pos")])),
+                (Role::new("TR"), BTreeSet::from([EventType::new("ok")])),
+            ]);
+            let result1 = exact_weak_well_formed_sub(get_interfacing_swarms_2(), &sub_to_extend);
+            let result2 = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_2(),
+                &sub_to_extend,
+                Granularity::Coarse,
+            );
+            assert!(result1.is_ok());
+            assert!(result2.is_ok());
+            let subs1 = result1.unwrap();
+            let subs2 = result2.unwrap();
+            assert!(check(get_interfacing_swarms_2(), &subs1).is_empty());
+            assert!(check(get_interfacing_swarms_2(), &subs2).is_empty());
+            assert!(subs1[&Role::new("D")].contains(&EventType::new("pos")));
+            assert!(subs2[&Role::new("D")].contains(&EventType::new("pos")));
+            assert!(subs1[&Role::new("TR")].contains(&EventType::new("ok")));
+            assert!(subs2[&Role::new("TR")].contains(&EventType::new("ok")));
 
-        let error_report = check(input, &get_subs1());
-        let mut errors = error_report_to_strings(error_report);
-        errors.sort();
-        let mut expected_errors = vec![
-            "active role does not subscribe to any of its emitted event types in transition (0)--[observe@TR<report1>]-->(1)",
-            "active role does not subscribe to any of its emitted event types in transition (1)--[build@F<car>]-->(2)",
-            "active role does not subscribe to any of its emitted event types in transition (2)--[test@TR<report2>]-->(3)",
-            "active role does not subscribe to any of its emitted event types in transition (3)--[accept@QCR<ok>]-->(4)",
-            "active role does not subscribe to any of its emitted event types in transition (3)--[reject@QCR<notOk>]-->(4)",
-            "subsequently active role F does not subscribe to events in transition (0)--[observe@TR<report1>]-->(1)",
-            "subsequently active role QCR does not subscribe to events in transition (2)--[test@TR<report2>]-->(3)",
-            "subsequently active role QCR does not subscribe to events in transition (2)--[test@TR<report2>]-->(3)",
-            "subsequently active role TR does not subscribe to events in transition (1)--[build@F<car>]-->(2)"
-        ];
+            let result2 = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_2(),
+                &sub_to_extend,
+                Granularity::Medium,
+            );
+            assert!(result2.is_ok());
+            let subs2 = result2.unwrap();
+            assert!(check(get_interfacing_swarms_2(), &subs2).is_empty());
+            assert!(subs2[&Role::new("D")].contains(&EventType::new("pos")));
+            assert!(subs2[&Role::new("TR")].contains(&EventType::new("ok")));
 
-        expected_errors.sort();
-        assert_eq!(errors, expected_errors);
-    }
-
-    #[test]
-    fn test_weak_well_formed_sub() {
-        setup_logger();
-        let result = exact_weak_well_formed_sub(get_interfacing_swarms_1(), &BTreeMap::new());
-        assert!(result.is_ok());
-        let subs1 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_1(), &subs1);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_1(),
-            &BTreeMap::new(),
-            Granularity::Coarse,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_1(), &subs2);
-        assert!(error_report.is_empty());
-        assert!(is_sub_subscription(subs1, subs2));
-
-        let result = exact_weak_well_formed_sub(get_interfacing_swarms_2(), &BTreeMap::new());
-        assert!(result.is_ok());
-        let subs1 = result.unwrap();
-        println!("exact: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        let error_report = check(get_interfacing_swarms_2(), &subs1);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_2(),
-            &BTreeMap::new(),
-            Granularity::Coarse,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        println!("approx: {}", serde_json::to_string_pretty(&subs2).unwrap());
-        let error_report = check(get_interfacing_swarms_2(), &subs2);
-        assert!(error_report.is_empty());
-        assert!(is_sub_subscription(subs1, subs2));
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_1(),
-            &BTreeMap::new(),
-            Granularity::Medium,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_1(), &subs2);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_1(),
-            &BTreeMap::new(),
-            Granularity::Fine,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_1(), &subs2);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_1(),
-            &BTreeMap::new(),
-            Granularity::TwoStep,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_1(), &subs2);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_2(),
-            &BTreeMap::new(),
-            Granularity::Medium,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_2(), &subs2);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_2(),
-            &BTreeMap::new(),
-            Granularity::Fine,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_2(), &subs2);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_2(),
-            &BTreeMap::new(),
-            Granularity::TwoStep,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_2(), &subs2);
-        assert!(error_report.is_empty());
-    }
-
-    #[test]
-    fn test_weak_well_formed_sub_1() {
-        setup_logger();
-        println!("interfacing swarms 4:");
-        let result = exact_weak_well_formed_sub(get_interfacing_swarms_4(), &BTreeMap::new());
-        assert!(result.is_ok());
-        let subs1 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_4(), &subs1);
-        assert!(error_report.is_empty());
-        println!("---------");
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_4(),
-            &BTreeMap::new(),
-            Granularity::Coarse,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_4(), &subs2);
-        assert!(error_report.is_empty());
-        assert!(is_sub_subscription(subs1, subs2));
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_4(),
-            &BTreeMap::new(),
-            Granularity::Medium,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_4(), &subs2);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_4(),
-            &BTreeMap::new(),
-            Granularity::Fine,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_4(), &subs2);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_4(),
-            &BTreeMap::new(),
-            Granularity::TwoStep,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_4(), &subs2);
-        assert!(error_report.is_empty());
-    }
-
-    #[test]
-    fn test_extend_subs() {
-        setup_logger();
-        let sub_to_extend = BTreeMap::from([
-            (Role::new("D"), BTreeSet::from([EventType::new("pos")])),
-            (Role::new("TR"), BTreeSet::from([EventType::new("ok")])),
-        ]);
-        let result1 = exact_weak_well_formed_sub(get_interfacing_swarms_2(), &sub_to_extend);
-        let result2 = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_2(),
-            &sub_to_extend,
-            Granularity::Coarse,
-        );
-        assert!(result1.is_ok());
-        assert!(result2.is_ok());
-        let subs1 = result1.unwrap();
-        let subs2 = result2.unwrap();
-        println!("exact: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        println!("approx: {}", serde_json::to_string_pretty(&subs2).unwrap());
-        assert!(check(get_interfacing_swarms_2(), &subs1).is_empty());
-        assert!(check(get_interfacing_swarms_2(), &subs2).is_empty());
-        assert!(subs1[&Role::new("D")].contains(&EventType::new("pos")));
-        assert!(subs2[&Role::new("D")].contains(&EventType::new("pos")));
-        assert!(subs1[&Role::new("TR")].contains(&EventType::new("ok")));
-        assert!(subs2[&Role::new("TR")].contains(&EventType::new("ok")));
-
-        let result2 = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_2(),
-            &sub_to_extend,
-            Granularity::Medium,
-        );
-        assert!(result2.is_ok());
-        let subs2 = result2.unwrap();
-        println!("exact: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        println!("approx: {}", serde_json::to_string_pretty(&subs2).unwrap());
-        assert!(check(get_interfacing_swarms_2(), &subs2).is_empty());
-        assert!(subs2[&Role::new("D")].contains(&EventType::new("pos")));
-        assert!(subs2[&Role::new("TR")].contains(&EventType::new("ok")));
-
-        let result2 = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_2(),
-            &sub_to_extend,
-            Granularity::Fine,
-        );
-        assert!(result2.is_ok());
-        let subs2 = result2.unwrap();
-        println!("exact: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        println!("approx: {}", serde_json::to_string_pretty(&subs2).unwrap());
-        assert!(check(get_interfacing_swarms_2(), &subs2).is_empty());
-        assert!(subs2[&Role::new("D")].contains(&EventType::new("pos")));
-        assert!(subs2[&Role::new("TR")].contains(&EventType::new("ok")));
-    }
-
-    #[test]
-    fn test_compose_non_wwf_swarms() {
-        setup_logger();
-        let input = get_interfacing_swarms_1();
-        let subs = BTreeMap::from([
-            (Role::new("T"), BTreeSet::from([EventType::new("part")])),
-            (Role::new("D"), BTreeSet::from([EventType::new("part")])),
-            (Role::new("FL"), BTreeSet::from([EventType::new("part")])),
-            (Role::new("F"), BTreeSet::from([EventType::new("part")])),
-        ]);
-        let error_report = check(input, &subs);
-        let mut errors = error_report_to_strings(error_report);
-        errors.sort();
-        let mut expected_errors = vec![
-            "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[close@D<time>]-->(3 || 0)",
-            "active role does not subscribe to any of its emitted event types in transition (1 || 1)--[get@FL<pos>]-->(2 || 1)",
-            "active role does not subscribe to any of its emitted event types in transition (0 || 2)--[build@F<car>]-->(0 || 3)",
-            "active role does not subscribe to any of its emitted event types in transition (0 || 3)--[close@D<time>]-->(3 || 3)",
-            "active role does not subscribe to any of its emitted event types in transition (0 || 2)--[close@D<time>]-->(3 || 2)",
-            "active role does not subscribe to any of its emitted event types in transition (3 || 2)--[build@F<car>]-->(3 || 3)",
-            "role D does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "role T does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "role FL does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "role F does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "subsequently active role FL does not subscribe to events in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "subsequently active role T does not subscribe to events in transition (1 || 1)--[get@FL<pos>]-->(2 || 1)",
-        ];
-        expected_errors.sort();
-        assert_eq!(errors, expected_errors);
-    }
-
-    #[test]
-    fn test_fail1() {
-        setup_logger();
-        let result = exact_weak_well_formed_sub(get_fail_1_swarms(), &BTreeMap::new());
-        assert!(result.is_ok());
-        let subs1 = result.unwrap();
-        let error_report = check(get_fail_1_swarms(), &subs1);
-        assert!(error_report.is_empty());
-
-        let error_report = check(get_fail_1_swarms(), &BTreeMap::new());
-        let mut errors = error_report_to_strings(error_report);
-        errors.sort();
-        let mut expected_errors = vec![
-            "active role does not subscribe to any of its emitted event types in transition (456 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(456 || 460)",
-            "subsequently active role R455 does not subscribe to events in transition (456 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(456 || 460)",
-            "active role does not subscribe to any of its emitted event types in transition (456 || 459)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 459)",
-            "subsequently active role R454 does not subscribe to events in transition (456 || 459)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 459)",
-            "active role does not subscribe to any of its emitted event types in transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
-            "active role does not subscribe to any of its emitted event types in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
-            "subsequently active role R455 does not subscribe to events in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
-            "active role does not subscribe to any of its emitted event types in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
-            "subsequently active role R454 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
-            "subsequently active role R455 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
-            "active role does not subscribe to any of its emitted event types in transition (456 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(456 || 459)",
-            "subsequently active role R455 does not subscribe to events in transition (456 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(456 || 459)",
-            "active role does not subscribe to any of its emitted event types in transition (456 || 460)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 460)"
-        ];
-        expected_errors.sort();
-        assert_eq!(errors, expected_errors);
-    }
-
-    #[test]
-    fn test_join_errors() {
-        setup_logger();
-        let composition: InterfacingProtocols = get_interfacing_swarms_2();
-        let result_composition = exact_weak_well_formed_sub(composition.clone(), &BTreeMap::new());
-        assert!(result_composition.is_ok());
-        let mut subs_composition = result_composition.unwrap();
-        subs_composition.entry(Role::new("QCR")).and_modify(|s| {
-            *s = BTreeSet::from([
-                EventType::new("report2"),
-                EventType::new("ok"),
-                EventType::new("notOk"),
-                EventType::new("partID"),
-                EventType::new("time"),
-            ])
-        });
-        subs_composition.entry(Role::new("F")).and_modify(|s| {
-            s.remove(&EventType::new("report1"));
-        });
-        let error_report = check(composition.clone(), &subs_composition);
-        let mut errors = error_report_to_strings(error_report);
-        //let (expanded, initial) = compose_protocols(composition.clone()).unwrap();
-        //println!("{}", serde_json::to_string_pretty(&to_swarm_json(expanded, initial)).unwrap());
-        let mut expected_errors = vec![
-            "role F does not subscribe to event types report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)",
-            "subsequently active role F does not subscribe to events in transition (0 || 2 || 0)--[observe@TR<report1>]-->(0 || 2 || 1)",
-            "subsequently active role F does not subscribe to events in transition (3 || 2 || 0)--[observe@TR<report1>]-->(3 || 2 || 1)",
-            "role QCR does not subscribe to event types car, part, report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)"];
-        errors.sort();
-        expected_errors.sort();
-        assert_eq!(errors, expected_errors);
-    }
-
-    #[test]
-    #[ignore]
-    fn test_example_from_text() {
-        setup_logger();
-        let composition = compose_protocols(get_interfacing_swarms_4());
-        assert!(composition.is_ok());
-
-        let result_composition =
-            exact_weak_well_formed_sub(get_interfacing_swarms_4(), &BTreeMap::new());
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-        let result = check(get_interfacing_swarms_4(), &subs_composition);
-        assert!(result.is_empty());
-        let result_composition = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_4(),
-            &BTreeMap::new(),
-            Granularity::Coarse,
-        );
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-
-        let result = check(get_interfacing_swarms_4(), &subs_composition);
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn test_example_3() {
-        setup_logger();
-        let composition = compose_protocols(get_interfacing_swarms_3());
-        assert!(composition.is_ok());
-
-        let (g, i) = composition.unwrap();
-        let swarm = to_swarm_json(g, i);
-        println!("proto:\n {}", serde_json::to_string_pretty(&swarm).unwrap());
-        let result_composition =
-            exact_weak_well_formed_sub(get_interfacing_swarms_3(), &BTreeMap::new());
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-        println!(
-            "subs exact: {}",
-            serde_json::to_string_pretty(&subs_composition).unwrap()
-        );
-        let result_composition = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_3(),
-            &BTreeMap::new(),
-            Granularity::Fine,
-        );
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-        println!(
-            "subs approx: {}",
-            serde_json::to_string_pretty(&subs_composition).unwrap()
-        );
-    }
-
-    #[test]
-    #[ignore]
-    fn test_pattern_4() {
-        setup_logger();
-        for i in 1..6 {
-            let index = i as usize;
-            let composition = compose_protocols(InterfacingProtocols(
-                get_interfacing_swarms_pat_4().0[..index].to_vec(),
-            ));
-            assert!(composition.is_ok());
-
-            let (g, i) = composition.unwrap();
-            let node_count = g.node_count();
-            let edge_count = g.edge_count();
-            let swarm = to_swarm_json(g, i);
-            println!("{}\n$$$$\n", serde_json::to_string_pretty(&swarm).unwrap());
-            println!("num states: {}, num edges: {}", node_count, edge_count);
+            let result2 = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_2(),
+                &sub_to_extend,
+                Granularity::Fine,
+            );
+            assert!(result2.is_ok());
+            let subs2 = result2.unwrap();
+            assert!(check(get_interfacing_swarms_2(), &subs2).is_empty());
+            assert!(subs2[&Role::new("D")].contains(&EventType::new("pos")));
+            assert!(subs2[&Role::new("TR")].contains(&EventType::new("ok")));
         }
     }
 
