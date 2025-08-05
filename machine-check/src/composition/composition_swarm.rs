@@ -813,6 +813,9 @@ fn finer_overapprox_wwf_sub(
     // Determinacy
     finer_approx_add_branches_and_joins(proto_info, &mut subscription);
 
+    // Add looping event types to the subscription.
+    add_looping_event_types(proto_info, &mut subscription);
+
     subscription
 }
 
@@ -3648,12 +3651,23 @@ mod tests {
         println!("errors: {:?}", error_report_to_strings(errors));
         assert!(is_empty);
 
-        // Check overapprox well-formed subscriptions
+        // Check overapprox weak well-formed subscriptions
         let sub =
             overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
                 .unwrap();
         println!(
-            "exact wf subs: {}",
+            "subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
+        let sub =
+            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
+                .unwrap();
+        println!(
+            "subs: {}",
             serde_json::to_string_pretty(&sub).unwrap()
         );
         let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
@@ -3730,12 +3744,23 @@ mod tests {
         println!("errors: {:?}", error_report_to_strings(errors));
         assert!(is_empty);
 
-        // Check overapprox well-formed subscriptions
+        // Check overapprox weak well-formed subscriptions
         let sub =
             overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
                 .unwrap();
         println!(
-            "exact wf subs: {}",
+            "subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
+        let sub =
+            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
+                .unwrap();
+        println!(
+            "subs: {}",
             serde_json::to_string_pretty(&sub).unwrap()
         );
         let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
@@ -3804,12 +3829,23 @@ mod tests {
         println!("errors: {:?}", error_report_to_strings(errors));
         assert!(is_empty);
 
-        // Check overapprox well-formed subscriptions
+        // Check overapprox weak well-formed subscriptions
         let sub =
             overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
                 .unwrap();
         println!(
-            "exact wf subs: {}",
+            "subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
+        let sub =
+            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
+                .unwrap();
+        println!(
+            "subs: {}",
             serde_json::to_string_pretty(&sub).unwrap()
         );
         let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
@@ -3889,12 +3925,23 @@ mod tests {
         println!("errors: {:?}", error_report_to_strings(errors));
         assert!(is_empty);
 
-        // Check overapprox well-formed subscriptions
+        // Check overapprox weak well-formed subscriptions
         let sub =
             overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
                 .unwrap();
         println!(
-            "exact wf subs: {}",
+            "subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
+        let sub =
+            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
+                .unwrap();
+        println!(
+            "subs: {}",
             serde_json::to_string_pretty(&sub).unwrap()
         );
         let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
@@ -3974,12 +4021,23 @@ mod tests {
         println!("errors: {:?}", error_report_to_strings(errors));
         assert!(is_empty);
 
-        // Check overapprox well-formed subscriptions
+        // Check overapprox weak well-formed subscriptions
         let sub =
             overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
                 .unwrap();
         println!(
-            "exact wf subs: {}",
+            "subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
+        let sub =
+            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
+                .unwrap();
+        println!(
+            "subs: {}",
             serde_json::to_string_pretty(&sub).unwrap()
         );
         let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
@@ -4060,7 +4118,18 @@ mod tests {
             overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
                 .unwrap();
         println!(
-            "exact wf subs: {}",
+            "subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
+        let sub =
+            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
+                .unwrap();
+        println!(
+            "subs: {}",
             serde_json::to_string_pretty(&sub).unwrap()
         );
         let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
