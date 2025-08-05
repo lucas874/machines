@@ -3446,7 +3446,7 @@ mod tests {
         }
     }
 
-    mod loops {
+    mod loop_tests {
         use super::*;
 
         // This module contains tests for relating to looping event types.
