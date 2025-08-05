@@ -3651,7 +3651,7 @@ mod tests {
         println!("errors: {:?}", error_report_to_strings(errors));
         assert!(is_empty);
 
-        // Check overapprox weak well-formed subscriptions
+        // Check overapprox well-formed subscriptions
         let sub =
             overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
                 .unwrap();
@@ -3744,7 +3744,7 @@ mod tests {
         println!("errors: {:?}", error_report_to_strings(errors));
         assert!(is_empty);
 
-        // Check overapprox weak well-formed subscriptions
+        // Check overapprox well-formed subscriptions
         let sub =
             overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
                 .unwrap();
@@ -3829,7 +3829,7 @@ mod tests {
         println!("errors: {:?}", error_report_to_strings(errors));
         assert!(is_empty);
 
-        // Check overapprox weak well-formed subscriptions
+        // Check overapprox well-formed subscriptions
         let sub =
             overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
                 .unwrap();
@@ -3925,7 +3925,7 @@ mod tests {
         println!("errors: {:?}", error_report_to_strings(errors));
         assert!(is_empty);
 
-        // Check overapprox weak well-formed subscriptions
+        // Check overapprox well-formed subscriptions
         let sub =
             overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
                 .unwrap();
@@ -4021,7 +4021,7 @@ mod tests {
         println!("errors: {:?}", error_report_to_strings(errors));
         assert!(is_empty);
 
-        // Check overapprox weak well-formed subscriptions
+        // Check overapprox well-formed subscriptions
         let sub =
             overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
                 .unwrap();
@@ -4101,7 +4101,7 @@ mod tests {
                 .map(|e| e.to_string())
                 .collect::<Vec<_>>()
         );
-        // Check exact weak well-formed subscriptions
+        // Check exact well-formed subscriptions
         let sub =
             exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
                 .unwrap();
@@ -4113,7 +4113,7 @@ mod tests {
         let is_empty = errors.is_empty();
         println!("errors: {:?}", error_report_to_strings(errors));
         assert!(is_empty);
-        // Check overapprox weak well-formed subscriptions
+        // Check overapprox well-formed subscriptions
         let sub =
             overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
                 .unwrap();
