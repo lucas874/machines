@@ -82,14 +82,15 @@ impl InterfaceStruct {
 
 #[derive(Debug, Clone)]
 pub struct ProtoInfo {
-    pub protocols: Vec<ProtoStruct>, // maybe weird to have an interface as if it was related to one protocol. but convenient. "a graph interfaces with rest on if"
+    pub protocols: Vec<ProtoStruct>,
     pub role_event_map: RoleEventMap,
-    pub concurrent_events: BTreeSet<UnordEventPair>, // consider to make a more specific type. unordered pair.
+    pub concurrent_events: BTreeSet<UnordEventPair>, // Consider to make a more specific type. unordered pair.
     pub branching_events: Vec<BTreeSet<EventType>>,
     pub joining_events: BTreeMap<EventType, BTreeSet<EventType>>,
     pub immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
     pub succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
     pub interfacing_events: BTreeSet<EventType>,
+    pub infinitely_looping_events: BTreeSet<EventType>, // Event types that do not lead to a terminal state.
     pub interface_errors: Vec<Error>,
 }
 
@@ -103,6 +104,7 @@ impl ProtoInfo {
         immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
         succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
         interfacing_events: BTreeSet<EventType>,
+        infinitely_looping_events: BTreeSet<EventType>,
         interface_errors: Vec<Error>,
     ) -> Self {
         Self {
@@ -114,6 +116,7 @@ impl ProtoInfo {
             immediately_pre,
             succeeding_events,
             interfacing_events,
+            infinitely_looping_events,
             interface_errors,
         }
     }
@@ -128,6 +131,7 @@ impl ProtoInfo {
             immediately_pre: BTreeMap::new(),
             succeeding_events: BTreeMap::new(),
             interfacing_events: BTreeSet::new(),
+            infinitely_looping_events: BTreeSet::new(),
             interface_errors: Vec::new(),
         }
     }
