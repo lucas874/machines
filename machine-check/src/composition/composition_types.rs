@@ -90,7 +90,7 @@ pub struct ProtoInfo {
     pub immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
     pub succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
     pub interfacing_events: BTreeSet<EventType>,
-    pub interminably_looping_events: BTreeSet<EventType>, // Event types that do not lead to a terminal state.
+    pub infinitely_looping_events: BTreeSet<EventType>, // Event types that do not lead to a terminal state.
     pub interface_errors: Vec<Error>,
 }
 
@@ -104,7 +104,7 @@ impl ProtoInfo {
         immediately_pre: BTreeMap<EventType, BTreeSet<EventType>>,
         succeeding_events: BTreeMap<EventType, BTreeSet<EventType>>,
         interfacing_events: BTreeSet<EventType>,
-        interminably_looping_events: BTreeSet<EventType>,
+        infinitely_looping_events: BTreeSet<EventType>,
         interface_errors: Vec<Error>,
     ) -> Self {
         Self {
@@ -116,7 +116,7 @@ impl ProtoInfo {
             immediately_pre,
             succeeding_events,
             interfacing_events,
-            interminably_looping_events,
+            infinitely_looping_events,
             interface_errors,
         }
     }
@@ -131,7 +131,7 @@ impl ProtoInfo {
             immediately_pre: BTreeMap::new(),
             succeeding_events: BTreeMap::new(),
             interfacing_events: BTreeSet::new(),
-            interminably_looping_events: BTreeSet::new(),
+            infinitely_looping_events: BTreeSet::new(),
             interface_errors: Vec::new(),
         }
     }

@@ -446,7 +446,7 @@ fn weak_well_formed(
 
             // Determinacy.
             // Corresponds to the looping rule of determinacy.
-            if proto_info.interminably_looping_events.contains(&event_type) {
+            if proto_info.infinitely_looping_events.contains(&event_type) {
                 // If the event type is not in the subscriptions of all involved roles, add it.
                 // This is a weak condition, but we do not check looping errors in this function.
                 let t_and_after_t: BTreeSet<EventType> = [event_type.clone()]
@@ -666,7 +666,7 @@ fn exact_wwf_looping_event_types(proto_info: &ProtoInfo, subscriptions: &mut Sub
     let _span = tracing::info_span!("exact_wwf_looping_event_types").entered();
 
     // For each event type t in the set of event types that can not reach a terminal state, check predicate adding t to subs of all involved roles if false.
-    for t in &proto_info.interminably_looping_events {
+    for t in &proto_info.infinitely_looping_events {
         let t_and_after_t: BTreeSet<EventType> = [t.clone()]
             .into_iter()
             .chain(
@@ -1185,10 +1185,10 @@ fn combine_two_proto_infos(proto_info1: ProtoInfo, proto_info2: ProtoInfo) -> Pr
     .flatten()
     .collect();
 
-    let interminably_looping_events = proto_info1
-        .interminably_looping_events
+    let infinitely_looping_events = proto_info1
+        .infinitely_looping_events
         .into_iter()
-        .chain(proto_info2.interminably_looping_events.into_iter())
+        .chain(proto_info2.infinitely_looping_events.into_iter())
         .collect();
 
     ProtoInfo::new(
@@ -1200,7 +1200,7 @@ fn combine_two_proto_infos(proto_info1: ProtoInfo, proto_info2: ProtoInfo) -> Pr
         immediately_pre,
         happens_after,
         interfacing_event_types,
-        interminably_looping_events,
+        infinitely_looping_events,
         [
             proto_info1.interface_errors,
             proto_info2.interface_errors,
@@ -1439,7 +1439,7 @@ fn prepare_proto_info(proto: SwarmProtocolType) -> ProtoInfo {
     let happens_after = after_not_concurrent(&graph, initial.unwrap(), &BTreeSet::new());
 
     // Nodes that can not reach a terminal node.
-    let interminably_looping_events = interminably_looping_event_types(&graph, &happens_after);
+    let infinitely_looping_events = infinitely_looping_event_types(&graph, &happens_after);
 
     ProtoInfo::new(
         vec![ProtoStruct::new(
@@ -1455,7 +1455,7 @@ fn prepare_proto_info(proto: SwarmProtocolType) -> ProtoInfo {
         immediately_pre_map,
         happens_after,
         BTreeSet::new(),
-        interminably_looping_events,
+        infinitely_looping_events,
         vec![],
     )
 }
@@ -1583,8 +1583,8 @@ fn nodes_not_reaching_terminal(graph: &Graph) -> Vec<NodeId> {
 }
 
 // Return all event types that are part of an infinte loop in a graph (according to succ_map).
-fn interminably_looping_event_types(graph: &Graph, succ_map: &BTreeMap<EventType, BTreeSet<EventType>>) -> BTreeSet<EventType> {
-    let _span = tracing::info_span!("interminably_looping_event_types").entered();
+fn infinitely_looping_event_types(graph: &Graph, succ_map: &BTreeMap<EventType, BTreeSet<EventType>>) -> BTreeSet<EventType> {
+    let _span = tracing::info_span!("infinitely_looping_event_types").entered();
     let nodes = nodes_not_reaching_terminal(graph);
     nodes
         .into_iter()
@@ -1679,7 +1679,7 @@ fn explicit_composition_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
     let (composed, composed_initial) = explicit_composition(&proto_info);
     let succeeding_events =
         after_not_concurrent(&composed, composed_initial, &proto_info.concurrent_events);
-    let interminably_looping_events = interminably_looping_event_types(&composed, &succeeding_events);
+    let infinitely_looping_events = infinitely_looping_event_types(&composed, &succeeding_events);
     ProtoInfo {
         protocols: vec![ProtoStruct::new(
             composed,
@@ -1688,7 +1688,7 @@ fn explicit_composition_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
             BTreeSet::new(),
         )],
         succeeding_events,
-        interminably_looping_events,
+        infinitely_looping_events,
         ..proto_info
     }
 }
@@ -3616,7 +3616,7 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
         assert_eq!(
             proto_info
-                .interminably_looping_events
+                .infinitely_looping_events
                 .clone()
                 .into_iter()
                 .map(|e| e.to_string())
@@ -3624,9 +3624,9 @@ mod tests {
             vec!["c", "d", "e"]
         );
         println!(
-            "interminably looping events: {:?}",
+            "infinitely looping events: {:?}",
             proto_info
-                .interminably_looping_events
+                .infinitely_looping_events
                 .into_iter()
                 .map(|e| e.to_string())
                 .collect::<Vec<_>>()
@@ -3683,7 +3683,7 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
         assert_eq!(
             proto_info
-                .interminably_looping_events
+                .infinitely_looping_events
                 .clone()
                 .into_iter()
                 .map(|e| e.to_string())
@@ -3691,9 +3691,9 @@ mod tests {
             vec!["c", "d", "e"]
         );
         println!(
-            "interminably looping events: {:?}",
+            "infinitely looping events: {:?}",
             proto_info
-                .interminably_looping_events
+                .infinitely_looping_events
                 .into_iter()
                 .map(|e| e.to_string())
                 .collect::<Vec<_>>()
@@ -3750,7 +3750,7 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
         assert_eq!(
             proto_info
-                .interminably_looping_events
+                .infinitely_looping_events
                 .clone()
                 .into_iter()
                 .map(|e| e.to_string())
@@ -3812,7 +3812,7 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
         assert_eq!(
             proto_info
-                .interminably_looping_events
+                .infinitely_looping_events
                 .clone()
                 .into_iter()
                 .map(|e| e.to_string())
@@ -3820,9 +3820,9 @@ mod tests {
             vec!["c", "d", "e", "f", "g", "h"]
         );
         println!(
-            "interminably looping events: {:?}",
+            "infinitely looping events: {:?}",
             proto_info
-                .interminably_looping_events
+                .infinitely_looping_events
                 .into_iter()
                 .map(|e| e.to_string())
                 .collect::<Vec<_>>()
@@ -3882,7 +3882,7 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
         assert_eq!(
             proto_info
-                .interminably_looping_events
+                .infinitely_looping_events
                 .clone()
                 .into_iter()
                 .map(|e| e.to_string())
@@ -3890,9 +3890,9 @@ mod tests {
             vec!["a", "b", "c", "d", "e", "f", "g", "h"]
         );
         println!(
-            "interminably looping events: {:?}",
+            "infinitely looping events: {:?}",
             proto_info
-                .interminably_looping_events
+                .infinitely_looping_events
                 .into_iter()
                 .map(|e| e.to_string())
                 .collect::<Vec<_>>()
@@ -3949,7 +3949,7 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
         assert_eq!(
             proto_info
-                .interminably_looping_events
+                .infinitely_looping_events
                 .clone()
                 .into_iter()
                 .map(|e| e.to_string())
@@ -3957,9 +3957,9 @@ mod tests {
             vec!["a", "b", "c", "d", "e", "f"]
         );
         println!(
-            "interminably looping events: {:?}",
+            "infinitely looping events: {:?}",
             proto_info
-                .interminably_looping_events
+                .infinitely_looping_events
                 .into_iter()
                 .map(|e| e.to_string())
                 .collect::<Vec<_>>()
