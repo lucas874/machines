@@ -2441,7 +2441,7 @@ mod tests {
         }
     }
 
-    mod well_formedness_check {
+    mod well_formedness_check_tests {
         use super::*;
         // Tests relating to well-formedness checking.
 
@@ -2645,6 +2645,252 @@ mod tests {
             errors.sort();
             expected_errors.sort();
             assert_eq!(errors, expected_errors);
+        }
+
+            #[test]
+        fn inference_example_1() {
+            fn subs() -> Subscriptions {
+                serde_json::from_str::<Subscriptions>(
+                    r#"{
+                    "R1": ["a1", "a2", "b1"],
+                    "R2": ["b1", "b2", "a1"],
+                    "R3": ["c1", "c2"]
+                }"#,
+                )
+                .unwrap()
+            }
+            fn proto1() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
+                        { "source": "1", "target": "3", "label": { "cmd": "cmd_a2", "logType": ["a2"], "role": "R1" } },
+                        { "source": "0", "target": "2", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
+                        { "source": "2", "target": "4", "label": { "cmd": "cmd_b2", "logType": ["b2"], "role": "R2" } }
+                    ]
+                }"#,
+            )
+            .unwrap()
+            }
+            fn proto2() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R3" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "cmd_c2", "logType": ["c2"], "role": "R3" } }
+                        ]
+                    }"#,
+                )
+                .unwrap()
+            }
+            fn as_interfacing_protocols() -> InterfacingProtocols {
+                InterfacingProtocols(vec![proto1(), proto2()])
+            }
+
+            assert!(check(as_interfacing_protocols(), &subs()).is_empty());
+            let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
+            assert!(smalles_sub.is_ok());
+            assert_eq!(smalles_sub.unwrap(), subs());
+        }
+
+        #[test]
+        fn inference_example_2() {
+            fn subs() -> Subscriptions {
+                serde_json::from_str::<Subscriptions>(
+                    r#"{
+                    "R1": ["a1", "a2", "b1"],
+                    "R2": ["b1", "b2", "a1"],
+                    "R3": ["c1", "c2"],
+                    "IR": ["i1", "a1", "a2", "b1", "c2"]
+                }"#,
+                )
+                .unwrap()
+            }
+            fn proto1() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
+                        { "source": "1", "target": "3", "label": { "cmd": "cmd_a2", "logType": ["a2"], "role": "R1" } },
+                        { "source": "3", "target": "5", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
+                        { "source": "0", "target": "2", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
+                        { "source": "2", "target": "4", "label": { "cmd": "cmd_b2", "logType": ["b2"], "role": "R2" } }
+                    ]
+                }"#,
+            )
+            .unwrap()
+            }
+            fn proto2() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R3" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "cmd_c2", "logType": ["c2"], "role": "R3" } },
+                            { "source": "2", "target": "3", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } }
+                        ]
+                    }"#,
+                )
+                .unwrap()
+            }
+            fn as_interfacing_protocols() -> InterfacingProtocols {
+                InterfacingProtocols(vec![proto1(), proto2()])
+            }
+            assert!(check(as_interfacing_protocols(), &subs()).is_empty());
+            let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
+            assert!(smalles_sub.is_ok());
+            assert_eq!(smalles_sub.unwrap(), subs());
+        }
+
+        #[test]
+        fn inference_example_3() {
+            fn subs() -> Subscriptions {
+                serde_json::from_str::<Subscriptions>(
+                    r#"{
+                    "R1": ["i1", "a1", "a2", "b1"],
+                    "R2": ["i1", "b1", "b2", "a1"],
+                    "R3": ["i1", "c1", "c2"],
+                    "IR": ["i1"]
+                }"#,
+                )
+                .unwrap()
+            }
+            fn proto1() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
+                        { "source": "2", "target": "4", "label": { "cmd": "cmd_a2", "logType": ["a2"], "role": "R1" } },
+                        { "source": "1", "target": "3", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
+                        { "source": "3", "target": "5", "label": { "cmd": "cmd_b2", "logType": ["b2"], "role": "R2" } }
+                    ]
+                }"#,
+            )
+            .unwrap()
+            }
+            fn proto2() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R3" } },
+                            { "source": "2", "target": "3", "label": { "cmd": "cmd_c2", "logType": ["c2"], "role": "R3" } }
+                        ]
+                    }"#,
+                )
+                .unwrap()
+            }
+            fn as_interfacing_protocols() -> InterfacingProtocols {
+                InterfacingProtocols(vec![proto1(), proto2()])
+            }
+
+            assert!(check(as_interfacing_protocols(), &subs()).is_empty());
+            let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
+            assert!(smalles_sub.is_ok());
+            assert_eq!(smalles_sub.unwrap(), subs());
+        }
+
+        #[test]
+        fn inference_example_4() {
+            fn subs() -> Subscriptions {
+                serde_json::from_str::<Subscriptions>(
+                    r#"{
+                    "R1": ["c1", "a1"],
+                    "R2": ["a1", "b1"],
+                    "R3": ["a1", "b1", "c1"]
+                }"#,
+                )
+                .unwrap()
+            }
+            fn proto1() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } },
+                        { "source": "0", "target": "3", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
+                        { "source": "3", "target": "4", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
+                        { "source": "4", "target": "0", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R3" } }
+                    ]
+                }"#,
+            )
+            .unwrap()
+            }
+            fn proto2() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } }
+                        ]
+                    }"#,
+                )
+                .unwrap()
+            }
+            fn as_interfacing_protocols() -> InterfacingProtocols {
+                InterfacingProtocols(vec![proto1(), proto2()])
+            }
+
+            assert!(check(as_interfacing_protocols(), &subs()).is_empty());
+            let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
+            assert!(smalles_sub.is_ok());
+            assert_eq!(smalles_sub.unwrap(), subs());
+        }
+
+        #[test]
+        fn inference_example_5() {
+            fn subs() -> Subscriptions {
+                serde_json::from_str::<Subscriptions>(
+                    r#"{
+                    "R1": ["a1", "c1"],
+                    "R2": ["a1", "b1", "c1"]
+                }"#,
+                )
+                .unwrap()
+            }
+            fn proto1() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
+                        { "source": "0", "target": "3", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R1" } },
+                        { "source": "0", "target": "4", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
+                        { "source": "4", "target": "5", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } }
+                    ]
+                }"#,
+            )
+            .unwrap()
+            }
+            fn proto2() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } }
+                        ]
+                    }"#,
+                )
+                .unwrap()
+            }
+            fn as_interfacing_protocols() -> InterfacingProtocols {
+                InterfacingProtocols(vec![proto1(), proto2()])
+            }
+
+            assert!(check(as_interfacing_protocols(), &subs()).is_empty());
+            let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
+            assert!(smalles_sub.is_ok());
+            assert_eq!(smalles_sub.unwrap(), subs());
         }
     }
 
@@ -3199,255 +3445,6 @@ mod tests {
             assert!(error_report.is_empty());
         }
     }
-
-    // the tests below can safely be deleted. But keep until whole inference rule show is over.
-
-    #[test]
-    fn inference_example_1() {
-        fn subs() -> Subscriptions {
-            serde_json::from_str::<Subscriptions>(
-                r#"{
-                "R1": ["a1", "a2", "b1"],
-                "R2": ["b1", "b2", "a1"],
-                "R3": ["c1", "c2"]
-            }"#,
-            )
-            .unwrap()
-        }
-        fn proto1() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
-                    { "source": "1", "target": "3", "label": { "cmd": "cmd_a2", "logType": ["a2"], "role": "R1" } },
-                    { "source": "0", "target": "2", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
-                    { "source": "2", "target": "4", "label": { "cmd": "cmd_b2", "logType": ["b2"], "role": "R2" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-        }
-        fn proto2() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R3" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "cmd_c2", "logType": ["c2"], "role": "R3" } }
-                    ]
-                }"#,
-            )
-            .unwrap()
-        }
-        fn as_interfacing_protocols() -> InterfacingProtocols {
-            InterfacingProtocols(vec![proto1(), proto2()])
-        }
-
-        assert!(check(as_interfacing_protocols(), &subs()).is_empty());
-        let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
-        assert!(smalles_sub.is_ok());
-        assert_eq!(smalles_sub.unwrap(), subs());
-    }
-
-    #[test]
-    fn inference_example_2() {
-        fn subs() -> Subscriptions {
-            serde_json::from_str::<Subscriptions>(
-                r#"{
-                "R1": ["a1", "a2", "b1"],
-                "R2": ["b1", "b2", "a1"],
-                "R3": ["c1", "c2"],
-                "IR": ["i1", "a1", "a2", "b1", "c2"]
-            }"#,
-            )
-            .unwrap()
-        }
-        fn proto1() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
-                    { "source": "1", "target": "3", "label": { "cmd": "cmd_a2", "logType": ["a2"], "role": "R1" } },
-                    { "source": "3", "target": "5", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
-                    { "source": "0", "target": "2", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
-                    { "source": "2", "target": "4", "label": { "cmd": "cmd_b2", "logType": ["b2"], "role": "R2" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-        }
-        fn proto2() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R3" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "cmd_c2", "logType": ["c2"], "role": "R3" } },
-                        { "source": "2", "target": "3", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } }
-                    ]
-                }"#,
-            )
-            .unwrap()
-        }
-        fn as_interfacing_protocols() -> InterfacingProtocols {
-            InterfacingProtocols(vec![proto1(), proto2()])
-        }
-        assert!(check(as_interfacing_protocols(), &subs()).is_empty());
-        let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
-        assert!(smalles_sub.is_ok());
-        assert_eq!(smalles_sub.unwrap(), subs());
-    }
-
-    #[test]
-    fn inference_example_3() {
-        fn subs() -> Subscriptions {
-            serde_json::from_str::<Subscriptions>(
-                r#"{
-                "R1": ["i1", "a1", "a2", "b1"],
-                "R2": ["i1", "b1", "b2", "a1"],
-                "R3": ["i1", "c1", "c2"],
-                "IR": ["i1"]
-            }"#,
-            )
-            .unwrap()
-        }
-        fn proto1() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
-                    { "source": "2", "target": "4", "label": { "cmd": "cmd_a2", "logType": ["a2"], "role": "R1" } },
-                    { "source": "1", "target": "3", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
-                    { "source": "3", "target": "5", "label": { "cmd": "cmd_b2", "logType": ["b2"], "role": "R2" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-        }
-        fn proto2() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R3" } },
-                        { "source": "2", "target": "3", "label": { "cmd": "cmd_c2", "logType": ["c2"], "role": "R3" } }
-                    ]
-                }"#,
-            )
-            .unwrap()
-        }
-        fn as_interfacing_protocols() -> InterfacingProtocols {
-            InterfacingProtocols(vec![proto1(), proto2()])
-        }
-
-        assert!(check(as_interfacing_protocols(), &subs()).is_empty());
-        let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
-        assert!(smalles_sub.is_ok());
-        assert_eq!(smalles_sub.unwrap(), subs());
-    }
-
-    #[test]
-    fn inference_example_4() {
-        fn subs() -> Subscriptions {
-            serde_json::from_str::<Subscriptions>(
-                r#"{
-                "R1": ["c1", "a1"],
-                "R2": ["a1", "b1"],
-                "R3": ["b1", "c1"]
-            }"#,
-            )
-            .unwrap()
-        }
-        fn proto1() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } },
-                    { "source": "0", "target": "3", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
-                    { "source": "3", "target": "4", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
-                    { "source": "4", "target": "0", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R3" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-        }
-        fn proto2() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } }
-                    ]
-                }"#,
-            )
-            .unwrap()
-        }
-        fn as_interfacing_protocols() -> InterfacingProtocols {
-            InterfacingProtocols(vec![proto1(), proto2()])
-        }
-
-        assert!(check(as_interfacing_protocols(), &subs()).is_empty());
-        let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
-        assert!(smalles_sub.is_ok());
-        assert_eq!(smalles_sub.unwrap(), subs());
-    }
-
-    #[test]
-    fn inference_example_5() {
-        fn subs() -> Subscriptions {
-            serde_json::from_str::<Subscriptions>(
-                r#"{
-                "R1": ["a1", "c1"],
-                "R2": ["a1", "b1", "c1"]
-            }"#,
-            )
-            .unwrap()
-        }
-        fn proto1() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
-                    { "source": "0", "target": "3", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R1" } },
-                    { "source": "0", "target": "4", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
-                    { "source": "4", "target": "5", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-        }
-        fn proto2() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } }
-                    ]
-                }"#,
-            )
-            .unwrap()
-        }
-        fn as_interfacing_protocols() -> InterfacingProtocols {
-            InterfacingProtocols(vec![proto1(), proto2()])
-        }
-
-        assert!(check(as_interfacing_protocols(), &subs()).is_empty());
-        let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
-        assert!(smalles_sub.is_ok());
-        assert_eq!(smalles_sub.unwrap(), subs());
-    }
-
 
     mod loops {
         use super::*;
