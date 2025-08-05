@@ -1215,13 +1215,11 @@ fn combine_proto_infos(protos: Vec<ProtoInfo>) -> ProtoInfo {
     if protos.is_empty() {
         return ProtoInfo::new_only_proto(vec![]);
     }
-    // if empty protoinfos return None change signature
-    let proto = protos[0].clone();
 
     let mut combined = protos[1..]
         .to_vec()
         .into_iter()
-        .fold(proto, |acc, p| combine_two_proto_infos(acc, p));
+        .fold(protos[0].clone(), |acc, p| combine_two_proto_infos(acc, p));
 
     combined.joining_events = joining_event_types_map(&combined);
     combined
