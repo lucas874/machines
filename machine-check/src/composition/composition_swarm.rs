@@ -543,7 +543,7 @@ fn exact_wwf_sub(
     }
 
     // Handle looping event types
-    exact_wwf_looping_event_types(&proto_info, &mut subscriptions);
+    add_looping_event_types(&proto_info, &mut subscriptions);
 
     subscriptions
 }
@@ -662,8 +662,8 @@ fn exact_wwf_sub_step(
 // Handle looping event types.
 // For each event type t that does not lead to a terminal state, check looping condition from determinacy:
 // if t is not in subscriptions, add it to all roles in roles(t, G).
-fn exact_wwf_looping_event_types(proto_info: &ProtoInfo, subscriptions: &mut Subscriptions) {
-    let _span = tracing::info_span!("exact_wwf_looping_event_types").entered();
+fn add_looping_event_types(proto_info: &ProtoInfo, subscriptions: &mut Subscriptions) {
+    let _span = tracing::info_span!("add_looping_event_types").entered();
 
     // For each event type t in the set of event types that can not reach a terminal state, check predicate adding t to subs of all involved roles if false.
     for t in &proto_info.infinitely_looping_events {
@@ -920,6 +920,9 @@ fn two_step_overapprox_wwf_sub(
             }
         }
     }
+
+    // Add looping event types to the subscription.
+    add_looping_event_types(proto_info, subscription);
 
     subscription.clone()
 }
@@ -3631,8 +3634,23 @@ mod tests {
                 .map(|e| e.to_string())
                 .collect::<Vec<_>>()
         );
+
+        // Check exact well-formed subscriptions
         let sub =
             exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+                .unwrap();
+        println!(
+            "exact wf subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
+
+        // Check overapprox well-formed subscriptions
+        let sub =
+            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
                 .unwrap();
         println!(
             "exact wf subs: {}",
@@ -3698,8 +3716,23 @@ mod tests {
                 .map(|e| e.to_string())
                 .collect::<Vec<_>>()
         );
+
+        // Check exact well-formed subscriptions
         let sub =
             exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+                .unwrap();
+        println!(
+            "exact wf subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
+
+        // Check overapprox well-formed subscriptions
+        let sub =
+            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
                 .unwrap();
         println!(
             "exact wf subs: {}",
@@ -3757,8 +3790,23 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["c", "d", "e", "f", "g", "h", "i"]
         );
+
+        // Check exact well-formed subscriptions
         let sub =
             exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+                .unwrap();
+        println!(
+            "exact wf subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
+
+        // Check overapprox well-formed subscriptions
+        let sub =
+            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
                 .unwrap();
         println!(
             "exact wf subs: {}",
@@ -3827,8 +3875,23 @@ mod tests {
                 .map(|e| e.to_string())
                 .collect::<Vec<_>>()
         );
+
+        // Check exact well-formed subscriptions
         let sub =
             exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+                .unwrap();
+        println!(
+            "exact wf subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
+
+        // Check overapprox well-formed subscriptions
+        let sub =
+            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
                 .unwrap();
         println!(
             "exact wf subs: {}",
@@ -3897,6 +3960,8 @@ mod tests {
                 .map(|e| e.to_string())
                 .collect::<Vec<_>>()
         );
+
+        // Check exact well-formed subscriptions
         let sub =
             exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
                 .unwrap();
@@ -3908,7 +3973,21 @@ mod tests {
         let is_empty = errors.is_empty();
         println!("errors: {:?}", error_report_to_strings(errors));
         assert!(is_empty);
+
+        // Check overapprox well-formed subscriptions
+        let sub =
+            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
+                .unwrap();
+        println!(
+            "exact wf subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
     }
+
     #[test]
     fn looping_6() {
         fn proto1() -> SwarmProtocolType {
@@ -3964,8 +4043,21 @@ mod tests {
                 .map(|e| e.to_string())
                 .collect::<Vec<_>>()
         );
+        // Check exact weak well-formed subscriptions
         let sub =
             exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+                .unwrap();
+        println!(
+            "exact wf subs: {}",
+            serde_json::to_string_pretty(&sub).unwrap()
+        );
+        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
+        let is_empty = errors.is_empty();
+        println!("errors: {:?}", error_report_to_strings(errors));
+        assert!(is_empty);
+        // Check overapprox weak well-formed subscriptions
+        let sub =
+            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
                 .unwrap();
         println!(
             "exact wf subs: {}",
