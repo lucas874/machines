@@ -917,7 +917,7 @@ mod tests {
     fn from_adaptation_graph_to_graph(graph: &AdaptationGraph) -> Graph {
         graph.map(|_, n| n.state.state_name().clone(), |_, x| x.clone())
     }
-    // Example from coplaws slides
+
     fn get_proto1() -> SwarmProtocolType {
         serde_json::from_str::<SwarmProtocolType>(
             r#"{
@@ -1013,6 +1013,299 @@ mod tests {
 
     fn get_interfacing_swarms_warehouse() -> InterfacingProtocols {
         InterfacingProtocols(vec![get_proto1()])
+    }
+
+    fn get_whf_transport() -> MachineType {
+        serde_json::from_str::<MachineType>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    {
+                    "label": {
+                        "tag": "Execute",
+                        "cmd": "request",
+                        "logType": [
+                        "partID"
+                        ]
+                    },
+                    "source": "0",
+                    "target": "0"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "time"
+                    },
+                    "source": "0",
+                    "target": "5"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "partID"
+                    },
+                    "source": "0",
+                    "target": "1"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "pos"
+                    },
+                    "source": "1",
+                    "target": "2"
+                    },
+                    {
+                    "label": {
+                        "tag": "Execute",
+                        "cmd": "deliver",
+                        "logType": [
+                        "part"
+                        ]
+                    },
+                    "source": "2",
+                    "target": "2"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "part"
+                    },
+                    "source": "2",
+                    "target": "3"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "time"
+                    },
+                    "source": "3",
+                    "target": "4"
+                    }
+                ]
+                }
+            "#,
+        )
+        .unwrap()
+    }
+
+    fn get_whf_door() -> MachineType {
+        serde_json::from_str::<MachineType>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    {
+                    "label": {
+                        "tag": "Execute",
+                        "cmd": "close",
+                        "logType": [
+                        "time"
+                        ]
+                    },
+                    "source": "0",
+                    "target": "0"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "time"
+                    },
+                    "source": "0",
+                    "target": "4"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "partID"
+                    },
+                    "source": "0",
+                    "target": "1"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "part"
+                    },
+                    "source": "1",
+                    "target": "2"
+                    },
+                    {
+                    "label": {
+                        "tag": "Execute",
+                        "cmd": "close",
+                        "logType": [
+                        "time"
+                        ]
+                    },
+                    "source": "2",
+                    "target": "2"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "time"
+                    },
+                    "source": "2",
+                    "target": "3"
+                    }
+                ]
+                }
+            "#,
+        )
+        .unwrap()
+    }
+
+    fn get_whf_forklift() -> MachineType {
+        serde_json::from_str::<MachineType>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "time"
+                    },
+                    "source": "0",
+                    "target": "5"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "partID"
+                    },
+                    "source": "0",
+                    "target": "1"
+                    },
+                    {
+                    "label": {
+                        "tag": "Execute",
+                        "cmd": "get",
+                        "logType": [
+                        "pos"
+                        ]
+                    },
+                    "source": "1",
+                    "target": "1"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "pos"
+                    },
+                    "source": "1",
+                    "target": "2"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "part"
+                    },
+                    "source": "2",
+                    "target": "3"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "time"
+                    },
+                    "source": "3",
+                    "target": "4"
+                    }
+                ]
+                }
+            "#,
+        )
+        .unwrap()
+    }
+
+    fn get_whf_f() -> MachineType {
+        serde_json::from_str::<MachineType>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "time"
+                    },
+                    "source": "0",
+                    "target": "6"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "partID"
+                    },
+                    "source": "0",
+                    "target": "1"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "part"
+                    },
+                    "source": "1",
+                    "target": "2"
+                    },
+                    {
+                    "label": {
+                        "tag": "Execute",
+                        "cmd": "build",
+                        "logType": [
+                        "car"
+                        ]
+                    },
+                    "source": "2",
+                    "target": "2"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "time"
+                    },
+                    "source": "2",
+                    "target": "3"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "car"
+                    },
+                    "source": "2",
+                    "target": "4"
+                    },
+                    {
+                    "label": {
+                        "tag": "Execute",
+                        "cmd": "build",
+                        "logType": [
+                        "car"
+                        ]
+                    },
+                    "source": "3",
+                    "target": "3"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "time"
+                    },
+                    "source": "4",
+                    "target": "5"
+                    },
+                    {
+                    "label": {
+                        "tag": "Input",
+                        "eventType": "car"
+                    },
+                    "source": "3",
+                    "target": "5"
+                    }
+                ]
+                }
+            "#,
+        )
+        .unwrap()
     }
 
     mod projection_tests {
@@ -1758,6 +2051,64 @@ mod tests {
                 assert!(errors.is_empty());
             }
         }
+
+        #[test]
+        fn test_all_projs_whf() {
+            setup_logger();
+            let composition = compose_protocols(get_interfacing_swarms_1());
+            assert!(composition.is_ok());
+            let (composed_graph, composed_initial) = composition.unwrap();
+            let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_1(),
+                &BTreeMap::new(),
+                Granularity::TwoStep
+            );
+            assert!(subs.is_ok());
+            let subs = subs.unwrap();
+
+            let all_roles = vec![
+                Role::new("T"),
+                Role::new("FL"),
+                Role::new("D"),
+                Role::new("F"),
+            ];
+
+            let expected_projs = BTreeMap::from([
+                (Role::new("T"), get_whf_transport()),
+                (Role::new("FL"), get_whf_forklift()),
+                (Role::new("D"), get_whf_door()),
+                (Role::new("F"), get_whf_f()),
+            ]);
+
+            for role in all_roles {
+                let (expand_proj, expand_proj_initial) = project(
+                    &composed_graph,
+                    composed_initial,
+                    &subs,
+                    role.clone(),
+                    true,
+                );
+                let (combined_proj, combined_proj_initial) =
+                    project_combine(&swarms_to_proto_info(get_interfacing_swarms_1()), &subs, role.clone(), true);
+
+                assert!(equivalent(
+                    &to_option_machine(&expand_proj),
+                    expand_proj_initial,
+                    &combined_proj,
+                    combined_proj_initial.unwrap())
+                    .is_empty()
+                );
+
+                let (expected, expected_initial, _) = crate::machine::from_json(expected_projs.get(&role).unwrap().clone());
+
+                assert!(equivalent(
+                    &expected,
+                    expected_initial.unwrap(),
+                    &combined_proj,
+                    combined_proj_initial.unwrap())
+                    .is_empty());
+            }
+        }
     }
 
 
@@ -1781,45 +2132,6 @@ mod tests {
             serde_json::to_string_pretty(&from_option_to_machine(proj, proj_initial.unwrap()))
                 .unwrap()
         );
-    }
-
-    #[test]
-    fn test_all_projs_whf() {
-        setup_logger();
-        let composition = compose_protocols(get_interfacing_swarms_1());
-        assert!(composition.is_ok());
-        let (composed_graph, composed_initial) = composition.unwrap();
-        let subs = crate::composition::composition_swarm::exact_weak_well_formed_sub(
-            get_interfacing_swarms_1(),
-            &BTreeMap::new(),
-        );
-        assert!(subs.is_ok());
-        let subs = subs.unwrap();
-        println!(
-            "subscription: {}",
-            serde_json::to_string_pretty(&subs).unwrap()
-        );
-        let all_roles = vec![
-            Role::new("T"),
-            Role::new("FL"),
-            Role::new("D"),
-            Role::new("F"),
-        ];
-
-        for role in all_roles {
-            let (proj, proj_initial) = project(
-                &composed_graph,
-                composed_initial,
-                &subs,
-                role.clone(),
-                false,
-            );
-            println!(
-                "{}: {}",
-                role.clone().to_string(),
-                serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap()
-            );
-        }
     }
 
     #[test]
