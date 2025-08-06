@@ -1873,7 +1873,33 @@ mod tests {
         )
         .unwrap()
     }
-
+    fn get_proto_4() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_ir_0", "logType": ["e_ir_0"], "role": "IR" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_1", "logType": ["e_ir_1"], "role": "IR" } },
+                    { "source": "2", "target": "1", "label": { "cmd": "c_r0_0", "logType": ["e_r0_0"], "role": "R0" } },
+                    { "source": "1", "target": "3", "label": { "cmd": "c_r0_1", "logType": ["e_r0_1"], "role": "R0" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+    fn get_proto_5() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_ir_0", "logType": ["e_ir_0"], "role": "IR" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_r1_0", "logType": ["e_r1_0"], "role": "R1" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_1", "logType": ["e_ir_1"], "role": "IR" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
     fn get_subs_composition_1() -> Subscriptions {
         serde_json::from_str::<Subscriptions>(
             r#"{
@@ -1932,8 +1958,7 @@ mod tests {
     }
 
     // pos event type associated with multiple commands and nondeterminism at 0.
-    // No terminal state can be reached from any state -- OK according to confusion freeness, but not according to our
-    // stricter-than-necessary checks
+    // No terminal state can be reached from any state -- OK according to confusion freeness
     fn get_confusionful_proto1() -> SwarmProtocolType {
         serde_json::from_str::<SwarmProtocolType>(
             r#"{
@@ -1949,8 +1974,7 @@ mod tests {
         )
         .unwrap()
     }
-    // No terminal state can be reached from any state -- OK according to confusion freeness, but not according to our
-    // stricter-than-necessary checks
+    // No terminal state can be reached from any state -- OK according to confusion freeness
     fn get_some_nonterminating_proto() -> SwarmProtocolType {
         serde_json::from_str::<SwarmProtocolType>(
             r#"{
@@ -2109,33 +2133,6 @@ mod tests {
         .unwrap()
     }
 
-    fn diff_example_proto_0() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_ir_0", "logType": ["e_ir_0"], "role": "IR" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_ir_1", "logType": ["e_ir_1"], "role": "IR" } },
-                    { "source": "2", "target": "1", "label": { "cmd": "c_r0_0", "logType": ["e_r0_0"], "role": "R0" } },
-                    { "source": "1", "target": "3", "label": { "cmd": "c_r0_1", "logType": ["e_r0_1"], "role": "R0" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-    fn diff_example_proto_1() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_ir_0", "logType": ["e_ir_0"], "role": "IR" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_r1_0", "logType": ["e_r1_0"], "role": "R1" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "c_ir_1", "logType": ["e_ir_1"], "role": "IR" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
     fn ref_pat_proto_0() -> SwarmProtocolType {
         serde_json::from_str::<SwarmProtocolType>(
             r#"{
@@ -2178,8 +2175,8 @@ mod tests {
         .unwrap()
     }
 
-    fn get_interfacing_swarms_diff_example() -> InterfacingProtocols {
-        InterfacingProtocols(vec![diff_example_proto_0(), diff_example_proto_1()])
+    fn get_interfacing_swarms_5() -> InterfacingProtocols {
+        InterfacingProtocols(vec![get_proto_4(), get_proto_5()])
     }
 
     fn get_ref_pat_protos() -> InterfacingProtocols {
@@ -2254,1887 +2251,1557 @@ mod tests {
         true
     }
 
-    #[test]
-    fn test_prepare_graph_confusionfree() {
-        setup_logger();
-        let composition = get_interfacing_swarms_1();
-        let proto_info = combine_proto_infos(prepare_proto_infos(composition));
-        let proto_info = explicit_composition_proto_info(proto_info);
+    mod confusion_freeness_tests {
+        use super::*;
 
-        assert!(proto_info.get_ith_proto(0).is_some());
-        assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
-        assert_eq!(
-            proto_info.concurrent_events,
-            BTreeSet::from([
-                unord_event_pair(EventType::new("time"), EventType::new("car")),
-                unord_event_pair(EventType::new("pos"), EventType::new("car"))
-            ])
-        );
-        assert_eq!(
-            proto_info.branching_events,
-            vec![BTreeSet::from([
-                EventType::new("time"),
-                EventType::new("partID")
-            ])]
-        );
-        assert_eq!(proto_info.joining_events, BTreeMap::new());
-        let expected_role_event_map = BTreeMap::from([
-            (
-                Role::from("T"),
+        // Tests relating to confusion-freeness of protocols.
+
+        #[test]
+        fn test_prepare_graph_confusionfree() {
+            setup_logger();
+            let composition = get_interfacing_swarms_1();
+            let proto_info = combine_proto_infos(prepare_proto_infos(composition));
+            let proto_info = explicit_composition_proto_info(proto_info);
+
+            assert!(proto_info.get_ith_proto(0).is_some());
+            assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
+            assert_eq!(
+                proto_info.concurrent_events,
                 BTreeSet::from([
-                    SwarmLabel {
-                        cmd: Command::new("deliver"),
-                        log_type: vec![EventType::new("part")],
-                        role: Role::new("T"),
-                    },
-                    SwarmLabel {
-                        cmd: Command::new("request"),
-                        log_type: vec![EventType::new("partID")],
-                        role: Role::new("T"),
-                    },
-                ]),
-            ),
-            (
-                Role::from("FL"),
-                BTreeSet::from([SwarmLabel {
-                    cmd: Command::new("get"),
-                    log_type: vec![EventType::new("pos")],
-                    role: Role::new("FL"),
-                }]),
-            ),
-            (
-                Role::from("D"),
-                BTreeSet::from([SwarmLabel {
-                    cmd: Command::new("close"),
-                    log_type: vec![EventType::new("time")],
-                    role: Role::new("D"),
-                }]),
-            ),
-            (
-                Role::from("F"),
-                BTreeSet::from([SwarmLabel {
-                    cmd: Command::new("build"),
-                    log_type: vec![EventType::new("car")],
-                    role: Role::new("F"),
-                }]),
-            ),
-        ]);
-        assert_eq!(proto_info.role_event_map, expected_role_event_map);
-        let proto_info = prepare_proto_info(get_proto1());
-        assert!(proto_info.get_ith_proto(0).is_some());
-        assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
-        assert_eq!(proto_info.concurrent_events, BTreeSet::new());
-        assert_eq!(
-            proto_info.branching_events,
-            vec![BTreeSet::from([
-                EventType::new("time"),
-                EventType::new("partID")
-            ])]
-        );
-        assert_eq!(proto_info.joining_events, BTreeMap::new());
+                    unord_event_pair(EventType::new("time"), EventType::new("car")),
+                    unord_event_pair(EventType::new("pos"), EventType::new("car"))
+                ])
+            );
+            assert_eq!(
+                proto_info.branching_events,
+                vec![BTreeSet::from([
+                    EventType::new("time"),
+                    EventType::new("partID")
+                ])]
+            );
+            assert_eq!(proto_info.joining_events, BTreeMap::new());
+            let expected_role_event_map = BTreeMap::from([
+                (
+                    Role::from("T"),
+                    BTreeSet::from([
+                        SwarmLabel {
+                            cmd: Command::new("deliver"),
+                            log_type: vec![EventType::new("part")],
+                            role: Role::new("T"),
+                        },
+                        SwarmLabel {
+                            cmd: Command::new("request"),
+                            log_type: vec![EventType::new("partID")],
+                            role: Role::new("T"),
+                        },
+                    ]),
+                ),
+                (
+                    Role::from("FL"),
+                    BTreeSet::from([SwarmLabel {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                        role: Role::new("FL"),
+                    }]),
+                ),
+                (
+                    Role::from("D"),
+                    BTreeSet::from([SwarmLabel {
+                        cmd: Command::new("close"),
+                        log_type: vec![EventType::new("time")],
+                        role: Role::new("D"),
+                    }]),
+                ),
+                (
+                    Role::from("F"),
+                    BTreeSet::from([SwarmLabel {
+                        cmd: Command::new("build"),
+                        log_type: vec![EventType::new("car")],
+                        role: Role::new("F"),
+                    }]),
+                ),
+            ]);
+            assert_eq!(proto_info.role_event_map, expected_role_event_map);
+            let proto_info = prepare_proto_info(get_proto1());
+            assert!(proto_info.get_ith_proto(0).is_some());
+            assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
+            assert_eq!(proto_info.concurrent_events, BTreeSet::new());
+            assert_eq!(
+                proto_info.branching_events,
+                vec![BTreeSet::from([
+                    EventType::new("time"),
+                    EventType::new("partID")
+                ])]
+            );
+            assert_eq!(proto_info.joining_events, BTreeMap::new());
 
-        let proto_info = prepare_proto_info(get_proto2()); //get_proto2(), None);
-        assert!(proto_info.get_ith_proto(0).is_some());
-        assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
-        assert_eq!(proto_info.concurrent_events, BTreeSet::new());
-        assert_eq!(proto_info.branching_events, Vec::new());
-        assert_eq!(proto_info.joining_events, BTreeMap::new());
+            let proto_info = prepare_proto_info(get_proto2());
+            assert!(proto_info.get_ith_proto(0).is_some());
+            assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
+            assert_eq!(proto_info.concurrent_events, BTreeSet::new());
+            assert_eq!(proto_info.branching_events, Vec::new());
+            assert_eq!(proto_info.joining_events, BTreeMap::new());
 
-        let proto_info = prepare_proto_info(get_proto3()); //get_proto2(), None);//get_proto3(), None);
-        assert!(proto_info.get_ith_proto(0).is_some());
-        assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
-        assert_eq!(proto_info.concurrent_events, BTreeSet::new());
+            let proto_info = prepare_proto_info(get_proto3());
+            assert!(proto_info.get_ith_proto(0).is_some());
+            assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
+            assert_eq!(proto_info.concurrent_events, BTreeSet::new());
 
-        // Should not contain any branching event types since only state with two outgoing is 3
-        // and both of these outgoing transitions go to state 4:
-        // { "source": "3", "target": "4", "label": { "cmd": "accept", "logType": ["ok"], "role": "QCR" } },
-        // { "source": "3", "target": "4", "label": { "cmd": "reject", "logType": ["notOk"], "role": "QCR" } }
-        assert_eq!(proto_info.branching_events, vec![]);
-        assert_eq!(proto_info.joining_events, BTreeMap::new());
-    }
+            // Should not contain any branching event types since only state with two outgoing is 3
+            // and both of these outgoing transitions go to state 4:
+            // { "source": "3", "target": "4", "label": { "cmd": "accept", "logType": ["ok"], "role": "QCR" } },
+            // { "source": "3", "target": "4", "label": { "cmd": "reject", "logType": ["notOk"], "role": "QCR" } }
+            assert_eq!(proto_info.branching_events, vec![]);
+            assert_eq!(proto_info.joining_events, BTreeMap::new());
+        }
 
-    #[test]
-    fn test_prepare_graph_malformed() {
-        setup_logger();
-        let proto1 = get_malformed_proto1();
-        let proto_info = prepare_proto_info(proto1.clone()); //proto1.clone(), None);
-        let mut errors = vec![proto_info.get_ith_proto(0).unwrap().errors]
+        #[test]
+        fn test_prepare_graph_malformed() {
+            setup_logger();
+            let proto1 = get_malformed_proto1();
+            let proto_info = prepare_proto_info(proto1.clone()); //proto1.clone(), None);
+            let mut errors = vec![proto_info.get_ith_proto(0).unwrap().errors]
+                .concat()
+                .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
+
+            let mut expected_erros = vec![
+                "transition (0)--[close@D<time,time2>]-->(0) emits more than one event type",
+                "log type must not be empty (1)--[get@FL<>]-->(2)",
+            ];
+            errors.sort();
+            expected_erros.sort();
+            assert_eq!(errors, expected_erros);
+
+            let proto_info = prepare_proto_info(get_malformed_proto2()); //get_malformed_proto2(), None);
+            let errors = vec![
+                confusion_free(&proto_info, 0),
+                proto_info.get_ith_proto(0).unwrap().errors,
+            ]
             .concat()
             .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
 
-        let mut expected_erros = vec![
-            "transition (0)--[close@D<time,time2>]-->(0) emits more than one event type",
-            "log type must not be empty (1)--[get@FL<>]-->(2)",
-        ];
-        errors.sort();
-        expected_erros.sort();
-        assert_eq!(errors, expected_erros);
+            let expected_errors = vec![
+                "initial swarm protocol state has no transitions",
+                "initial swarm protocol state has no transitions",
+            ];
+            assert_eq!(errors, expected_errors);
 
-        let proto_info = prepare_proto_info(get_malformed_proto2()); //get_malformed_proto2(), None);
-        let errors = vec![
-            confusion_free(&proto_info, 0),
-            proto_info.get_ith_proto(0).unwrap().errors,
-        ]
-        .concat()
-        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
+            let proto_info = prepare_proto_info(get_malformed_proto3()); //get_malformed_proto3(), None);
+            let errors = proto_info
+                .get_ith_proto(0)
+                .unwrap()
+                .errors
+                .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
 
-        let expected_errors = vec![
-            "initial swarm protocol state has no transitions",
-            "initial swarm protocol state has no transitions",
-        ];
-        assert_eq!(errors, expected_errors);
+            let expected_errors = vec![
+                "state 2 is unreachable from initial state",
+                "state 3 is unreachable from initial state",
+                "state 4 is unreachable from initial state",
+                "state 5 is unreachable from initial state",
+            ];
+            assert_eq!(errors, expected_errors);
+        }
 
-        let proto_info = prepare_proto_info(get_malformed_proto3()); //get_malformed_proto3(), None);
-        let errors = proto_info
-            .get_ith_proto(0)
-            .unwrap()
-            .errors
+        // pos event type associated with multiple commands and nondeterminism at 0
+        #[test]
+        fn test_prepare_graph_confusionful() {
+            setup_logger();
+            let proto = get_confusionful_proto1();
+
+            let proto_info = prepare_proto_info(proto); //proto, None);
+            let mut errors = vec![
+                confusion_free(&proto_info, 0),
+                proto_info.get_ith_proto(0).unwrap().errors,
+            ]
+            .concat()
             .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
 
-        let expected_errors = vec![
-            "state 2 is unreachable from initial state",
-            "state 3 is unreachable from initial state",
-            "state 4 is unreachable from initial state",
-            "state 5 is unreachable from initial state",
-        ];
-        assert_eq!(errors, expected_errors);
-    }
+            let mut expected_errors = vec![
+                "command request enabled in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0), (2)--[request@T<pos>]-->(0)",
+                "event type partID emitted in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0)",
+                "event type pos emitted in more than one transition: (1)--[get@FL<pos>]-->(2), (2)--[request@T<pos>]-->(0)",
+            ];
+            errors.sort();
+            expected_errors.sort();
+            assert_eq!(errors, expected_errors);
 
-    // pos event type associated with multiple commands and nondeterminism at 0
-    #[test]
-    fn test_prepare_graph_confusionful() {
-        setup_logger();
-        let proto = get_confusionful_proto1();
+            let proto = get_some_nonterminating_proto();
+            let proto_info = prepare_proto_info(proto);
+            let mut errors = vec![
+                confusion_free(&proto_info, 0),
+                proto_info.get_ith_proto(0).unwrap().errors,
+            ]
+            .concat()
+            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
 
-        let proto_info = prepare_proto_info(proto); //proto, None);
-        let mut errors = vec![
-            confusion_free(&proto_info, 0),
-            proto_info.get_ith_proto(0).unwrap().errors,
-        ]
-        .concat()
-        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
-
-        let mut expected_errors = vec![
-            "command request enabled in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0), (2)--[request@T<pos>]-->(0)",
-            "event type partID emitted in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0)",
-            "event type pos emitted in more than one transition: (1)--[get@FL<pos>]-->(2), (2)--[request@T<pos>]-->(0)",
-        ];
-        errors.sort();
-        expected_errors.sort();
-        assert_eq!(errors, expected_errors);
-
-        let proto = get_some_nonterminating_proto();
-        let proto_info = prepare_proto_info(proto);
-        let mut errors = vec![
-            confusion_free(&proto_info, 0),
-            proto_info.get_ith_proto(0).unwrap().errors,
-        ]
-        .concat()
-        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph));
-
-        let mut expected_errors: Vec<String> = vec![];
-        errors.sort();
-        expected_errors.sort();
-        assert_eq!(errors, expected_errors);
-    }
-
-    #[test]
-    fn test_wwf_ok() {
-        setup_logger();
-        let proto1: InterfacingProtocols = InterfacingProtocols(vec![get_proto1()]);
-        let result1 = exact_weak_well_formed_sub(proto1.clone(), &BTreeMap::new());
-        assert!(result1.is_ok());
-        let subs1 = result1.unwrap();
-        let error_report = check(proto1, &subs1);
-        assert!(error_report.is_empty());
-        assert_eq!(get_subs1(), subs1);
-
-        let proto2: InterfacingProtocols = InterfacingProtocols(vec![get_proto2()]);
-        let result2 = exact_weak_well_formed_sub(proto2.clone(), &BTreeMap::new());
-        assert!(result2.is_ok());
-        let subs2 = result2.unwrap();
-        let error_report = check(proto2, &subs2);
-        assert!(error_report.is_empty());
-        assert_eq!(get_subs2(), subs2);
-
-        let proto3: InterfacingProtocols = InterfacingProtocols(vec![get_proto3()]);
-        let result3 = exact_weak_well_formed_sub(proto3.clone(), &BTreeMap::new());
-        assert!(result3.is_ok());
-        let subs3 = result3.unwrap();
-        let error_report = check(proto3, &subs3);
-        assert!(error_report.is_empty());
-        assert_eq!(get_subs3(), subs3);
-
-        let composition1: InterfacingProtocols = get_interfacing_swarms_1();
-        let result_composition1 =
-            exact_weak_well_formed_sub(composition1.clone(), &BTreeMap::new());
-        assert!(result_composition1.is_ok());
-        let subs_composition = result_composition1.unwrap();
-        let (g, i) = compose_protocols(composition1.clone()).unwrap();
-        let thing = to_swarm_json(g, i);
-        println!("{}", serde_json::to_string_pretty(&thing).unwrap());
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&subs_composition).unwrap()
-        );
-        let error_report = check(composition1, &subs_composition);
-        assert!(error_report.is_empty());
-        assert_eq!(get_subs_composition_1(), subs_composition);
-
-        let composition2: InterfacingProtocols = get_interfacing_swarms_2();
-        let result_composition2 =
-            exact_weak_well_formed_sub(composition2.clone(), &BTreeMap::new());
-        assert!(result_composition2.is_ok());
-        let subs_composition = result_composition2.unwrap();
-        let error_report = check(composition2, &subs_composition);
-        assert!(error_report.is_empty());
-        assert_eq!(get_subs_composition_2(), subs_composition);
-    }
-
-    #[test]
-    fn test_wwf_fail() {
-        setup_logger();
-        let input: InterfacingProtocols = InterfacingProtocols(vec![get_proto1()]);
-        let subs = BTreeMap::from([
-            (Role::new("T"), BTreeSet::from([EventType::new("pos")])),
-            (Role::new("D"), BTreeSet::from([EventType::new("pos")])),
-            (Role::new("FL"), BTreeSet::from([EventType::new("partID")])),
-        ]);
-        let error_report = check(input, &subs);
-        let mut errors = error_report_to_strings(error_report);
-        errors.sort();
-        let mut expected_errors = vec![
-            "active role does not subscribe to any of its emitted event types in transition (0)--[close@D<time>]-->(3)",
-            "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
-            "active role does not subscribe to any of its emitted event types in transition (2)--[deliver@T<part>]-->(0)",
-            "active role does not subscribe to any of its emitted event types in transition (1)--[get@FL<pos>]-->(2)",
-            "role T does not subscribe to event types partID, time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
-            "role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
-            "role FL does not subscribe to event types time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
-            "subsequently active role D does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
-            "subsequently active role T does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
-        ];
-
-        expected_errors.sort();
-        assert_eq!(errors, expected_errors);
-
-        let input: InterfacingProtocols = InterfacingProtocols(vec![get_proto2()]);
-        let error_report = check(input, &get_subs3());
-        let mut errors = error_report_to_strings(error_report);
-        errors.sort();
-        let mut expected_errors = vec![
-            "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
-            "subsequently active role T does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
-            "active role does not subscribe to any of its emitted event types in transition (1)--[deliver@T<part>]-->(2)",
-            "subsequently active role F does not subscribe to events in transition (1)--[deliver@T<part>]-->(2)"
-        ];
-
-        expected_errors.sort();
-        assert_eq!(errors, expected_errors);
-
-        let input: InterfacingProtocols = InterfacingProtocols(vec![get_proto3()]);
-
-        let error_report = check(input, &get_subs1());
-        let mut errors = error_report_to_strings(error_report);
-        errors.sort();
-        let mut expected_errors = vec![
-            "active role does not subscribe to any of its emitted event types in transition (0)--[observe@TR<report1>]-->(1)",
-            "active role does not subscribe to any of its emitted event types in transition (1)--[build@F<car>]-->(2)",
-            "active role does not subscribe to any of its emitted event types in transition (2)--[test@TR<report2>]-->(3)",
-            "active role does not subscribe to any of its emitted event types in transition (3)--[accept@QCR<ok>]-->(4)",
-            "active role does not subscribe to any of its emitted event types in transition (3)--[reject@QCR<notOk>]-->(4)",
-            "subsequently active role F does not subscribe to events in transition (0)--[observe@TR<report1>]-->(1)",
-            "subsequently active role QCR does not subscribe to events in transition (2)--[test@TR<report2>]-->(3)",
-            "subsequently active role QCR does not subscribe to events in transition (2)--[test@TR<report2>]-->(3)",
-            "subsequently active role TR does not subscribe to events in transition (1)--[build@F<car>]-->(2)"
-        ];
-
-        expected_errors.sort();
-        assert_eq!(errors, expected_errors);
-    }
-
-    #[test]
-    fn test_weak_well_formed_sub() {
-        setup_logger();
-        let result = exact_weak_well_formed_sub(get_interfacing_swarms_1(), &BTreeMap::new());
-        assert!(result.is_ok());
-        let subs1 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_1(), &subs1);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_1(),
-            &BTreeMap::new(),
-            Granularity::Coarse,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_1(), &subs2);
-        assert!(error_report.is_empty());
-        assert!(is_sub_subscription(subs1, subs2));
-
-        let result = exact_weak_well_formed_sub(get_interfacing_swarms_2(), &BTreeMap::new());
-        assert!(result.is_ok());
-        let subs1 = result.unwrap();
-        println!("exact: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        let error_report = check(get_interfacing_swarms_2(), &subs1);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_2(),
-            &BTreeMap::new(),
-            Granularity::Coarse,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        println!("approx: {}", serde_json::to_string_pretty(&subs2).unwrap());
-        let error_report = check(get_interfacing_swarms_2(), &subs2);
-        assert!(error_report.is_empty());
-        assert!(is_sub_subscription(subs1, subs2));
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_1(),
-            &BTreeMap::new(),
-            Granularity::Medium,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_1(), &subs2);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_1(),
-            &BTreeMap::new(),
-            Granularity::Fine,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_1(), &subs2);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_1(),
-            &BTreeMap::new(),
-            Granularity::TwoStep,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_1(), &subs2);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_2(),
-            &BTreeMap::new(),
-            Granularity::Medium,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_2(), &subs2);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_2(),
-            &BTreeMap::new(),
-            Granularity::Fine,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_2(), &subs2);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_2(),
-            &BTreeMap::new(),
-            Granularity::TwoStep,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_2(), &subs2);
-        assert!(error_report.is_empty());
-    }
-
-    #[test]
-    fn test_weak_well_formed_sub_1() {
-        setup_logger();
-        println!("interfacing swarms 4:");
-        let result = exact_weak_well_formed_sub(get_interfacing_swarms_4(), &BTreeMap::new());
-        assert!(result.is_ok());
-        let subs1 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_4(), &subs1);
-        assert!(error_report.is_empty());
-        println!("---------");
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_4(),
-            &BTreeMap::new(),
-            Granularity::Coarse,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_4(), &subs2);
-        assert!(error_report.is_empty());
-        assert!(is_sub_subscription(subs1, subs2));
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_4(),
-            &BTreeMap::new(),
-            Granularity::Medium,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_4(), &subs2);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_4(),
-            &BTreeMap::new(),
-            Granularity::Fine,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_4(), &subs2);
-        assert!(error_report.is_empty());
-
-        let result = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_4(),
-            &BTreeMap::new(),
-            Granularity::TwoStep,
-        );
-        assert!(result.is_ok());
-        let subs2 = result.unwrap();
-        let error_report = check(get_interfacing_swarms_4(), &subs2);
-        assert!(error_report.is_empty());
-    }
-
-    #[test]
-    fn test_extend_subs() {
-        setup_logger();
-        let sub_to_extend = BTreeMap::from([
-            (Role::new("D"), BTreeSet::from([EventType::new("pos")])),
-            (Role::new("TR"), BTreeSet::from([EventType::new("ok")])),
-        ]);
-        let result1 = exact_weak_well_formed_sub(get_interfacing_swarms_2(), &sub_to_extend);
-        let result2 = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_2(),
-            &sub_to_extend,
-            Granularity::Coarse,
-        );
-        assert!(result1.is_ok());
-        assert!(result2.is_ok());
-        let subs1 = result1.unwrap();
-        let subs2 = result2.unwrap();
-        println!("exact: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        println!("approx: {}", serde_json::to_string_pretty(&subs2).unwrap());
-        assert!(check(get_interfacing_swarms_2(), &subs1).is_empty());
-        assert!(check(get_interfacing_swarms_2(), &subs2).is_empty());
-        assert!(subs1[&Role::new("D")].contains(&EventType::new("pos")));
-        assert!(subs2[&Role::new("D")].contains(&EventType::new("pos")));
-        assert!(subs1[&Role::new("TR")].contains(&EventType::new("ok")));
-        assert!(subs2[&Role::new("TR")].contains(&EventType::new("ok")));
-
-        let result2 = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_2(),
-            &sub_to_extend,
-            Granularity::Medium,
-        );
-        assert!(result2.is_ok());
-        let subs2 = result2.unwrap();
-        println!("exact: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        println!("approx: {}", serde_json::to_string_pretty(&subs2).unwrap());
-        assert!(check(get_interfacing_swarms_2(), &subs2).is_empty());
-        assert!(subs2[&Role::new("D")].contains(&EventType::new("pos")));
-        assert!(subs2[&Role::new("TR")].contains(&EventType::new("ok")));
-
-        let result2 = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_2(),
-            &sub_to_extend,
-            Granularity::Fine,
-        );
-        assert!(result2.is_ok());
-        let subs2 = result2.unwrap();
-        println!("exact: {}", serde_json::to_string_pretty(&subs1).unwrap());
-        println!("approx: {}", serde_json::to_string_pretty(&subs2).unwrap());
-        assert!(check(get_interfacing_swarms_2(), &subs2).is_empty());
-        assert!(subs2[&Role::new("D")].contains(&EventType::new("pos")));
-        assert!(subs2[&Role::new("TR")].contains(&EventType::new("ok")));
-    }
-
-    #[test]
-    fn test_compose_non_wwf_swarms() {
-        setup_logger();
-        let input = get_interfacing_swarms_1();
-        let subs = BTreeMap::from([
-            (Role::new("T"), BTreeSet::from([EventType::new("part")])),
-            (Role::new("D"), BTreeSet::from([EventType::new("part")])),
-            (Role::new("FL"), BTreeSet::from([EventType::new("part")])),
-            (Role::new("F"), BTreeSet::from([EventType::new("part")])),
-        ]);
-        let error_report = check(input, &subs);
-        let mut errors = error_report_to_strings(error_report);
-        errors.sort();
-        let mut expected_errors = vec![
-            "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[close@D<time>]-->(3 || 0)",
-            "active role does not subscribe to any of its emitted event types in transition (1 || 1)--[get@FL<pos>]-->(2 || 1)",
-            "active role does not subscribe to any of its emitted event types in transition (0 || 2)--[build@F<car>]-->(0 || 3)",
-            "active role does not subscribe to any of its emitted event types in transition (0 || 3)--[close@D<time>]-->(3 || 3)",
-            "active role does not subscribe to any of its emitted event types in transition (0 || 2)--[close@D<time>]-->(3 || 2)",
-            "active role does not subscribe to any of its emitted event types in transition (3 || 2)--[build@F<car>]-->(3 || 3)",
-            "role D does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "role T does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "role FL does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "role F does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "subsequently active role FL does not subscribe to events in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
-            "subsequently active role T does not subscribe to events in transition (1 || 1)--[get@FL<pos>]-->(2 || 1)",
-        ];
-        expected_errors.sort();
-        assert_eq!(errors, expected_errors);
-    }
-
-    #[test]
-    fn test_fail1() {
-        setup_logger();
-        let result = exact_weak_well_formed_sub(get_fail_1_swarms(), &BTreeMap::new());
-        assert!(result.is_ok());
-        let subs1 = result.unwrap();
-        let error_report = check(get_fail_1_swarms(), &subs1);
-        assert!(error_report.is_empty());
-
-        let error_report = check(get_fail_1_swarms(), &BTreeMap::new());
-        let mut errors = error_report_to_strings(error_report);
-        errors.sort();
-        let mut expected_errors = vec![
-            "active role does not subscribe to any of its emitted event types in transition (456 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(456 || 460)",
-            "subsequently active role R455 does not subscribe to events in transition (456 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(456 || 460)",
-            "active role does not subscribe to any of its emitted event types in transition (456 || 459)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 459)",
-            "subsequently active role R454 does not subscribe to events in transition (456 || 459)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 459)",
-            "active role does not subscribe to any of its emitted event types in transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
-            "active role does not subscribe to any of its emitted event types in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
-            "subsequently active role R455 does not subscribe to events in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
-            "active role does not subscribe to any of its emitted event types in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
-            "subsequently active role R454 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
-            "subsequently active role R455 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
-            "active role does not subscribe to any of its emitted event types in transition (456 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(456 || 459)",
-            "subsequently active role R455 does not subscribe to events in transition (456 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(456 || 459)",
-            "active role does not subscribe to any of its emitted event types in transition (456 || 460)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 460)"
-        ];
-        expected_errors.sort();
-        assert_eq!(errors, expected_errors);
-    }
-
-    #[test]
-    fn test_join_errors() {
-        setup_logger();
-        let composition: InterfacingProtocols = get_interfacing_swarms_2();
-        let result_composition = exact_weak_well_formed_sub(composition.clone(), &BTreeMap::new());
-        assert!(result_composition.is_ok());
-        let mut subs_composition = result_composition.unwrap();
-        subs_composition.entry(Role::new("QCR")).and_modify(|s| {
-            *s = BTreeSet::from([
-                EventType::new("report2"),
-                EventType::new("ok"),
-                EventType::new("notOk"),
-                EventType::new("partID"),
-                EventType::new("time"),
-            ])
-        });
-        subs_composition.entry(Role::new("F")).and_modify(|s| {
-            s.remove(&EventType::new("report1"));
-        });
-        let error_report = check(composition.clone(), &subs_composition);
-        let mut errors = error_report_to_strings(error_report);
-        //let (expanded, initial) = compose_protocols(composition.clone()).unwrap();
-        //println!("{}", serde_json::to_string_pretty(&to_swarm_json(expanded, initial)).unwrap());
-        let mut expected_errors = vec![
-            "role F does not subscribe to event types report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)",
-            "subsequently active role F does not subscribe to events in transition (0 || 2 || 0)--[observe@TR<report1>]-->(0 || 2 || 1)",
-            "subsequently active role F does not subscribe to events in transition (3 || 2 || 0)--[observe@TR<report1>]-->(3 || 2 || 1)",
-            "role QCR does not subscribe to event types car, part, report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)"];
-        errors.sort();
-        expected_errors.sort();
-        assert_eq!(errors, expected_errors);
-    }
-
-    #[test]
-    #[ignore]
-    fn test_example_from_text() {
-        setup_logger();
-        let composition = compose_protocols(get_interfacing_swarms_4());
-        assert!(composition.is_ok());
-
-        let result_composition =
-            exact_weak_well_formed_sub(get_interfacing_swarms_4(), &BTreeMap::new());
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-        let result = check(get_interfacing_swarms_4(), &subs_composition);
-        assert!(result.is_empty());
-        let result_composition = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_4(),
-            &BTreeMap::new(),
-            Granularity::Coarse,
-        );
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-
-        let result = check(get_interfacing_swarms_4(), &subs_composition);
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn test_example_3() {
-        setup_logger();
-        let composition = compose_protocols(get_interfacing_swarms_3());
-        assert!(composition.is_ok());
-
-        let (g, i) = composition.unwrap();
-        let swarm = to_swarm_json(g, i);
-        println!("proto:\n {}", serde_json::to_string_pretty(&swarm).unwrap());
-        let result_composition =
-            exact_weak_well_formed_sub(get_interfacing_swarms_3(), &BTreeMap::new());
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-        println!(
-            "subs exact: {}",
-            serde_json::to_string_pretty(&subs_composition).unwrap()
-        );
-        let result_composition = overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_3(),
-            &BTreeMap::new(),
-            Granularity::Fine,
-        );
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-        println!(
-            "subs approx: {}",
-            serde_json::to_string_pretty(&subs_composition).unwrap()
-        );
-    }
-
-    #[test]
-    #[ignore]
-    fn test_pattern_4() {
-        setup_logger();
-        for i in 1..6 {
-            let index = i as usize;
-            let composition = compose_protocols(InterfacingProtocols(
-                get_interfacing_swarms_pat_4().0[..index].to_vec(),
-            ));
-            assert!(composition.is_ok());
-
-            let (g, i) = composition.unwrap();
-            let node_count = g.node_count();
-            let edge_count = g.edge_count();
-            let swarm = to_swarm_json(g, i);
-            println!("{}\n$$$$\n", serde_json::to_string_pretty(&swarm).unwrap());
-            println!("num states: {}, num edges: {}", node_count, edge_count);
+            let mut expected_errors: Vec<String> = vec![];
+            errors.sort();
+            expected_errors.sort();
+            assert_eq!(errors, expected_errors);
         }
     }
 
-    #[test]
-    #[ignore]
-    fn test_diff_example() {
-        setup_logger();
-        let composition = compose_protocols(get_interfacing_swarms_diff_example());
-        assert!(composition.is_ok());
-        let protos = get_interfacing_swarms_diff_example();
-        let result_composition = exact_weak_well_formed_sub(protos.clone(), &BTreeMap::new());
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-        let result = check(protos.clone(), &subs_composition);
-        assert!(result.is_empty());
-        let result_composition =
-            overapprox_weak_well_formed_sub(protos.clone(), &BTreeMap::new(), Granularity::Fine);
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-        let result = check(protos.clone(), &subs_composition);
-        assert!(result.is_empty());
-    }
+    mod well_formedness_check_tests {
+        use super::*;
+        // Tests relating to well-formedness checking.
 
-    #[test]
-    #[ignore]
-    fn test_ref_example() {
-        setup_logger();
-        let composition = compose_protocols(get_ref_pat_protos());
-        assert!(composition.is_ok());
-        let protos = get_ref_pat_protos();
-        for p in protos.0.iter() {
-            println!("{}", serde_json::to_string_pretty(&p.clone()).unwrap());
+        #[test]
+        fn test_wwf_ok() {
+            setup_logger();
+            let proto1: InterfacingProtocols = InterfacingProtocols(vec![get_proto1()]);
+            let result1 = exact_weak_well_formed_sub(proto1.clone(), &BTreeMap::new());
+            assert!(result1.is_ok());
+            let subs1 = result1.unwrap();
+            let error_report = check(proto1, &subs1);
+            assert!(error_report.is_empty());
+            assert_eq!(get_subs1(), subs1);
+
+            let proto2: InterfacingProtocols = InterfacingProtocols(vec![get_proto2()]);
+            let result2 = exact_weak_well_formed_sub(proto2.clone(), &BTreeMap::new());
+            assert!(result2.is_ok());
+            let subs2 = result2.unwrap();
+            let error_report = check(proto2, &subs2);
+            assert!(error_report.is_empty());
+            assert_eq!(get_subs2(), subs2);
+
+            let proto3: InterfacingProtocols = InterfacingProtocols(vec![get_proto3()]);
+            let result3 = exact_weak_well_formed_sub(proto3.clone(), &BTreeMap::new());
+            assert!(result3.is_ok());
+            let subs3 = result3.unwrap();
+            let error_report = check(proto3, &subs3);
+            assert!(error_report.is_empty());
+            assert_eq!(get_subs3(), subs3);
+
+            let composition1: InterfacingProtocols = get_interfacing_swarms_1();
+            let result_composition1 =
+                exact_weak_well_formed_sub(composition1.clone(), &BTreeMap::new());
+            assert!(result_composition1.is_ok());
+            let subs_composition = result_composition1.unwrap();
+            let error_report = check(composition1, &subs_composition);
+            assert!(error_report.is_empty());
+            assert_eq!(get_subs_composition_1(), subs_composition);
+
+            let composition2: InterfacingProtocols = get_interfacing_swarms_2();
+            let result_composition2 =
+                exact_weak_well_formed_sub(composition2.clone(), &BTreeMap::new());
+            assert!(result_composition2.is_ok());
+            let subs_composition = result_composition2.unwrap();
+            let error_report = check(composition2, &subs_composition);
+            assert!(error_report.is_empty());
+            assert_eq!(get_subs_composition_2(), subs_composition);
         }
-        let (g, i) = composition.unwrap();
-        let swarm = to_swarm_json(g, i);
-        println!(
-            "composition:\n {}",
-            serde_json::to_string_pretty(&swarm).unwrap()
-        );
-        let result_composition = exact_weak_well_formed_sub(protos.clone(), &BTreeMap::new());
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-        println!(
-            "subs exact: {}",
-            serde_json::to_string_pretty(&subs_composition).unwrap()
-        );
-        let result_composition =
-            overapprox_weak_well_formed_sub(protos.clone(), &BTreeMap::new(), Granularity::Fine);
-        assert!(result_composition.is_ok());
-        let subs_composition = result_composition.unwrap();
-        println!(
-            "subs approx: {}",
-            serde_json::to_string_pretty(&subs_composition).unwrap()
-        );
 
-        let result = check(protos.clone(), &subs_composition);
-        println!("errors is empty: {}", result.is_empty());
-    }
+        #[test]
+        fn test_wwf_fail() {
+            setup_logger();
+            let input: InterfacingProtocols = InterfacingProtocols(vec![get_proto1()]);
+            let subs = BTreeMap::from([
+                (Role::new("T"), BTreeSet::from([EventType::new("pos")])),
+                (Role::new("D"), BTreeSet::from([EventType::new("pos")])),
+                (Role::new("FL"), BTreeSet::from([EventType::new("partID")])),
+            ]);
+            let error_report = check(input, &subs);
+            let mut errors = error_report_to_strings(error_report);
+            errors.sort();
+            let mut expected_errors = vec![
+                "active role does not subscribe to any of its emitted event types in transition (0)--[close@D<time>]-->(3)",
+                "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
+                "active role does not subscribe to any of its emitted event types in transition (2)--[deliver@T<part>]-->(0)",
+                "active role does not subscribe to any of its emitted event types in transition (1)--[get@FL<pos>]-->(2)",
+                "role T does not subscribe to event types partID, time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
+                "role D does not subscribe to event types partID, time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
+                "role FL does not subscribe to event types time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",
+                "subsequently active role D does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
+                "subsequently active role T does not subscribe to events in transition (2)--[deliver@T<part>]-->(0)",
+            ];
 
-    #[test]
-    fn test_after_not_concurrent() {
-        let proto1: SwarmProtocolType =
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "a", "logType": ["a"], "role": "R1" } },
-                        { "source": "2", "target": "3", "label": { "cmd": "b", "logType": ["b"], "role": "R1" } },
-                        { "source": "3", "target": "4", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR" } }
-                    ]
+            expected_errors.sort();
+            assert_eq!(errors, expected_errors);
+
+            let input: InterfacingProtocols = InterfacingProtocols(vec![get_proto2()]);
+            let error_report = check(input, &get_subs3());
+            let mut errors = error_report_to_strings(error_report);
+            errors.sort();
+            let mut expected_errors = vec![
+                "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
+                "subsequently active role T does not subscribe to events in transition (0)--[request@T<partID>]-->(1)",
+                "active role does not subscribe to any of its emitted event types in transition (1)--[deliver@T<part>]-->(2)",
+                "subsequently active role F does not subscribe to events in transition (1)--[deliver@T<part>]-->(2)"
+            ];
+
+            expected_errors.sort();
+            assert_eq!(errors, expected_errors);
+
+            let input: InterfacingProtocols = InterfacingProtocols(vec![get_proto3()]);
+
+            let error_report = check(input, &get_subs1());
+            let mut errors = error_report_to_strings(error_report);
+            errors.sort();
+            let mut expected_errors = vec![
+                "active role does not subscribe to any of its emitted event types in transition (0)--[observe@TR<report1>]-->(1)",
+                "active role does not subscribe to any of its emitted event types in transition (1)--[build@F<car>]-->(2)",
+                "active role does not subscribe to any of its emitted event types in transition (2)--[test@TR<report2>]-->(3)",
+                "active role does not subscribe to any of its emitted event types in transition (3)--[accept@QCR<ok>]-->(4)",
+                "active role does not subscribe to any of its emitted event types in transition (3)--[reject@QCR<notOk>]-->(4)",
+                "subsequently active role F does not subscribe to events in transition (0)--[observe@TR<report1>]-->(1)",
+                "subsequently active role QCR does not subscribe to events in transition (2)--[test@TR<report2>]-->(3)",
+                "subsequently active role QCR does not subscribe to events in transition (2)--[test@TR<report2>]-->(3)",
+                "subsequently active role TR does not subscribe to events in transition (1)--[build@F<car>]-->(2)"
+            ];
+
+            expected_errors.sort();
+            assert_eq!(errors, expected_errors);
+        }
+
+        #[test]
+        fn test_compose_non_wwf_swarms() {
+            setup_logger();
+            let input = get_interfacing_swarms_1();
+            let subs = BTreeMap::from([
+                (Role::new("T"), BTreeSet::from([EventType::new("part")])),
+                (Role::new("D"), BTreeSet::from([EventType::new("part")])),
+                (Role::new("FL"), BTreeSet::from([EventType::new("part")])),
+                (Role::new("F"), BTreeSet::from([EventType::new("part")])),
+            ]);
+            let error_report = check(input, &subs);
+            let mut errors = error_report_to_strings(error_report);
+            errors.sort();
+            let mut expected_errors = vec![
+                "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+                "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[close@D<time>]-->(3 || 0)",
+                "active role does not subscribe to any of its emitted event types in transition (1 || 1)--[get@FL<pos>]-->(2 || 1)",
+                "active role does not subscribe to any of its emitted event types in transition (0 || 2)--[build@F<car>]-->(0 || 3)",
+                "active role does not subscribe to any of its emitted event types in transition (0 || 3)--[close@D<time>]-->(3 || 3)",
+                "active role does not subscribe to any of its emitted event types in transition (0 || 2)--[close@D<time>]-->(3 || 2)",
+                "active role does not subscribe to any of its emitted event types in transition (3 || 2)--[build@F<car>]-->(3 || 3)",
+                "role D does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+                "role T does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+                "role FL does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+                "role F does not subscribe to event types partID, time in branching transitions at state 0 || 0, but is involved after transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+                "subsequently active role FL does not subscribe to events in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
+                "subsequently active role T does not subscribe to events in transition (1 || 1)--[get@FL<pos>]-->(2 || 1)",
+            ];
+            expected_errors.sort();
+            assert_eq!(errors, expected_errors);
+        }
+
+        #[test]
+        fn test_fail1() {
+            setup_logger();
+            let result = exact_weak_well_formed_sub(get_fail_1_swarms(), &BTreeMap::new());
+            assert!(result.is_ok());
+            let subs1 = result.unwrap();
+            let error_report = check(get_fail_1_swarms(), &subs1);
+            assert!(error_report.is_empty());
+
+            let error_report = check(get_fail_1_swarms(), &BTreeMap::new());
+            let mut errors = error_report_to_strings(error_report);
+            errors.sort();
+            let mut expected_errors = vec![
+                "active role does not subscribe to any of its emitted event types in transition (456 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(456 || 460)",
+                "subsequently active role R455 does not subscribe to events in transition (456 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(456 || 460)",
+                "active role does not subscribe to any of its emitted event types in transition (456 || 459)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 459)",
+                "subsequently active role R454 does not subscribe to events in transition (456 || 459)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 459)",
+                "active role does not subscribe to any of its emitted event types in transition (457 || 459)--[R454_cmd_0@R454<R454_e_0>]-->(458 || 461)",
+                "active role does not subscribe to any of its emitted event types in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
+                "subsequently active role R455 does not subscribe to events in transition (457 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(457 || 460)",
+                "active role does not subscribe to any of its emitted event types in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
+                "subsequently active role R454 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
+                "subsequently active role R455 does not subscribe to events in transition (457 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(457 || 459)",
+                "active role does not subscribe to any of its emitted event types in transition (456 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(456 || 459)",
+                "subsequently active role R455 does not subscribe to events in transition (456 || 460)--[R455_cmd_1@R455<R455_e_1>]-->(456 || 459)",
+                "active role does not subscribe to any of its emitted event types in transition (456 || 460)--[R453_cmd_0@R453<R453_e_0>]-->(457 || 460)"
+            ];
+            expected_errors.sort();
+            assert_eq!(errors, expected_errors);
+        }
+
+        #[test]
+        fn test_join_errors() {
+            setup_logger();
+            let composition: InterfacingProtocols = get_interfacing_swarms_2();
+            let result_composition = exact_weak_well_formed_sub(composition.clone(), &BTreeMap::new());
+            assert!(result_composition.is_ok());
+            let mut subs_composition = result_composition.unwrap();
+            subs_composition.entry(Role::new("QCR")).and_modify(|s| {
+                *s = BTreeSet::from([
+                    EventType::new("report2"),
+                    EventType::new("ok"),
+                    EventType::new("notOk"),
+                    EventType::new("partID"),
+                    EventType::new("time"),
+                ])
+            });
+            subs_composition.entry(Role::new("F")).and_modify(|s| {
+                s.remove(&EventType::new("report1"));
+            });
+            let error_report = check(composition.clone(), &subs_composition);
+            let mut errors = error_report_to_strings(error_report);
+            let mut expected_errors = vec![
+                "role F does not subscribe to event types report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)",
+                "subsequently active role F does not subscribe to events in transition (0 || 2 || 0)--[observe@TR<report1>]-->(0 || 2 || 1)",
+                "subsequently active role F does not subscribe to events in transition (3 || 2 || 0)--[observe@TR<report1>]-->(3 || 2 || 1)",
+                "role QCR does not subscribe to event types car, part, report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)"];
+            errors.sort();
+            expected_errors.sort();
+            assert_eq!(errors, expected_errors);
+        }
+
+            #[test]
+        fn inference_example_1() {
+            fn subs() -> Subscriptions {
+                serde_json::from_str::<Subscriptions>(
+                    r#"{
+                    "R1": ["a1", "a2", "b1"],
+                    "R2": ["b1", "b2", "a1"],
+                    "R3": ["c1", "c2"]
                 }"#,
-            )
-            .unwrap();
-
-        let proto2: SwarmProtocolType =
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "c", "logType": ["c"], "role": "R2" } },
-                        { "source": "2", "target": "3", "label": { "cmd": "d", "logType": ["d"], "role": "R2" } },
-                        { "source": "3", "target": "4", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR" } }
-                    ]
-                }"#,
-            )
-            .unwrap();
-
-        let interfacing_swarms = InterfacingProtocols(vec![proto1, proto2]);
-
-        let expected_after = BTreeMap::from([
-            (
-                EventType::new("i1"),
-                BTreeSet::from([
-                    EventType::new("a"),
-                    EventType::new("b"),
-                    EventType::new("c"),
-                    EventType::new("d"),
-                    EventType::new("i2"),
-                ]),
-            ),
-            (
-                EventType::new("a"),
-                BTreeSet::from([EventType::new("b"), EventType::new("i2")]),
-            ),
-            (EventType::new("b"), BTreeSet::from([EventType::new("i2")])),
-            (
-                EventType::new("c"),
-                BTreeSet::from([EventType::new("d"), EventType::new("i2")]),
-            ),
-            (EventType::new("d"), BTreeSet::from([EventType::new("i2")])),
-            (EventType::new("i2"), BTreeSet::from([])),
-        ]);
-
-        let expected_concurrent = BTreeSet::from([
-            unord_event_pair(EventType::new("a"), EventType::new("c")),
-            unord_event_pair(EventType::new("a"), EventType::new("d")),
-            unord_event_pair(EventType::new("b"), EventType::new("c")),
-            unord_event_pair(EventType::new("b"), EventType::new("d")),
-        ]);
-
-        let combined_proto_info =
-            combine_proto_infos(prepare_proto_infos(interfacing_swarms.clone()));
-
-        assert_eq!(expected_after, combined_proto_info.succeeding_events);
-        assert_eq!(expected_concurrent, combined_proto_info.concurrent_events);
-
-        let (composition, composition_initial) =
-            compose_protocols(interfacing_swarms.clone()).unwrap();
-
-        let after_map = after_not_concurrent(
-            &composition,
-            composition_initial,
-            &combined_proto_info.concurrent_events,
-        );
-        assert_eq!(expected_after, after_map);
-
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap()
-        );
-    }
-
-    #[test]
-    fn test_interface() {
-        let proto1: SwarmProtocolType =
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR1" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "a", "logType": ["a"], "role": "R1" } }
-                    ]
-                }"#,
-            )
-            .unwrap();
-
-        let proto2: SwarmProtocolType =
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR1" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR2" } }
-                    ]
-                }"#,
-            )
-            .unwrap();
-
-        let proto3: SwarmProtocolType =
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR2" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "c", "logType": ["i1"], "role": "R3" } }
-                    ]
-                }"#,
-            )
-            .unwrap();
-
-        let interfacing_swarms = InterfacingProtocols(vec![proto1, proto2, proto3]);
-
-        let combined_proto_info =
-            combine_proto_infos(prepare_proto_infos(interfacing_swarms.clone()));
-
-        // The IR1 not used as an interface refers to the composition of (p || proto3) where p = (proto1 || proto2)
-        let expected_errors = vec!["Event type i1 appears as i1@IR1<i1> and as c@R3<i1>"];
-        let mut errors = error_report_to_strings(proto_info_to_error_report(combined_proto_info));
-        errors.sort();
-        assert_eq!(expected_errors, errors);
-        println!("________________________________");
-
-        let proto1: SwarmProtocolType =
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR1" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "a", "logType": ["a"], "role": "R1" } }
-                    ]
-                }"#,
-            )
-            .unwrap();
-
-        let proto2: SwarmProtocolType =
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR1" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR1" } },
-                        { "source": "2", "target": "3", "label": { "cmd": "i3", "logType": ["i3"], "role": "IR2" } },
-                        { "source": "3", "target": "4", "label": { "cmd": "i4", "logType": ["i4"], "role": "IR2" } }
-                    ]
-                }"#,
-            )
-            .unwrap();
-
-        let proto3: SwarmProtocolType =
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "i3", "logType": ["i3"], "role": "IR2" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "i5", "logType": ["i4"], "role": "IR2" } }
-                    ]
-                }"#,
-            )
-            .unwrap();
-
-        let interfacing_swarms = InterfacingProtocols(vec![proto1, proto2, proto3]);
-
-        let combined_proto_info =
-            combine_proto_infos(prepare_proto_infos(interfacing_swarms.clone()));
-
-        // The IR1 not used as an interface refers to the composition of (p || proto3) where p = (proto1 || proto2)
-        let expected_errors = vec!["Event type i4 appears as i4@IR2<i4> and as i5@IR2<i4>"];
-        let mut errors = error_report_to_strings(proto_info_to_error_report(combined_proto_info));
-        errors.sort();
-        assert_eq!(expected_errors, errors);
-        println!("{:?}", errors);
-    }
-
-    #[test]
-    fn test_joining_event_types() {
-        // e_r0
-        // e_ir
-        let preceding_events = |range: std::ops::Range<usize>| -> BTreeSet<EventType> {
-            range
-                .into_iter()
-                .map(|u| EventType::new(&format!("e_r{}", u)))
-                .collect()
-        };
-        setup_logger();
-        for i in 1..6 {
-            let index = i as usize;
-            let proto_info = swarms_to_proto_info(InterfacingProtocols(
-                get_interfacing_swarms_pat_4().0[..index].to_vec(),
-            ));
-            if i == 1 {
-                assert_eq!(proto_info.joining_events, BTreeMap::new());
-            } else {
-                assert_eq!(
-                    proto_info.joining_events,
-                    BTreeMap::from([(EventType::new("e_ir"), preceding_events(0..i))])
-                );
+                )
+                .unwrap()
             }
-        }
-    }
-
-    #[test]
-    fn test_thinggg() {
-        let error_report = proto_info_to_error_report(ProtoInfo::new_only_proto(vec![]));
-        assert!(error_report.is_empty());
-    }
-
-    // the tests below can safely be deleted. But keep until whole inference rule show is over.
-
-    #[test]
-    fn inference_example_1() {
-        fn subs() -> Subscriptions {
-            serde_json::from_str::<Subscriptions>(
-                r#"{
-                "R1": ["a1", "a2", "b1"],
-                "R2": ["b1", "b2", "a1"],
-                "R3": ["c1", "c2"]
-            }"#,
-            )
-            .unwrap()
-        }
-        fn proto1() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
-                    { "source": "1", "target": "3", "label": { "cmd": "cmd_a2", "logType": ["a2"], "role": "R1" } },
-                    { "source": "0", "target": "2", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
-                    { "source": "2", "target": "4", "label": { "cmd": "cmd_b2", "logType": ["b2"], "role": "R2" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-        }
-        fn proto2() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
+            fn proto1() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
                 r#"{
                     "initial": "0",
                     "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R3" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "cmd_c2", "logType": ["c2"], "role": "R3" } }
+                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
+                        { "source": "1", "target": "3", "label": { "cmd": "cmd_a2", "logType": ["a2"], "role": "R1" } },
+                        { "source": "0", "target": "2", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
+                        { "source": "2", "target": "4", "label": { "cmd": "cmd_b2", "logType": ["b2"], "role": "R2" } }
                     ]
                 }"#,
             )
             .unwrap()
-        }
-        fn as_interfacing_protocols() -> InterfacingProtocols {
-            InterfacingProtocols(vec![proto1(), proto2()])
-        }
-        let (composition, composition_initial) =
-            compose_protocols(as_interfacing_protocols()).unwrap();
-
-        println!(
-            "proto 1: {}",
-            serde_json::to_string_pretty(&proto1()).unwrap()
-        );
-        println!(
-            "proto 2: {}",
-            serde_json::to_string_pretty(&proto2()).unwrap()
-        );
-        println!(
-            "composition: {}",
-            serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap()
-        );
-        println!("subs: {}", serde_json::to_string_pretty(&subs()).unwrap());
-        println!(
-            "subs-wf? empty list means yes {:?}",
-            error_report_to_strings(check(as_interfacing_protocols(), &subs()))
-        );
-        let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
-        match smalles_sub {
-            Ok(sub) => {
-                println!(
-                    "smallest sub: {}",
-                    serde_json::to_string_pretty(&sub).unwrap()
-                );
-                println!("smallest == manual?: {}", subs() == sub);
             }
-            Err(e) => println!("errors generating sub: {:?}", error_report_to_strings(e)),
-        }
-    }
+            fn proto2() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R3" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "cmd_c2", "logType": ["c2"], "role": "R3" } }
+                        ]
+                    }"#,
+                )
+                .unwrap()
+            }
+            fn as_interfacing_protocols() -> InterfacingProtocols {
+                InterfacingProtocols(vec![proto1(), proto2()])
+            }
 
-    #[test]
-    fn inference_example_2() {
-        fn subs() -> Subscriptions {
-            serde_json::from_str::<Subscriptions>(
-                r#"{
-                "R1": ["a1", "a2", "b1"],
-                "R2": ["b1", "b2", "a1"],
-                "R3": ["c1", "c2"],
-                "IR": ["i1", "a1", "a2", "b1", "c2"]
-            }"#,
-            )
-            .unwrap()
+            assert!(check(as_interfacing_protocols(), &subs()).is_empty());
+            let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
+            assert!(smalles_sub.is_ok());
+            assert_eq!(smalles_sub.unwrap(), subs());
         }
-        fn proto1() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
-                    { "source": "1", "target": "3", "label": { "cmd": "cmd_a2", "logType": ["a2"], "role": "R1" } },
-                    { "source": "3", "target": "5", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
-                    { "source": "0", "target": "2", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
-                    { "source": "2", "target": "4", "label": { "cmd": "cmd_b2", "logType": ["b2"], "role": "R2" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-        }
-        fn proto2() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
+
+        #[test]
+        fn inference_example_2() {
+            fn subs() -> Subscriptions {
+                serde_json::from_str::<Subscriptions>(
+                    r#"{
+                    "R1": ["a1", "a2", "b1"],
+                    "R2": ["b1", "b2", "a1"],
+                    "R3": ["c1", "c2"],
+                    "IR": ["i1", "a1", "a2", "b1", "c2"]
+                }"#,
+                )
+                .unwrap()
+            }
+            fn proto1() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
                 r#"{
                     "initial": "0",
                     "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R3" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "cmd_c2", "logType": ["c2"], "role": "R3" } },
-                        { "source": "2", "target": "3", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } }
+                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
+                        { "source": "1", "target": "3", "label": { "cmd": "cmd_a2", "logType": ["a2"], "role": "R1" } },
+                        { "source": "3", "target": "5", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
+                        { "source": "0", "target": "2", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
+                        { "source": "2", "target": "4", "label": { "cmd": "cmd_b2", "logType": ["b2"], "role": "R2" } }
                     ]
                 }"#,
             )
             .unwrap()
-        }
-        fn as_interfacing_protocols() -> InterfacingProtocols {
-            InterfacingProtocols(vec![proto1(), proto2()])
-        }
-        let (composition, composition_initial) =
-            compose_protocols(as_interfacing_protocols()).unwrap();
-
-        println!(
-            "proto 1: {}",
-            serde_json::to_string_pretty(&proto1()).unwrap()
-        );
-        println!(
-            "proto 2: {}",
-            serde_json::to_string_pretty(&proto2()).unwrap()
-        );
-        println!(
-            "composition: {}",
-            serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap()
-        );
-        println!("subs: {}", serde_json::to_string_pretty(&subs()).unwrap());
-        println!(
-            "subs-wf? empty list means yes {:?}",
-            error_report_to_strings(check(as_interfacing_protocols(), &subs()))
-        );
-        let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
-        match smalles_sub {
-            Ok(sub) => {
-                println!(
-                    "smallest sub: {}",
-                    serde_json::to_string_pretty(&sub).unwrap()
-                );
-                println!("smallest == manual?: {}", subs() == sub);
             }
-            Err(e) => println!("errors generating sub: {:?}", error_report_to_strings(e)),
+            fn proto2() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R3" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "cmd_c2", "logType": ["c2"], "role": "R3" } },
+                            { "source": "2", "target": "3", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } }
+                        ]
+                    }"#,
+                )
+                .unwrap()
+            }
+            fn as_interfacing_protocols() -> InterfacingProtocols {
+                InterfacingProtocols(vec![proto1(), proto2()])
+            }
+            assert!(check(as_interfacing_protocols(), &subs()).is_empty());
+            let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
+            assert!(smalles_sub.is_ok());
+            assert_eq!(smalles_sub.unwrap(), subs());
         }
-    }
 
-    #[test]
-    fn inference_example_3() {
-        fn subs() -> Subscriptions {
-            serde_json::from_str::<Subscriptions>(
-                r#"{
-                "R1": ["i1", "a1", "a2", "b1"],
-                "R2": ["i1", "b1", "b2", "a1"],
-                "R3": ["i1", "c1", "c2"],
-                "IR": ["i1"]
-            }"#,
-            )
-            .unwrap()
-        }
-        fn proto1() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
-                    { "source": "2", "target": "4", "label": { "cmd": "cmd_a2", "logType": ["a2"], "role": "R1" } },
-                    { "source": "1", "target": "3", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
-                    { "source": "3", "target": "5", "label": { "cmd": "cmd_b2", "logType": ["b2"], "role": "R2" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-        }
-        fn proto2() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
+        #[test]
+        fn inference_example_3() {
+            fn subs() -> Subscriptions {
+                serde_json::from_str::<Subscriptions>(
+                    r#"{
+                    "R1": ["i1", "a1", "a2", "b1"],
+                    "R2": ["i1", "b1", "b2", "a1"],
+                    "R3": ["i1", "c1", "c2"],
+                    "IR": ["i1"]
+                }"#,
+                )
+                .unwrap()
+            }
+            fn proto1() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
                 r#"{
                     "initial": "0",
                     "transitions": [
                         { "source": "0", "target": "1", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R3" } },
-                        { "source": "2", "target": "3", "label": { "cmd": "cmd_c2", "logType": ["c2"], "role": "R3" } }
+                        { "source": "1", "target": "2", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
+                        { "source": "2", "target": "4", "label": { "cmd": "cmd_a2", "logType": ["a2"], "role": "R1" } },
+                        { "source": "1", "target": "3", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
+                        { "source": "3", "target": "5", "label": { "cmd": "cmd_b2", "logType": ["b2"], "role": "R2" } }
                     ]
                 }"#,
             )
             .unwrap()
-        }
-        fn as_interfacing_protocols() -> InterfacingProtocols {
-            InterfacingProtocols(vec![proto1(), proto2()])
-        }
-        let (composition, composition_initial) =
-            compose_protocols(as_interfacing_protocols()).unwrap();
-
-        println!(
-            "proto 1: {}",
-            serde_json::to_string_pretty(&proto1()).unwrap()
-        );
-        println!(
-            "proto 2: {}",
-            serde_json::to_string_pretty(&proto2()).unwrap()
-        );
-        println!(
-            "composition: {}",
-            serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap()
-        );
-        println!("subs: {}", serde_json::to_string_pretty(&subs()).unwrap());
-        println!(
-            "subs-wf? empty list means yes {:?}",
-            error_report_to_strings(check(as_interfacing_protocols(), &subs()))
-        );
-        let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
-        match smalles_sub {
-            Ok(sub) => {
-                println!(
-                    "smallest sub: {}",
-                    serde_json::to_string_pretty(&sub).unwrap()
-                );
-                println!("smallest == manual?: {}", subs() == sub);
             }
-            Err(e) => println!("errors generating sub: {:?}", error_report_to_strings(e)),
-        }
-    }
-
-    #[test]
-    fn inference_example_4() {
-        fn subs() -> Subscriptions {
-            serde_json::from_str::<Subscriptions>(
-                r#"{
-                "R1": ["c1", "a1"],
-                "R2": ["a1", "b1"],
-                "R3": ["b1", "c1"]
-            }"#,
-            )
-            .unwrap()
-        }
-        fn proto1() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } },
-                    { "source": "0", "target": "3", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
-                    { "source": "3", "target": "4", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
-                    { "source": "4", "target": "0", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R3" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-        }
-        fn proto2() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } }
-                    ]
-                }"#,
-            )
-            .unwrap()
-        }
-        fn as_interfacing_protocols() -> InterfacingProtocols {
-            InterfacingProtocols(vec![proto1(), proto2()])
-        }
-        let (composition, composition_initial) =
-            compose_protocols(as_interfacing_protocols()).unwrap();
-
-        println!(
-            "proto 1: {}",
-            serde_json::to_string_pretty(&proto1()).unwrap()
-        );
-        println!(
-            "proto 2: {}",
-            serde_json::to_string_pretty(&proto2()).unwrap()
-        );
-        println!(
-            "composition: {}",
-            serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap()
-        );
-        println!("subs: {}", serde_json::to_string_pretty(&subs()).unwrap());
-        println!(
-            "subs-wf? empty list means yes {:?}",
-            error_report_to_strings(check(as_interfacing_protocols(), &subs()))
-        );
-        let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
-        match smalles_sub {
-            Ok(sub) => {
-                println!(
-                    "smallest sub: {}",
-                    serde_json::to_string_pretty(&sub).unwrap()
-                );
-                println!("smallest == manual?: {}", subs() == sub);
+            fn proto2() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R3" } },
+                            { "source": "2", "target": "3", "label": { "cmd": "cmd_c2", "logType": ["c2"], "role": "R3" } }
+                        ]
+                    }"#,
+                )
+                .unwrap()
             }
-            Err(e) => println!("errors generating sub: {:?}", error_report_to_strings(e)),
-        }
-    }
-
-    #[test]
-    fn inference_example_5() {
-        fn subs() -> Subscriptions {
-            serde_json::from_str::<Subscriptions>(
-                r#"{
-                "R1": ["a1", "c1"],
-                "R2": ["a1", "b1", "c1"]
-            }"#,
-            )
-            .unwrap()
-        }
-        fn proto1() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
-                    { "source": "0", "target": "3", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R1" } },
-                    { "source": "0", "target": "4", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
-                    { "source": "4", "target": "5", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-        }
-        fn proto2() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } }
-                    ]
-                }"#,
-            )
-            .unwrap()
-        }
-        fn as_interfacing_protocols() -> InterfacingProtocols {
-            InterfacingProtocols(vec![proto1(), proto2()])
-        }
-        let (composition, composition_initial) =
-            compose_protocols(as_interfacing_protocols()).unwrap();
-
-        println!(
-            "proto 1: {}",
-            serde_json::to_string_pretty(&proto1()).unwrap()
-        );
-        println!(
-            "proto 2: {}",
-            serde_json::to_string_pretty(&proto2()).unwrap()
-        );
-        println!(
-            "composition: {}",
-            serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap()
-        );
-        println!("subs: {}", serde_json::to_string_pretty(&subs()).unwrap());
-        println!(
-            "subs-wf? empty list means yes {:?}",
-            error_report_to_strings(check(as_interfacing_protocols(), &subs()))
-        );
-        let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
-        match smalles_sub {
-            Ok(sub) => {
-                println!(
-                    "smallest sub: {}",
-                    serde_json::to_string_pretty(&sub).unwrap()
-                );
-                println!("smallest == manual?: {}", subs() == sub);
+            fn as_interfacing_protocols() -> InterfacingProtocols {
+                InterfacingProtocols(vec![proto1(), proto2()])
             }
-            Err(e) => println!("errors generating sub: {:?}", error_report_to_strings(e)),
-        }
-    }
 
-    #[test]
-    fn looping_1() {
-        fn proto1() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
+            assert!(check(as_interfacing_protocols(), &subs()).is_empty());
+            let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
+            assert!(smalles_sub.is_ok());
+            assert_eq!(smalles_sub.unwrap(), subs());
+        }
+
+        #[test]
+        fn inference_example_4() {
+            fn subs() -> Subscriptions {
+                serde_json::from_str::<Subscriptions>(
+                    r#"{
+                    "R1": ["c1", "a1"],
+                    "R2": ["a1", "b1"],
+                    "R3": ["a1", "b1", "c1"]
+                }"#,
+                )
+                .unwrap()
+            }
+            fn proto1() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
                 r#"{
                     "initial": "0",
                     "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
-                        { "source": "0", "target": "2", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
-                        { "source": "2", "target": "3", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R1" } },
-                        { "source": "3", "target": "4", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R2" } },
-                        { "source": "4", "target": "2", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R1" } }
+                        { "source": "0", "target": "1", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } },
+                        { "source": "0", "target": "3", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
+                        { "source": "3", "target": "4", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
+                        { "source": "4", "target": "0", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R3" } }
                     ]
                 }"#,
             )
             .unwrap()
+            }
+            fn proto2() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } }
+                        ]
+                    }"#,
+                )
+                .unwrap()
+            }
+            fn as_interfacing_protocols() -> InterfacingProtocols {
+                InterfacingProtocols(vec![proto1(), proto2()])
+            }
+
+            assert!(check(as_interfacing_protocols(), &subs()).is_empty());
+            let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
+            assert!(smalles_sub.is_ok());
+            assert_eq!(smalles_sub.unwrap(), subs());
         }
-        println!(
-            "proto1: {}",
-            serde_json::to_string_pretty(&proto1()).unwrap()
-        );
-        let (graph, _, _) = swarm_to_graph(&proto1());
-        let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
-        let state_names: Vec<String> = states_not_reaching_terminal
-            .into_iter()
-            .map(|n| graph[n].state_name().to_string())
-            .collect::<Vec<_>>();
-        println!(
-            "states not reaching a terminal state:\n {}",
-            state_names.join("\n")
-        );
-        assert_eq!(state_names, ["2", "3", "4"]);
-        let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
-        let errors = proto_info_to_error_report(proto_info.clone());
-        let errors = error_report_to_strings(errors);
-        println!("errors:\n {}", errors.join("\n"));
-        assert_eq!(errors, Vec::<String>::new());
-        assert_eq!(
-            proto_info
-                .infinitely_looping_events
-                .clone()
-                .into_iter()
-                .map(|e| e.to_string())
-                .collect::<Vec<_>>(),
-            vec!["c", "d", "e"]
-        );
-        println!(
-            "infinitely looping events: {:?}",
-            proto_info
-                .infinitely_looping_events
-                .into_iter()
-                .map(|e| e.to_string())
-                .collect::<Vec<_>>()
-        );
 
-        // Check exact well-formed subscriptions
-        let sub =
-            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
-                .unwrap();
-        println!(
-            "exact wf subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
-
-        // Check overapprox well-formed subscriptions
-        let sub =
-            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
-                .unwrap();
-        println!(
-            "subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
-        let sub =
-            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
-                .unwrap();
-        println!(
-            "subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
-    }
-
-    #[test]
-    fn looping_2() {
-        fn proto1() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
+        #[test]
+        fn inference_example_5() {
+            fn subs() -> Subscriptions {
+                serde_json::from_str::<Subscriptions>(
+                    r#"{
+                    "R1": ["a1", "c1"],
+                    "R2": ["a1", "b1", "c1"]
+                }"#,
+                )
+                .unwrap()
+            }
+            fn proto1() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
                 r#"{
                     "initial": "0",
                     "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
-                        { "source": "0", "target": "2", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
-                        { "source": "2", "target": "3", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R3" } },
-                        { "source": "3", "target": "4", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R4" } },
-                        { "source": "4", "target": "2", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R5" } }
+                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a1", "logType": ["a1"], "role": "R1" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "cmd_b1", "logType": ["b1"], "role": "R2" } },
+                        { "source": "0", "target": "3", "label": { "cmd": "cmd_c1", "logType": ["c1"], "role": "R1" } },
+                        { "source": "0", "target": "4", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } },
+                        { "source": "4", "target": "5", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } }
                     ]
                 }"#,
             )
             .unwrap()
+            }
+            fn proto2() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "cmd_i2", "logType": ["i2"], "role": "IR" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "cmd_i1", "logType": ["i1"], "role": "IR" } }
+                        ]
+                    }"#,
+                )
+                .unwrap()
+            }
+            fn as_interfacing_protocols() -> InterfacingProtocols {
+                InterfacingProtocols(vec![proto1(), proto2()])
+            }
+
+            assert!(check(as_interfacing_protocols(), &subs()).is_empty());
+            let smalles_sub = exact_weak_well_formed_sub(as_interfacing_protocols(), &BTreeMap::new());
+            assert!(smalles_sub.is_ok());
+            assert_eq!(smalles_sub.unwrap(), subs());
         }
-        println!(
-            "proto1: {}",
-            serde_json::to_string_pretty(&proto1()).unwrap()
-        );
-        let (graph, _, _) = swarm_to_graph(&proto1());
-        let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
-        let state_names: Vec<String> = states_not_reaching_terminal
-            .into_iter()
-            .map(|n| graph[n].state_name().to_string())
-            .collect::<Vec<_>>();
-        println!(
-            "states not reaching a terminal state:\n {}",
-            state_names.join("\n")
-        );
-        assert_eq!(state_names, ["2", "3", "4"]);
-        let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
-        let errors = proto_info_to_error_report(proto_info.clone());
-        let errors = error_report_to_strings(errors);
-        println!("errors:\n {}", errors.join("\n"));
-        assert_eq!(errors, Vec::<String>::new());
-        assert_eq!(
-            proto_info
-                .infinitely_looping_events
-                .clone()
-                .into_iter()
-                .map(|e| e.to_string())
-                .collect::<Vec<_>>(),
-            vec!["c", "d", "e"]
-        );
-        println!(
-            "infinitely looping events: {:?}",
-            proto_info
-                .infinitely_looping_events
-                .into_iter()
-                .map(|e| e.to_string())
-                .collect::<Vec<_>>()
-        );
-
-        // Check exact well-formed subscriptions
-        let sub =
-            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
-                .unwrap();
-        println!(
-            "exact wf subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
-
-        // Check overapprox well-formed subscriptions
-        let sub =
-            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
-                .unwrap();
-        println!(
-            "subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
-        let sub =
-            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
-                .unwrap();
-        println!(
-            "subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
     }
 
-    #[test]
-    fn looping_3() {
-        fn proto1() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
-                        { "source": "0", "target": "2", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
-                        { "source": "2", "target": "3", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R3" } },
-                        { "source": "3", "target": "4", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R4" } },
-                        { "source": "4", "target": "2", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R5" } },
-                        { "source": "1", "target": "5", "label": { "cmd": "cmd_f", "logType": ["f"], "role": "R5" } },
-                        { "source": "5", "target": "6", "label": { "cmd": "cmd_g", "logType": ["g"], "role": "R6" } },
-                        { "source": "6", "target": "7", "label": { "cmd": "cmd_h", "logType": ["h"], "role": "R6" } },
-                        { "source": "7", "target": "1", "label": { "cmd": "cmd_i", "logType": ["i"], "role": "R7" } }
-                    ]
-                }"#,
-            )
-            .unwrap()
+    mod subscription_generation_tests {
+        use super::*;
+
+        // Tests relating to subscription generation.
+        #[test]
+        fn test_well_formed_sub() {
+            setup_logger();
+
+            // Test interfacing_swarms_1
+            let result = exact_weak_well_formed_sub(get_interfacing_swarms_1(), &BTreeMap::new());
+            assert!(result.is_ok());
+            let subs1 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_1(), &subs1);
+            assert!(error_report.is_empty());
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_1(),
+                &BTreeMap::new(),
+                Granularity::Coarse,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_1(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_1(),
+                &BTreeMap::new(),
+                Granularity::Medium,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_1(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_1(),
+                &BTreeMap::new(),
+                Granularity::Fine,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_1(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_1(),
+                &BTreeMap::new(),
+                Granularity::TwoStep,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_1(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            // Test interfacing_swarms_2
+            let result = exact_weak_well_formed_sub(get_interfacing_swarms_2(), &BTreeMap::new());
+            assert!(result.is_ok());
+            let subs1 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_2(), &subs1);
+            assert!(error_report.is_empty());
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_2(),
+                &BTreeMap::new(),
+                Granularity::Coarse,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_2(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_2(),
+                &BTreeMap::new(),
+                Granularity::Medium,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_2(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_2(),
+                &BTreeMap::new(),
+                Granularity::Fine,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_2(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_2(),
+                &BTreeMap::new(),
+                Granularity::TwoStep,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_2(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            // Test interfacing_swarms_3
+            let result = exact_weak_well_formed_sub(get_interfacing_swarms_3(), &BTreeMap::new());
+            assert!(result.is_ok());
+            let subs1 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_3(), &subs1);
+            assert!(error_report.is_empty());
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_3(),
+                &BTreeMap::new(),
+                Granularity::Coarse,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_3(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_3(),
+                &BTreeMap::new(),
+                Granularity::Medium,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_3(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_3(),
+                &BTreeMap::new(),
+                Granularity::Fine,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_3(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_3(),
+                &BTreeMap::new(),
+                Granularity::TwoStep,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_3(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
         }
-        println!(
-            "proto1: {}",
-            serde_json::to_string_pretty(&proto1()).unwrap()
-        );
-        let (graph, _, _) = swarm_to_graph(&proto1());
-        let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
-        let state_names: Vec<String> = states_not_reaching_terminal
-            .into_iter()
-            .map(|n| graph[n].state_name().to_string())
-            .collect::<Vec<_>>();
-        assert_eq!(state_names, ["0", "1", "2", "3", "4", "5", "6", "7"]);
-        let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
-        let errors = proto_info_to_error_report(proto_info.clone());
-        let errors = error_report_to_strings(errors);
-        println!("errors:\n {}", errors.join("\n"));
-        assert_eq!(errors, Vec::<String>::new());
-        assert_eq!(
-            proto_info
-                .infinitely_looping_events
-                .clone()
-                .into_iter()
-                .map(|e| e.to_string())
-                .collect::<Vec<_>>(),
-            vec!["c", "d", "e", "f", "g", "h", "i"]
-        );
 
-        // Check exact well-formed subscriptions
-        let sub =
-            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
-                .unwrap();
-        println!(
-            "exact wf subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
+        #[test]
+        fn test_well_formed_sub_1() {
+            setup_logger();
+            // Test interfacing_swarms_4
+            let result = exact_weak_well_formed_sub(get_interfacing_swarms_4(), &BTreeMap::new());
+            assert!(result.is_ok());
+            let subs1 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_4(), &subs1);
+            assert!(error_report.is_empty());
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_4(),
+                &BTreeMap::new(),
+                Granularity::Coarse,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_4(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
 
-        // Check overapprox well-formed subscriptions
-        let sub =
-            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
-                .unwrap();
-        println!(
-            "subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
-        let sub =
-            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
-                .unwrap();
-        println!(
-            "subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_4(),
+                &BTreeMap::new(),
+                Granularity::Medium,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_4(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_4(),
+                &BTreeMap::new(),
+                Granularity::Fine,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_4(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_4(),
+                &BTreeMap::new(),
+                Granularity::TwoStep,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_4(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            // Test interfacing_swarms_5
+            let result = exact_weak_well_formed_sub(get_interfacing_swarms_5(), &BTreeMap::new());
+            assert!(result.is_ok());
+            let subs1 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_5(), &subs1);
+            assert!(error_report.is_empty());
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_5(),
+                &BTreeMap::new(),
+                Granularity::Coarse,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_5(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_5(),
+                &BTreeMap::new(),
+                Granularity::Medium,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_5(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_5(),
+                &BTreeMap::new(),
+                Granularity::Fine,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_5(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+
+            let result = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_5(),
+                &BTreeMap::new(),
+                Granularity::TwoStep,
+            );
+            assert!(result.is_ok());
+            let subs2 = result.unwrap();
+            let error_report = check(get_interfacing_swarms_5(), &subs2);
+            assert!(error_report.is_empty());
+            assert!(is_sub_subscription(subs1.clone(), subs2));
+        }
+
+        #[test]
+        fn test_refinement_pattern() {
+            setup_logger();
+            let composition = compose_protocols(get_ref_pat_protos());
+            assert!(composition.is_ok());
+            let protos = get_ref_pat_protos();
+            let result_composition = exact_weak_well_formed_sub(protos.clone(), &BTreeMap::new());
+            assert!(result_composition.is_ok());
+            let subs_composition = result_composition.unwrap();
+            assert!(check(protos.clone(), &subs_composition).is_empty());
+            let result_composition =
+                overapprox_weak_well_formed_sub(protos.clone(), &BTreeMap::new(), Granularity::Fine);
+            assert!(result_composition.is_ok());
+            let subs_composition = result_composition.unwrap();
+            assert!(check(protos.clone(), &subs_composition).is_empty());
+            let result_composition =
+                overapprox_weak_well_formed_sub(protos.clone(), &BTreeMap::new(), Granularity::TwoStep);
+            assert!(result_composition.is_ok());
+            let subs_composition = result_composition.unwrap();
+            assert!(check(protos.clone(), &subs_composition).is_empty());
+        }
+
+        #[test]
+        fn test_extend_subs() {
+            setup_logger();
+            let sub_to_extend = BTreeMap::from([
+                (Role::new("D"), BTreeSet::from([EventType::new("pos")])),
+                (Role::new("TR"), BTreeSet::from([EventType::new("ok")])),
+            ]);
+            let result1 = exact_weak_well_formed_sub(get_interfacing_swarms_2(), &sub_to_extend);
+            let result2 = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_2(),
+                &sub_to_extend,
+                Granularity::Coarse,
+            );
+            assert!(result1.is_ok());
+            assert!(result2.is_ok());
+            let subs1 = result1.unwrap();
+            let subs2 = result2.unwrap();
+            assert!(check(get_interfacing_swarms_2(), &subs1).is_empty());
+            assert!(check(get_interfacing_swarms_2(), &subs2).is_empty());
+            assert!(subs1[&Role::new("D")].contains(&EventType::new("pos")));
+            assert!(subs2[&Role::new("D")].contains(&EventType::new("pos")));
+            assert!(subs1[&Role::new("TR")].contains(&EventType::new("ok")));
+            assert!(subs2[&Role::new("TR")].contains(&EventType::new("ok")));
+
+            let result2 = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_2(),
+                &sub_to_extend,
+                Granularity::Medium,
+            );
+            assert!(result2.is_ok());
+            let subs2 = result2.unwrap();
+            assert!(check(get_interfacing_swarms_2(), &subs2).is_empty());
+            assert!(subs2[&Role::new("D")].contains(&EventType::new("pos")));
+            assert!(subs2[&Role::new("TR")].contains(&EventType::new("ok")));
+
+            let result2 = overapprox_weak_well_formed_sub(
+                get_interfacing_swarms_2(),
+                &sub_to_extend,
+                Granularity::Fine,
+            );
+            assert!(result2.is_ok());
+            let subs2 = result2.unwrap();
+            assert!(check(get_interfacing_swarms_2(), &subs2).is_empty());
+            assert!(subs2[&Role::new("D")].contains(&EventType::new("pos")));
+            assert!(subs2[&Role::new("TR")].contains(&EventType::new("ok")));
+        }
     }
 
-    #[test]
-    fn looping_4() {
-        fn proto1() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
-                        { "source": "2", "target": "3", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R3" } },
-                        { "source": "3", "target": "4", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R4" } },
-                        { "source": "4", "target": "5", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R5" } },
-                        { "source": "5", "target": "6", "label": { "cmd": "cmd_f", "logType": ["f"], "role": "R6" } },
-                        { "source": "6", "target": "7", "label": { "cmd": "cmd_g", "logType": ["g"], "role": "R7" } },
-                        { "source": "7", "target": "2", "label": { "cmd": "cmd_h", "logType": ["h"], "role": "R8" } }
-                    ]
-                }"#,
-            )
-            .unwrap()
+    // These tests should be moved to composition_types.rs, requires refactoring.
+    mod proto_info_tests {
+        use super::*;
+        #[test]
+        fn test_after_not_concurrent() {
+            let proto1: SwarmProtocolType =
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "a", "logType": ["a"], "role": "R1" } },
+                            { "source": "2", "target": "3", "label": { "cmd": "b", "logType": ["b"], "role": "R1" } },
+                            { "source": "3", "target": "4", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR" } }
+                        ]
+                    }"#,
+                )
+                .unwrap();
+
+            let proto2: SwarmProtocolType =
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "c", "logType": ["c"], "role": "R2" } },
+                            { "source": "2", "target": "3", "label": { "cmd": "d", "logType": ["d"], "role": "R2" } },
+                            { "source": "3", "target": "4", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR" } }
+                        ]
+                    }"#,
+                )
+                .unwrap();
+
+            let interfacing_swarms = InterfacingProtocols(vec![proto1, proto2]);
+
+            let expected_after = BTreeMap::from([
+                (
+                    EventType::new("i1"),
+                    BTreeSet::from([
+                        EventType::new("a"),
+                        EventType::new("b"),
+                        EventType::new("c"),
+                        EventType::new("d"),
+                        EventType::new("i2"),
+                    ]),
+                ),
+                (
+                    EventType::new("a"),
+                    BTreeSet::from([EventType::new("b"), EventType::new("i2")]),
+                ),
+                (EventType::new("b"), BTreeSet::from([EventType::new("i2")])),
+                (
+                    EventType::new("c"),
+                    BTreeSet::from([EventType::new("d"), EventType::new("i2")]),
+                ),
+                (EventType::new("d"), BTreeSet::from([EventType::new("i2")])),
+                (EventType::new("i2"), BTreeSet::from([])),
+            ]);
+
+            let expected_concurrent = BTreeSet::from([
+                unord_event_pair(EventType::new("a"), EventType::new("c")),
+                unord_event_pair(EventType::new("a"), EventType::new("d")),
+                unord_event_pair(EventType::new("b"), EventType::new("c")),
+                unord_event_pair(EventType::new("b"), EventType::new("d")),
+            ]);
+
+            let combined_proto_info =
+                combine_proto_infos(prepare_proto_infos(interfacing_swarms.clone()));
+
+            assert_eq!(expected_after, combined_proto_info.succeeding_events);
+            assert_eq!(expected_concurrent, combined_proto_info.concurrent_events);
+
+            let (composition, composition_initial) =
+                compose_protocols(interfacing_swarms.clone()).unwrap();
+
+            let after_map = after_not_concurrent(
+                &composition,
+                composition_initial,
+                &combined_proto_info.concurrent_events,
+            );
+            assert_eq!(expected_after, after_map);
         }
-        println!(
-            "proto1: {}",
-            serde_json::to_string_pretty(&proto1()).unwrap()
-        );
-        let (graph, _, _) = swarm_to_graph(&proto1());
-        let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
-        let state_names: Vec<String> = states_not_reaching_terminal
-            .into_iter()
-            .map(|n| graph[n].state_name().to_string())
-            .collect::<Vec<_>>();
-        println!(
-            "states not reaching a terminal state:\n {}",
-            state_names.join("\n")
-        );
-        assert_eq!(state_names, ["0", "1", "2", "3", "4", "5", "6", "7"]);
-        let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
-        let errors = proto_info_to_error_report(proto_info.clone());
-        let errors = error_report_to_strings(errors);
-        println!("errors:\n {}", errors.join("\n"));
-        assert_eq!(errors, Vec::<String>::new());
-        assert_eq!(
-            proto_info
-                .infinitely_looping_events
-                .clone()
-                .into_iter()
-                .map(|e| e.to_string())
-                .collect::<Vec<_>>(),
-            vec!["c", "d", "e", "f", "g", "h"]
-        );
-        println!(
-            "infinitely looping events: {:?}",
-            proto_info
-                .infinitely_looping_events
-                .into_iter()
-                .map(|e| e.to_string())
-                .collect::<Vec<_>>()
-        );
 
-        // Check exact well-formed subscriptions
-        let sub =
-            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+        #[test]
+        fn test_interface() {
+            let proto1: SwarmProtocolType =
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR1" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "a", "logType": ["a"], "role": "R1" } }
+                        ]
+                    }"#,
+                )
                 .unwrap();
-        println!(
-            "exact wf subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
 
-        // Check overapprox well-formed subscriptions
-        let sub =
-            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
+            let proto2: SwarmProtocolType =
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR1" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR2" } }
+                        ]
+                    }"#,
+                )
                 .unwrap();
-        println!(
-            "subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
-        let sub =
-            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
+
+            let proto3: SwarmProtocolType =
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR2" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "c", "logType": ["i1"], "role": "R3" } }
+                        ]
+                    }"#,
+                )
                 .unwrap();
-        println!(
-            "subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
+
+            let interfacing_swarms = InterfacingProtocols(vec![proto1, proto2, proto3]);
+
+            let combined_proto_info =
+                combine_proto_infos(prepare_proto_infos(interfacing_swarms.clone()));
+
+            // The IR1 not used as an interface refers to the composition of (p || proto3) where p = (proto1 || proto2)
+            let expected_errors = vec!["Event type i1 appears as i1@IR1<i1> and as c@R3<i1>"];
+            let mut errors = error_report_to_strings(proto_info_to_error_report(combined_proto_info));
+            errors.sort();
+            assert_eq!(expected_errors, errors);
+
+            let proto1: SwarmProtocolType =
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR1" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "a", "logType": ["a"], "role": "R1" } }
+                        ]
+                    }"#,
+                )
+                .unwrap();
+
+            let proto2: SwarmProtocolType =
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR1" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR1" } },
+                            { "source": "2", "target": "3", "label": { "cmd": "i3", "logType": ["i3"], "role": "IR2" } },
+                            { "source": "3", "target": "4", "label": { "cmd": "i4", "logType": ["i4"], "role": "IR2" } }
+                        ]
+                    }"#,
+                )
+                .unwrap();
+
+            let proto3: SwarmProtocolType =
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "i3", "logType": ["i3"], "role": "IR2" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "i5", "logType": ["i4"], "role": "IR2" } }
+                        ]
+                    }"#,
+                )
+                .unwrap();
+
+            let interfacing_swarms = InterfacingProtocols(vec![proto1, proto2, proto3]);
+
+            let combined_proto_info =
+                combine_proto_infos(prepare_proto_infos(interfacing_swarms.clone()));
+
+            // The IR1 not used as an interface refers to the composition of (p || proto3) where p = (proto1 || proto2)
+            let expected_errors = vec!["Event type i4 appears as i4@IR2<i4> and as i5@IR2<i4>"];
+            let mut errors = error_report_to_strings(proto_info_to_error_report(combined_proto_info));
+            errors.sort();
+            assert_eq!(expected_errors, errors);
+        }
+
+        #[test]
+        fn test_joining_event_types() {
+            // e_r0
+            // e_ir
+            let preceding_events = |range: std::ops::Range<usize>| -> BTreeSet<EventType> {
+                range
+                    .into_iter()
+                    .map(|u| EventType::new(&format!("e_r{}", u)))
+                    .collect()
+            };
+            setup_logger();
+            for i in 1..6 {
+                let index = i as usize;
+                let proto_info = swarms_to_proto_info(InterfacingProtocols(
+                    get_interfacing_swarms_pat_4().0[..index].to_vec(),
+                ));
+                if i == 1 {
+                    assert_eq!(proto_info.joining_events, BTreeMap::new());
+                } else {
+                    assert_eq!(
+                        proto_info.joining_events,
+                        BTreeMap::from([(EventType::new("e_ir"), preceding_events(0..i))])
+                    );
+                }
+            }
+        }
+
+        #[test]
+        fn test_thinggg() {
+            let error_report = proto_info_to_error_report(ProtoInfo::new_only_proto(vec![]));
+            assert!(error_report.is_empty());
+        }
     }
 
-    #[test]
-    fn looping_5() {
-        fn proto1() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
-                        { "source": "2", "target": "3", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R3" } },
-                        { "source": "3", "target": "0", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R4" } },
-                        { "source": "0", "target": "4", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R5" } },
-                        { "source": "4", "target": "5", "label": { "cmd": "cmd_f", "logType": ["f"], "role": "R6" } },
-                        { "source": "5", "target": "6", "label": { "cmd": "cmd_g", "logType": ["g"], "role": "R7" } },
-                        { "source": "6", "target": "0", "label": { "cmd": "cmd_h", "logType": ["h"], "role": "R8" } }
-                    ]
-                }"#,
-            )
-            .unwrap()
+    mod loop_tests {
+        use super::*;
+
+        // This module contains tests for relating to looping event types.
+
+        #[test]
+        fn looping_1() {
+            setup_logger();
+            fn proto1() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
+                            { "source": "0", "target": "2", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
+                            { "source": "2", "target": "3", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R1" } },
+                            { "source": "3", "target": "4", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R2" } },
+                            { "source": "4", "target": "2", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R1" } }
+                        ]
+                    }"#,
+                )
+                .unwrap()
+            }
+
+            // Check states that can not reach terminal state an infinitely looping event types
+            let (graph, _, _) = swarm_to_graph(&proto1());
+            let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+            let state_names: Vec<String> = states_not_reaching_terminal
+                .into_iter()
+                .map(|n| graph[n].state_name().to_string())
+                .collect::<Vec<_>>();
+            assert_eq!(state_names, ["2", "3", "4"]);
+            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
+            assert!(proto_info.no_errors());
+            assert_eq!(
+                proto_info
+                    .infinitely_looping_events
+                    .clone()
+                    .into_iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>(),
+                vec!["c", "d", "e"]
+            );
+
+            // Check exact well-formed subscriptions
+            let sub =
+                exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
+
+            // Check overapprox well-formed subscriptions
+            let sub =
+                overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
+
+            let sub =
+                overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
         }
-        println!(
-            "proto1: {}",
-            serde_json::to_string_pretty(&proto1()).unwrap()
-        );
-        let (graph, _, _) = swarm_to_graph(&proto1());
-        let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
-        let state_names: Vec<String> = states_not_reaching_terminal
-            .into_iter()
-            .map(|n| graph[n].state_name().to_string())
-            .collect::<Vec<_>>();
-        println!(
-            "states not reaching a terminal state:\n {}",
-            state_names.join("\n")
-        );
-        assert_eq!(state_names, ["0", "1", "2", "3", "4", "5", "6"]);
-        let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
-        let errors = proto_info_to_error_report(proto_info.clone());
-        let errors = error_report_to_strings(errors);
-        println!("errors:\n {}", errors.join("\n"));
-        assert_eq!(errors, Vec::<String>::new());
-        assert_eq!(
-            proto_info
-                .infinitely_looping_events
-                .clone()
+
+        #[test]
+        fn looping_2() {
+            setup_logger();
+            fn proto1() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
+                            { "source": "0", "target": "2", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
+                            { "source": "2", "target": "3", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R3" } },
+                            { "source": "3", "target": "4", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R4" } },
+                            { "source": "4", "target": "2", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R5" } }
+                        ]
+                    }"#,
+                )
+                .unwrap()
+            }
+
+            // Check states that can not reach terminal state an infinitely looping event types
+            let (graph, _, _) = swarm_to_graph(&proto1());
+            let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+            let state_names: Vec<String> = states_not_reaching_terminal
                 .into_iter()
-                .map(|e| e.to_string())
-                .collect::<Vec<_>>(),
-            vec!["a", "b", "c", "d", "e", "f", "g", "h"]
-        );
-        println!(
-            "infinitely looping events: {:?}",
-            proto_info
-                .infinitely_looping_events
-                .into_iter()
-                .map(|e| e.to_string())
-                .collect::<Vec<_>>()
-        );
+                .map(|n| graph[n].state_name().to_string())
+                .collect::<Vec<_>>();
+            assert_eq!(state_names, ["2", "3", "4"]);
+            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
+            assert!(proto_info.no_errors());
+            assert_eq!(
+                proto_info
+                    .infinitely_looping_events
+                    .clone()
+                    .into_iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>(),
+                vec!["c", "d", "e"]
+            );
 
-        // Check exact well-formed subscriptions
-        let sub =
-            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
-                .unwrap();
-        println!(
-            "exact wf subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
+            // Check exact well-formed subscriptions
+            let sub =
+                exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
 
-        // Check overapprox well-formed subscriptions
-        let sub =
-            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
-                .unwrap();
-        println!(
-            "subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
-        let sub =
-            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
-                .unwrap();
-        println!(
-            "subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
-    }
+            // Check overapprox well-formed subscriptions
+            let sub =
+                overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
 
-    #[test]
-    fn looping_6() {
-        fn proto1() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
-                        { "source": "1", "target": "0", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R3" } },
-                        { "source": "2", "target": "3", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R4" } },
-                        { "source": "3", "target": "4", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R5" } },
-                        { "source": "4", "target": "0", "label": { "cmd": "cmd_f", "logType": ["f"], "role": "R6" } }
-                    ]
-                }"#,
-            )
-            .unwrap()
+            let sub =
+                overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
         }
-        println!(
-            "proto1: {}",
-            serde_json::to_string_pretty(&proto1()).unwrap()
-        );
-        let (graph, _, _) = swarm_to_graph(&proto1());
-        let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
-        let state_names: Vec<String> = states_not_reaching_terminal
-            .into_iter()
-            .map(|n| graph[n].state_name().to_string())
-            .collect::<Vec<_>>();
-        println!(
-            "states not reaching a terminal state:\n {}",
-            state_names.join("\n")
-        );
-        assert_eq!(state_names, ["0", "1", "2", "3", "4"]);
-        let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
-        let errors = proto_info_to_error_report(proto_info.clone());
-        let errors = error_report_to_strings(errors);
-        println!("errors:\n {}", errors.join("\n"));
-        assert_eq!(errors, Vec::<String>::new());
-        assert_eq!(
-            proto_info
-                .infinitely_looping_events
-                .clone()
+
+        #[test]
+        fn looping_3() {
+            setup_logger();
+            fn proto1() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
+                            { "source": "0", "target": "2", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
+                            { "source": "2", "target": "3", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R3" } },
+                            { "source": "3", "target": "4", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R4" } },
+                            { "source": "4", "target": "2", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R5" } },
+                            { "source": "1", "target": "5", "label": { "cmd": "cmd_f", "logType": ["f"], "role": "R5" } },
+                            { "source": "5", "target": "6", "label": { "cmd": "cmd_g", "logType": ["g"], "role": "R6" } },
+                            { "source": "6", "target": "7", "label": { "cmd": "cmd_h", "logType": ["h"], "role": "R6" } },
+                            { "source": "7", "target": "1", "label": { "cmd": "cmd_i", "logType": ["i"], "role": "R7" } }
+                        ]
+                    }"#,
+                )
+                .unwrap()
+            }
+
+            // Check states that can not reach terminal state an infinitely looping event types
+            let (graph, _, _) = swarm_to_graph(&proto1());
+            let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+            let state_names: Vec<String> = states_not_reaching_terminal
                 .into_iter()
-                .map(|e| e.to_string())
-                .collect::<Vec<_>>(),
-            vec!["a", "b", "c", "d", "e", "f"]
-        );
-        println!(
-            "infinitely looping events: {:?}",
-            proto_info
-                .infinitely_looping_events
+                .map(|n| graph[n].state_name().to_string())
+                .collect::<Vec<_>>();
+            assert_eq!(state_names, ["0", "1", "2", "3", "4", "5", "6", "7"]);
+            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
+            assert!(proto_info.no_errors());
+            assert_eq!(
+                proto_info
+                    .infinitely_looping_events
+                    .clone()
+                    .into_iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>(),
+                vec!["c", "d", "e", "f", "g", "h", "i"]
+            );
+
+            // Check exact well-formed subscriptions
+            let sub =
+                exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
+
+            // Check overapprox well-formed subscriptions
+            let sub =
+                overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
+
+            let sub =
+                overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
+        }
+
+        #[test]
+        fn looping_4() {
+            setup_logger();
+            fn proto1() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
+                            { "source": "2", "target": "3", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R3" } },
+                            { "source": "3", "target": "4", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R4" } },
+                            { "source": "4", "target": "5", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R5" } },
+                            { "source": "5", "target": "6", "label": { "cmd": "cmd_f", "logType": ["f"], "role": "R6" } },
+                            { "source": "6", "target": "7", "label": { "cmd": "cmd_g", "logType": ["g"], "role": "R7" } },
+                            { "source": "7", "target": "2", "label": { "cmd": "cmd_h", "logType": ["h"], "role": "R8" } }
+                        ]
+                    }"#,
+                )
+                .unwrap()
+            }
+
+            // Check states that can not reach terminal state an infinitely looping event types
+            let (graph, _, _) = swarm_to_graph(&proto1());
+            let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+            let state_names: Vec<String> = states_not_reaching_terminal
                 .into_iter()
-                .map(|e| e.to_string())
-                .collect::<Vec<_>>()
-        );
-        // Check exact well-formed subscriptions
-        let sub =
-            exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
-                .unwrap();
-        println!(
-            "exact wf subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
-        // Check overapprox well-formed subscriptions
-        let sub =
-            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
-                .unwrap();
-        println!(
-            "subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
-        let sub =
-            overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
-                .unwrap();
-        println!(
-            "subs: {}",
-            serde_json::to_string_pretty(&sub).unwrap()
-        );
-        let errors = check(InterfacingProtocols(vec![proto1()]), &sub);
-        let is_empty = errors.is_empty();
-        println!("errors: {:?}", error_report_to_strings(errors));
-        assert!(is_empty);
+                .map(|n| graph[n].state_name().to_string())
+                .collect::<Vec<_>>();
+            assert_eq!(state_names, ["0", "1", "2", "3", "4", "5", "6", "7"]);
+            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
+            assert!(proto_info.no_errors());
+            assert_eq!(
+                proto_info
+                    .infinitely_looping_events
+                    .clone()
+                    .into_iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>(),
+                vec!["c", "d", "e", "f", "g", "h"]
+            );
+
+            // Check exact well-formed subscriptions
+            let sub =
+                exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
+
+            // Check overapprox well-formed subscriptions
+            let sub =
+                overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
+
+            let sub =
+                overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
+        }
+
+        #[test]
+        fn looping_5() {
+            setup_logger();
+            fn proto1() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
+                            { "source": "2", "target": "3", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R3" } },
+                            { "source": "3", "target": "0", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R4" } },
+                            { "source": "0", "target": "4", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R5" } },
+                            { "source": "4", "target": "5", "label": { "cmd": "cmd_f", "logType": ["f"], "role": "R6" } },
+                            { "source": "5", "target": "6", "label": { "cmd": "cmd_g", "logType": ["g"], "role": "R7" } },
+                            { "source": "6", "target": "0", "label": { "cmd": "cmd_h", "logType": ["h"], "role": "R8" } }
+                        ]
+                    }"#,
+                )
+                .unwrap()
+            }
+
+            // Check states that can not reach terminal state an infinitely looping event types
+            let (graph, _, _) = swarm_to_graph(&proto1());
+            let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+            let state_names: Vec<String> = states_not_reaching_terminal
+                .into_iter()
+                .map(|n| graph[n].state_name().to_string())
+                .collect::<Vec<_>>();
+            assert_eq!(state_names, ["0", "1", "2", "3", "4", "5", "6"]);
+            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
+            assert!(proto_info.no_errors());
+            assert_eq!(
+                proto_info
+                    .infinitely_looping_events
+                    .clone()
+                    .into_iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>(),
+                vec!["a", "b", "c", "d", "e", "f", "g", "h"]
+            );
+
+            // Check exact well-formed subscriptions
+            let sub =
+                exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
+
+            // Check overapprox well-formed subscriptions
+            let sub =
+                overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
+
+            let sub =
+                overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
+        }
+
+        #[test]
+        fn looping_6() {
+            setup_logger();
+            fn proto1() -> SwarmProtocolType {
+                serde_json::from_str::<SwarmProtocolType>(
+                    r#"{
+                        "initial": "0",
+                        "transitions": [
+                            { "source": "0", "target": "1", "label": { "cmd": "cmd_a", "logType": ["a"], "role": "R1" } },
+                            { "source": "1", "target": "0", "label": { "cmd": "cmd_b", "logType": ["b"], "role": "R2" } },
+                            { "source": "1", "target": "2", "label": { "cmd": "cmd_c", "logType": ["c"], "role": "R3" } },
+                            { "source": "2", "target": "3", "label": { "cmd": "cmd_d", "logType": ["d"], "role": "R4" } },
+                            { "source": "3", "target": "4", "label": { "cmd": "cmd_e", "logType": ["e"], "role": "R5" } },
+                            { "source": "4", "target": "0", "label": { "cmd": "cmd_f", "logType": ["f"], "role": "R6" } }
+                        ]
+                    }"#,
+                )
+                .unwrap()
+            }
+
+            // Check states that can not reach terminal state an infinitely looping event types
+            let (graph, _, _) = swarm_to_graph(&proto1());
+            let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+            let state_names: Vec<String> = states_not_reaching_terminal
+                .into_iter()
+                .map(|n| graph[n].state_name().to_string())
+                .collect::<Vec<_>>();
+            assert_eq!(state_names, ["0", "1", "2", "3", "4"]);
+            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![proto1()]));
+            assert!(proto_info.no_errors());
+            assert_eq!(
+                proto_info
+                    .infinitely_looping_events
+                    .clone()
+                    .into_iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>(),
+                vec!["a", "b", "c", "d", "e", "f"]
+            );
+
+            // Check exact well-formed subscriptions
+            let sub =
+                exact_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new())
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
+
+            // Check overapprox well-formed subscriptions
+            let sub =
+                overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::TwoStep)
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
+
+            let sub =
+                overapprox_weak_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
+                    .unwrap();
+            assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
+        }
     }
 }

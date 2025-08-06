@@ -379,15 +379,3 @@ impl SwarmInterface for Role {
             .collect()
     }
 }
-
-/*
-    triples_a.
-    map(|triple|
-        match (c, et, r) {
-            (c, et, r) if *r == self && !triples_b.contains(triple) => Some(Not in both),
-            (c, et, r) if *r != self && (event_types_b.contains(et) || commands_b.contains(c)) => Some(Spurious event type)
-        }
-        )
-
-
-*/
