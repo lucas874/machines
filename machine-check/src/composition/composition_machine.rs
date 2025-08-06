@@ -2188,6 +2188,9 @@ mod tests {
         }
     }
 
+    // TODO:
+    // Move tests related to adaptation and adaptation info to a module. Make one more (one that currently just prints).
+    // Add a test somewhere that uses WH || F || QC
 
     #[test]
     fn test_example_from_text_machine() {
