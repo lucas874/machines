@@ -972,21 +972,7 @@ mod tests {
         )
         .unwrap()
     }
-    fn get_proto_5() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "test", "logType": ["report"], "role": "TR" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "accept", "logType": ["ok"], "role": "QCR" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "reject", "logType": ["notOk"], "role": "QCR" } },
-                    { "source": "3", "target": "4", "label": { "cmd": "reject1", "logType": ["notOk1"], "role": "QCR" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
+
     fn get_interfacing_swarms_1() -> InterfacingProtocols {
         InterfacingProtocols(vec![get_proto1(), get_proto2()])
     }
@@ -1005,10 +991,6 @@ mod tests {
 
     fn get_interfacing_swarms_3() -> InterfacingProtocols {
         InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto_4()])
-    }
-
-    fn get_interfacing_swarms_4() -> InterfacingProtocols {
-        InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto_5()])
     }
 
     fn get_interfacing_swarms_warehouse() -> InterfacingProtocols {
@@ -2109,6 +2091,101 @@ mod tests {
                     .is_empty());
             }
         }
+
+        #[test]
+        fn test_compose_zero() {
+            let left = MachineType {
+                initial: State::new("left_0"),
+                transitions: vec![
+                    Transition {
+                        label: MachineLabel::Input {
+                            event_type: EventType::new("a"),
+                        },
+                        source: State::new("left_0"),
+                        target: State::new("left_1"),
+                    },
+                    Transition {
+                        label: MachineLabel::Execute {
+                            cmd: Command::new("cmd_a"),
+                            log_type: vec![EventType::new("a")],
+                        },
+                        source: State::new("left_0"),
+                        target: State::new("left_0"),
+                    },
+                    Transition {
+                        label: MachineLabel::Input {
+                            event_type: EventType::new("b"),
+                        },
+                        source: State::new("left_1"),
+                        target: State::new("left_2"),
+                    },
+                    Transition {
+                        label: MachineLabel::Execute {
+                            cmd: Command::new("cmd_b"),
+                            log_type: vec![EventType::new("b")],
+                        },
+                        source: State::new("left_1"),
+                        target: State::new("left_1"),
+                    },
+                ],
+            };
+            let right = MachineType {
+                initial: State::new("right_0"),
+                transitions: vec![
+                    Transition {
+                        label: MachineLabel::Input {
+                            event_type: EventType::new("b"),
+                        },
+                        source: State::new("right_0"),
+                        target: State::new("right_1"),
+                    },
+                    Transition {
+                        label: MachineLabel::Execute {
+                            cmd: Command::new("cmd_b"),
+                            log_type: vec![EventType::new("b")],
+                        },
+                        source: State::new("right_0"),
+                        target: State::new("right_0"),
+                    },
+                    Transition {
+                        label: MachineLabel::Input {
+                            event_type: EventType::new("a"),
+                        },
+                        source: State::new("right_1"),
+                        target: State::new("right_2"),
+                    },
+                    Transition {
+                        label: MachineLabel::Execute {
+                            cmd: Command::new("cmd_a"),
+                            log_type: vec![EventType::new("a")],
+                        },
+                        source: State::new("right_1"),
+                        target: State::new("right_1"),
+                    },
+                ],
+            };
+            let (left, left_initial, _) = crate::machine::from_json(left);
+            let left = from_option_graph_to_graph(&left);
+            let (right, right_initial, _) = crate::machine::from_json(right);
+            let right = from_option_graph_to_graph(&right);
+            let interface = BTreeSet::from([EventType::new("a"), EventType::new("b")]);
+            let (combined, combined_initial) = compose(
+                right,
+                right_initial.unwrap(),
+                left,
+                left_initial.unwrap(),
+                interface,
+                gen_state_name,
+            );
+            let combined = to_json_machine(combined, combined_initial);
+
+            let expected = MachineType {
+                initial: State::new("right_0 || left_0"),
+                transitions: vec![],
+            };
+
+            assert_eq!(combined, expected);
+        }
     }
 
 
@@ -2134,109 +2211,6 @@ mod tests {
         );
     }
 
-    #[test]
-    #[ignore]
-    fn test_all_projs_whfqcr() {
-        setup_logger();
-        let mut input_sub = BTreeMap::new();
-        input_sub.insert(Role::new("T"), BTreeSet::from([EventType::new("notOk1")]));
-        let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_4(),
-            &input_sub,
-            Granularity::Medium,
-        )
-        .unwrap();
-        let all_roles = vec![
-            Role::new("T"),
-            Role::new("FL"),
-            Role::new("D"),
-            Role::new("F"),
-            Role::new("QCR"),
-        ];
-        let proto_info = swarms_to_proto_info(get_interfacing_swarms_4());
-        assert!(proto_info.no_errors());
-        //println!("conc: {:?}", proto_info.concurrent_events);
-        for role in all_roles {
-            let (proj, proj_initial) = project_combine(&proto_info, &subs, role.clone(), false);
-            //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
-            let branch_thing = paths_from_event_types(&proj, &proto_info);
-            println!(
-                "role: {}\n branch thing: {}",
-                role.to_string(),
-                serde_json::to_string_pretty(&branch_thing).unwrap()
-            );
-            let thing = from_option_to_machine(proj, proj_initial.unwrap());
-            println!("proj: {}", serde_json::to_string_pretty(&thing).unwrap())
-        }
-    }
-
-    #[test]
-    #[ignore]
-    fn test_all_projs_whfqcr1() {
-        setup_logger();
-        let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_3(),
-            &BTreeMap::new(),
-            Granularity::Medium,
-        )
-        .unwrap();
-        let all_roles = vec![
-            Role::new("T"),
-            Role::new("FL"),
-            Role::new("D"),
-            Role::new("F"),
-            Role::new("QCR"),
-        ];
-        let proto_info = swarms_to_proto_info(get_interfacing_swarms_3());
-        assert!(proto_info.no_errors());
-        //println!("conc: {:?}", proto_info.concurrent_events);
-        for role in all_roles {
-            let (proj, proj_initial) = project_combine(&proto_info, &subs, role.clone(), false);
-            //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
-            let branch_thing = paths_from_event_types(&proj, &proto_info);
-            println!(
-                "role: {}\n branch thing: {}",
-                role.to_string(),
-                serde_json::to_string_pretty(&branch_thing).unwrap()
-            );
-            let thing = from_option_to_machine(proj, proj_initial.unwrap());
-            println!("proj: {}", serde_json::to_string_pretty(&thing).unwrap())
-        }
-    }
-
-    #[test]
-    #[ignore]
-    fn test_all_projs_wh_only() {
-        setup_logger();
-        let input_sub = BTreeMap::new();
-        let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
-            get_interfacing_swarms_warehouse(),
-            &input_sub,
-            Granularity::TwoStep,
-        )
-        .unwrap();
-        let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D")];
-        println!("subs: {}", serde_json::to_string_pretty(&subs).unwrap());
-        let proto_info = swarms_to_proto_info(get_interfacing_swarms_warehouse());
-        assert!(proto_info.no_errors());
-        //println!("conc: {:?}", proto_info.concurrent_events);
-
-        for role in all_roles {
-            let (proj, proj_initial) = project_combine(&proto_info, &subs, role.clone(), false);
-            //let branching_event_types = proto_info.branching_events.clone().into_iter().flatten().collect::<BTreeSet<EventType>>();
-            if role.to_string() == "D" {
-                let branch_thing = paths_from_event_types(&proj, &proto_info);
-                println!(
-                    "role: {}\n branch thing: {}",
-                    role.to_string(),
-                    serde_json::to_string_pretty(&branch_thing).unwrap()
-                );
-            }
-            let thing = from_option_to_machine(proj, proj_initial.unwrap());
-            println!("{}\n$$$$", serde_json::to_string_pretty(&thing).unwrap())
-            //let thing = project(&proto_info.protocols.)
-        }
-    }
     #[test]
     #[ignore]
     fn combine_with_self() {
@@ -2605,100 +2579,6 @@ mod tests {
                 adapted_proj_initial.unwrap()
             ))
             .unwrap()
-        );
-    }
-
-    #[test]
-    #[ignore]
-    fn test_compose_zero() {
-        let left = MachineType {
-            initial: State::new("left_0"),
-            transitions: vec![
-                Transition {
-                    label: MachineLabel::Input {
-                        event_type: EventType::new("a"),
-                    },
-                    source: State::new("left_0"),
-                    target: State::new("left_1"),
-                },
-                Transition {
-                    label: MachineLabel::Execute {
-                        cmd: Command::new("cmd_a"),
-                        log_type: vec![EventType::new("a")],
-                    },
-                    source: State::new("left_0"),
-                    target: State::new("left_0"),
-                },
-                Transition {
-                    label: MachineLabel::Input {
-                        event_type: EventType::new("b"),
-                    },
-                    source: State::new("left_1"),
-                    target: State::new("left_2"),
-                },
-                Transition {
-                    label: MachineLabel::Execute {
-                        cmd: Command::new("cmd_b"),
-                        log_type: vec![EventType::new("b")],
-                    },
-                    source: State::new("left_1"),
-                    target: State::new("left_1"),
-                },
-            ],
-        };
-        let right = MachineType {
-            initial: State::new("right_0"),
-            transitions: vec![
-                Transition {
-                    label: MachineLabel::Input {
-                        event_type: EventType::new("b"),
-                    },
-                    source: State::new("right_0"),
-                    target: State::new("right_1"),
-                },
-                Transition {
-                    label: MachineLabel::Execute {
-                        cmd: Command::new("cmd_b"),
-                        log_type: vec![EventType::new("b")],
-                    },
-                    source: State::new("right_0"),
-                    target: State::new("right_0"),
-                },
-                Transition {
-                    label: MachineLabel::Input {
-                        event_type: EventType::new("a"),
-                    },
-                    source: State::new("right_1"),
-                    target: State::new("right_2"),
-                },
-                Transition {
-                    label: MachineLabel::Execute {
-                        cmd: Command::new("cmd_a"),
-                        log_type: vec![EventType::new("a")],
-                    },
-                    source: State::new("right_1"),
-                    target: State::new("right_1"),
-                },
-            ],
-        };
-        let (left, left_initial, _) = crate::machine::from_json(left);
-        let left = from_option_graph_to_graph(&left);
-        let (right, right_initial, _) = crate::machine::from_json(right);
-        let right = from_option_graph_to_graph(&right);
-        let interface = BTreeSet::from([EventType::new("a"), EventType::new("b")]);
-        let (combined, combined_initial) = compose(
-            right,
-            right_initial.unwrap(),
-            left,
-            left_initial.unwrap(),
-            interface,
-            gen_state_name,
-        );
-        let combined = to_json_machine(combined, combined_initial);
-
-        println!(
-            "combined: {}",
-            serde_json::to_string_pretty(&combined).unwrap()
         );
     }
 
