@@ -1,0 +1,20 @@
+indentation
+color windows tmux 
+
+gray stuff state payload. opacity
+
+same color background terminal and slides 
+maybe just conside light them shell 
+
+avoid red and green 
+
+start bottom up 
+u want the machines
+how can i make sure it is correct. i want some sort of guarantees
+then formalise things with a swarm protocol 
+then composition 
+
+sp some sort of machinery to verify stuff about machines 
+
+operate within boundaries of sp 
+when projections 
