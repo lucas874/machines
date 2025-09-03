@@ -278,7 +278,7 @@ export const createMachineRunner = <
  * eventId associated with the type by the mapping to the event.
  *
  * A branch-tracking MachineRunner maintains the event-type-to-eventId mapping
- * and ignores events not pointing to the expected updating event type.
+ * and ignores events not pointing to the expected eventIds.
  *
  * @param sdk - An instance of Actyx.
  * @param tags - List of tags to be subscribed. These tags will also be added to
