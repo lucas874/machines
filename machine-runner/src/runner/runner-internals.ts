@@ -468,6 +468,7 @@ export namespace RunnerInternalsBT {
     const matchingReaction = reactions.get(firstEvent.payload.type)
 
     if (!matchingReaction) return { shouldQueue: false }
+    // Remove console.log
     if (newEvent.payload.lbj != branchTracker.jbLast.get(newEvent.payload.type) ) { console.log("event not enqueued\n"); return { shouldQueue: false } }
 
     // Asserted as non-nullish because it is impossible for `queue`'s length to
