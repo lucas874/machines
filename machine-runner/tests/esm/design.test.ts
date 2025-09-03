@@ -64,11 +64,11 @@ describe('MachineEvent', () => {
     })
     expect(event.parse({ type: 'a' } as any)).toEqual({
       success: false,
-      error: 'Validation error: Required at "a"',
+      error: 'Validation error: Invalid input: expected number, received undefined at "a"',
     })
     expect(event.parse({ type: 'a', a: null } as any)).toEqual({
       success: false,
-      error: 'Validation error: Expected number, received null at "a"',
+      error: 'Validation error: Invalid input: expected number, received null at "a"',
     })
     expect(event.parse({ type: 'a', a: 42 })).toEqual({
       success: true,
