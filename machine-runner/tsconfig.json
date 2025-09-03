@@ -2,7 +2,7 @@
   "compilerOptions": {
     "alwaysStrict": true,
     "declaration": true,
-    "esModuleInterop": false,
+    "esModuleInterop": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": false,
     "lib": ["dom", "es2019"],

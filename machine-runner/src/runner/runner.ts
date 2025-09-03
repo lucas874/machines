@@ -1577,8 +1577,11 @@ export namespace ImplStateOpaque {
         commandGeneratorCriteria,
       )
 
-    const is: ThisStateOpaque['is'] = (...factories) =>
-      factories.find((factory) => factoryAtSnapshot.mechanism === factory.mechanism) !== undefined
+    const is: ThisStateOpaque['is'] = function <F extends StateFactory<SwarmProtocolName, any, any, any, any, any>[]>(
+      ...factories: F
+    ): this is StateOpaque.Of<F[any]> {
+      return factories.find((factory) => factoryAtSnapshot.mechanism === factory.mechanism) !== undefined
+    }
 
     const as: ThisStateOpaque['as'] = <
       StateName extends string,
@@ -1610,10 +1613,11 @@ export namespace ImplStateOpaque {
         stateAtSnapshot,
       })
 
-    const isLike: ThisStateOpaque['isLike'] = (factory) => {
+    const isLike: ThisStateOpaque['isLike'] = function <F extends StateFactory<SwarmProtocolName, any, any, any, any, any>>(
+      factory: F
+    ): this is StateOpaque.Of<F> {
       return Object.keys(factory.mechanism.commands).every((cmdName) => cmdName in factoryAtSnapshot.mechanism.commands) &&
-        Object.keys(factory.mechanism.commandDefinitions).every((cmdName) => cmdName in factoryAtSnapshot.mechanism.commandDefinitions) //&&
-          //factoryAtSnapshot.mechanism.commandDefinitions[cmdName as keyof typeof factoryAtSnapshot.mechanism.commandDefinitions]?.toString() === factory.mechanism.commandDefinitions[cmdName as keyof typeof factory.mechanism.commandDefinitions]?.toString())
+          Object.keys(factory.mechanism.commandDefinitions).every((cmdName) => cmdName in factoryAtSnapshot.mechanism.commandDefinitions)
     }
 
     return {
