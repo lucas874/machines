@@ -270,12 +270,14 @@ export const createMachineRunner = <
 }
 
 /**
+ * Construct a branch-tracking machine.
  * @param sdk - An instance of Actyx.
  * @param tags - List of tags to be subscribed. These tags will also be added to
  * events published to Actyx.
  * @param initialFactory - initial state factory of the machine.
  * @param initialPayload - initial state payload of the machine.
- * @returns a MachineRunner instance.
+ * @param adaptedMachine - the {@link AdaptedMachine} to run.
+ * @returns a {@link MachineRunner} instance.
  */
 export const createMachineRunnerBT = <
   SwarmProtocolName extends string,

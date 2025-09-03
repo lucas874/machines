@@ -1,5 +1,5 @@
 import { Actyx } from '@actyx/sdk'
-import { createMachineRunnerBT} from '@actyx/machine-runner'
+import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { Events, manifest, Composition, listOfProtocols, subscriptions, warehouseProtocol, subsWarehouse, printState } from './protocol'
 import * as readline from 'readline';
 import chalk from "chalk";
@@ -14,15 +14,15 @@ const rl = readline.createInterface({
 const door = Composition.makeMachine('Door')
 export const s0 = door.designEmpty('s0')
     .command('close', [Events.closingTime], () => {
-        var dateString = new Date().toLocaleString();
+        const dateString = new Date().toString();
         return [Events.closingTime.make({timeOfDay: dateString})]})
     .finish()
 export const s1 = door.designEmpty('s1').finish()
 export const s2 = door.designEmpty('s2').finish()
 
-s0.react([Events.partReq], s1, (_, e) => { return s1.make() })
-s1.react([Events.partOK], s0, (_, e) => { return s0.make() })
-s0.react([Events.closingTime], s2, (_, e) => { return s2.make() })
+s0.react([Events.partReq], s1, () => { return s1.make() })
+s1.react([Events.partOK], s0, () => { return s0.make() })
+s0.react([Events.closingTime], s2, () => { return s2.make() })
 
 // Check that the original machine is a correct implementation. A prerequisite for reusing it.
 const checkProjResult = checkComposedProjection(warehouseProtocol, subsWarehouse, "D", door.createJSONForAnalysis(s0))
