@@ -283,6 +283,8 @@ namespace ImplMachine {
    * Create a machine protocol with a specific name, event factories,
    * a function mapping event types to sets of events types
    * and set of 'special event types' used for branch tracking.
+   * This function is used to create 'empty machines' serving as
+   * a base for creating 'adapted machines'.
    * @param machineName - name of the machine protocol.
    * @param registeredEventFactories - tuple of MachineEventFactories.
    * @see MachineEvent.design to get started on creating MachineEventFactories
@@ -495,10 +497,6 @@ export namespace MachineAnalysisResource {
 }
 
 export namespace MachineAdaptation {
-  // f is the
-  // reaction. should be the same for each base case since any intermediate states are due to
-  // concurrency and subscribing to event types from other protocols.
-
   type ReactionLabel = {
     source: string;
     target: string;
