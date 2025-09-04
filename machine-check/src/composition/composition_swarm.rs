@@ -556,6 +556,9 @@ fn exact_wwf_sub_step(
     subscriptions: &mut Subscriptions,
 ) -> bool {
     let _span = tracing::info_span!("exact_wwf_sub_step").entered();
+    if graph.node_count() == 0 || initial == NodeId::end() {
+        return true
+    }
     let mut is_stable = true;
     let add_to_sub =
         |role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subscriptions| -> bool {
@@ -1297,6 +1300,9 @@ fn after_not_concurrent_step(
     concurrent_events: &BTreeSet<BTreeSet<EventType>>,
     succ_map: &mut BTreeMap<EventType, BTreeSet<EventType>>,
 ) -> bool {
+    if graph.node_count() == 0 || initial == NodeId::end() {
+        return true
+    }
     let mut is_stable = true;
     let mut walk = DfsPostOrder::new(&graph, initial);
     while let Some(node) = walk.next(&graph) {
@@ -3059,6 +3065,9 @@ mod tests {
         #[test]
         fn test_well_formed_sub_1() {
             setup_logger();
+            let empty = exact_weak_well_formed_sub(InterfacingProtocols(vec![]), &BTreeMap::new());
+            assert!(empty.is_ok());
+            assert_eq!(empty.unwrap(), BTreeMap::new());
             // Test interfacing_swarms_4
             let result = exact_weak_well_formed_sub(get_interfacing_swarms_4(), &BTreeMap::new());
             assert!(result.is_ok());

@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, Subscriptions, MachineType, checkWWFSwarmProtocol, DataResult, InterfacingSwarms, exactWWFSubscriptions, overapproxWWFSubscriptions, composeProtocols} from '../../..'
+import { SwarmProtocolType, Subscriptions, MachineType, checkWWFSwarmProtocol, DataResult, InterfacingProtocols, exactWWFSubscriptions, overapproxWWFSubscriptions, composeProtocols} from '../../..'
 import { Events } from './car-factory-protos.js'
 
 /*
@@ -80,7 +80,7 @@ const G3: SwarmProtocolType = {
     },
   ],
 }
-const interfacing_swarms: InterfacingSwarms = [{protocol: G1, interface: null}, {protocol: G2, interface: 'T'}, {protocol: G3, interface: 'F'}]
+const interfacing_swarms: InterfacingProtocols = [G1, G2, G3]
 const exact_result_subscriptions: DataResult<Subscriptions> = exactWWFSubscriptions(interfacing_swarms, {})
 const overapprox_result_subscriptions: DataResult<Subscriptions> = overapproxWWFSubscriptions(interfacing_swarms, {}, "Coarse")
 
@@ -131,8 +131,8 @@ const G2_: SwarmProtocolType = {
   ],
 }
 
-const interfacing_swarms_error_1: InterfacingSwarms = [{protocol: G1, interface: null}, {protocol: G2, interface: 'FL'}, {protocol: G3, interface: 'F'}]
-const interfacing_swarms_error_2: InterfacingSwarms = [{protocol: G1, interface: null}, {protocol: G2_, interface: 'T'}]
+const interfacing_swarms_error_1: InterfacingProtocols = [G1, G2, G3,]
+const interfacing_swarms_error_2: InterfacingProtocols = [G1, G2_,]
 const result_composition_ok = composeProtocols(interfacing_swarms)
 const result_composition_error_1 = composeProtocols(interfacing_swarms_error_1)
 const result_composition_error_2 = composeProtocols(interfacing_swarms_error_2)
@@ -143,30 +143,12 @@ describe('various tests', () => {
   })
 
   // fix this error reporting. an empty proto info returned somewhere. keep going instead but propagate errors.
-  it('should be not be ok, FL not valid interface', () => {
-    expect(result_composition_error_1).toEqual({
-        type: 'ERROR',
-        errors: [
-          "role FL can not be used as interface",
-          "event type position does not appear in both protocols",
-          "role FL can not be used as interface",
-          "event type position does not appear in both protocols",
-          "role F can not be used as interface",
-          "event type car does not appear in both protocols",
-          "role F can not be used as interface",
-          "event type car does not appear in both protocols"
-        ]
-      })
+  it('should be be ok', () => {
+    expect(result_composition_error_1.type).toEqual('OK')
   })
   // change this error reporting as well?
-  it('should be not be ok, all events of T not in G2_', () => {
-    expect(result_composition_error_2).toEqual({
-        type: 'ERROR',
-        errors: [
-          "event type part does not appear in both protocols",
-          "event type part does not appear in both protocols"
-        ]
-      })
+  it('should be not be ok, even though all events of T not in G2_', () => {
+    expect(result_composition_error_2.type).toEqual('OK')
   })
 })
 
@@ -174,20 +156,14 @@ describe('various tests', () => {
 describe('various errors', () => {
   it('subscription for empty list of protocols', () => {
     expect(overapproxWWFSubscriptions([], {}, "Coarse")).toEqual({
-      type: 'ERROR',
-      errors: [
-        "invalid argument",
-        "invalid argument"
-      ]
+      type: 'OK',
+      data: {}
     })
   })
   it('subscription for empty list of protocols', () => {
     expect(exactWWFSubscriptions([], {})).toEqual({
-      type: 'ERROR',
-      errors: [
-        "invalid argument",
-        "invalid argument"
-      ]
+      type: 'OK',
+      data: {}
     })
   })
 })

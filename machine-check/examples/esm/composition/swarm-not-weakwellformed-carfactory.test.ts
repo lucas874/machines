@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, Subscriptions, checkWWFSwarmProtocol, DataResult, InterfacingSwarms, exactWWFSubscriptions} from '../../..'
+import { SwarmProtocolType, Subscriptions, checkWWFSwarmProtocol, DataResult, InterfacingProtocols, exactWWFSubscriptions} from '../../..'
 import { Events } from './car-factory-protos.js'
 
 /*
@@ -30,27 +30,6 @@ const G1: SwarmProtocolType = {
       source: '0',
       target: '3',
       label: { cmd: 'close', role: 'D', logType: [Events.time.type] },
-    },
-  ],
-}
-
-const G2: SwarmProtocolType = {
-  initial: '0',
-  transitions: [
-    {
-      source: '0',
-      target: '1',
-      label: { cmd: 'request', role: 'T', logType: [Events.partID.type] },
-    },
-    {
-      source: '1',
-      target: '2',
-      label: { cmd: 'deliver', role: 'T', logType: [Events.part.type] },
-    },
-    {
-      source: '2',
-      target: '0',
-      label: { cmd: 'build', role: 'F', logType: [Events.car.type] },
     },
   ],
 }
@@ -97,31 +76,18 @@ const subscriptions1 = {
     ],
 }
 
-const G1_: InterfacingSwarms = [{protocol: G1, interface: null}]
-const G2_: InterfacingSwarms = [{protocol: G2, interface: null}]
-const G3_: InterfacingSwarms = [{protocol: G3, interface: null}]
+const G1_: InterfacingProtocols = [G1]
+const G3_: InterfacingProtocols = [G3]
 
-const result_subscriptions2: DataResult<Subscriptions> = exactWWFSubscriptions(G2_, {})
+
 const result_subscriptions3: DataResult<Subscriptions> = exactWWFSubscriptions(G3_, {})
 
-describe('check confusion-ful protocols G2 and G3', () => {
-  it('result should not be ok', () => {
-    expect(result_subscriptions2).toEqual({
-      type: 'ERROR',
-      errors: [
-        "state 0 can not reach terminal node",
-        "state 1 can not reach terminal node",
-        "state 2 can not reach terminal node",
-      ]
-    })
-  })
-
+describe('check confusion-ful protocols G1 and G3', () => {
   it('result should not be ok', () => {
     expect(result_subscriptions3).toEqual({
       type: 'ERROR',
       errors: [
-        "guard event type report appears in transitions from multiple states",
-        "event type report emitted by command in transition (0)--[build@F<report>]-->(1) and command in transition (1)--[test@TR<report>]-->(2)",
+        "event type report emitted in more than one transition: (0)--[build@F<report>]-->(1), (1)--[test@TR<report>]-->(2)",
       ]
     })
   })

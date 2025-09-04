@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, checkSwarmProtocol, Subscriptions, checkWWFSwarmProtocol, DataResult, InterfacingSwarms, exactWWFSubscriptions, overapproxWWFSubscriptions} from '../../..'
+import { SwarmProtocolType, checkSwarmProtocol, Subscriptions, checkWWFSwarmProtocol, DataResult, InterfacingProtocols, exactWWFSubscriptions, overapproxWWFSubscriptions} from '../../..'
 import { Events } from './car-factory-protos.js'
 
 /*
@@ -80,9 +80,9 @@ const G3: SwarmProtocolType = {
     },
   ],
 }
-const G1_: InterfacingSwarms = [{protocol: G1, interface: null}]
-const G2_: InterfacingSwarms = [{protocol: G2, interface: null}]
-const G3_: InterfacingSwarms = [{protocol: G3, interface: null}]
+const G1_: InterfacingProtocols = [G1]
+const G2_: InterfacingProtocols = [G2]
+const G3_: InterfacingProtocols = [G3]
 const exact_result_subscriptions1: DataResult<Subscriptions> = exactWWFSubscriptions(G1_, {})
 const exact_result_subscriptions2: DataResult<Subscriptions> = exactWWFSubscriptions(G2_, {})
 const exact_result_subscriptions3: DataResult<Subscriptions> = exactWWFSubscriptions(G3_, {})
@@ -193,7 +193,7 @@ describe('checkWWFSwarmProtocol for protocols with overapproximated wwf subscrip
 })
 
 
-const Gcomposed: InterfacingSwarms = [{protocol: G1, interface: null}, {protocol: G2, interface: 'T'}, {protocol: G3, interface: 'F'}]
+const Gcomposed: InterfacingProtocols = [G1, G2, G3]
 const overapprox_result_subscriptions_composed: DataResult<Subscriptions> = overapproxWWFSubscriptions(Gcomposed, {}, "Fine")
 if (overapprox_result_subscriptions_composed.type === 'ERROR') throw new Error('error getting subscription')
 const overapprox_subscriptions_composed: Subscriptions = overapprox_result_subscriptions_composed.data
