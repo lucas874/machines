@@ -1,8 +1,8 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use machine_check::composition::composition_types::{Granularity, InterfacingProtocols};
 use machine_check::composition::{
-    composition_types::InterfacingSwarms, exact_weak_well_formed_sub,
-    overapproximated_weak_well_formed_sub,
+    composition_types::InterfacingSwarms, exact_well_formed_sub,
+    overapproximated_well_formed_sub,
 };
 use machine_check::types::{EventType, Role};
 use serde::{Deserialize, Serialize};
@@ -95,10 +95,10 @@ fn short_bench_general(c: &mut Criterion) {
 
     for (size, interfacing_swarms) in interfacing_swarms_general.iter().step_by(step) {
         group.bench_with_input(BenchmarkId::new("Algorithm 1", size), interfacing_swarms,
-        |b, input| b.iter(|| overapproximated_weak_well_formed_sub(input.clone(), subs.clone(), two_step_granularity.clone())));
+        |b, input| b.iter(|| overapproximated_well_formed_sub(input.clone(), subs.clone(), two_step_granularity.clone())));
 
         group.bench_with_input(BenchmarkId::new("Exact", size), interfacing_swarms,
-        |b, input| b.iter(|| exact_weak_well_formed_sub(input.clone(), subs.clone())));
+        |b, input| b.iter(|| exact_well_formed_sub(input.clone(), subs.clone())));
 
         println!("{}", SPECIAL_SYMBOL);
     }

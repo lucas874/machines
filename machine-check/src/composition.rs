@@ -21,7 +21,7 @@ macro_rules! deserialize_subs {
 }
 
 #[wasm_bindgen]
-pub fn check_wwf_swarm(protos: InterfacingProtocols, subs: String) -> CheckResult {
+pub fn check_composed_swarm(protos: InterfacingProtocols, subs: String) -> CheckResult {
     let subs = deserialize_subs!(subs, |e| CheckResult::ERROR {
         errors: vec![format!("parsing subscriptions: {}", e)]
     });
@@ -36,14 +36,14 @@ pub fn check_wwf_swarm(protos: InterfacingProtocols, subs: String) -> CheckResul
 }
 
 #[wasm_bindgen]
-pub fn exact_weak_well_formed_sub(
+pub fn exact_well_formed_sub(
     protos: InterfacingProtocols,
     subs: String,
 ) -> DataResult<Subscriptions> {
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
         errors: vec![format!("parsing subscriptions: {}", e)]
     });
-    let result = composition_swarm::exact_weak_well_formed_sub(protos, &subs);
+    let result = composition_swarm::exact_well_formed_sub(protos, &subs);
     match result {
         Ok(subscriptions) => DataResult::OK {
             data: subscriptions,
@@ -55,7 +55,7 @@ pub fn exact_weak_well_formed_sub(
 }
 
 #[wasm_bindgen]
-pub fn overapproximated_weak_well_formed_sub(
+pub fn overapproximated_well_formed_sub(
     protos: InterfacingProtocols,
     subs: String,
     granularity: Granularity,
@@ -63,7 +63,7 @@ pub fn overapproximated_weak_well_formed_sub(
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
         errors: vec![format!("parsing subscriptions: {}", e)]
     });
-    let result = composition_swarm::overapprox_weak_well_formed_sub(protos, &subs, granularity);
+    let result = composition_swarm::overapprox_well_formed_sub(protos, &subs, granularity);
     match result {
         Ok(subscriptions) => DataResult::OK {
             data: subscriptions,

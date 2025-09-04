@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import { MachineEvent, SwarmProtocol } from '@actyx/machine-runner'
-import { SwarmProtocolType, Subscriptions, checkWWFSwarmProtocol, DataResult, InterfacingSwarms, overapproxWWFSubscriptions, checkComposedProjection, MachineType, InterfacingProtocols } from '@actyx/machine-check'
+import { SwarmProtocolType, Subscriptions, DataResult, overapproxWFSubscriptions, InterfacingProtocols } from '@actyx/machine-check'
 
 export const manifest = {
   appId: 'com.example.car-factory',
@@ -36,7 +36,7 @@ export const Gwarehouse: SwarmProtocolType = {
 export const warehouse_protocol: InterfacingProtocols = [Gwarehouse]
 
 const result_subs_warehouse: DataResult<Subscriptions>
-  = overapproxWWFSubscriptions(warehouse_protocol, {}, 'TwoStep')
+  = overapproxWFSubscriptions(warehouse_protocol, {}, 'TwoStep')
 if (result_subs_warehouse.type === 'ERROR') throw new Error(result_subs_warehouse.errors.join(', '))
 export var subs_warehouse: Subscriptions = result_subs_warehouse.data
 

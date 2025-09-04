@@ -1,4 +1,4 @@
-import { check_swarm, check_projection, check_wwf_swarm, exact_weak_well_formed_sub, overapproximated_weak_well_formed_sub, check_composed_projection,
+import { check_swarm, check_projection, check_composed_swarm, exact_well_formed_sub, overapproximated_well_formed_sub, check_composed_projection,
   revised_projection, project_combine, compose_protocols, projection_information,
   CheckResult, MachineType, SwarmProtocolType, Subscriptions, InterfacingSwarms as InterfacingSwarmsInner, CompositionComponent as CompositionComponentInner, Role, DataResult, Granularity,
   ProjectionInfo, InterfacingProtocols } from '../pkg/machine_check.js'
@@ -56,8 +56,8 @@ export function checkProjection(
  * @param subscriptions - A subscription.
  * @returns - Result indicating successful verification or a list of error messages.
  */
-export function checkWWFSwarmProtocol(protos: InterfacingProtocols, subscriptions: Subscriptions): CheckResult {
-  return check_wwf_swarm(protos, JSON.stringify(subscriptions))
+export function checkComposedSwarmProtocol(protos: InterfacingProtocols, subscriptions: Subscriptions): CheckResult {
+  return check_composed_swarm(protos, JSON.stringify(subscriptions))
 }
 
 /**
@@ -68,8 +68,8 @@ export function checkWWFSwarmProtocol(protos: InterfacingProtocols, subscription
  * @param subscriptions - A subscription.
  * @returns - Result containing the computed subscription or a list of error messages.
  */
-export function exactWWFSubscriptions(protos: InterfacingProtocols, subscriptions: Subscriptions): DataResult<Subscriptions> {
-  return exact_weak_well_formed_sub(protos, JSON.stringify(subscriptions));
+export function exactWFSubscriptions(protos: InterfacingProtocols, subscriptions: Subscriptions): DataResult<Subscriptions> {
+  return exact_well_formed_sub(protos, JSON.stringify(subscriptions));
 }
 
 /**
@@ -82,8 +82,8 @@ export function exactWWFSubscriptions(protos: InterfacingProtocols, subscription
  * @param granularity - The precision of the approximation.
  * @returns - Result containing the computed subscription or a list of error messages.
  */
-export function overapproxWWFSubscriptions(protos: InterfacingProtocols, subscriptions: Subscriptions, granularity: Granularity): DataResult<Subscriptions> {
-  return overapproximated_weak_well_formed_sub(protos, JSON.stringify(subscriptions), granularity);
+export function overapproxWFSubscriptions(protos: InterfacingProtocols, subscriptions: Subscriptions, granularity: Granularity): DataResult<Subscriptions> {
+  return overapproximated_well_formed_sub(protos, JSON.stringify(subscriptions), granularity);
 }
 
 /**

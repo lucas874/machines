@@ -4,7 +4,7 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import { MachineEvent, SwarmProtocol } from '@actyx/machine-runner'
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, Subscriptions, checkWWFSwarmProtocol, DataResult, InterfacingProtocols, overapproxWWFSubscriptions, checkComposedProjection} from '../../../..'
+import { SwarmProtocolType, Subscriptions, checkComposedSwarmProtocol, DataResult, InterfacingProtocols, overapproxWFSubscriptions, checkComposedProjection} from '../../../..'
 
 /*
  * Example from CoPLaWS slides by Florian Furbach
@@ -52,13 +52,13 @@ const Gquality: SwarmProtocolType = {
 const protocols: InterfacingProtocols = [Gwarehouse, Gfactory, Gquality]
 
 const result_subs: DataResult<Subscriptions>
-  = overapproxWWFSubscriptions(protocols, {}, 'Medium')
+  = overapproxWFSubscriptions(protocols, {}, 'Medium')
 if (result_subs.type === 'ERROR') throw new Error(result_subs.errors.join(', '))
 const subs: Subscriptions = result_subs.data
 
 describe('checkWWFSwarmProtocol for composition with overapproximated wwf subscription', () => {
   it('should be weak-well-formed protocol composition', () => {
-    expect(checkWWFSwarmProtocol(protocols, subs)).toEqual({
+    expect(checkComposedSwarmProtocol(protocols, subs)).toEqual({
       type: 'OK',
     })
   })
@@ -69,7 +69,7 @@ fail_subs['R'] = [Events.car.type]
 
 describe('checkWWFSwarmProtocol for composition with non-wwf subscription', () => {
   it('should not be weak-well-formed protocol composition', () => {
-    expect(checkWWFSwarmProtocol(protocols, fail_subs)).toEqual({
+    expect(checkComposedSwarmProtocol(protocols, fail_subs)).toEqual({
       type: 'ERROR',
       errors: [
         "role R does not subscribe to event types partID, time in branching transitions at state 0 || 0 || 0, but is involved after transition (0 || 0 || 0)--[request@T<partID>]-->(1 || 1 || 0)",

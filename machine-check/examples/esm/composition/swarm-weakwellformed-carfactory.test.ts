@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, checkSwarmProtocol, Subscriptions, checkWWFSwarmProtocol, DataResult, InterfacingProtocols, exactWWFSubscriptions, overapproxWWFSubscriptions} from '../../..'
+import { SwarmProtocolType, checkSwarmProtocol, Subscriptions, checkComposedSwarmProtocol, DataResult, InterfacingProtocols, exactWFSubscriptions, overapproxWFSubscriptions} from '../../..'
 import { Events } from './car-factory-protos.js'
 
 /*
@@ -83,9 +83,9 @@ const G3: SwarmProtocolType = {
 const G1_: InterfacingProtocols = [G1]
 const G2_: InterfacingProtocols = [G2]
 const G3_: InterfacingProtocols = [G3]
-const exact_result_subscriptions1: DataResult<Subscriptions> = exactWWFSubscriptions(G1_, {})
-const exact_result_subscriptions2: DataResult<Subscriptions> = exactWWFSubscriptions(G2_, {})
-const exact_result_subscriptions3: DataResult<Subscriptions> = exactWWFSubscriptions(G3_, {})
+const exact_result_subscriptions1: DataResult<Subscriptions> = exactWFSubscriptions(G1_, {})
+const exact_result_subscriptions2: DataResult<Subscriptions> = exactWFSubscriptions(G2_, {})
+const exact_result_subscriptions3: DataResult<Subscriptions> = exactWFSubscriptions(G3_, {})
 
 describe('extended subscriptions', () => {
   it('subscription1 should be ok', () => {
@@ -142,27 +142,27 @@ describe('checkSwarmProtocol for protocols with exact wwf subscription', () => {
 
 describe('checkWWFSwarmProtocol for protocols with exact wwf subscription', () => {
   it('should be weak-well-formed protocol G1', () => {
-    expect(checkWWFSwarmProtocol(G1_, exact_subscriptions1)).toEqual({
+    expect(checkComposedSwarmProtocol(G1_, exact_subscriptions1)).toEqual({
       type: 'OK',
     })
   })
 
   it('should be weak-well-formed protocol G1', () => {
-    expect(checkWWFSwarmProtocol(G2_, exact_subscriptions2)).toEqual({
+    expect(checkComposedSwarmProtocol(G2_, exact_subscriptions2)).toEqual({
       type: 'OK',
     })
   })
 
   it('should be weak-well-formed protocol G1', () => {
-    expect(checkWWFSwarmProtocol(G3_, exact_subscriptions3)).toEqual({
+    expect(checkComposedSwarmProtocol(G3_, exact_subscriptions3)).toEqual({
       type: 'OK',
     })
   })
 })
 
-const overapprox_result_subscriptions1: DataResult<Subscriptions> = overapproxWWFSubscriptions(G1_, {}, "Coarse")
-const overapprox_result_subscriptions2: DataResult<Subscriptions> = overapproxWWFSubscriptions(G2_, {}, "Coarse")
-const overapprox_result_subscriptions3: DataResult<Subscriptions> = overapproxWWFSubscriptions(G3_, {}, "Coarse")
+const overapprox_result_subscriptions1: DataResult<Subscriptions> = overapproxWFSubscriptions(G1_, {}, "Coarse")
+const overapprox_result_subscriptions2: DataResult<Subscriptions> = overapproxWFSubscriptions(G2_, {}, "Coarse")
+const overapprox_result_subscriptions3: DataResult<Subscriptions> = overapproxWFSubscriptions(G3_, {}, "Coarse")
 if (overapprox_result_subscriptions1.type === 'ERROR') throw new Error('error getting subscription')
 const overapprox_subscriptions1: Subscriptions = overapprox_result_subscriptions1.data
 
@@ -174,19 +174,19 @@ const overapprox_subscriptions3: Subscriptions = overapprox_result_subscriptions
 
 describe('checkWWFSwarmProtocol for protocols with overapproximated wwf subscription', () => {
   it('should be weak-well-formed protocol G1', () => {
-    expect(checkWWFSwarmProtocol(G1_, overapprox_subscriptions1)).toEqual({
+    expect(checkComposedSwarmProtocol(G1_, overapprox_subscriptions1)).toEqual({
       type: 'OK',
     })
   })
 
   it('should be weak-well-formed protocol G1', () => {
-    expect(checkWWFSwarmProtocol(G2_, overapprox_subscriptions2)).toEqual({
+    expect(checkComposedSwarmProtocol(G2_, overapprox_subscriptions2)).toEqual({
       type: 'OK',
     })
   })
 
   it('should be weak-well-formed protocol G1', () => {
-    expect(checkWWFSwarmProtocol(G3_, overapprox_subscriptions3)).toEqual({
+    expect(checkComposedSwarmProtocol(G3_, overapprox_subscriptions3)).toEqual({
       type: 'OK',
     })
   })
@@ -194,13 +194,13 @@ describe('checkWWFSwarmProtocol for protocols with overapproximated wwf subscrip
 
 
 const Gcomposed: InterfacingProtocols = [G1, G2, G3]
-const overapprox_result_subscriptions_composed: DataResult<Subscriptions> = overapproxWWFSubscriptions(Gcomposed, {}, "Fine")
+const overapprox_result_subscriptions_composed: DataResult<Subscriptions> = overapproxWFSubscriptions(Gcomposed, {}, "Fine")
 if (overapprox_result_subscriptions_composed.type === 'ERROR') throw new Error('error getting subscription')
 const overapprox_subscriptions_composed: Subscriptions = overapprox_result_subscriptions_composed.data
 
 describe('checkWWFSwarmProtocol for composition with overapproximated wwf subscription', () => {
   it('should be weak-well-formed protocol G1', () => {
-    expect(checkWWFSwarmProtocol(Gcomposed, overapprox_subscriptions_composed)).toEqual({
+    expect(checkComposedSwarmProtocol(Gcomposed, overapprox_subscriptions_composed)).toEqual({
       type: 'OK',
     })
   })

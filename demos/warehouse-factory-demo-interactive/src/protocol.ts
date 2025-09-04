@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import { MachineEvent, SwarmProtocol } from '@actyx/machine-runner'
-import { SwarmProtocolType, Subscriptions, Result, DataResult, overapproxWWFSubscriptions, checkWWFSwarmProtocol, InterfacingProtocols } from '@actyx/machine-check'
+import { SwarmProtocolType, Subscriptions, Result, DataResult, overapproxWFSubscriptions, checkComposedSwarmProtocol, InterfacingProtocols } from '@actyx/machine-check'
 import chalk from "chalk";
 
 export const manifest = {
@@ -50,19 +50,19 @@ export const listOfProtocols: InterfacingProtocols = [Gwarehouse, Gfactory]
 
 // Well-formed subscription for the warehouse protocol
 const resultSubsWarehouse: DataResult<Subscriptions>
-  = overapproxWWFSubscriptions(warehouseProtocol, {}, 'TwoStep')
+  = overapproxWFSubscriptions(warehouseProtocol, {}, 'TwoStep')
 if (resultSubsWarehouse.type === 'ERROR') throw new Error(resultSubsWarehouse.errors.join(', '))
 export var subsWarehouse: Subscriptions = resultSubsWarehouse.data
 
 // Well-formed subscription for the factory protocol
 const resultSubsFactory: DataResult<Subscriptions>
-  = overapproxWWFSubscriptions(factoryProtocol, {}, 'TwoStep')
+  = overapproxWFSubscriptions(factoryProtocol, {}, 'TwoStep')
 if (resultSubsFactory.type === 'ERROR') throw new Error(resultSubsFactory.errors.join(', '))
 export var subsFactory: Subscriptions = resultSubsFactory.data
 
 // Well-formed subscription for the warehouse || factory protocol
 const resultSubsComposition: DataResult<Subscriptions>
-  = overapproxWWFSubscriptions(listOfProtocols, {}, 'TwoStep')
+  = overapproxWFSubscriptions(listOfProtocols, {}, 'TwoStep')
 if (resultSubsComposition.type === 'ERROR') throw new Error(resultSubsComposition.errors.join(', '))
 export var subscriptions: Subscriptions = resultSubsComposition.data
 
@@ -70,7 +70,7 @@ export var subscriptions: Subscriptions = resultSubsComposition.data
 //subs_composition['FL'] = ['pos']
 
 // check that the subscription generated for the composition is indeed well-formed
-const resultCheckWF: Result = checkWWFSwarmProtocol(listOfProtocols, subscriptions)
+const resultCheckWF: Result = checkComposedSwarmProtocol(listOfProtocols, subscriptions)
 if (resultCheckWF.type === 'ERROR') throw new Error(resultCheckWF.errors.join(', \n'))
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random

@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, Subscriptions, MachineType, checkWWFSwarmProtocol, DataResult, InterfacingProtocols, exactWWFSubscriptions, overapproxWWFSubscriptions, composeProtocols} from '../../..'
+import { SwarmProtocolType, Subscriptions, DataResult, InterfacingProtocols, checkComposedSwarmProtocol, exactWFSubscriptions, overapproxWFSubscriptions, composeProtocols} from '../../..'
 import { Events } from './car-factory-protos.js'
 
 /*
@@ -81,8 +81,8 @@ const G3: SwarmProtocolType = {
   ],
 }
 const interfacing_swarms: InterfacingProtocols = [G1, G2, G3]
-const exact_result_subscriptions: DataResult<Subscriptions> = exactWWFSubscriptions(interfacing_swarms, {})
-const overapprox_result_subscriptions: DataResult<Subscriptions> = overapproxWWFSubscriptions(interfacing_swarms, {}, "Coarse")
+const exact_result_subscriptions: DataResult<Subscriptions> = exactWFSubscriptions(interfacing_swarms, {})
+const overapprox_result_subscriptions: DataResult<Subscriptions> = overapproxWFSubscriptions(interfacing_swarms, {}, "Coarse")
 
 describe('subscriptions', () => {
   it('exact should be ok', () => {
@@ -103,13 +103,13 @@ const overapprox_subscriptions: Subscriptions = overapprox_result_subscriptions.
 
 describe('checkWWFSwarmProtocol G1 || G2 || G3 with generated subsription', () => {
   it('should be weak-well-formed protocol w.r.t. exact', () => {
-    expect(checkWWFSwarmProtocol(interfacing_swarms, exact_subscriptions)).toEqual({
+    expect(checkComposedSwarmProtocol(interfacing_swarms, exact_subscriptions)).toEqual({
       type: 'OK',
     })
   })
 
   it('should be weak-well-formed protocol w.r.t. overapproximation', () => {
-    expect(checkWWFSwarmProtocol(interfacing_swarms, overapprox_subscriptions)).toEqual({
+    expect(checkComposedSwarmProtocol(interfacing_swarms, overapprox_subscriptions)).toEqual({
       type: 'OK',
     })
   })
@@ -155,13 +155,13 @@ describe('various tests', () => {
 // fix this error being recorded twice.
 describe('various errors', () => {
   it('subscription for empty list of protocols', () => {
-    expect(overapproxWWFSubscriptions([], {}, "Coarse")).toEqual({
+    expect(overapproxWFSubscriptions([], {}, "Coarse")).toEqual({
       type: 'OK',
       data: {}
     })
   })
   it('subscription for empty list of protocols', () => {
-    expect(exactWWFSubscriptions([], {})).toEqual({
+    expect(exactWFSubscriptions([], {})).toEqual({
       type: 'OK',
       data: {}
     })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, Subscriptions, checkWWFSwarmProtocol, DataResult, InterfacingProtocols, exactWWFSubscriptions} from '../../..'
+import { SwarmProtocolType, Subscriptions, checkComposedSwarmProtocol, DataResult, InterfacingProtocols, exactWFSubscriptions} from '../../..'
 import { Events } from './car-factory-protos.js'
 
 /*
@@ -80,7 +80,7 @@ const G1_: InterfacingProtocols = [G1]
 const G3_: InterfacingProtocols = [G3]
 
 
-const result_subscriptions3: DataResult<Subscriptions> = exactWWFSubscriptions(G3_, {})
+const result_subscriptions3: DataResult<Subscriptions> = exactWFSubscriptions(G3_, {})
 
 describe('check confusion-ful protocols G1 and G3', () => {
   it('result should not be ok', () => {
@@ -95,7 +95,7 @@ describe('check confusion-ful protocols G1 and G3', () => {
 
 describe('checkWWFSwarmProtocol G1', () => {
   it('should catch not well-formed protocol', () => {
-    expect(checkWWFSwarmProtocol(G1_, subscriptions1)).toEqual({
+    expect(checkComposedSwarmProtocol(G1_, subscriptions1)).toEqual({
       type: 'ERROR',
       errors: [
         "role FL does not subscribe to event types time in branching transitions at state 0, but is involved after transition (0)--[request@T<partID>]-->(1)",

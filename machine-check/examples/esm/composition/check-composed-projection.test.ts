@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, Subscriptions, DataResult, InterfacingProtocols, checkComposedProjection, overapproxWWFSubscriptions} from '../../..'
+import { SwarmProtocolType, Subscriptions, DataResult, InterfacingProtocols, checkComposedProjection, overapproxWFSubscriptions} from '../../..'
 import { Events, Composition } from './car-factory-protos.js'
 
 
@@ -95,7 +95,7 @@ const G2: SwarmProtocolType = {
 }
 
 const interfacing_swarms: InterfacingProtocols = [G1, G2]
-const overapprox_result_subscriptions: DataResult<Subscriptions> = overapproxWWFSubscriptions(interfacing_swarms, {}, "Coarse")
+const overapprox_result_subscriptions: DataResult<Subscriptions> = overapproxWFSubscriptions(interfacing_swarms, {}, "Coarse")
 
 describe('subscriptions', () => {
   it('overapproximation should be ok', () => {
