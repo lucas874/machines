@@ -121,11 +121,11 @@ pub fn project_combine(
 
 #[wasm_bindgen]
 pub fn projection_information(
-    protos: InterfacingProtocols,
-    subs: String,
     role: Role,
-    machine: MachineType,
+    protos: InterfacingProtocols,
     k: usize,
+    subs: String,
+    machine: MachineType,
     minimize: bool,
 ) -> DataResult<ProjectionInfo> {
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
@@ -165,8 +165,6 @@ pub fn projection_information(
     }
 }
 
-// check an implementation against the combined projection of swarms over role.
-// consider also offering one projecting over explicit projection?
 #[wasm_bindgen]
 pub fn check_composed_projection(
     protos: InterfacingProtocols,

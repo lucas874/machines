@@ -159,7 +159,7 @@ export namespace SwarmProtocol {
       adaptMachine: (role, protocols, k, subscriptions, oldMachine, verbose?) => {
         const minimize = false
         const [mOld, mOldInitial] = oldMachine
-        const projectionInfo = projectionInformation(protocols, subscriptions, role, mOld.createJSONForAnalysis(mOldInitial), k, minimize)
+        const projectionInfo = projectionInformation(role, protocols, k, subscriptions, mOld.createJSONForAnalysis(mOldInitial), minimize)
         if (projectionInfo.type == 'ERROR') {
           return {data: undefined, ... projectionInfo}
         }

@@ -26,5 +26,6 @@
     "strictPropertyInitialization": true,
     "stripInternal": true,
     "target": "es2019"
-  }
+  },
+  "exclude": ["node_modules", "tests", "**/*.test.ts"]
 }
