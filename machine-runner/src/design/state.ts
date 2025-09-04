@@ -357,15 +357,17 @@ export namespace StateMechanism {
 
     const commandFromList: Self['commandFromList'] = (cmds) => {
       var acc: any;
-      const mechanisms = new Array();
-
+      const commands = new Array();
+      const commandDefinitions = new Array()
       for (var [name, events, handler] of cmds) {
         acc = command(name, events, handler)
-        mechanisms.push(acc.commands)
+        commands.push(acc.commands)
+        commandDefinitions.push(acc.commandDefinitions)
       }
-      let allcmds = mechanisms.reduce((acc, obj) => ({ ...acc, ...obj }), {});
+      let allcmds = commands.reduce((acc, obj) => ({ ...acc, ...obj }), {});
+      let allCommandDefinitions = commandDefinitions.reduce((acc, obj) => ({ ...acc, ...obj }), {});
       acc.commands = allcmds
-
+      acc.commandDefinitions = allCommandDefinitions
       return acc;
     }
 

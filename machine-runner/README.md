@@ -7,7 +7,7 @@ The detailed documentation of this library is provided in its JsDoc comments.
 
 ## Example usage
 
-[More detailed tutorial can be found here](../docs/swarm-workflow)
+[More detailed tutorial can be found here](https://github.com/lucas874/machines/tree/master/docs/swarm-workflow)
 
 We demonstrate the usage of our decentralized state machines on an example from manufacturing automation, i.e. the factory shop floor: a warehouse requests the fleet of logistics robots to pick something up and bring it somewhere else.
 Our task is to write the logic for the warehouse and for each of the robots so that the job will eventually be done.
@@ -19,17 +19,24 @@ First we define our set of events:
 
 ```typescript
 // sent by the warehouse to get things started
-const requested = Event.design('requested')
+export const request = Event.design('request')
   .withPayload<{ id: string; from: string; to: string }>()
 // sent by each available candidate robot to register interest
-const bid = Event.design('bid')
-  .withPayload<{ robot: string; delay: number }>()
+export const bid = Event.design('bid')
+  .withPayload<{ robot: string; delay: number, id: string }>()
 // sent by the robots
-const selected = Event.design('selected')
-  .withPayload<{ winner: string }>()
+export const selected = Event.design('selected')
+  .withPayload<{ winner: string, id: string }>()
+// sent by the robot performing the delivery
+export const deliver = Event.design('deliver')
+  .withPayload<{ id: string }>()
+// sent by the warehouse to acknowledge delivery
+export const ack = Event.design('acknowledge')
+  .withPayload<{ id: string }>()
+
 
 // declare a precisely typed tuple of all events we can now choose from
-const transportOrderEvents = [requested, bid, selected] as const
+const transportOrderEvents = [request, bid, selected, deliver, ack] as const
 ```
 
 Then we can declare a swarm protocol using these events:
@@ -48,16 +55,30 @@ const TransportOrderForWarehouse =
 
 // add initial state with command to request the transport
 export const InitialWarehouse = TransportOrderForWarehouse
-  .designState('Initial')
-  .withPayload<{ id: string }>()
-  .command('request', [requested], (ctx, from: string, to: string) =>
-                                   [{ id: ctx.self.id, from, to }])
+  .designEmpty('Initial')
+  .command('request', [request], (_ctx, id: string, from: string, to: string) =>
+                                   [{ id, from, to }])
+  .finish()
+
+// add state entered after performing the request
+export const RequestedWarehouse = TransportOrderForWarehouse
+  .designEmpty('Requested')
+  .finish()
+
+// add state for acknowledging a delivery entered after a robot has performed the delivery
+export const AcknowledgeWarehouse = TransportOrderForWarehouse
+  .designEmpty('Acknowledge')
+  .command('acknowledge', [ack], (_ctx, id: string) =>
+                                   [{ id }])
   .finish()
 
 export const DoneWarehouse = TransportOrderForWarehouse.designEmpty('Done').finish()
 
-// describe the transition into the `Done` state after request has been made
-InitialWarehouse.react([requested], DoneWarehouse, (_ctx, _r) => [{}])
+// describe the transition into the `Requested` state after request has been made
+InitialWarehouse.react([request], RequestedWarehouse, (_ctx, _r) => [{}])
+// Des
+RequestedWarehouse.react([request], DoneWarehouse, (_ctx, _r) => [{}])
+InitialWarehouse.react([request], DoneWarehouse, (_ctx, _r) => [{}])
 ```
 
 The `robot` state machine is constructed in the same way, albeit with more commands and state transitions:
@@ -352,7 +373,7 @@ warehouse.events.on('error', (error) => {
   if (error instanceof MachineRunnerErrorCommandFiredAfterLocked) {
     //
   }
-  
+
   if (error instanceof MachineRunnerErrorCommandFiredAfterDestroyed) {
     //
   }
@@ -369,7 +390,7 @@ warehouse.events.on('error', (error) => {
 
 A `next` event is emitted when a state transition happens and the machine runner has processed all events matching the supplied tag.
 
-The payload is `StateOpaque`, similar to the value produced in the `for-await` loop. 
+The payload is `StateOpaque`, similar to the value produced in the `for-await` loop.
 
 ##### `error`
 
@@ -386,7 +407,7 @@ The payload has an error subtype.
 A `change` event is emitted when a `next` event is emitted, a command is issued, a command’s event has been published, or a subscription error happened due to losing a connection to Actyx.
 This event is particularly useful in UI code where not only state changes are tracked, but also command availability and errors.
 
-The payload is of type `StateOpaque`, like the value produced in the `for-await` loop. 
+The payload is of type `StateOpaque`, like the value produced in the `for-await` loop.
 
 ##### `debug.bootTime`
 
