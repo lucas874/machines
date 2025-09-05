@@ -385,44 +385,31 @@ Finally, using the subscription, we can adapt the machines and run them using *b
 
 ```typescript
 // Adapted machines.
-export const [assemblyRobotAdapted, initialAssemblyAdapted] =
-  AssemblyProtocol.adaptMachine('assemblyRobot',
+export const [assemblyRobotAdapted, initialAssemblyAdapted] = AssemblyProtocol.adaptMachine('assemblyRobot',
   [transportOrderProtocol, assemblyLineProtocol], 1,
   subscriptions, [AssemblyRobot, InitialAssemblyRobot], true).data!
 
-export const [transportAdapted, initialTransportAdapted] =
-  TransportOrder.adaptMachine('transportRobot',
+export const [transportAdapted, initialTransportAdapted] = TransportOrder.adaptMachine('transportRobot',
   [transportOrderProtocol, assemblyLineProtocol], 0,
   subscriptions, [TransportRobot, InitialTransport], true).data!
 
-export const [warehouseAdapted, warehouseInitialAdapted] =
-  TransportOrder.adaptMachine('warehouse',
+export const [warehouseAdapted, warehouseInitialAdapted] = TransportOrder.adaptMachine('warehouse',
   [transportOrderProtocol, assemblyLineProtocol], 0,
   subscriptions, [Warehouse, InitialWarehouse], true).data!
 
 ...
 
 // Branch-tracking machine runners
-const assemblyRobot = createMachineRunnerBT(app, tags, initialAssemblyAdapted, undefined, assemblyRobotAdapted)
-const transportRobot = createMachineRunnerBT(app, tags, initialTransportAdapted, initialPayload, transportAdapted)
-const warehouse = createMachineRunnerBT(app, tags, initialWarehouseAdapted, undefined, warehouseAdapted)
+const assemblyRobot =
+  createMachineRunnerBT(app, tags, initialAssemblyAdapted, undefined, assemblyRobotAdapted)
+const transportRobot =
+  createMachineRunnerBT(app, tags, initialTransportAdapted, initialPayload, transportAdapted)
+const warehouse =
+  createMachineRunnerBT(app, tags, initialWarehouseAdapted, undefined, warehouseAdapted)
 ```
 
-
-
-With these preparations in place, we can construct a composed swarm where the assembly robot and the machines implemented
-for the transport order work together. We do this by *adapting* the macines to the composition
-of the transport order and the assembly line protocols.
-
-
-The transport order workflow offers the functionality of orchestrating
-a fleet of robots to deliver some requested item from the warehouse. We can reuse this functionality
-in another protocol by specifying a workflow that uses the `warehouse` role to handle material transportation.
-
-
-
-
-Notice how the `warehouse` role from the `transportOrderProtocol` appears in the workflow above. By doing so we can implement a
+For brevity in some of the examples above, code that resides in different files were shown together.
+The full executable example outlined above is found [here](https://github.com/lucas874/machines/tree/update-packages/demos/warehouse-readme-demo).
 
 ### Errors
 
