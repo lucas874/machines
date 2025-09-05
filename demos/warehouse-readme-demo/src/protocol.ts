@@ -5,7 +5,7 @@ import chalk from "chalk";
 
 export const manifest = {
   appId: 'com.example.warehouse-factory',
-  displayName: 'Warehouse-Factory',
+  displayName: 'warehouse-factory',
   version: '1.0.0',
 }
 
@@ -35,7 +35,7 @@ export namespace Events {
 
 export const Composition = SwarmProtocol.make('Composition', Events.allEvents)
 
-export const warehouseProtocol: SwarmProtocolType = {
+export const transportOrderProtocol: SwarmProtocolType = {
   initial: 'initial',
   transitions: [
     {source: 'initial', target: 'auction', label: {cmd: 'request', role: 'warehouse', logType: [Events.request.type]}},
@@ -46,7 +46,7 @@ export const warehouseProtocol: SwarmProtocolType = {
   ]
 }
 
-export const factoryProtocol: SwarmProtocolType = {
+export const assemblyLineProtocol: SwarmProtocolType = {
   initial: 'initial',
   transitions: [
     {source: 'initial', target: 'req', label: { cmd: 'request', role: 'warehouse', logType: [Events.request.type]}},
@@ -58,24 +58,24 @@ export const factoryProtocol: SwarmProtocolType = {
 
 // Well-formed subscription for the warehouse protocol
 const result_subs_warehouse: DataResult<Subscriptions>
-  = overapproxWFSubscriptions([warehouseProtocol], {}, 'TwoStep')
+  = overapproxWFSubscriptions([transportOrderProtocol], {}, 'TwoStep')
 if (result_subs_warehouse.type === 'ERROR') throw new Error(result_subs_warehouse.errors.join(', '))
 export const subsWarehouse: Subscriptions = result_subs_warehouse.data
 
 // Well-formed subscription for the factory protocol
 const resultSubsFactory: DataResult<Subscriptions>
-  = overapproxWFSubscriptions([factoryProtocol], {}, 'TwoStep')
+  = overapproxWFSubscriptions([assemblyLineProtocol], {}, 'TwoStep')
 if (resultSubsFactory.type === 'ERROR') throw new Error(resultSubsFactory.errors.join(', '))
 export var subsFactory: Subscriptions = resultSubsFactory.data
 
 // Well-formed subscription for the warehouse || factory protocol
 const resultSubsComposition: DataResult<Subscriptions>
-  = overapproxWFSubscriptions([warehouseProtocol, factoryProtocol], {}, 'TwoStep')
+  = overapproxWFSubscriptions([transportOrderProtocol, assemblyLineProtocol], {}, 'TwoStep')
 if (resultSubsComposition.type === 'ERROR') throw new Error(resultSubsComposition.errors.join(', '))
 export var subscriptions: Subscriptions = resultSubsComposition.data
 
 // check that the subscription generated for the composition is indeed well-formed
-const resultCheckWf: Result = checkComposedSwarmProtocol([warehouseProtocol, factoryProtocol], subscriptions)
+const resultCheckWf: Result = checkComposedSwarmProtocol([transportOrderProtocol, assemblyLineProtocol], subscriptions)
 if (resultCheckWf.type === 'ERROR') throw new Error(resultCheckWf.errors.join(', \n'))
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random

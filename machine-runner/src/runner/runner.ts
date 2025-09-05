@@ -1624,6 +1624,7 @@ export namespace ImplStateOpaque {
         stateAtSnapshot,
       })
 
+    // improve this to use projection information.
     const isLike: ThisStateOpaque['isLike'] = function <F extends StateFactory<SwarmProtocolName, any, any, any, any, any>>(
       factory: F
     ): this is StateOpaque.Of<F> {

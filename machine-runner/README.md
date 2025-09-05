@@ -72,20 +72,21 @@ const SelectedWarehouse = TransportOrderForWarehouse
 const AcknowledgeWarehouse = TransportOrderForWarehouse
   .designState('Acknowledge')
   .withPayload<{id: string}>()
-  .command('acknowledge', [Events.ack], (ctx) => [{ id: ctx.self.id }])
+  .command('acknowledge', [Events.ack],
+    (ctx) => [{ id: ctx.self.id }])
   .finish()
 
 const DoneWarehouse = TransportOrderForWarehouse.designEmpty('Done').finish()
 
 // describe the transition into the `AuctionWarehouse` state after request has been made
-InitialWarehouse.react([Events.request], AuctionWarehouse, (_ctx, _event) => [{}])
+InitialWarehouse.react([Events.request], AuctionWarehouse, (_ctx, _event) => {})
 // describe the transitions from the `AuctionWarehouse` state
-AuctionWarehouse.react([Events.bid], AuctionWarehouse, (_ctx, _event) => [{}])
-AuctionWarehouse.react([Events.selected], SelectedWarehouse, (_ctx, _event) => [{}])
+AuctionWarehouse.react([Events.bid], AuctionWarehouse, (_ctx, _event) => {})
+AuctionWarehouse.react([Events.selected], SelectedWarehouse, (_ctx, _event) => {})
 // describe the transitions from the `SelectedWarehouse` state
 SelectedWarehouse.react([Events.deliver], AcknowledgeWarehouse, (_ctx, event) => AcknowledgeWarehouse.make({id: event.payload.id}))
 // describe the transitions from the `AcknoweledgeWarehouse` state
-AcknowledgeWarehouse.react([Events.ack], DoneWarehouse, (_ctx, _event) => [{}])
+AcknowledgeWarehouse.react([Events.ack], DoneWarehouse, (_ctx, _event) => {})
 ```
 
 The `robot` state machine is constructed in the same way:
@@ -137,15 +138,15 @@ DoIt.react([Events.deliver], Done, (_ctx) => {[]})
 
 ### Checking the machines
 
-<img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/update-packages/demos/warehouse-readme-demo/warehouse-protocol.svg" alt="workflow" width="300" />
+<img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/update-packages/demos/warehouse-readme-demo/transport-order-protocol.svg" alt="transport order workflow" width="300" />
 
-The part of the transport order workflow implemented in the previous section is visualized above as a UML state diagram.
+The transport order workflow implemented in the previous section is visualized above as a UML state diagram.
 With the `@actyx/machine-check` library we can check that this workflow makes sense (i.e. it achieves eventual consensus, which is the same kind of consensus used by the bitcoin network to settle transactions), and we can also check that our state machines written down in code implement this workflow correctly.
 
 To this end, we first need to declare the graph in JSON notation:
 
 ```typescript
-export const warehouseProtocol: SwarmProtocolType = {
+export const transportOrderProtocol: SwarmProtocolType = {
   initial: 'initial',
   transitions: [
     {source: 'initial', target: 'auction',
@@ -166,7 +167,7 @@ The naming of states does not need to be the same as in our code, but the event 
 With this preparation, we can perform the behavioral type checking as follows:
 
 ```typescript
-import { SwarmProtocolType, checkProjection, checkSwarmProtocol } from '@actyx/machine-check'
+import { checkComposedProjection, checkComposedSwarmProtocol } from '@actyx/machine-check'
 
 const robotJSON =
   TransportOrderForRobot.createJSONForAnalysis(Initial)
@@ -181,9 +182,9 @@ const subscriptions = {
 // the code (you would normally verify this using your favorite unit
 // testing framework)
 console.log(
-  checkComposedSwarmProtocol(proto, subscriptions),
-  checkComposedProjection(proto, subscriptions, 'robot', robotJSON),
-  checkComposedProjection(proto, subscriptions, 'warehouse', warehouseJSON),
+  checkComposedSwarmProtocol([transportOrderProtocol], subscriptions),
+  checkComposedProjection([transportOrderProtocol], subscriptions, 'robot', robotJSON),
+  checkComposedProjection([transportOrderProtocol], subscriptions, 'warehouse', warehouseJSON),
 )
 ```
 
@@ -195,11 +196,11 @@ Therefore, before we can run our machines we need to use the Actyx SDK to connec
 
 ```typescript
 const actyx = await Actyx.of(
-  { appId: 'com.example.acm', displayName: 'example', version: '0.0.1' })
-const tags = transportOrder.tagWithEntityId('4711')
-const robot1 = createMachineRunner(actyx, tags, Initial, { robot: 'agv1' })
-const warehouse = createMachineRunner(actyx, tags, InitialWarehouse,
-                                      { id: '4711' })
+  { appId: 'com.example.warehouse-factory', displayName: 'warehouse-factory', version: '1.0.0' })
+
+const tags = transportOrder.tagWithEntityId('warehouse-factory')
+const transportRobot = createMachineRunner(app, tags, initialAdapted, { robot: "robotId" })
+const warehouse = createMachineRunner(app, tags, warehouseInitialAdapted, undefined)
 ```
 
 The `tags` can be thought of as the name of a [dedicated pub–sub channel](https://developer.actyx.com/docs/conceptual/tags) for this particular workflow instance.
@@ -209,43 +210,45 @@ Getting the process started means interacting with the state machines:
 
 ```typescript
 for await (const state of warehouse) {
-  if (state.is(InitialWarehouse)) {
-    await state.cast().commands()?.request('from', 'to')
-  } else {
-    // this role is done
-    break
+  if (state.isLike(InitialWarehouse)) {
+    await state.cast().commands()?.request(parts[Math.floor(Math.random() * parts.length)], "a", "b")
+  }
+  if (state.isL ike(AcknowledgeWarehouse)) {
+    await state.cast().commands()?.acknowledge()
   }
 }
 ```
 
 The `warehouse` machine implements the [async iterator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#the_async_iterator_and_async_iterable_protocols) JavaScript protocol, which makes it conveniently consumable using a `for await (...)` loop.
-Exiting this loop, e.g. using `break` as shown, will destroy the `warehouse` running machine, including cancelling the underlying Actyx event subscription for live updates.
+Exiting this loop, e.g. using `break` as shown below, will destroy the running machine, including cancelling the underlying Actyx event subscription for live updates.
 
 Using the `robot` role we demonstrate a few more features of the machine runner:
 
 ```typescript
 let IamWinner = false
+for await (const state of transportRobot) {
+if (state.isLike(Auction)) {
+    const auction = state.cast()
+    if (!auction.payload.scores.find((s) => s.robot === auction.payload.robot)) {
 
-for await (const state of robot1) {
-  if (state.is(Auction)) {
-    const open = state.cast()
-    if (!open.payload.scores.find((s) => s.robot === open.payload.robot)) {
-      await open.commands()?.bid(1)
-      setTimeout(() => {
-        const open = robot1.get()?.as(Auction)
-        open && open.commands()?.select(bestRobot(open.payload.scores))
-      }, 5000)
+        auction.commands()?.bid(getRandomInt(1, 10))
+        setTimeout(() => {
+            const stateAfterTimeOut = transportRobot.get()
+            if (stateAfterTimeOut?.isLike(Auction)) {
+                stateAfterTimeOut?.cast().commands()?.select(bestRobot(auction.payload.scores))
+            }
+        }, 3000)
     }
-  } else if (state.is(DoIt)) {
-    const assigned = state.cast()
-    IamWinner = assigned.payload.winner === assigned.payload.robot
-    if (!IamWinner) break
-    // now we have the order and can start the mission
-  }
+    } else if (state.isLike(DoIt)) {
+        const assigned = state.cast()
+        IamWinner = assigned.payload.winner === assigned.payload.robot
+        if (!IamWinner) break
+        assigned.commands()?.deliver()
+    }
 }
 ```
 
-The first one is that the accumulated state is inspected in the `state.is(Auction)` case to see whether this particular robot has already provided its bid for the auction.
+The first one is that the accumulated state is inspected in the `state.isLike(Auction)` case to see whether this particular robot has already provided its bid for the auction.
 If not, it will do so by invoking a command, which will subsequently lead to the emission of a `bid` event and consequently to a new state being emitted from the machine, so a new round through the `for await` loop — this time we’ll find our bid in the list, though.
 
 The second part is that upon registering our bid, we also set a timer to expire after 5sec.
@@ -254,6 +257,21 @@ If the workflow still is in the `Auction` state, we compute the best robot bid (
 
 The third feature becomes relevant once the auction has ended: we check if our robot is indeed the winner and record that in a variable `IamWinner`, i.e. in the current application in-memory state.
 Then we can use this information in all following states as well.
+
+### Composing swarms
+Suppose that the transport order swarm protocol is used at a factory facility where
+materials from the warehouse are needed on the assembly line.
+We can utilise the services offered by the transport order protocol on the assembly line be specifying a workflow
+that uses the `warehouse` role to handle material transportation.
+A simple swarm protocol specifying a workflow where an assembly robot requests an item from the warehouse and uses
+it to assemble a product is shown below.
+
+<img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/update-packages/demos/warehouse-readme-demo/assembly-protocol.svg" alt="assembly line workflow" width="300" />
+
+Notice how the `warehouse` role from the `transportOrderProtocol` appears in the workflow above.
+By d
+
+
 
 ### Change detection on for-await loop
 

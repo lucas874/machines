@@ -1,7 +1,7 @@
 import { checkComposedProjection, checkComposedSwarmProtocol } from '@actyx/machine-check'
 import { TransportOrderForRobot, Initial } from './transport_robot'
 import { TransportOrderForWarehouse, InitialWarehouse } from './warehouse'
-import { warehouseProtocol } from './protocol'
+import { transportOrderProtocol } from './protocol'
 
 const robotJSON =
   TransportOrderForRobot.createJSONForAnalysis(Initial)
@@ -16,7 +16,7 @@ const subscriptions = {
 // the code (you would normally verify this using your favorite unit
 // testing framework)
 console.log(
-  checkComposedSwarmProtocol([warehouseProtocol], subscriptions),
-  checkComposedProjection([warehouseProtocol], subscriptions, 'robot', robotJSON),
-  checkComposedProjection([warehouseProtocol], subscriptions, 'warehouse', warehouseJSON),
+  checkComposedSwarmProtocol([transportOrderProtocol], subscriptions),
+  checkComposedProjection([transportOrderProtocol], subscriptions, 'robot', robotJSON),
+  checkComposedProjection([transportOrderProtocol], subscriptions, 'warehouse', warehouseJSON),
 )

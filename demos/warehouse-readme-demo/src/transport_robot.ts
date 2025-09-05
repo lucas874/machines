@@ -1,4 +1,4 @@
-import { Events, Composition, subsWarehouse, warehouseProtocol, factoryProtocol, subscriptions } from './protocol'
+import { Events, Composition, subsWarehouse, transportOrderProtocol, assemblyLineProtocol, subscriptions } from './protocol'
 import { checkComposedProjection } from '@actyx/machine-check';
 
 export const TransportOrderForRobot = Composition.makeMachine('robot')
@@ -45,4 +45,4 @@ Auction.react([Events.selected], DoIt, (ctx, s) =>
 DoIt.react([Events.deliver], Done, (_ctx) => {[]})
 
 // Adapted machine. Adapting here has no effect. Except that we can make a verbose machine.
-export const [transportAdapted, initialAdapted] = Composition.adaptMachine('robot', [warehouseProtocol, factoryProtocol], 0, subscriptions, [TransportOrderForRobot, Initial], true).data!
+export const [transportAdapted, initialAdapted] = Composition.adaptMachine('robot', [transportOrderProtocol, assemblyLineProtocol], 0, subscriptions, [TransportOrderForRobot, Initial], true).data!
