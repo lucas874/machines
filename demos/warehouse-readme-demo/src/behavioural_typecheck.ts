@@ -1,22 +1,36 @@
 import { checkComposedProjection, checkComposedSwarmProtocol } from '@actyx/machine-check'
-import { TransportOrderForRobot, Initial } from './transport_robot'
-import { TransportOrderForWarehouse, InitialWarehouse } from './warehouse'
-import { transportOrderProtocol } from './protocol'
+import { TransportRobot, Initial } from './transport_robot'
+import { Warehouse, InitialWarehouse } from './warehouse'
+import { transportOrderProtocol, Events, assemblyLineProtocol } from './protocol'
+import { AssemblyRobot, AssemblyRobotInitial } from './assembly_robot'
 
-const robotJSON =
-  TransportOrderForRobot.createJSONForAnalysis(Initial)
+const transportRobotJSON =
+  TransportRobot.createJSONForAnalysis(Initial)
 const warehouseJSON =
-  TransportOrderForWarehouse.createJSONForAnalysis(InitialWarehouse)
-const subscriptions = {
-  robot: robotJSON.subscriptions,
+  Warehouse.createJSONForAnalysis(InitialWarehouse)
+const subscriptionsTransportOrder = {
+  transportRobot: transportRobotJSON.subscriptions,
   warehouse: warehouseJSON.subscriptions,
+}
+const assemblyRobotJSON =
+  AssemblyRobot.createJSONForAnalysis(AssemblyRobotInitial)
+const subscriptionsForAssemblyLine = {
+  assemblyRobot: assemblyRobotJSON.subscriptions,
+  warehouse: [Events.request.type, Events.ack.type],
 }
 
 // these should all print `{ type: 'OK' }`, otherwise there’s a mistake in
 // the code (you would normally verify this using your favorite unit
 // testing framework)
 console.log(
-  checkComposedSwarmProtocol([transportOrderProtocol], subscriptions),
-  checkComposedProjection([transportOrderProtocol], subscriptions, 'robot', robotJSON),
-  checkComposedProjection([transportOrderProtocol], subscriptions, 'warehouse', warehouseJSON),
+  checkComposedSwarmProtocol([transportOrderProtocol], subscriptionsTransportOrder),
+  checkComposedProjection([transportOrderProtocol], subscriptionsTransportOrder, 'transportRobot', transportRobotJSON),
+  checkComposedProjection([transportOrderProtocol], subscriptionsTransportOrder, 'warehouse', warehouseJSON),
 )
+
+// these should all print `{ type: 'OK' }`
+console.log(
+  checkComposedSwarmProtocol([assemblyLineProtocol], subscriptionsForAssemblyLine),
+  checkComposedProjection([assemblyLineProtocol], subscriptionsForAssemblyLine, 'assemblyRobot', assemblyRobotJSON)
+)
+

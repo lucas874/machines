@@ -259,17 +259,21 @@ The third feature becomes relevant once the auction has ended: we check if our r
 Then we can use this information in all following states as well.
 
 ### Composing swarms
-Suppose that the transport order swarm protocol is used at a factory facility where
-materials from the warehouse are needed on the assembly line.
-We can utilise the services offered by the transport order protocol on the assembly line be specifying a workflow
-that uses the `warehouse` role to handle material transportation.
-A simple swarm protocol specifying a workflow where an assembly robot requests an item from the warehouse and uses
-it to assemble a product is shown below.
+Suppose that the warehouse is part of a larger factory facility and that items from the warehouse are
+needed on the assembly line. The transport order workflow offers the functionality of orchestrating
+a fleet of robots to deliver some requested item from the warehouse. We can can make use of this functionality
+by specifying another workflow that uses the `warehouse` role to handle material transportation.
 
 <img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/update-packages/demos/warehouse-readme-demo/assembly-protocol.svg" alt="assembly line workflow" width="300" />
 
-Notice how the `warehouse` role from the `transportOrderProtocol` appears in the workflow above.
-By d
+The workflow above specifies how the `warehouse` role requests an item and acknowledges its delivery, and how an `assembly-robot`
+uses it to assemble a product. It does not specify what happens between the `warehouse`'s request for an item and its acknowledgement.
+
+
+
+
+
+Notice how the `warehouse` role from the `transportOrderProtocol` appears in the workflow above. By doing so we can implement a
 
 
 

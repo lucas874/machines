@@ -6,6 +6,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start-warehouse": "tsc && node dist/run_warehouse.js",
     "start-transport-robot": "tsc && node dist/run_transport_robot.js",
+    "start-assembly-robot": "tsc && node dist/run_assembly_robot.js",
     "check": "tsc && node dist/behavioural_typecheck.js"
   },
   "keywords": [],

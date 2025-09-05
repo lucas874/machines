@@ -2,17 +2,17 @@ import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { manifest, Composition, printState, getRandomInt } from './protocol'
 import { randomUUID } from "crypto";
-import { Auction, DoIt, Done, initialAdapted, Score, transportAdapted } from './transport_robot';
+import { Auction, DoIt, Done, initialTransportAdapted, Score, transportAdapted } from './transport_robot';
 
 // Run the adapted machine
 async function main() {
     const app = await Actyx.of(manifest)
     const tags = Composition.tagWithEntityId('warehouse-factory')
     const initialPayload = { robot: randomUUID().slice(0, 8) }
-    const transportRobot = createMachineRunnerBT(app, tags, initialAdapted, initialPayload, transportAdapted)
+    const transportRobot = createMachineRunnerBT(app, tags, initialTransportAdapted, initialPayload, transportAdapted)
     let IamWinner = false
     const bestRobot = (scores: Score[]) => scores.reduce((best, current) => current.delay <= best.delay ? current : best).robot
-    printState(transportAdapted.machineName, initialAdapted.mechanism.name, initialPayload)
+    printState(transportAdapted.machineName, initialTransportAdapted.mechanism.name, initialPayload)
     for await (const state of transportRobot) {
     if (state.isLike(Auction)) {
         const auction = state.cast()

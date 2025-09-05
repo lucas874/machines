@@ -25,12 +25,12 @@ export namespace Events {
     // sent by the warehouse to acknowledge delivery
     export const ack = MachineEvent.design('acknowledge')
         .withPayload<{ id: string }>()
-    // sent by the robot when a car has been built
-    export const car = MachineEvent.design('car')
-        .withoutPayload()
+    // sent by the assembly robot when a product has been assembled
+    export const product = MachineEvent.design('product')
+        .withPayload<{productName: string}>()
 
     // declare a precisely typed tuple of all events we can now choose from
-    export const allEvents = [request, bid, selected, deliver, ack, car] as const
+    export const allEvents = [request, bid, selected, deliver, ack, product] as const
 }
 
 export const Composition = SwarmProtocol.make('Composition', Events.allEvents)
@@ -39,9 +39,9 @@ export const transportOrderProtocol: SwarmProtocolType = {
   initial: 'initial',
   transitions: [
     {source: 'initial', target: 'auction', label: {cmd: 'request', role: 'warehouse', logType: [Events.request.type]}},
-    {source: 'auction', target: 'auction', label: {cmd: 'bid', role: 'robot', logType: [Events.bid.type]}},
-    {source: 'auction', target: 'delivery', label: {cmd: 'select', role: 'robot', logType: [Events.selected.type]}},
-    {source: 'delivery', target: 'delivered', label: {cmd: 'deliver', role: 'robot', logType: [Events.deliver.type]}},
+    {source: 'auction', target: 'auction', label: {cmd: 'bid', role: 'transportRobot', logType: [Events.bid.type]}},
+    {source: 'auction', target: 'delivery', label: {cmd: 'select', role: 'transportRobot', logType: [Events.selected.type]}},
+    {source: 'delivery', target: 'delivered', label: {cmd: 'deliver', role: 'transportRobot', logType: [Events.deliver.type]}},
     {source: 'delivered', target: 'acknowledged', label: {cmd: 'acknowledge', role: 'warehouse', logType: [Events.ack.type]}},
   ]
 }
@@ -49,9 +49,9 @@ export const transportOrderProtocol: SwarmProtocolType = {
 export const assemblyLineProtocol: SwarmProtocolType = {
   initial: 'initial',
   transitions: [
-    {source: 'initial', target: 'req', label: { cmd: 'request', role: 'warehouse', logType: [Events.request.type]}},
-    {source: 'req', target: 'ok', label: { cmd: 'acknowledge', role: 'warehouse', logType: [Events.ack.type]}},
-    {source: 'ok', target: 'done', label: { cmd: 'build', role: 'assembly-robot', logType: [Events.car.type] }},
+    {source: 'initial', target: 'delivery', label: { cmd: 'request', role: 'warehouse', logType: [Events.request.type]}},
+    {source: 'delivery', target: 'acknowledge-delivery', label: { cmd: 'acknowledge', role: 'warehouse', logType: [Events.ack.type]}},
+    {source: 'acknowledge-delivery', target: 'done', label: { cmd: 'assemble', role: 'assemblyRobot', logType: [Events.product.type] }},
   ]
 }
 

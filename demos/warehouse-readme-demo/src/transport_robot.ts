@@ -1,26 +1,25 @@
-import { Events, Composition, subsWarehouse, transportOrderProtocol, assemblyLineProtocol, subscriptions } from './protocol'
-import { checkComposedProjection } from '@actyx/machine-check';
+import { Events, Composition, transportOrderProtocol, assemblyLineProtocol, subscriptions } from './protocol'
 
-export const TransportOrderForRobot = Composition.makeMachine('robot')
+export const TransportRobot = Composition.makeMachine('transport-robot')
 
 export type Score = { robot: string; delay: number }
 export type AuctionPayload =
   { id: string; from: string; to: string; robot: string; scores: Score[] }
 
-export const Initial = TransportOrderForRobot.designState('Initial')
+export const Initial = TransportRobot.designState('Initial')
   .withPayload<{ robot: string }>()
   .finish()
-export const Auction = TransportOrderForRobot.designState('Auction')
+export const Auction = TransportRobot.designState('Auction')
   .withPayload<AuctionPayload>()
   .command('bid', [Events.bid], (ctx, delay: number) =>
                          [{ robot: ctx.self.robot, delay, id: ctx.self.id }])
   .command('select', [Events.selected], (ctx, winner: string) => [{ winner, id: ctx.self.id}])
   .finish()
-export const DoIt = TransportOrderForRobot.designState('DoIt')
+export const DoIt = TransportRobot.designState('DoIt')
   .withPayload<{ robot: string; winner: string, id: string }>()
   .command('deliver', [Events.deliver], (ctx) => [{ id: ctx.self.id }])
   .finish()
-export const Done = TransportOrderForRobot.designEmpty('Done').finish()
+export const Done = TransportRobot.designEmpty('Done').finish()
 
 // ingest the request from the `warehouse`
 Initial.react([Events.request], Auction, (ctx, r) => ({
@@ -45,4 +44,4 @@ Auction.react([Events.selected], DoIt, (ctx, s) =>
 DoIt.react([Events.deliver], Done, (_ctx) => {[]})
 
 // Adapted machine. Adapting here has no effect. Except that we can make a verbose machine.
-export const [transportAdapted, initialAdapted] = Composition.adaptMachine('robot', [transportOrderProtocol, assemblyLineProtocol], 0, subscriptions, [TransportOrderForRobot, Initial], true).data!
+export const [transportAdapted, initialTransportAdapted] = Composition.adaptMachine('transportRobot', [transportOrderProtocol, assemblyLineProtocol], 0, subscriptions, [TransportRobot, Initial], true).data!
