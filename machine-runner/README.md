@@ -19,24 +19,23 @@ First we define our set of events:
 
 ```typescript
 // sent by the warehouse to get things started
-export const request = Event.design('request')
-  .withPayload<{ id: string; from: string; to: string }>()
-// sent by each available candidate robot to register interest
-export const bid = Event.design('bid')
-  .withPayload<{ robot: string; delay: number, id: string }>()
-// sent by the robots
-export const selected = Event.design('selected')
-  .withPayload<{ winner: string, id: string }>()
-// sent by the robot performing the delivery
-export const deliver = Event.design('deliver')
-  .withPayload<{ id: string }>()
+export const request = MachineEvent.design('request')
+    .withPayload<{ id: string; from: string; to: string }>()
+// sent by each available candidate transport robot to register interest
+export const bid = MachineEvent.design('bid')
+    .withPayload<{ robot: string; delay: number, id: string }>()
+// sent by the transport robots
+export const selected = MachineEvent.design('selected')
+    .withPayload<{ winner: string, id: string }>()
+// sent by the transport robot performing the delivery
+export const deliver = MachineEvent.design('deliver')
+    .withPayload<{ id: string }>()
 // sent by the warehouse to acknowledge delivery
-export const ack = Event.design('acknowledge')
-  .withPayload<{ id: string }>()
-
+export const ack = MachineEvent.design('acknowledge')
+    .withPayload<{ id: string }>()
 
 // declare a precisely typed tuple of all events we can now choose from
-const transportOrderEvents = [request, bid, selected, deliver, ack] as const
+export const transportOrderEvents = [request, bid, selected, deliver, ack] as const
 ```
 
 Then we can declare a swarm protocol using these events:
@@ -45,46 +44,54 @@ Then we can declare a swarm protocol using these events:
 const transportOrder = SwarmProtocol.make('transportOrder', transportOrderEvents)
 ```
 
-Now we build two machines that participate in this protocol: the `warehouse` will request the material transport, while the fleet of `robot` will figure out who does it.
-The `warehouse` is much simpler in this initial part of the workflow since it has no further role after making the request — in a real implementation the protocol would go on to include the actual delivery.
+Now we build two machines that participate in this protocol: the `warehouse` will request the material transport and acknowledge the delivery once it has taken place,
+while the fleet of `robot` perform the material transport.
 
 ```typescript
 // initialize the state machine builder for the `warehouse` role
 const TransportOrderForWarehouse =
-  transportOrder.makeMachine('warehouse')
+  Composition.makeMachine('warehouse')
 
 // add initial state with command to request the transport
-export const InitialWarehouse = TransportOrderForWarehouse
+const InitialWarehouse = TransportOrderForWarehouse
   .designEmpty('Initial')
-  .command('request', [request], (_ctx, id: string, from: string, to: string) =>
-                                   [{ id, from, to }])
+  .command('request', [Events.request], (_ctx, id: string, from: string, to: string) => [{ id, from, to }])
   .finish()
 
 // add state entered after performing the request
-export const RequestedWarehouse = TransportOrderForWarehouse
-  .designEmpty('Requested')
+const AuctionWarehouse = TransportOrderForWarehouse
+  .designEmpty('AuctionWarehouse')
+  .finish()
+
+// add state entered after a transport robot has been selected
+const SelectedWarehouse = TransportOrderForWarehouse
+  .designEmpty('SelectedWarehouse')
   .finish()
 
 // add state for acknowledging a delivery entered after a robot has performed the delivery
-export const AcknowledgeWarehouse = TransportOrderForWarehouse
-  .designEmpty('Acknowledge')
-  .command('acknowledge', [ack], (_ctx, id: string) =>
-                                   [{ id }])
+const AcknowledgeWarehouse = TransportOrderForWarehouse
+  .designState('Acknowledge')
+  .withPayload<{id: string}>()
+  .command('acknowledge', [Events.ack], (ctx) => [{ id: ctx.self.id }])
   .finish()
 
-export const DoneWarehouse = TransportOrderForWarehouse.designEmpty('Done').finish()
+const DoneWarehouse = TransportOrderForWarehouse.designEmpty('Done').finish()
 
-// describe the transition into the `Requested` state after request has been made
-InitialWarehouse.react([request], RequestedWarehouse, (_ctx, _r) => [{}])
-// Des
-RequestedWarehouse.react([request], DoneWarehouse, (_ctx, _r) => [{}])
-InitialWarehouse.react([request], DoneWarehouse, (_ctx, _r) => [{}])
+// describe the transition into the `AuctionWarehouse` state after request has been made
+InitialWarehouse.react([Events.request], AuctionWarehouse, (_ctx, _event) => [{}])
+// describe the transitions from the `AuctionWarehouse` state
+AuctionWarehouse.react([Events.bid], AuctionWarehouse, (_ctx, _event) => [{}])
+AuctionWarehouse.react([Events.selected], SelectedWarehouse, (_ctx, _event) => [{}])
+// describe the transitions from the `SelectedWarehouse` state
+SelectedWarehouse.react([Events.deliver], AcknowledgeWarehouse, (_ctx, event) => AcknowledgeWarehouse.make({id: event.payload.id}))
+// describe the transitions from the `AcknoweledgeWarehouse` state
+AcknowledgeWarehouse.react([Events.ack], DoneWarehouse, (_ctx, _event) => [{}])
 ```
 
-The `robot` state machine is constructed in the same way, albeit with more commands and state transitions:
+The `robot` state machine is constructed in the same way:
 
 ```typescript
-const TransportOrderForRobot = transportOrder.makeMachine('robot')
+const TransportOrderForRobot = Composition.makeMachine('robot')
 
 type Score = { robot: string; delay: number }
 type AuctionPayload =
@@ -95,35 +102,42 @@ export const Initial = TransportOrderForRobot.designState('Initial')
   .finish()
 export const Auction = TransportOrderForRobot.designState('Auction')
   .withPayload<AuctionPayload>()
-  .command('bid', [bid], (ctx, delay: number) =>
-                         [{ robot: ctx.self.robot, delay }])
-  .command('select', [selected], (_ctx, winner: string) => [{ winner }])
+  .command('bid', [Events.bid], (ctx, delay: number) =>
+                         [{ robot: ctx.self.robot, delay, id: ctx.self.id }])
+  .command('select', [Events.selected], (ctx, winner: string) => [{ winner, id: ctx.self.id}])
   .finish()
 export const DoIt = TransportOrderForRobot.designState('DoIt')
-  .withPayload<{ robot: string; winner: string }>()
+  .withPayload<{ robot: string; winner: string, id: string }>()
+  .command('deliver', [Events.deliver], (ctx) => [{ id: ctx.self.id }])
   .finish()
+export const Done = TransportOrderForRobot.designEmpty('Done').finish()
 
 // ingest the request from the `warehouse`
-Initial.react([requested], Auction, (ctx, r) => ({
-  ...ctx.self,
-  ...r.payload,
-  scores: [],
+Initial.react([Events.request], Auction, (ctx, r) => ({
+  id: r.payload.id,
+  from: r.payload.from,
+  to: r.payload.to,
+  robot: ctx.self.robot,
+  scores: []
 }))
 
 // accumulate bids from all `robot`
-Auction.react([bid], Auction, (ctx, b) => {
-  ctx.self.scores.push(b.payload)
+Auction.react([Events.bid], Auction, (ctx, b) => {
+  ctx.self.scores.push({robot: b.payload.robot, delay: b.payload.delay})
   return ctx.self
 })
 
 // end the auction when a selection has happened
-Auction.react([selected], DoIt, (ctx, s) =>
-  ({ robot: ctx.self.robot, winner: s.payload.winner }))
+Auction.react([Events.selected], DoIt, (ctx, s) =>
+  ({ robot: ctx.self.robot, winner: s.payload.winner, id: ctx.self.id }))
+
+// go to the final state
+DoIt.react([Events.deliver], Done, (_ctx) => {[]})
 ```
 
 ### Checking the machines
 
-<img src="https://raw.githubusercontent.com/Actyx/machines/62fbda79d27a71260159c2688f0f57ef4c9e13ca/machine-runner/example-workflow.png" alt="workflow" width="300" />
+<img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/update-packages/demos/warehouse-readme-demo/warehouse-protocol.svg" alt="workflow" width="300" />
 
 The part of the transport order workflow implemented in the previous section is visualized above as a UML state diagram.
 With the `@actyx/machine-check` library we can check that this workflow makes sense (i.e. it achieves eventual consensus, which is the same kind of consensus used by the bitcoin network to settle transactions), and we can also check that our state machines written down in code implement this workflow correctly.
@@ -131,15 +145,19 @@ With the `@actyx/machine-check` library we can check that this workflow makes se
 To this end, we first need to declare the graph in JSON notation:
 
 ```typescript
-const proto: SwarmProtocolType = {
+export const warehouseProtocol: SwarmProtocolType = {
   initial: 'initial',
   transitions: [
-    { source: 'initial', target: 'auction',
-      label: { cmd: 'request', logType: ['requested'], role: 'warehouse' } },
-    { source: 'auction', target: 'auction',
-      label: { cmd: 'bid', logType: ['bid'], role: 'robot' } },
-    { source: 'auction', target: 'doIt',
-      label: { cmd: 'select', logType: ['selected'], role: 'robot' } },
+    {source: 'initial', target: 'auction',
+      label: {cmd: 'request', role: 'warehouse', logType: [Events.request.type]}},
+    {source: 'auction', target: 'auction',
+      label: {cmd: 'bid', role: 'robot', logType: [Events.bid.type]}},
+    {source: 'auction', target: 'delivery',
+      label: {cmd: 'select', role: 'robot', logType: [Events.selected.type]}},
+    {source: 'delivery', target: 'delivered',
+      label: {cmd: 'deliver', role: 'robot', logType: [Events.deliver.type]}},
+    {source: 'delivered', target: 'acknowledged',
+      label: {cmd: 'acknowledge', role: 'warehouse', logType: [Events.ack.type]}},
   ]
 }
 ```
@@ -163,9 +181,9 @@ const subscriptions = {
 // the code (you would normally verify this using your favorite unit
 // testing framework)
 console.log(
-  checkSwarmProtocol(proto, subscriptions),
-  checkProjection(proto, subscriptions, 'robot', robotJSON),
-  checkProjection(proto, subscriptions, 'warehouse', warehouseJSON),
+  checkComposedSwarmProtocol(proto, subscriptions),
+  checkComposedProjection(proto, subscriptions, 'robot', robotJSON),
+  checkComposedProjection(proto, subscriptions, 'warehouse', warehouseJSON),
 )
 ```
 

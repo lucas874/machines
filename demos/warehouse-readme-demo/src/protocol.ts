@@ -29,6 +29,7 @@ export namespace Events {
     export const car = MachineEvent.design('car')
         .withoutPayload()
 
+    // declare a precisely typed tuple of all events we can now choose from
     export const allEvents = [request, bid, selected, deliver, ack, car] as const
 }
 
@@ -37,20 +38,22 @@ export const Composition = SwarmProtocol.make('Composition', Events.allEvents)
 export const warehouseProtocol: SwarmProtocolType = {
   initial: 'initial',
   transitions: [
-    {source: 'initial', target: 'auction', label: {cmd: 'request', role: 'W', logType: [Events.request.type]}},
-    {source: 'auction', target: 'auction', label: {cmd: 'bid', role: 'T', logType: [Events.bid.type]}},
-    {source: 'auction', target: 'delivery', label: {cmd: 'select', role: 'T', logType: [Events.selected.type]}},
-    {source: 'delivery', target: 'delivered', label: {cmd: 'deliver', role: 'T', logType: [Events.deliver.type]}},
-    {source: 'delivered', target: 'acknowledged', label: {cmd: 'acknowledge', role: 'W', logType: [Events.ack.type]}},
-  ]}
+    {source: 'initial', target: 'auction', label: {cmd: 'request', role: 'warehouse', logType: [Events.request.type]}},
+    {source: 'auction', target: 'auction', label: {cmd: 'bid', role: 'robot', logType: [Events.bid.type]}},
+    {source: 'auction', target: 'delivery', label: {cmd: 'select', role: 'robot', logType: [Events.selected.type]}},
+    {source: 'delivery', target: 'delivered', label: {cmd: 'deliver', role: 'robot', logType: [Events.deliver.type]}},
+    {source: 'delivered', target: 'acknowledged', label: {cmd: 'acknowledge', role: 'warehouse', logType: [Events.ack.type]}},
+  ]
+}
 
 export const factoryProtocol: SwarmProtocolType = {
   initial: 'initial',
   transitions: [
-    {source: 'initial', target: 'req', label: { cmd: 'request', role: 'W', logType: [Events.request.type]}},
-    {source: 'req', target: 'ok', label: { cmd: 'acknowledge', role: 'W', logType: [Events.ack.type]}},
-    {source: 'ok', target: 'done', label: { cmd: 'build', role: 'R', logType: [Events.car.type] }},
-  ]}
+    {source: 'initial', target: 'req', label: { cmd: 'request', role: 'warehouse', logType: [Events.request.type]}},
+    {source: 'req', target: 'ok', label: { cmd: 'acknowledge', role: 'warehouse', logType: [Events.ack.type]}},
+    {source: 'ok', target: 'done', label: { cmd: 'build', role: 'assembly-robot', logType: [Events.car.type] }},
+  ]
+}
 
 
 // Well-formed subscription for the warehouse protocol

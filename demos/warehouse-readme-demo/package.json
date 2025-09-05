@@ -4,8 +4,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start-warehouse": "tsc && node dist/warehouse.js",
-    "start-transport": "tsc && node dist/transport.js"
+    "start-warehouse": "tsc && node dist/run_warehouse.js",
+    "start-transport-robot": "tsc && node dist/run_transport_robot.js",
+    "check": "tsc && node dist/behavioural_typecheck.js"
   },
   "keywords": [],
   "author": "",

@@ -1,0 +1,28 @@
+import { Actyx } from '@actyx/sdk'
+import { createMachineRunnerBT } from '@actyx/machine-runner'
+import { manifest, Composition, printState } from './protocol'
+import chalk from "chalk";
+import { AcknowledgeWarehouse, InitialWarehouse, warehouseAdapted, warehouseInitialAdapted } from './warehouse';
+
+const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
+
+// Run the adapted machine
+async function main() {
+  const app = await Actyx.of(manifest)
+  const tags = Composition.tagWithEntityId('warehouse-factory')
+  const machine = createMachineRunnerBT(app, tags, warehouseInitialAdapted, undefined, warehouseAdapted)
+  printState(warehouseAdapted.machineName, warehouseInitialAdapted.mechanism.name, undefined)
+  console.log(chalk.bgBlack.red.dim`    request!`);
+
+  for await (const state of machine) {
+    if (state.isLike(InitialWarehouse)) {
+      await state.cast().commands()?.request(parts[Math.floor(Math.random() * parts.length)], "a", "b")
+    }
+    if (state.isLike(AcknowledgeWarehouse)) {
+      await state.cast().commands()?.acknowledge()
+    }
+  }
+  app.dispose()
+}
+
+main()
