@@ -6,7 +6,7 @@ export type Score = { robot: string; delay: number }
 export type AuctionPayload =
   { id: string; from: string; to: string; robot: string; scores: Score[] }
 
-export const Initial = TransportRobot.designState('Initial')
+export const InitialTransport = TransportRobot.designState('Initial')
   .withPayload<{ robot: string }>()
   .finish()
 export const Auction = TransportRobot.designState('Auction')
@@ -22,7 +22,7 @@ export const DoIt = TransportRobot.designState('DoIt')
 export const Done = TransportRobot.designEmpty('Done').finish()
 
 // ingest the request from the `warehouse`
-Initial.react([Events.request], Auction, (ctx, r) => ({
+InitialTransport.react([Events.request], Auction, (ctx, r) => ({
   id: r.payload.id,
   from: r.payload.from,
   to: r.payload.to,
@@ -43,5 +43,5 @@ Auction.react([Events.selected], DoIt, (ctx, s) =>
 // go to the final state
 DoIt.react([Events.deliver], Done, (_ctx) => {[]})
 
-// Adapted machine. Adapting here has no effect. Except that we can make a verbose machine.
-export const [transportAdapted, initialTransportAdapted] = TransportOrder.adaptMachine('transportRobot', [transportOrderProtocol, assemblyLineProtocol], 0, subscriptions, [TransportRobot, Initial], true).data!
+// Adapted machine.
+export const [transportAdapted, initialTransportAdapted] = TransportOrder.adaptMachine('transportRobot', [transportOrderProtocol, assemblyLineProtocol], 0, subscriptions, [TransportRobot, InitialTransport], true).data!

@@ -2,7 +2,7 @@ import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
 import { manifest, TransportOrder, printState, Events } from './protocol'
 import chalk from "chalk";
-import { AcknowledgeWarehouse, DoneWarehouse, InitialWarehouse, warehouseAdapted, warehouseInitialAdapted } from './warehouse';
+import { AcknowledgeWarehouse, DoneWarehouse, InitialWarehouse, warehouseAdapted, initialWarehouseAdapted } from './warehouse';
 
 const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 
@@ -10,8 +10,8 @@ const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 async function main() {
   const app = await Actyx.of(manifest)
   const tags = TransportOrder.tagWithEntityId('warehouse-factory')
-  const warehouse = createMachineRunnerBT(app, tags, warehouseInitialAdapted, undefined, warehouseAdapted)
-  printState(warehouseAdapted.machineName, warehouseInitialAdapted.mechanism.name, undefined)
+  const warehouse = createMachineRunnerBT(app, tags, initialWarehouseAdapted, undefined, warehouseAdapted)
+  printState(warehouseAdapted.machineName, initialWarehouseAdapted.mechanism.name, undefined)
   console.log()
   console.log(chalk.bgBlack.red.dim`    ${Events.request.type}!`);
 

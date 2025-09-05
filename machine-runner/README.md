@@ -41,7 +41,7 @@ export const allEvents = [request, bid, selected, deliver, ack] as const
 Then we can declare a swarm protocol using these events:
 
 ```typescript
-const transportOrder = SwarmProtocol.make('transportOrder', transportOrderEvents)
+export const TransportOrder = SwarmProtocol.make('warehouse-factory', Events.allEvents)
 ```
 
 Now we build two machines that participate in this protocol: the `warehouse` will request the material transport and acknowledge the delivery once it has taken place,
@@ -49,34 +49,33 @@ while the fleet of `robot` perform the material transport.
 
 ```typescript
 // initialize the state machine builder for the `warehouse` role
-const TransportOrderForWarehouse =
-  Composition.makeMachine('warehouse')
+export const Warehouse =
+  TransportOrder.makeMachine('warehouse')
 
 // add initial state with command to request the transport
-const InitialWarehouse = TransportOrderForWarehouse
+export const InitialWarehouse = Warehouse
   .designEmpty('Initial')
   .command('request', [Events.request], (_ctx, id: string, from: string, to: string) => [{ id, from, to }])
   .finish()
 
 // add state entered after performing the request
-const AuctionWarehouse = TransportOrderForWarehouse
+export const AuctionWarehouse = Warehouse
   .designEmpty('AuctionWarehouse')
   .finish()
 
 // add state entered after a transport robot has been selected
-const SelectedWarehouse = TransportOrderForWarehouse
+export const SelectedWarehouse = Warehouse
   .designEmpty('SelectedWarehouse')
   .finish()
 
 // add state for acknowledging a delivery entered after a robot has performed the delivery
-const AcknowledgeWarehouse = TransportOrderForWarehouse
+export const AcknowledgeWarehouse = Warehouse
   .designState('Acknowledge')
   .withPayload<{id: string}>()
-  .command('acknowledge', [Events.ack],
-    (ctx) => [{ id: ctx.self.id }])
+  .command('acknowledge', [Events.ack], (ctx) => [{ id: ctx.self.id }])
   .finish()
 
-const DoneWarehouse = TransportOrderForWarehouse.designEmpty('Done').finish()
+export const DoneWarehouse = Warehouse.designEmpty('Done').finish()
 
 // describe the transition into the `AuctionWarehouse` state after request has been made
 InitialWarehouse.react([Events.request], AuctionWarehouse, (_ctx, _event) => {})
@@ -92,29 +91,29 @@ AcknowledgeWarehouse.react([Events.ack], DoneWarehouse, (_ctx, _event) => {})
 The `robot` state machine is constructed in the same way:
 
 ```typescript
-const TransportOrderForRobot = Composition.makeMachine('robot')
+export const TransportRobot = TransportOrder.makeMachine('transporRobot')
 
-type Score = { robot: string; delay: number }
-type AuctionPayload =
+export type Score = { robot: string; delay: number }
+export type AuctionPayload =
   { id: string; from: string; to: string; robot: string; scores: Score[] }
 
-export const Initial = TransportOrderForRobot.designState('Initial')
+export const InitialTransport = TransportRobot.designState('Initial')
   .withPayload<{ robot: string }>()
   .finish()
-export const Auction = TransportOrderForRobot.designState('Auction')
+export const Auction = TransportRobot.designState('Auction')
   .withPayload<AuctionPayload>()
   .command('bid', [Events.bid], (ctx, delay: number) =>
                          [{ robot: ctx.self.robot, delay, id: ctx.self.id }])
   .command('select', [Events.selected], (ctx, winner: string) => [{ winner, id: ctx.self.id}])
   .finish()
-export const DoIt = TransportOrderForRobot.designState('DoIt')
+export const DoIt = TransportRobot.designState('DoIt')
   .withPayload<{ robot: string; winner: string, id: string }>()
   .command('deliver', [Events.deliver], (ctx) => [{ id: ctx.self.id }])
   .finish()
-export const Done = TransportOrderForRobot.designEmpty('Done').finish()
+export const Done = TransportRobot.designEmpty('Done').finish()
 
 // ingest the request from the `warehouse`
-Initial.react([Events.request], Auction, (ctx, r) => ({
+InitialTransport.react([Events.request], Auction, (ctx, r) => ({
   id: r.payload.id,
   from: r.payload.from,
   to: r.payload.to,
@@ -152,11 +151,11 @@ export const transportOrderProtocol: SwarmProtocolType = {
     {source: 'initial', target: 'auction',
       label: {cmd: 'request', role: 'warehouse', logType: [Events.request.type]}},
     {source: 'auction', target: 'auction',
-      label: {cmd: 'bid', role: 'robot', logType: [Events.bid.type]}},
+      label: {cmd: 'bid', role: 'transportRobot', logType: [Events.bid.type]}},
     {source: 'auction', target: 'delivery',
-      label: {cmd: 'select', role: 'robot', logType: [Events.selected.type]}},
+      label: {cmd: 'select', role: 'transportRobot', logType: [Events.selected.type]}},
     {source: 'delivery', target: 'delivered',
-      label: {cmd: 'deliver', role: 'robot', logType: [Events.deliver.type]}},
+      label: {cmd: 'deliver', role: 'transportRobot', logType: [Events.deliver.type]}},
     {source: 'delivered', target: 'acknowledged',
       label: {cmd: 'acknowledge', role: 'warehouse', logType: [Events.ack.type]}},
   ]
@@ -199,8 +198,8 @@ const actyx = await Actyx.of(
   { appId: 'com.example.warehouse-factory', displayName: 'warehouse-factory', version: '1.0.0' })
 
 const tags = transportOrder.tagWithEntityId('warehouse-factory')
-const transportRobot = createMachineRunner(app, tags, initialAdapted, { robot: "robotId" })
-const warehouse = createMachineRunner(app, tags, warehouseInitialAdapted, undefined)
+const transportRobot = createMachineRunner(app, tags, InitialTransport, { robot: "robotId" })
+const warehouse = createMachineRunner(app, tags, InitialWarehouse, undefined)
 ```
 
 The `tags` can be thought of as the name of a [dedicated pub–sub channel](https://developer.actyx.com/docs/conceptual/tags) for this particular workflow instance.
@@ -258,85 +257,6 @@ If the workflow still is in the `Auction` state, we compute the best robot bid (
 The third feature becomes relevant once the auction has ended: we check if our robot is indeed the winner and record that in a variable `IamWinner`, i.e. in the current application in-memory state.
 Then we can use this information in all following states as well.
 
-### Composing swarms
-Suppose that the warehouse is part of a larger factory facility and that items from the warehouse are
-needed on the assembly line. Instead of specifying a large workflow that combines the transport order
-workflow with a description of how delivered items are used on the assembly line and implementing
-the resulting workfow, we can reuse the transport order protocol and the machines that implement it.
-
-<img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/update-packages/demos/warehouse-readme-demo/assembly-protocol.svg" alt="assembly line workflow" width="300" />
-
-The workflow above specifies how the `warehouse` role requests an item and acknowledges its delivery, and how an `assemblyRobot`
-then uses the delivered item to assemble a product. Unlike the transport order workflow, this workflow does not specify
-exactly how requested items are obtained. It simply states that an item can be requested and sometimes later its delivery can be acknowledged.
-
-We can, however, implement the `assemblyRobot` for for the worklflow above and then automatically adapt this machine
-and the machines from the transport order protocol work together. The resulting machines will then implement the worklfow below:
-
-<img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/update-packages/demos/warehouse-readme-demo/composition.svg" alt="assembly line workflow" width="300" />
-
-To achieve this we
-
-We start by defining the event emitted by the assembly robot when a product has been finished.
-```typescript
-...
-// sent by the assembly robot when a product has been assembled
-export const product = MachineEvent.design('product')
-    .withPayload<{productName: string}>()
-
-// declare a precisely typed tuple of all events we can now choose from
-export const allEvents = [request, bid, selected, deliver, ack] as const
-```
-
-We then declare a new swarm protocol using these events:
-```typescript
-export const AssemblyProtocol = SwarmProtocol.make('TransportOrder', Events.allEvents)
-```
-
-Now we build the assembly robot for this protocol. Once an item has been delivered from the warehouse, it will use it to assemble a product.
-```typescript
-export const AssemblyRobot = AssemblyProtocol.makeMachine('assemblyRobot')
-
-export const AssemblyRobotInitial = AssemblyRobot.designEmpty('Initial')
-  .finish()
-export const Assemble = AssemblyRobot.designState('Assemble')
-  .withPayload<{id: string}>()
-  .command('assemble', [Events.product], (_ctx) =>
-                         [{ productName: "product" }])
-  .finish()
-export const Done = AssemblyRobot.designEmpty('Done').finish()
-
-// ingest the request from the `warehouse`
-AssemblyRobotInitial.react([Events.ack], Assemble, (ctx, a) => ({
-  id: a.payload.id
-}))
-// go to the final state
-Assemble.react([Events.product], Done, (ctx, b) => {})
-```
-
-To make the machines implemented for the transport order protocol work together with the assembly robot machine we must *adapt* them to the composition
-of the transport order and the assembly line protocols.
-
-
-
-To make thethe assembly robot work together with the machines implemented for the transport order work together with we must *adapt* them to the composition
-of the transport order and the assembly line protocols.
-
-
-
-
-
-The transport order workflow offers the functionality of orchestrating
-a fleet of robots to deliver some requested item from the warehouse. We can reuse this functionality
-in another protocol by specifying a workflow that uses the `warehouse` role to handle material transportation.
-
-
-
-
-Notice how the `warehouse` role from the `transportOrderProtocol` appears in the workflow above. By doing so we can implement a
-
-
-
 ### Change detection on for-await loop
 
 When using a for-await loop with the machine runner, the loop iterates only if all of the following criteria are met:
@@ -354,6 +274,155 @@ Instead, each robot independently ensures that after at five seconds a decision 
 
 Machine runner resolves this conflict by using only the `selected` event that comes first in the Actyx event sort order; in other words, Actyx arbitrarily picks a winner and the losing event is discarded.
 If a robot saw itself winning, started the mission, and then discovers that its win turned out to be invalid, it will have to stop the mission and pick a new one.
+
+
+### Composing swarms
+Suppose that the warehouse is part of a larger factory facility and that items from the warehouse are
+needed on the assembly line. Instead of specifying a large workflow that combines the transport order
+workflow with a description of how delivered items are used on the assembly line, and then implementing
+the resulting workfow, we can reuse the transport order protocol and the machines that implement it.
+
+<img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/update-packages/demos/warehouse-readme-demo/assembly-protocol.svg" alt="assembly line workflow" width="300" />
+
+The workflow above specifies how the `warehouse` role requests an item and acknowledges its delivery, and how an `assemblyRobot`
+uses the delivered item to assemble a product. Unlike the transport order workflow, this workflow does not specify
+exactly how requested items are obtained. It simply states that an item can be requested and sometimes later its delivery can be acknowledged.
+
+We can, however, implement the `assemblyRobot` for for the workflow above and then **automatically adapt** this machine
+and the machines from the transport order protocol to work together. The resulting machines will then implement the workflow below:
+
+<p id="composition">
+<img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/update-packages/demos/warehouse-readme-demo/composition.svg" alt="composed workflow" width="300" />
+</p>
+
+To achieve this start by defining the event emitted by the assembly robot when a product has been finished.
+```typescript
+// the previously defined events
+
+...
+
+// sent by the assembly robot when a product has been assembled
+export const product = MachineEvent.design('product')
+    .withPayload<{productName: string}>()
+
+// declare a precisely typed tuple of all events we can now choose from
+export const allEvents = [request, bid, selected, deliver, ack] as const
+```
+
+We then declare a new swarm protocol using these events:
+```typescript
+export const AssemblyLine = SwarmProtocol.make('warehouse-factory', Events.allEvents)
+```
+
+Now we build the assembly robot for this protocol. Once an item has been delivered from the warehouse, it will use it to assemble a product.
+```typescript
+export const AssemblyRobot = AssemblyLine.makeMachine('assemblyRobot')
+
+export const InitialAssemblyRobot = AssemblyRobot.designEmpty('Initial')
+  .finish()
+export const Assemble = AssemblyRobot.designState('Assemble')
+  .withPayload<{id: string}>()
+  .command('assemble', [Events.product], (_ctx) =>
+                         [{ productName: "product" }])
+  .finish()
+export const Done = AssemblyRobot.designEmpty('Done').finish()
+
+// ingest the request from the `warehouse`
+InitialAssemblyRobot.react([Events.ack], Assemble, (ctx, a) => ({
+  id: a.payload.id
+}))
+
+// go to the final state
+Assemble.react([Events.product], Done, (ctx, b) => {})
+```
+
+As with the transport order protocol, we can perform the behavioral type checking:
+
+```typescript
+import { checkComposedProjection, checkComposedSwarmProtocol } from '@actyx/machine-check'
+
+export const assemblyLineProtocol: SwarmProtocolType = {
+  initial: 'initial',
+  transitions: [
+    {source: 'initial', target: 'wait',
+      label: { cmd: 'request', role: 'warehouse', logType: [Events.request.type]}},
+    {source: 'wait', target: 'assemble',
+      label: { cmd: 'acknowledge', role: 'warehouse', logType: [Events.ack.type]}},
+    {source: 'assemble', target: 'done',
+      label: { cmd: 'assemble', role: 'assemblyRobot', logType: [Events.product.type] }},
+  ]
+}
+
+const assemblyRobotJSON =
+  AssemblyRobot.createJSONForAnalysis(AssemblyRobotInitial)
+const subscriptionsForAssemblyLine = {
+  assemblyRobot: assemblyRobotJSON.subscriptions,
+  warehouse: [Events.request.type, Events.ack.type],
+}
+
+// these should all print `{ type: 'OK' }`
+console.log(
+  checkComposedSwarmProtocol([assemblyLineProtocol], subscriptionsForAssemblyLine),
+  checkComposedProjection([assemblyLineProtocol], subscriptionsForAssemblyLine, 'assemblyRobot', assemblyRobotJSON)
+)
+```
+
+To make the machines implemented for the transport order protocol and the assembly robot machine work together with we must *adapt* them to the [composition
+of the transport order and the assembly line protocols](#composition).
+
+We do this by first generating a subscription that works for the composed swarm:
+
+```typescript
+// subscription for the composed swarm
+const resultSubsComposition: DataResult<Subscriptions>
+  = overapproxWFSubscriptions([transportOrderProtocol, assemblyLineProtocol], {}, 'TwoStep')
+if (resultSubsComposition.type === 'ERROR') throw new Error(resultSubsComposition.errors.join(', '))
+
+export const subscriptions: Subscriptions = resultSubsComposition.data
+```
+
+Finally, using the subscription, we can adapt the machines and run them using *branch-tracking* MachineRunners:
+
+```typescript
+// Adapted machines.
+export const [assemblyRobotAdapted, initialAssemblyAdapted] =
+  AssemblyProtocol.adaptMachine('assemblyRobot',
+  [transportOrderProtocol, assemblyLineProtocol], 1,
+  subscriptions, [AssemblyRobot, InitialAssemblyRobot], true).data!
+
+export const [transportAdapted, initialTransportAdapted] =
+  TransportOrder.adaptMachine('transportRobot',
+  [transportOrderProtocol, assemblyLineProtocol], 0,
+  subscriptions, [TransportRobot, InitialTransport], true).data!
+
+export const [warehouseAdapted, warehouseInitialAdapted] =
+  TransportOrder.adaptMachine('warehouse',
+  [transportOrderProtocol, assemblyLineProtocol], 0,
+  subscriptions, [Warehouse, InitialWarehouse], true).data!
+
+...
+
+// Branch-tracking machine runners
+const assemblyRobot = createMachineRunnerBT(app, tags, initialAssemblyAdapted, undefined, assemblyRobotAdapted)
+const transportRobot = createMachineRunnerBT(app, tags, initialTransportAdapted, initialPayload, transportAdapted)
+const warehouse = createMachineRunnerBT(app, tags, initialWarehouseAdapted, undefined, warehouseAdapted)
+```
+
+
+
+With these preparations in place, we can construct a composed swarm where the assembly robot and the machines implemented
+for the transport order work together. We do this by *adapting* the macines to the composition
+of the transport order and the assembly line protocols.
+
+
+The transport order workflow offers the functionality of orchestrating
+a fleet of robots to deliver some requested item from the warehouse. We can reuse this functionality
+in another protocol by specifying a workflow that uses the `warehouse` role to handle material transportation.
+
+
+
+
+Notice how the `warehouse` role from the `transportOrderProtocol` appears in the workflow above. By doing so we can implement a
 
 ### Errors
 

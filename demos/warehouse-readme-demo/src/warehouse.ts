@@ -40,8 +40,8 @@ SelectedWarehouse.react([Events.deliver], AcknowledgeWarehouse, (_ctx, event) =>
 // describe the transitions from the `AcknoweledgeWarehouse` state
 AcknowledgeWarehouse.react([Events.ack], DoneWarehouse, (_ctx, _event) => {})
 
-// Adapted machine. Adapting here has no effect. Except that we can make a verbose machine.
-export const [warehouseAdapted, warehouseInitialAdapted] = TransportOrder.adaptMachine('warehouse', [transportOrderProtocol, assemblyLineProtocol], 0, subscriptions, [Warehouse, InitialWarehouse], true).data!
+// Adapted machine.
+export const [warehouseAdapted, initialWarehouseAdapted] = TransportOrder.adaptMachine('warehouse', [transportOrderProtocol, assemblyLineProtocol], 0, subscriptions, [Warehouse, InitialWarehouse], true).data!
 
 
 

@@ -1,11 +1,11 @@
 import { SwarmProtocol } from '@actyx/machine-runner';
 import { Events, transportOrderProtocol, assemblyLineProtocol, subscriptions } from './protocol'
 
-export const AssemblyProtocol = SwarmProtocol.make('TransportOrder', Events.allEvents)
+export const AssemblyLine = SwarmProtocol.make('warehouse-factory', Events.allEvents)
 
-export const AssemblyRobot = AssemblyProtocol.makeMachine('assemblyRobot')
+export const AssemblyRobot = AssemblyLine.makeMachine('assemblyRobot')
 
-export const AssemblyRobotInitial = AssemblyRobot.designEmpty('Initial')
+export const InitialAssemblyRobot = AssemblyRobot.designEmpty('Initial')
   .finish()
 export const Assemble = AssemblyRobot.designState('Assemble')
   .withPayload<{id: string}>()
@@ -15,12 +15,12 @@ export const Assemble = AssemblyRobot.designState('Assemble')
 export const Done = AssemblyRobot.designEmpty('Done').finish()
 
 // ingest the request from the `warehouse`
-AssemblyRobotInitial.react([Events.ack], Assemble, (ctx, a) => ({
+InitialAssemblyRobot.react([Events.ack], Assemble, (ctx, a) => ({
   id: a.payload.id
 }))
 
 // go to the final state
 Assemble.react([Events.product], Done, (ctx, b) => {})
 
-// Adapted machine. Adapting here has no effect. Except that we can make a verbose machine.
-export const [assemblyRobotAdapted, initialAssemblyAdapted] = AssemblyProtocol.adaptMachine('assemblyRobot', [transportOrderProtocol, assemblyLineProtocol], 1, subscriptions, [AssemblyRobot, AssemblyRobotInitial], true).data!
+// Adapted machine.
+export const [assemblyRobotAdapted, initialAssemblyAdapted] = AssemblyLine.adaptMachine('assemblyRobot', [transportOrderProtocol, assemblyLineProtocol], 1, subscriptions, [AssemblyRobot, InitialAssemblyRobot], true).data!
