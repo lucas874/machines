@@ -60,11 +60,11 @@ If the workflow still is in the <code>Auction</code> state, we compute the best 
 <p>The third feature becomes relevant once the auction has ended: we check if our robot is indeed the winner and record that in a variable <code>IamWinner</code>, i.e. in the current application in-memory state.
 Then we can use this information in all following states as well.</p>
 <h3 id="composing-swarms" class="tsd-anchor-link">Composing swarms<a href="#composing-swarms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p>Suppose that the warehouse is part of a larger factory facility and that items from the warehouse are
-needed on the assembly line. The transport order workflow offers the service of orchestrating
-a fleet of robots to deliver some requested item from the warehouse. We can can make use of this
+needed on the assembly line. The transport order workflow offers the functionality of orchestrating
+a fleet of robots to deliver some requested item from the warehouse. We can can make use of this functionality
 by specifying another workflow that uses the <code>warehouse</code> role to handle material transportation.</p>
 <img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/update-packages/demos/warehouse-readme-demo/assembly-protocol.svg" alt="assembly line workflow" width="300" />
-<p>The workflow above specifies how the <code>warehouse</code> role requests an item and acknowledges its delivery, and how an assembly robot
+<p>The workflow above specifies how the <code>warehouse</code> role requests an item and acknowledges its delivery, and how an <code>assembly-robot</code>
 uses it to assemble a product. It does not specify what happens between the <code>warehouse</code>'s request for an item and its acknowledgement.</p>
 <p>Notice how the <code>warehouse</code> role from the <code>transportOrderProtocol</code> appears in the workflow above. By doing so we can implement a</p>
 <h3 id="change-detection-on-for-await-loop" class="tsd-anchor-link">Change detection on for-await loop<a href="#change-detection-on-for-await-loop" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p>When using a for-await loop with the machine runner, the loop iterates only if all of the following criteria are met:</p>
