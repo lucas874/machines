@@ -59,7 +59,7 @@ async function main() {
           console.log()
           stateAfterTimeOut?.cast().commands()?.request()
         }
-      }, getRandomInt(2000, 8000))
+      }, getRandomInt(2000, 3000))
     }
 
     if(state.isLike(s2)) {
@@ -70,6 +70,11 @@ async function main() {
           stateAfterTimeOut?.cast().commands()?.deliver()
         }
       }, getRandomInt(2000, 8000))
+    }
+    if (state.type === "3 || 3" || state.type === "3 || 2" || state.type === "3 || 0") {
+      console.log("final state")
+      console.log("please press CTRL + D")
+      break
     }
   }
   rl.close();
