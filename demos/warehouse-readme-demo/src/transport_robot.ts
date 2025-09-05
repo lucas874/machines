@@ -1,6 +1,6 @@
-import { Events, Composition, transportOrderProtocol, assemblyLineProtocol, subscriptions } from './protocol'
+import { Events, TransportOrder, transportOrderProtocol, assemblyLineProtocol, subscriptions } from './protocol'
 
-export const TransportRobot = Composition.makeMachine('transport-robot')
+export const TransportRobot = TransportOrder.makeMachine('transporRobot')
 
 export type Score = { robot: string; delay: number }
 export type AuctionPayload =
@@ -44,4 +44,4 @@ Auction.react([Events.selected], DoIt, (ctx, s) =>
 DoIt.react([Events.deliver], Done, (_ctx) => {[]})
 
 // Adapted machine. Adapting here has no effect. Except that we can make a verbose machine.
-export const [transportAdapted, initialTransportAdapted] = Composition.adaptMachine('transportRobot', [transportOrderProtocol, assemblyLineProtocol], 0, subscriptions, [TransportRobot, Initial], true).data!
+export const [transportAdapted, initialTransportAdapted] = TransportOrder.adaptMachine('transportRobot', [transportOrderProtocol, assemblyLineProtocol], 0, subscriptions, [TransportRobot, Initial], true).data!

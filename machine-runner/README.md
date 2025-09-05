@@ -35,7 +35,7 @@ export const ack = MachineEvent.design('acknowledge')
     .withPayload<{ id: string }>()
 
 // declare a precisely typed tuple of all events we can now choose from
-export const transportOrderEvents = [request, bid, selected, deliver, ack] as const
+export const allEvents = [request, bid, selected, deliver, ack] as const
 ```
 
 Then we can declare a swarm protocol using these events:
@@ -260,15 +260,75 @@ Then we can use this information in all following states as well.
 
 ### Composing swarms
 Suppose that the warehouse is part of a larger factory facility and that items from the warehouse are
-needed on the assembly line. The transport order workflow offers the functionality of orchestrating
-a fleet of robots to deliver some requested item from the warehouse. We can can make use of this functionality
-by specifying another workflow that uses the `warehouse` role to handle material transportation.
+needed on the assembly line. Instead of specifying a large workflow that combines the transport order
+workflow with a description of how delivered items are used on the assembly line and implementing
+the resulting workfow, we can reuse the transport order protocol and the machines that implement it.
 
 <img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/update-packages/demos/warehouse-readme-demo/assembly-protocol.svg" alt="assembly line workflow" width="300" />
 
-The workflow above specifies how the `warehouse` role requests an item and acknowledges its delivery, and how an `assembly-robot`
-uses it to assemble a product. It does not specify what happens between the `warehouse`'s request for an item and its acknowledgement.
+The workflow above specifies how the `warehouse` role requests an item and acknowledges its delivery, and how an `assemblyRobot`
+then uses the delivered item to assemble a product. Unlike the transport order workflow, this workflow does not specify
+exactly how requested items are obtained. It simply states that an item can be requested and sometimes later its delivery can be acknowledged.
 
+We can, however, implement the `assemblyRobot` for for the worklflow above and then automatically adapt this machine
+and the machines from the transport order protocol work together. The resulting machines will then implement the worklfow below:
+
+<img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/update-packages/demos/warehouse-readme-demo/composition.svg" alt="assembly line workflow" width="300" />
+
+To achieve this we
+
+We start by defining the event emitted by the assembly robot when a product has been finished.
+```typescript
+...
+// sent by the assembly robot when a product has been assembled
+export const product = MachineEvent.design('product')
+    .withPayload<{productName: string}>()
+
+// declare a precisely typed tuple of all events we can now choose from
+export const allEvents = [request, bid, selected, deliver, ack] as const
+```
+
+We then declare a new swarm protocol using these events:
+```typescript
+export const AssemblyProtocol = SwarmProtocol.make('TransportOrder', Events.allEvents)
+```
+
+Now we build the assembly robot for this protocol. Once an item has been delivered from the warehouse, it will use it to assemble a product.
+```typescript
+export const AssemblyRobot = AssemblyProtocol.makeMachine('assemblyRobot')
+
+export const AssemblyRobotInitial = AssemblyRobot.designEmpty('Initial')
+  .finish()
+export const Assemble = AssemblyRobot.designState('Assemble')
+  .withPayload<{id: string}>()
+  .command('assemble', [Events.product], (_ctx) =>
+                         [{ productName: "product" }])
+  .finish()
+export const Done = AssemblyRobot.designEmpty('Done').finish()
+
+// ingest the request from the `warehouse`
+AssemblyRobotInitial.react([Events.ack], Assemble, (ctx, a) => ({
+  id: a.payload.id
+}))
+// go to the final state
+Assemble.react([Events.product], Done, (ctx, b) => {})
+```
+
+To make the machines implemented for the transport order protocol work together with the assembly robot machine we must *adapt* them to the composition
+of the transport order and the assembly line protocols.
+
+
+
+To make thethe assembly robot work together with the machines implemented for the transport order work together with we must *adapt* them to the composition
+of the transport order and the assembly line protocols.
+
+
+
+
+
+The transport order workflow offers the functionality of orchestrating
+a fleet of robots to deliver some requested item from the warehouse. We can reuse this functionality
+in another protocol by specifying a workflow that uses the `warehouse` role to handle material transportation.
 
 
 

@@ -1,13 +1,13 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
-import { manifest, Composition, printState, Events } from './protocol'
+import { manifest, printState, Events } from './protocol'
 import chalk from "chalk";
-import { Assemble, assemblyRobotAdapted, initialAssemblyAdapted } from './assembly_robot';
+import { Assemble, AssemblyProtocol, assemblyRobotAdapted, initialAssemblyAdapted } from './assembly_robot';
 
 // Run the adapted machine
 async function main() {
   const app = await Actyx.of(manifest)
-  const tags = Composition.tagWithEntityId('warehouse-factory')
+  const tags = AssemblyProtocol.tagWithEntityId('warehouse-factory')
   const assemblyRobot = createMachineRunnerBT(app, tags, initialAssemblyAdapted, undefined, assemblyRobotAdapted)
   printState(assemblyRobotAdapted.machineName, initialAssemblyAdapted.mechanism.name, undefined)
 

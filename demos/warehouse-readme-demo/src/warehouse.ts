@@ -1,9 +1,9 @@
-import { Events, Composition, subsWarehouse, transportOrderProtocol, assemblyLineProtocol, subscriptions } from './protocol'
+import { Events, TransportOrder, subsWarehouse, transportOrderProtocol, assemblyLineProtocol, subscriptions } from './protocol'
 import { checkComposedProjection } from '@actyx/machine-check';
 
 // initialize the state machine builder for the `warehouse` role
 export const Warehouse =
-  Composition.makeMachine('warehouse')
+  TransportOrder.makeMachine('warehouse')
 
 // add initial state with command to request the transport
 export const InitialWarehouse = Warehouse
@@ -41,7 +41,7 @@ SelectedWarehouse.react([Events.deliver], AcknowledgeWarehouse, (_ctx, event) =>
 AcknowledgeWarehouse.react([Events.ack], DoneWarehouse, (_ctx, _event) => {})
 
 // Adapted machine. Adapting here has no effect. Except that we can make a verbose machine.
-export const [warehouseAdapted, warehouseInitialAdapted] = Composition.adaptMachine('warehouse', [transportOrderProtocol, assemblyLineProtocol], 0, subscriptions, [Warehouse, InitialWarehouse], true).data!
+export const [warehouseAdapted, warehouseInitialAdapted] = TransportOrder.adaptMachine('warehouse', [transportOrderProtocol, assemblyLineProtocol], 0, subscriptions, [Warehouse, InitialWarehouse], true).data!
 
 
 

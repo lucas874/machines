@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
-import { manifest, Composition, printState, Events } from './protocol'
+import { manifest, TransportOrder, printState, Events } from './protocol'
 import chalk from "chalk";
 import { AcknowledgeWarehouse, DoneWarehouse, InitialWarehouse, warehouseAdapted, warehouseInitialAdapted } from './warehouse';
 
@@ -9,7 +9,7 @@ const parts = ['tire', 'windshield', 'chassis', 'hood', 'spoiler']
 // Run the adapted machine
 async function main() {
   const app = await Actyx.of(manifest)
-  const tags = Composition.tagWithEntityId('warehouse-factory')
+  const tags = TransportOrder.tagWithEntityId('warehouse-factory')
   const warehouse = createMachineRunnerBT(app, tags, warehouseInitialAdapted, undefined, warehouseAdapted)
   printState(warehouseAdapted.machineName, warehouseInitialAdapted.mechanism.name, undefined)
   console.log()

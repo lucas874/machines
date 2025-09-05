@@ -33,7 +33,7 @@ export namespace Events {
     export const allEvents = [request, bid, selected, deliver, ack, product] as const
 }
 
-export const Composition = SwarmProtocol.make('Composition', Events.allEvents)
+export const TransportOrder = SwarmProtocol.make('TransportOrder', Events.allEvents)
 
 export const transportOrderProtocol: SwarmProtocolType = {
   initial: 'initial',
@@ -88,8 +88,3 @@ export function getRandomInt(min: number, max: number) {
 export const printState = (machineName: string, stateName: string, statePayload: any) => {
   console.log(chalk.bgBlack.white.bold`${machineName} - State: ${stateName}. Payload: ${statePayload ? JSON.stringify(statePayload, null, 0) : "{}"}`)
 }
-
-/* const thing = composeProtocols([warehouseProtocol, factoryProtocol])
-if (thing.type === 'OK') {
-    console.log(JSON.stringify(thing.data, null, 2))
-} */

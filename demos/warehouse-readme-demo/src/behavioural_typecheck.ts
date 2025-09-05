@@ -1,4 +1,4 @@
-import { checkComposedProjection, checkComposedSwarmProtocol } from '@actyx/machine-check'
+import { checkComposedProjection, checkComposedSwarmProtocol, composeProtocols } from '@actyx/machine-check'
 import { TransportRobot, Initial } from './transport_robot'
 import { Warehouse, InitialWarehouse } from './warehouse'
 import { transportOrderProtocol, Events, assemblyLineProtocol } from './protocol'
@@ -34,3 +34,7 @@ console.log(
   checkComposedProjection([assemblyLineProtocol], subscriptionsForAssemblyLine, 'assemblyRobot', assemblyRobotJSON)
 )
 
+const thing = composeProtocols([transportOrderProtocol, assemblyLineProtocol])
+if (thing.type === 'OK') {
+    console.log(JSON.stringify(thing.data, null, 2))
+}

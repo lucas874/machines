@@ -1,10 +1,9 @@
-import { Events, Composition, transportOrderProtocol, assemblyLineProtocol, subscriptions } from './protocol'
+import { SwarmProtocol } from '@actyx/machine-runner';
+import { Events, transportOrderProtocol, assemblyLineProtocol, subscriptions } from './protocol'
 
-export const AssemblyRobot = Composition.makeMachine('transport-robot')
+export const AssemblyProtocol = SwarmProtocol.make('TransportOrder', Events.allEvents)
 
-export type Score = { robot: string; delay: number }
-export type AuctionPayload =
-  { id: string; from: string; to: string; robot: string; scores: Score[] }
+export const AssemblyRobot = AssemblyProtocol.makeMachine('assemblyRobot')
 
 export const AssemblyRobotInitial = AssemblyRobot.designEmpty('Initial')
   .finish()
@@ -24,4 +23,4 @@ AssemblyRobotInitial.react([Events.ack], Assemble, (ctx, a) => ({
 Assemble.react([Events.product], Done, (ctx, b) => {})
 
 // Adapted machine. Adapting here has no effect. Except that we can make a verbose machine.
-export const [assemblyRobotAdapted, initialAssemblyAdapted] = Composition.adaptMachine('assemblyRobot', [transportOrderProtocol, assemblyLineProtocol], 1, subscriptions, [AssemblyRobot, AssemblyRobotInitial], true).data!
+export const [assemblyRobotAdapted, initialAssemblyAdapted] = AssemblyProtocol.adaptMachine('assemblyRobot', [transportOrderProtocol, assemblyLineProtocol], 1, subscriptions, [AssemblyRobot, AssemblyRobotInitial], true).data!
