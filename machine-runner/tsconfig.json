@@ -25,6 +25,5 @@
     "strictPropertyInitialization": true,
     "stripInternal": true,
     "target": "es2022"
-  },
-  "exclude": ["node_modules", "tests", "**/*.test.ts"]
+  }
 }
