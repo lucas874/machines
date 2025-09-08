@@ -53,9 +53,7 @@ async function main() {
       }, getRandomInt(2000, 8000))
     }
     if (state.type === "3 || 3" || state.type === "3 || 0") {
-      console.log("final state")
-      console.log("please press CTRL + D")
-      break
+      console.log("please press CTRL + C")
     }
   }
   rl.close();
