@@ -12,10 +12,70 @@ import { ProjToMachineStates } from '../../../machine-check/lib/pkg/machine_chec
  * SwarmProtocol dictates MachineEvents used for communication and Actyx Tags
  * used as the channel to transport said Events. A SwarmProtocol provides a way
  * to design Machine protocols that abides the Events and Tags rules of the
- * SwarmProtocol.
- * @example
+ * SwarmProtocol and a way to adapt machines to composed swarms.
+ *
+ * #### Example: creating a Swarm Protocol and a Machine
+ * ```ts
  * const protocol = SwarmProtocol.make("HangarBayExchange")
  * const machine = protocol.makeMachine("HangarBay")
+ * ```
+ * #### Example: adapting a Machine
+ * ```ts
+ * // Define events emitted in a swarm
+ * const partReq = MachineEvent.design('partReq').withoutPayload()
+ * const partOK = MachineEvent.design('partOK').withoutPayload()
+ * const pos = MachineEvent.design('pos').withoutPayload()
+ * const closingTime = MachineEvent.design('closingTime').withPayload<{ timeOfDay: string }>()
+ *
+ * // Specify the shape of a swarm protocol
+ * const warehouse: SwarmProtocolType = {
+ *   initial: '0',
+ *   transitions: [
+ *     {source: '0', target: '1', label: {cmd: 'request', role: 'T', logType: [partReq.type]}},
+ *     {source: '1', target: '2', label: {cmd: 'get', role: 'FL', logType: [pos.type]}},
+ *     {source: '2', target: '0', label: {cmd: 'deliver', role: 'T', logType: [partOK.type]}},
+ *     {source: '0', target: '3', label: {cmd: 'close', role: 'D', logType: [closingTime.type]}},
+ * ]}
+ *
+ * // Implement the machine 'door' for the swarm protocol 'warehouse'
+ * const door = composition.makeMachine('Door')
+ * const s0 = door.designEmpty('s0')
+ *   .command('close', [Events.closingTime], () => {
+ *       const dateString = new Date().toString();
+ *       return [Events.closingTime.make({timeOfDay: dateString})]})
+ *   .finish()
+ * const s1 = door.designEmpty('s1').finish()
+ * const s2 = door.designEmpty('s2').finish()
+ *
+ * s0.react([Events.partReq], s1, () => { return s1.make() })
+ * s1.react([Events.partOK], s0, () => { return s0.make() })
+ * s0.react([Events.closingTime], s2, () => { return s2.make() })
+ *
+ * // Specify the shape of another swarm protocol that can be composed with 'warehouse'
+ * // and an event from this swarm protocol.
+ * const factory: SwarmProtocolType = {
+ *   initial: '0',
+ *   transitions: [
+ *     {source: '0', target: '1', label: { cmd: 'request', role: 'T', logType: [partReq.type]}},
+ *     {source: '1', target: '2', label: { cmd: 'deliver', role: 'T', logType: [partOK.type]}},
+ *     {source: '2', target: '3', label: { cmd: 'build', role: 'R', logType: [car.type] }},
+ * ]}
+ *
+ * const car = MachineEvent.design('car').withoutPayload()
+ *
+ * // Instantiate a SwarmProtocol for running the swarm composed from 'warehouse' and 'factory'
+ * const allEvents = [partReq, partOK, pos, closingTime, car] as const
+ * const composition = SwarmProtocol.make('Composition', allEvents)
+ *
+ * // Generate a subscription that can be used by machines implementing the composed swarm protocol.
+ * const protocols: InterfacingProtocols = [warehouse, factory]
+ * const subscriptionsResult: DataResult<Subscriptions> = overapproxWWFSubscriptions(protocols, {}, 'Medium')
+ * if (subscriptionsResult.type === 'ERROR') throw new Error(subscriptionsResult.errors.join(', '))
+ * const subscriptions: Subscriptions = subscriptionsResult.data
+ *
+ * // Adapt 'door' to the composition of 'warehouse' and 'factory'
+ * const [doorAdapted, s0Adapted] = composition.adaptMachine('D', protocols, 0, subscriptions, [door, s0])
+ * ```
  */
 export type SwarmProtocol<
   SwarmProtocolName extends string,
@@ -26,6 +86,16 @@ export type SwarmProtocol<
     machineName: MachineName,
   ) => Machine<SwarmProtocolName, MachineName, MachineEventFactories>
   tagWithEntityId: (id: string) => Tags<MachineEvents>
+  /**
+   * Adapt a machine.
+   * @param role - The role implemented by the machine.
+   * @param protocols - The protocols forming the composition that the machine is adapted to.
+   * @param k - An index pointing into 'protocols' indicating the swarm protocol 'mOld' was implemented for.
+   * @param subscriptions - A map associating each role with the set of event types they receive.
+   * @param mOld - The machine to adapt.
+   * @param verbose - A verbose machine prints information on event emission and reception and on state changes.
+   * @returns a {@link MachineResult} containing an {@link AdaptedMachine} on success and a list of error messages otherwise.
+   */
   adaptMachine: <
     MachineName extends string,
     ProjectionName extends string,
@@ -89,7 +159,7 @@ export namespace SwarmProtocol {
       adaptMachine: (role, protocols, k, subscriptions, oldMachine, verbose?) => {
         const minimize = false
         const [mOld, mOldInitial] = oldMachine
-        const projectionInfo = projectionInformation(protocols, subscriptions, role, mOld.createJSONForAnalysis(mOldInitial), k, minimize)
+        const projectionInfo = projectionInformation(role, protocols, k, subscriptions, mOld.createJSONForAnalysis(mOldInitial), minimize)
         if (projectionInfo.type == 'ERROR') {
           return {data: undefined, ... projectionInfo}
         }
@@ -153,11 +223,21 @@ export type Machine<
   ) => MachineAnalysisResource
 }>
 
+/**
+ * Interface representing adapted machines. Extends {@link Machine} to contain information used
+ * for branch tracking and for associating states in an adapted machine with states
+ * in the machine from which the adapted machine is derived.
+ */
 export interface AdaptedMachine<
   SwarmProtocolName extends string,
   MachineName extends string,
   MachineEventFactories extends MachineEvent.Factory.Any
 > extends Machine<SwarmProtocolName, MachineName, MachineEventFactories>{
+  /**
+   * The projectionInfo field contains information used for branch tracking
+   * and a map associating states in an adapted machine with states
+   * in the machine from which the adapted machine is derived.
+   */
   readonly projectionInfo: ProjectionInfo
 }
 
@@ -283,6 +363,8 @@ namespace ImplMachine {
    * Create a machine protocol with a specific name, event factories,
    * a function mapping event types to sets of events types
    * and set of 'special event types' used for branch tracking.
+   * This function is used to create 'empty machines' serving as
+   * a base for creating 'adapted machines'.
    * @param machineName - name of the machine protocol.
    * @param registeredEventFactories - tuple of MachineEventFactories.
    * @see MachineEvent.design to get started on creating MachineEventFactories
@@ -395,8 +477,6 @@ export interface MachineAnalysisResource extends ProjectionType {
 
 export type MachineResult<T> = { type: 'OK'; data: T } | { type: 'ERROR'; errors: string[]; data: undefined }
 
-//export type ProjectionInfo = { projection: ProjectionType, branches: Record<string, Set<string>>, specialEventTypes: Set<string> }
-
 export namespace MachineAnalysisResource {
   export const SyntheticDelimiter = '§' as const
 
@@ -494,11 +574,12 @@ export namespace MachineAnalysisResource {
   }
 }
 
-export namespace MachineAdaptation {
-  // f is the
-  // reaction. should be the same for each base case since any intermediate states are due to
-  // concurrency and subscribing to event types from other protocols.
-
+/**
+ * For adapting machines to composed swarms.
+ * @see MachineAdaptation.adaptMachine - the sole
+ * exported item - for more information on its use.
+ */
+namespace MachineAdaptation {
   type ReactionLabel = {
     source: string;
     target: string;
@@ -664,6 +745,22 @@ export namespace MachineAdaptation {
     return mStateToCommandsMap
   }
 
+  /**
+   * Create a branch-tracking adaptation of a machine for a composed swarm.
+   * The structure of the adapted machine is the projection of the
+   * composed swarm protocol over the role of the original machine.
+   * All reactions and commands a transferred from the original machine to the
+   * adapted machine.
+   * @param mNew - Should be created using ImplMachine.AdaptedMachine. Contains
+   * information about the projection, information about branch tracking and
+   * function to create states.
+   * @param events - tuple of MachineEventFactories.
+   * @see MachineEvent.design to get started on creating MachineEventFactories
+   * for the registeredEventFactories parameter.
+   * @param mOldInitial - the initial state of the original machine to adapt.
+   * @param verbose - flag determining whether the generated machine
+   * should print information event emission, event reception and state changes.
+   */
   export const adaptMachine = <
     SwarmProtocolName extends string,
     MachineName extends string,

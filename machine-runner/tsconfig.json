@@ -5,7 +5,7 @@
     "esModuleInterop": false,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": false,
-    "lib": ["dom", "es2019"],
+    "lib": ["dom", "es2022"],
     "module": "Node16",
     "moduleResolution": "Node16",
     "noFallthroughCasesInSwitch": true,
@@ -24,6 +24,6 @@
     "strictNullChecks": true,
     "strictPropertyInitialization": true,
     "stripInternal": true,
-    "target": "es2019"
+    "target": "es2022"
   }
 }

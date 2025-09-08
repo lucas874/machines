@@ -889,8 +889,8 @@ mod tests {
     use crate::{
         composition::{
             composition_swarm::{
-                compose_protocols, exact_weak_well_formed_sub, from_json,
-                overapprox_weak_well_formed_sub, swarms_to_proto_info,
+                compose_protocols, exact_well_formed_sub, from_json,
+                overapprox_well_formed_sub, swarms_to_proto_info,
             },
             composition_types::{Granularity, InterfacingProtocols},
         },
@@ -1374,7 +1374,7 @@ mod tests {
             // warehouse example from coplaws slides
             let proto = get_proto1();
             let result_subs =
-                exact_weak_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+                exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
             assert!(result_subs.is_ok());
             let subs = result_subs.unwrap();
             let role = Role::new("FL");
@@ -1449,7 +1449,7 @@ mod tests {
             // car factory from coplaws example
             let proto = get_proto2();
             let result_subs =
-                exact_weak_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+                exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
             assert!(result_subs.is_ok());
             let subs = result_subs.unwrap();
             let role = Role::new("F");
@@ -1501,7 +1501,7 @@ mod tests {
             setup_logger();
             // car factory from coplaws example
             let protos = get_interfacing_swarms_1();
-            let result_subs = overapprox_weak_well_formed_sub(
+            let result_subs = overapprox_well_formed_sub(
                 protos.clone(),
                 &BTreeMap::from([(Role::new("T"), BTreeSet::from([EventType::new("car")]))]),
                 Granularity::Coarse,
@@ -1609,7 +1609,7 @@ mod tests {
             // warehouse example from coplaws slides
             let proto = get_proto1();
             let result_subs =
-                exact_weak_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+                exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
             assert!(result_subs.is_ok());
             let subs = result_subs.unwrap();
             let role = Role::new("FL");
@@ -1683,7 +1683,7 @@ mod tests {
             // warehouse example from coplaws slides
             let proto = get_proto1();
             let result_subs =
-                exact_weak_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+                exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
             assert!(result_subs.is_ok());
             let subs = result_subs.unwrap();
             let role = Role::new("FL");
@@ -1757,7 +1757,7 @@ mod tests {
             // warehouse example from coplaws slides
             let proto = get_proto1();
             let result_subs =
-                exact_weak_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+                exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
             assert!(result_subs.is_ok());
             let subs = result_subs.unwrap();
             let role = Role::new("FL");
@@ -1832,7 +1832,7 @@ mod tests {
             // warehouse example from coplaws slides
             let proto = get_proto1();
             let result_subs =
-                exact_weak_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+                exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
             assert!(result_subs.is_ok());
             let subs = result_subs.unwrap();
             let role = Role::new("FL");
@@ -1903,7 +1903,7 @@ mod tests {
             setup_logger();
             // Example from coplaws slides. Use generated WWF subscriptions. Project over T.
             let role = Role::new("T");
-            let subs1 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
+            let subs1 = crate::composition::composition_swarm::overapprox_well_formed_sub(
                 get_interfacing_swarms_1(),
                 &BTreeMap::new(),
                 Granularity::Coarse,
@@ -1916,7 +1916,7 @@ mod tests {
             let (proj_combined1, proj_combined_initial1) =
                 project_combine(&proto_info, &subs1, role.clone(), false);
 
-            let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
+            let subs2 = crate::composition::composition_swarm::overapprox_well_formed_sub(
                 get_interfacing_swarms_1_reversed(),
                 &BTreeMap::new(),
                 Granularity::Coarse,
@@ -1967,7 +1967,7 @@ mod tests {
             let composition = compose_protocols(get_interfacing_swarms_2());
             assert!(composition.is_ok());
             let (composed_graph, composed_initial) = composition.unwrap();
-            let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
+            let subs = crate::composition::composition_swarm::overapprox_well_formed_sub(
                 get_interfacing_swarms_2(),
                 &BTreeMap::new(),
                 Granularity::Coarse,
@@ -1984,7 +1984,7 @@ mod tests {
             ];
 
             for role in all_roles {
-                let subs1 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
+                let subs1 = crate::composition::composition_swarm::overapprox_well_formed_sub(
                     get_interfacing_swarms_2(),
                     &BTreeMap::new(),
                     Granularity::Coarse,
@@ -1997,7 +1997,7 @@ mod tests {
                 let (proj_combined1, proj_combined_initial1) =
                     project_combine(&proto_info, &subs1, role.clone(), false);
 
-                let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
+                let subs2 = crate::composition::composition_swarm::overapprox_well_formed_sub(
                     get_interfacing_swarms_2_reversed(),
                     &BTreeMap::new(),
                     Granularity::Coarse,
@@ -2040,7 +2040,7 @@ mod tests {
             let composition = compose_protocols(get_interfacing_swarms_1());
             assert!(composition.is_ok());
             let (composed_graph, composed_initial) = composition.unwrap();
-            let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
+            let subs = crate::composition::composition_swarm::overapprox_well_formed_sub(
                 get_interfacing_swarms_1(),
                 &BTreeMap::new(),
                 Granularity::TwoStep
@@ -2196,7 +2196,7 @@ mod tests {
     fn test_example_from_text_machine() {
         setup_logger();
         let role = Role::new("F");
-        let subs = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
+        let subs = crate::composition::composition_swarm::overapprox_well_formed_sub(
             get_interfacing_swarms_3(),
             &BTreeMap::new(),
             Granularity::Medium,
@@ -2220,7 +2220,7 @@ mod tests {
         setup_logger();
 
         let proto = get_proto1();
-        let result_subs = overapprox_weak_well_formed_sub(
+        let result_subs = overapprox_well_formed_sub(
             InterfacingProtocols(vec![proto.clone(), get_proto2()]),
             &BTreeMap::new(),
             Granularity::TwoStep,
@@ -2386,7 +2386,7 @@ mod tests {
 
         let role = Role::new("FL");
         let swarms = get_interfacing_swarms_1();
-        let subs1 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
+        let subs1 = crate::composition::composition_swarm::overapprox_well_formed_sub(
             swarms.clone(),
             &BTreeMap::new(),
             Granularity::TwoStep,
@@ -2427,7 +2427,7 @@ mod tests {
 
         let role = Role::new("FL");
         let swarms = get_interfacing_swarms_3();
-        let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
+        let subs2 = crate::composition::composition_swarm::overapprox_well_formed_sub(
             swarms.clone(),
             &BTreeMap::new(),
             Granularity::TwoStep,
@@ -2504,7 +2504,7 @@ mod tests {
 
         let role = Role::new("F");
         let swarms = get_interfacing_swarms_1();
-        let subs1 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
+        let subs1 = crate::composition::composition_swarm::overapprox_well_formed_sub(
             swarms.clone(),
             &BTreeMap::new(),
             Granularity::TwoStep,
@@ -2545,7 +2545,7 @@ mod tests {
 
         let role = Role::new("F");
         let swarms = get_interfacing_swarms_3();
-        let subs2 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
+        let subs2 = crate::composition::composition_swarm::overapprox_well_formed_sub(
             swarms.clone(),
             &BTreeMap::new(),
             Granularity::TwoStep,
@@ -2592,7 +2592,7 @@ mod tests {
         let composition = compose_protocols(get_interfacing_swarms_1());
         assert!(composition.is_ok());
         let (composed_graph, composed_initial) = composition.unwrap();
-        let subs = crate::composition::composition_swarm::exact_weak_well_formed_sub(
+        let subs = crate::composition::composition_swarm::exact_well_formed_sub(
             get_interfacing_swarms_1(),
             &BTreeMap::new(),
         );
@@ -2628,7 +2628,7 @@ mod tests {
         let composition = compose_protocols(get_interfacing_swarms_3());
         assert!(composition.is_ok());
         let (composed_graph, composed_initial) = composition.unwrap();
-        let subs = crate::composition::composition_swarm::exact_weak_well_formed_sub(
+        let subs = crate::composition::composition_swarm::exact_well_formed_sub(
             get_interfacing_swarms_3(),
             &BTreeMap::new(),
         );
@@ -2662,7 +2662,7 @@ mod tests {
         let composition = compose_protocols(get_interfacing_swarms_warehouse());
         assert!(composition.is_ok());
         let (composed_graph, composed_initial) = composition.unwrap();
-        let subs = crate::composition::composition_swarm::exact_weak_well_formed_sub(
+        let subs = crate::composition::composition_swarm::exact_well_formed_sub(
             get_interfacing_swarms_warehouse(),
             &BTreeMap::new(),
         );
@@ -2792,7 +2792,7 @@ mod tests {
         let (fl_m_graph, fl_m_graph_initial, _) = crate::machine::from_json(fl_m);
         let role = Role::new("FL");
         let swarms = get_interfacing_swarms_1();
-        let subs1 = crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
+        let subs1 = crate::composition::composition_swarm::overapprox_well_formed_sub(
             swarms.clone(),
             &BTreeMap::new(),
             Granularity::TwoStep,
@@ -2971,7 +2971,7 @@ mod tests {
         let swarms: InterfacingProtocols = InterfacingProtocols(vec![get_proto1()]);
         let swarms_for_sub = get_interfacing_swarms_1();
         let larger_than_necessary_sub =
-            crate::composition::composition_swarm::overapprox_weak_well_formed_sub(
+            crate::composition::composition_swarm::overapprox_well_formed_sub(
                 swarms_for_sub,
                 &BTreeMap::new(),
                 Granularity::TwoStep,

@@ -3,6 +3,8 @@
 This library allows you to check whether the machines you implement with [machine-runner](https://www.npmjs.com/package/@actyx/machine-runner) comply with a correct overall swarm behaviour.
 Before we dive into how to use it, we need to quickly establish some notation.
 
+The library also offers functionality supporting *swarm composition*. A description of this use of the library is given in [here](https://github.com/lucas874/machines/tree/update-packages/machine-runner#composing-swarms).
+
 ## Swarm Protocols
 
 Just like the workflow diagrams you put on a whiteboard to discuss how your product should work, we describe swarm behaviour in terms of a [_state machine_](https://en.wikipedia.org/wiki/Finite-state_machine).

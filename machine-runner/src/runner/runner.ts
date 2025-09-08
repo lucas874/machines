@@ -270,12 +270,23 @@ export const createMachineRunner = <
 }
 
 /**
+ * Construct a branch-tracking {@link MachineRunner}.
+ * In a composed swarm, each machine maintains a mapping from
+ * event types to [eventId](https://github.com/Actyx/Actyx/blob/master/js/sdk/src/types/various.ts#L243)s,
+ * updating the map when receiving *branching*, *joining*, or *looping* events.
+ * When a machine emits an event of some type, it attaches the
+ * eventId associated with the type by the mapping to the event.
+ *
+ * A branch-tracking MachineRunner maintains the event-type-to-eventId mapping
+ * and ignores events not pointing to the expected eventIds.
+ *
  * @param sdk - An instance of Actyx.
  * @param tags - List of tags to be subscribed. These tags will also be added to
  * events published to Actyx.
  * @param initialFactory - initial state factory of the machine.
  * @param initialPayload - initial state payload of the machine.
- * @returns a MachineRunner instance.
+ * @param adaptedMachine - the {@link AdaptedMachine} to run.
+ * @returns - a MachineRunner instance.
  */
 export const createMachineRunnerBT = <
   SwarmProtocolName extends string,
@@ -1577,8 +1588,11 @@ export namespace ImplStateOpaque {
         commandGeneratorCriteria,
       )
 
-    const is: ThisStateOpaque['is'] = (...factories) =>
-      factories.find((factory) => factoryAtSnapshot.mechanism === factory.mechanism) !== undefined
+    const is: ThisStateOpaque['is'] = function <F extends StateFactory<SwarmProtocolName, any, any, any, any, any>[]>(
+      ...factories: F
+    ): this is StateOpaque.Of<F[any]> {
+      return factories.find((factory) => factoryAtSnapshot.mechanism === factory.mechanism) !== undefined
+    }
 
     const as: ThisStateOpaque['as'] = <
       StateName extends string,
@@ -1610,10 +1624,12 @@ export namespace ImplStateOpaque {
         stateAtSnapshot,
       })
 
-    const isLike: ThisStateOpaque['isLike'] = (factory) => {
+    // improve this to use projection information.
+    const isLike: ThisStateOpaque['isLike'] = function <F extends StateFactory<SwarmProtocolName, any, any, any, any, any>>(
+      factory: F
+    ): this is StateOpaque.Of<F> {
       return Object.keys(factory.mechanism.commands).every((cmdName) => cmdName in factoryAtSnapshot.mechanism.commands) &&
-        Object.keys(factory.mechanism.commandDefinitions).every((cmdName) => cmdName in factoryAtSnapshot.mechanism.commandDefinitions) //&&
-          //factoryAtSnapshot.mechanism.commandDefinitions[cmdName as keyof typeof factoryAtSnapshot.mechanism.commandDefinitions]?.toString() === factory.mechanism.commandDefinitions[cmdName as keyof typeof factory.mechanism.commandDefinitions]?.toString())
+          Object.keys(factory.mechanism.commandDefinitions).every((cmdName) => cmdName in factoryAtSnapshot.mechanism.commandDefinitions)
     }
 
     return {

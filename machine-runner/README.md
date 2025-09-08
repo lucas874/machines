@@ -7,8 +7,6 @@ The detailed documentation of this library is provided in its JsDoc comments.
 
 ## Example usage
 
-[More detailed tutorial can be found here](../docs/swarm-workflow)
-
 We demonstrate the usage of our decentralized state machines on an example from manufacturing automation, i.e. the factory shop floor: a warehouse requests the fleet of logistics robots to pick something up and bring it somewhere else.
 Our task is to write the logic for the warehouse and for each of the robots so that the job will eventually be done.
 Since there are many robots we use an auction to settle who will do it.
@@ -19,106 +17,145 @@ First we define our set of events:
 
 ```typescript
 // sent by the warehouse to get things started
-const requested = Event.design('requested')
-  .withPayload<{ id: string; from: string; to: string }>()
-// sent by each available candidate robot to register interest
-const bid = Event.design('bid')
-  .withPayload<{ robot: string; delay: number }>()
-// sent by the robots
-const selected = Event.design('selected')
-  .withPayload<{ winner: string }>()
+export const request = MachineEvent.design('request')
+    .withPayload<{ id: string; from: string; to: string }>()
+// sent by each available candidate transport robot to register interest
+export const bid = MachineEvent.design('bid')
+    .withPayload<{ robot: string; delay: number, id: string }>()
+// sent by the transport robots
+export const selected = MachineEvent.design('selected')
+    .withPayload<{ winner: string, id: string }>()
+// sent by the transport robot performing the delivery
+export const deliver = MachineEvent.design('deliver')
+    .withPayload<{ id: string }>()
+// sent by the warehouse to acknowledge delivery
+export const ack = MachineEvent.design('acknowledge')
+    .withPayload<{ id: string }>()
 
 // declare a precisely typed tuple of all events we can now choose from
-const transportOrderEvents = [requested, bid, selected] as const
+export const allEvents = [request, bid, selected, deliver, ack] as const
 ```
 
 Then we can declare a swarm protocol using these events:
 
 ```typescript
-const transportOrder = SwarmProtocol.make('transportOrder', transportOrderEvents)
+export const TransportOrder = SwarmProtocol.make('warehouse-factory', Events.allEvents)
 ```
 
-Now we build two machines that participate in this protocol: the `warehouse` will request the material transport, while the fleet of `robot` will figure out who does it.
-The `warehouse` is much simpler in this initial part of the workflow since it has no further role after making the request — in a real implementation the protocol would go on to include the actual delivery.
+Now we build two machines that participate in this protocol: the `warehouse` will request the material transport and acknowledge the delivery once it has taken place,
+while the fleet of `robot` perform the material transport.
 
 ```typescript
 // initialize the state machine builder for the `warehouse` role
-const TransportOrderForWarehouse =
-  transportOrder.makeMachine('warehouse')
+export const Warehouse =
+  TransportOrder.makeMachine('warehouse')
 
 // add initial state with command to request the transport
-export const InitialWarehouse = TransportOrderForWarehouse
-  .designState('Initial')
-  .withPayload<{ id: string }>()
-  .command('request', [requested], (ctx, from: string, to: string) =>
-                                   [{ id: ctx.self.id, from, to }])
+export const InitialWarehouse = Warehouse
+  .designEmpty('Initial')
+  .command('request', [Events.request], (_ctx, id: string, from: string, to: string) => [{ id, from, to }])
   .finish()
 
-export const DoneWarehouse = TransportOrderForWarehouse.designEmpty('Done').finish()
+// add state entered after performing the request
+export const AuctionWarehouse = Warehouse
+  .designEmpty('AuctionWarehouse')
+  .finish()
 
-// describe the transition into the `Done` state after request has been made
-InitialWarehouse.react([requested], DoneWarehouse, (_ctx, _r) => [{}])
+// add state entered after a transport robot has been selected
+export const SelectedWarehouse = Warehouse
+  .designEmpty('SelectedWarehouse')
+  .finish()
+
+// add state for acknowledging a delivery entered after a robot has performed the delivery
+export const AcknowledgeWarehouse = Warehouse
+  .designState('Acknowledge')
+  .withPayload<{id: string}>()
+  .command('acknowledge', [Events.ack], (ctx) => [{ id: ctx.self.id }])
+  .finish()
+
+export const DoneWarehouse = Warehouse.designEmpty('Done').finish()
+
+// describe the transition into the `AuctionWarehouse` state after request has been made
+InitialWarehouse.react([Events.request], AuctionWarehouse, (_ctx, _event) => {})
+// describe the transitions from the `AuctionWarehouse` state
+AuctionWarehouse.react([Events.bid], AuctionWarehouse, (_ctx, _event) => {})
+AuctionWarehouse.react([Events.selected], SelectedWarehouse, (_ctx, _event) => {})
+// describe the transitions from the `SelectedWarehouse` state
+SelectedWarehouse.react([Events.deliver], AcknowledgeWarehouse, (_ctx, event) => AcknowledgeWarehouse.make({id: event.payload.id}))
+// describe the transitions from the `AcknoweledgeWarehouse` state
+AcknowledgeWarehouse.react([Events.ack], DoneWarehouse, (_ctx, _event) => {})
 ```
 
-The `robot` state machine is constructed in the same way, albeit with more commands and state transitions:
+The `robot` state machine is constructed in the same way:
 
 ```typescript
-const TransportOrderForRobot = transportOrder.makeMachine('robot')
+export const TransportRobot = TransportOrder.makeMachine('transporRobot')
 
-type Score = { robot: string; delay: number }
-type AuctionPayload =
+export type Score = { robot: string; delay: number }
+export type AuctionPayload =
   { id: string; from: string; to: string; robot: string; scores: Score[] }
 
-export const Initial = TransportOrderForRobot.designState('Initial')
+export const InitialTransport = TransportRobot.designState('Initial')
   .withPayload<{ robot: string }>()
   .finish()
-export const Auction = TransportOrderForRobot.designState('Auction')
+export const Auction = TransportRobot.designState('Auction')
   .withPayload<AuctionPayload>()
-  .command('bid', [bid], (ctx, delay: number) =>
-                         [{ robot: ctx.self.robot, delay }])
-  .command('select', [selected], (_ctx, winner: string) => [{ winner }])
+  .command('bid', [Events.bid], (ctx, delay: number) =>
+                         [{ robot: ctx.self.robot, delay, id: ctx.self.id }])
+  .command('select', [Events.selected], (ctx, winner: string) => [{ winner, id: ctx.self.id}])
   .finish()
-export const DoIt = TransportOrderForRobot.designState('DoIt')
-  .withPayload<{ robot: string; winner: string }>()
+export const DoIt = TransportRobot.designState('DoIt')
+  .withPayload<{ robot: string; winner: string, id: string }>()
+  .command('deliver', [Events.deliver], (ctx) => [{ id: ctx.self.id }])
   .finish()
+export const Done = TransportRobot.designEmpty('Done').finish()
 
 // ingest the request from the `warehouse`
-Initial.react([requested], Auction, (ctx, r) => ({
-  ...ctx.self,
-  ...r.payload,
-  scores: [],
+InitialTransport.react([Events.request], Auction, (ctx, r) => ({
+  id: r.payload.id,
+  from: r.payload.from,
+  to: r.payload.to,
+  robot: ctx.self.robot,
+  scores: []
 }))
 
 // accumulate bids from all `robot`
-Auction.react([bid], Auction, (ctx, b) => {
-  ctx.self.scores.push(b.payload)
+Auction.react([Events.bid], Auction, (ctx, b) => {
+  ctx.self.scores.push({robot: b.payload.robot, delay: b.payload.delay})
   return ctx.self
 })
 
 // end the auction when a selection has happened
-Auction.react([selected], DoIt, (ctx, s) =>
-  ({ robot: ctx.self.robot, winner: s.payload.winner }))
+Auction.react([Events.selected], DoIt, (ctx, s) =>
+  ({ robot: ctx.self.robot, winner: s.payload.winner, id: ctx.self.id }))
+
+// go to the final state
+DoIt.react([Events.deliver], Done, (_ctx) => {[]})
 ```
 
 ### Checking the machines
 
-<img src="https://raw.githubusercontent.com/Actyx/machines/62fbda79d27a71260159c2688f0f57ef4c9e13ca/machine-runner/example-workflow.png" alt="workflow" width="300" />
+<img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/update-packages/demos/warehouse-readme-demo/transport-order-protocol.svg" alt="transport order workflow" width="300" />
 
-The part of the transport order workflow implemented in the previous section is visualized above as a UML state diagram.
+The transport order workflow implemented in the previous section is visualized above as a UML state diagram.
 With the `@actyx/machine-check` library we can check that this workflow makes sense (i.e. it achieves eventual consensus, which is the same kind of consensus used by the bitcoin network to settle transactions), and we can also check that our state machines written down in code implement this workflow correctly.
 
 To this end, we first need to declare the graph in JSON notation:
 
 ```typescript
-const proto: SwarmProtocolType = {
+export const transportOrderProtocol: SwarmProtocolType = {
   initial: 'initial',
   transitions: [
-    { source: 'initial', target: 'auction',
-      label: { cmd: 'request', logType: ['requested'], role: 'warehouse' } },
-    { source: 'auction', target: 'auction',
-      label: { cmd: 'bid', logType: ['bid'], role: 'robot' } },
-    { source: 'auction', target: 'doIt',
-      label: { cmd: 'select', logType: ['selected'], role: 'robot' } },
+    {source: 'initial', target: 'auction',
+      label: {cmd: 'request', role: 'warehouse', logType: [Events.request.type]}},
+    {source: 'auction', target: 'auction',
+      label: {cmd: 'bid', role: 'transportRobot', logType: [Events.bid.type]}},
+    {source: 'auction', target: 'delivery',
+      label: {cmd: 'select', role: 'transportRobot', logType: [Events.selected.type]}},
+    {source: 'delivery', target: 'delivered',
+      label: {cmd: 'deliver', role: 'transportRobot', logType: [Events.deliver.type]}},
+    {source: 'delivered', target: 'acknowledged',
+      label: {cmd: 'acknowledge', role: 'warehouse', logType: [Events.ack.type]}},
   ]
 }
 ```
@@ -127,7 +164,7 @@ The naming of states does not need to be the same as in our code, but the event 
 With this preparation, we can perform the behavioral type checking as follows:
 
 ```typescript
-import { SwarmProtocolType, checkProjection, checkSwarmProtocol } from '@actyx/machine-check'
+import { checkComposedProjection, checkComposedSwarmProtocol } from '@actyx/machine-check'
 
 const robotJSON =
   TransportOrderForRobot.createJSONForAnalysis(Initial)
@@ -142,9 +179,9 @@ const subscriptions = {
 // the code (you would normally verify this using your favorite unit
 // testing framework)
 console.log(
-  checkSwarmProtocol(proto, subscriptions),
-  checkProjection(proto, subscriptions, 'robot', robotJSON),
-  checkProjection(proto, subscriptions, 'warehouse', warehouseJSON),
+  checkComposedSwarmProtocol([transportOrderProtocol], subscriptions),
+  checkComposedProjection([transportOrderProtocol], subscriptions, 'robot', robotJSON),
+  checkComposedProjection([transportOrderProtocol], subscriptions, 'warehouse', warehouseJSON),
 )
 ```
 
@@ -156,11 +193,11 @@ Therefore, before we can run our machines we need to use the Actyx SDK to connec
 
 ```typescript
 const actyx = await Actyx.of(
-  { appId: 'com.example.acm', displayName: 'example', version: '0.0.1' })
-const tags = transportOrder.tagWithEntityId('4711')
-const robot1 = createMachineRunner(actyx, tags, Initial, { robot: 'agv1' })
-const warehouse = createMachineRunner(actyx, tags, InitialWarehouse,
-                                      { id: '4711' })
+  { appId: 'com.example.warehouse-factory', displayName: 'warehouse-factory', version: '1.0.0' })
+
+const tags = transportOrder.tagWithEntityId('warehouse-factory')
+const transportRobot = createMachineRunner(app, tags, InitialTransport, { robot: "robotId" })
+const warehouse = createMachineRunner(app, tags, InitialWarehouse, undefined)
 ```
 
 The `tags` can be thought of as the name of a [dedicated pub–sub channel](https://developer.actyx.com/docs/conceptual/tags) for this particular workflow instance.
@@ -170,43 +207,45 @@ Getting the process started means interacting with the state machines:
 
 ```typescript
 for await (const state of warehouse) {
-  if (state.is(InitialWarehouse)) {
-    await state.cast().commands()?.request('from', 'to')
-  } else {
-    // this role is done
-    break
+  if (state.isLike(InitialWarehouse)) {
+    await state.cast().commands()?.request(parts[Math.floor(Math.random() * parts.length)], "a", "b")
+  }
+  if (state.isL ike(AcknowledgeWarehouse)) {
+    await state.cast().commands()?.acknowledge()
   }
 }
 ```
 
 The `warehouse` machine implements the [async iterator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#the_async_iterator_and_async_iterable_protocols) JavaScript protocol, which makes it conveniently consumable using a `for await (...)` loop.
-Exiting this loop, e.g. using `break` as shown, will destroy the `warehouse` running machine, including cancelling the underlying Actyx event subscription for live updates.
+Exiting this loop, e.g. using `break` as shown below, will destroy the running machine, including cancelling the underlying Actyx event subscription for live updates.
 
 Using the `robot` role we demonstrate a few more features of the machine runner:
 
 ```typescript
 let IamWinner = false
+for await (const state of transportRobot) {
+if (state.isLike(Auction)) {
+    const auction = state.cast()
+    if (!auction.payload.scores.find((s) => s.robot === auction.payload.robot)) {
 
-for await (const state of robot1) {
-  if (state.is(Auction)) {
-    const open = state.cast()
-    if (!open.payload.scores.find((s) => s.robot === open.payload.robot)) {
-      await open.commands()?.bid(1)
-      setTimeout(() => {
-        const open = robot1.get()?.as(Auction)
-        open && open.commands()?.select(bestRobot(open.payload.scores))
-      }, 5000)
+        auction.commands()?.bid(getRandomInt(1, 10))
+        setTimeout(() => {
+            const stateAfterTimeOut = transportRobot.get()
+            if (stateAfterTimeOut?.isLike(Auction)) {
+                stateAfterTimeOut?.cast().commands()?.select(bestRobot(auction.payload.scores))
+            }
+        }, 3000)
     }
-  } else if (state.is(DoIt)) {
-    const assigned = state.cast()
-    IamWinner = assigned.payload.winner === assigned.payload.robot
-    if (!IamWinner) break
-    // now we have the order and can start the mission
-  }
+    } else if (state.isLike(DoIt)) {
+        const assigned = state.cast()
+        IamWinner = assigned.payload.winner === assigned.payload.robot
+        if (!IamWinner) break
+        assigned.commands()?.deliver()
+    }
 }
 ```
 
-The first one is that the accumulated state is inspected in the `state.is(Auction)` case to see whether this particular robot has already provided its bid for the auction.
+The first one is that the accumulated state is inspected in the `state.isLike(Auction)` case to see whether this particular robot has already provided its bid for the auction.
 If not, it will do so by invoking a command, which will subsequently lead to the emission of a `bid` event and consequently to a new state being emitted from the machine, so a new round through the `for await` loop — this time we’ll find our bid in the list, though.
 
 The second part is that upon registering our bid, we also set a timer to expire after 5sec.
@@ -233,6 +272,142 @@ Instead, each robot independently ensures that after at five seconds a decision 
 
 Machine runner resolves this conflict by using only the `selected` event that comes first in the Actyx event sort order; in other words, Actyx arbitrarily picks a winner and the losing event is discarded.
 If a robot saw itself winning, started the mission, and then discovers that its win turned out to be invalid, it will have to stop the mission and pick a new one.
+
+
+### Composing swarms
+Suppose that the warehouse is part of a larger factory facility and that items from the warehouse are
+needed on the assembly line. Instead of specifying a large workflow that combines the transport order
+workflow with a description of how delivered items are used on the assembly line, and then implementing
+the resulting workfow, we can reuse the transport order protocol and the machines that implement it.
+
+<img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/update-packages/demos/warehouse-readme-demo/assembly-protocol.svg" alt="assembly line workflow" width="300" />
+
+The workflow above specifies how the `warehouse` role requests an item and acknowledges its delivery, and how an `assemblyRobot`
+uses the delivered item to assemble a product. Unlike the transport order workflow, this workflow does not specify
+exactly how requested items are obtained. It simply states that an item can be requested and sometimes later its delivery can be acknowledged.
+
+We can, however, implement the `assemblyRobot` for for the workflow above and then **automatically adapt** this machine
+and the machines from the transport order protocol to work together. The resulting machines will then implement the workflow below:
+
+<p id="composition">
+<img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/update-packages/demos/warehouse-readme-demo/composition.svg" alt="composed workflow" width="300" />
+</p>
+
+To achieve this start by defining the event emitted by the assembly robot when a product has been finished.
+```typescript
+// the previously defined events
+
+...
+
+// sent by the assembly robot when a product has been assembled
+export const product = MachineEvent.design('product')
+    .withPayload<{productName: string}>()
+
+// declare a precisely typed tuple of all events we can now choose from
+export const allEvents = [request, bid, selected, deliver, ack] as const
+```
+
+We then declare a new swarm protocol using these events:
+```typescript
+export const AssemblyLine = SwarmProtocol.make('warehouse-factory', Events.allEvents)
+```
+
+Now we build the assembly robot for this protocol. Once an item has been delivered from the warehouse, it will use it to assemble a product.
+```typescript
+export const AssemblyRobot = AssemblyLine.makeMachine('assemblyRobot')
+
+export const InitialAssemblyRobot = AssemblyRobot.designEmpty('Initial')
+  .finish()
+export const Assemble = AssemblyRobot.designState('Assemble')
+  .withPayload<{id: string}>()
+  .command('assemble', [Events.product], (_ctx) =>
+                         [{ productName: "product" }])
+  .finish()
+export const Done = AssemblyRobot.designEmpty('Done').finish()
+
+// ingest the request from the `warehouse`
+InitialAssemblyRobot.react([Events.ack], Assemble, (ctx, a) => ({
+  id: a.payload.id
+}))
+
+// go to the final state
+Assemble.react([Events.product], Done, (ctx, b) => {})
+```
+
+As with the transport order protocol, we can perform the behavioral type checking:
+
+```typescript
+import { checkComposedProjection, checkComposedSwarmProtocol } from '@actyx/machine-check'
+
+export const assemblyLineProtocol: SwarmProtocolType = {
+  initial: 'initial',
+  transitions: [
+    {source: 'initial', target: 'wait',
+      label: { cmd: 'request', role: 'warehouse', logType: [Events.request.type]}},
+    {source: 'wait', target: 'assemble',
+      label: { cmd: 'acknowledge', role: 'warehouse', logType: [Events.ack.type]}},
+    {source: 'assemble', target: 'done',
+      label: { cmd: 'assemble', role: 'assemblyRobot', logType: [Events.product.type] }},
+  ]
+}
+
+const assemblyRobotJSON =
+  AssemblyRobot.createJSONForAnalysis(AssemblyRobotInitial)
+const subscriptionsForAssemblyLine = {
+  assemblyRobot: assemblyRobotJSON.subscriptions,
+  warehouse: [Events.request.type, Events.ack.type],
+}
+
+// these should all print `{ type: 'OK' }`
+console.log(
+  checkComposedSwarmProtocol([assemblyLineProtocol], subscriptionsForAssemblyLine),
+  checkComposedProjection([assemblyLineProtocol], subscriptionsForAssemblyLine, 'assemblyRobot', assemblyRobotJSON)
+)
+```
+
+To make the machines implemented for the transport order protocol and the assembly robot machine work together with we must *adapt* them to the [composition
+of the transport order and the assembly line protocols](#composition).
+
+We do this by first generating a subscription that works for the composed swarm:
+
+```typescript
+// subscription for the composed swarm
+const resultSubsComposition: DataResult<Subscriptions>
+  = overapproxWFSubscriptions([transportOrderProtocol, assemblyLineProtocol], {}, 'TwoStep')
+if (resultSubsComposition.type === 'ERROR') throw new Error(resultSubsComposition.errors.join(', '))
+
+export const subscriptions: Subscriptions = resultSubsComposition.data
+```
+
+Finally, using the subscription, we can adapt the machines and run them using *branch-tracking* MachineRunners:
+
+```typescript
+// Adapted machines.
+export const [assemblyRobotAdapted, initialAssemblyAdapted] = AssemblyProtocol.adaptMachine('assemblyRobot',
+  [transportOrderProtocol, assemblyLineProtocol], 1,
+  subscriptions, [AssemblyRobot, InitialAssemblyRobot], true).data!
+
+export const [transportAdapted, initialTransportAdapted] = TransportOrder.adaptMachine('transportRobot',
+  [transportOrderProtocol, assemblyLineProtocol], 0,
+  subscriptions, [TransportRobot, InitialTransport], true).data!
+
+export const [warehouseAdapted, warehouseInitialAdapted] = TransportOrder.adaptMachine('warehouse',
+  [transportOrderProtocol, assemblyLineProtocol], 0,
+  subscriptions, [Warehouse, InitialWarehouse], true).data!
+
+...
+
+// Branch-tracking machine runners
+const assemblyRobot =
+  createMachineRunnerBT(app, tags, initialAssemblyAdapted, undefined, assemblyRobotAdapted)
+const transportRobot =
+  createMachineRunnerBT(app, tags, initialTransportAdapted, initialPayload, transportAdapted)
+const warehouse =
+  createMachineRunnerBT(app, tags, initialWarehouseAdapted, undefined, warehouseAdapted)
+```
+
+For brevity in some of the examples above, code that resides in different files were shown together.
+The full executable example outlined above is found [here](https://github.com/lucas874/machines/tree/update-packages/demos/warehouse-readme-demo).
 
 ### Errors
 
@@ -352,7 +527,7 @@ warehouse.events.on('error', (error) => {
   if (error instanceof MachineRunnerErrorCommandFiredAfterLocked) {
     //
   }
-  
+
   if (error instanceof MachineRunnerErrorCommandFiredAfterDestroyed) {
     //
   }
@@ -369,7 +544,7 @@ warehouse.events.on('error', (error) => {
 
 A `next` event is emitted when a state transition happens and the machine runner has processed all events matching the supplied tag.
 
-The payload is `StateOpaque`, similar to the value produced in the `for-await` loop. 
+The payload is `StateOpaque`, similar to the value produced in the `for-await` loop.
 
 ##### `error`
 
@@ -386,7 +561,7 @@ The payload has an error subtype.
 A `change` event is emitted when a `next` event is emitted, a command is issued, a command’s event has been published, or a subscription error happened due to losing a connection to Actyx.
 This event is particularly useful in UI code where not only state changes are tracked, but also command availability and errors.
 
-The payload is of type `StateOpaque`, like the value produced in the `for-await` loop. 
+The payload is of type `StateOpaque`, like the value produced in the `for-await` loop.
 
 ##### `debug.bootTime`
 

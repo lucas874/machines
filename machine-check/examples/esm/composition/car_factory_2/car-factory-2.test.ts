@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import { MachineEvent, SwarmProtocol } from '@actyx/machine-runner'
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, Subscriptions, checkWWFSwarmProtocol, DataResult, InterfacingSwarms, overapproxWWFSubscriptions, checkComposedProjection} from '../../../..'
+import { SwarmProtocolType, Subscriptions, checkComposedSwarmProtocol, DataResult, InterfacingProtocols, overapproxWFSubscriptions, checkComposedProjection} from '../../../..'
 
 /*
  * Example from CoPLaWS slides by Florian Furbach
@@ -46,16 +46,16 @@ const Gquality: SwarmProtocolType = {
     {source: '2', target: '3', label: { cmd: 'test', role: 'QCR', logType: [Events.report.type] }},
   ]}
 
-const protocols: InterfacingSwarms = [{protocol: Gwarehouse, interface: null}, {protocol: Gfactory, interface: 'T'}, {protocol: Gquality, interface: 'R'}]
+const protocols: InterfacingProtocols = [Gwarehouse, Gfactory, Gquality]
 
 const result_subs: DataResult<Subscriptions>
-  = overapproxWWFSubscriptions(protocols, {}, 'Medium')
+  = overapproxWFSubscriptions(protocols, {}, 'Medium')
 if (result_subs.type === 'ERROR') throw new Error(result_subs.errors.join(', '))
 const subs: Subscriptions = result_subs.data
 
 describe('checkWWFSwarmProtocol for composition with overapproximated wwf subscription', () => {
   it('should be weak-well-formed protocol composition', () => {
-    expect(checkWWFSwarmProtocol(protocols, subs)).toEqual({
+    expect(checkComposedSwarmProtocol(protocols, subs)).toEqual({
       type: 'OK',
     })
   })
@@ -66,12 +66,13 @@ fail_subs['R'] = [Events.car.type]
 
 describe('checkWWFSwarmProtocol for composition with non-wwf subscription', () => {
   it('should not be weak-well-formed protocol composition', () => {
-    expect(checkWWFSwarmProtocol(protocols, fail_subs)).toEqual({
+    expect(checkComposedSwarmProtocol(protocols, fail_subs)).toEqual({
       type: 'ERROR',
       errors: [
         "role R does not subscribe to event types partID, time in branching transitions at state 0 || 0 || 0, but is involved after transition (0 || 0 || 0)--[request@T<partID>]-->(1 || 1 || 0)",
         "subsequently active role R does not subscribe to events in transition (0 || 2 || 0)--[observe@QCR<obs>]-->(0 || 2 || 1)",
         "subsequently active role R does not subscribe to events in transition (3 || 2 || 0)--[observe@QCR<obs>]-->(3 || 2 || 1)",
+        "role R does not subscribe to event types obs, part leading to or in joining event in transition (0 || 2 || 1)--[build@R<car>]-->(0 || 3 || 2)",
         "subsequently active role R does not subscribe to events in transition (2 || 1 || 1)--[deliver@T<part>]-->(0 || 2 || 1)",
         "role R does not subscribe to event types partID, time in branching transitions at state 0 || 0 || 1, but is involved after transition (0 || 0 || 1)--[request@T<partID>]-->(1 || 1 || 1)"
       ]

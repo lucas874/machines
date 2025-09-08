@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import { MachineEvent, SwarmProtocol } from '@actyx/machine-runner'
-import { SwarmProtocolType, Subscriptions, Result, DataResult, overapproxWWFSubscriptions, checkWWFSwarmProtocol, InterfacingProtocols} from '@actyx/machine-check'
+import { SwarmProtocolType, Subscriptions, Result, DataResult, overapproxWFSubscriptions, checkComposedSwarmProtocol, InterfacingProtocols} from '@actyx/machine-check'
 import chalk from "chalk";
 
 export const manifest = {
@@ -48,12 +48,12 @@ export const warehouse_protocol: InterfacingProtocols = [Gwarehouse]
 
 // Well-formed subscription for the warehouse protocol
 const result_subs_warehouse: DataResult<Subscriptions>
-  = overapproxWWFSubscriptions(warehouse_protocol, {}, 'TwoStep')
+  = overapproxWFSubscriptions(warehouse_protocol, {}, 'TwoStep')
 if (result_subs_warehouse.type === 'ERROR') throw new Error(result_subs_warehouse.errors.join(', '))
 export var subs_warehouse: Subscriptions = result_subs_warehouse.data
 
 // check that the subscription generated for the composition is indeed well-formed
-const result_check_wf: Result = checkWWFSwarmProtocol(warehouse_protocol, subs_warehouse)
+const result_check_wf: Result = checkComposedSwarmProtocol(warehouse_protocol, subs_warehouse)
 if (result_check_wf.type === 'ERROR') throw new Error(result_check_wf.errors.join(', \n'))
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
