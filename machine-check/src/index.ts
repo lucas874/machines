@@ -16,10 +16,7 @@ export type InterfacingSwarms = InterfacingSwarmsInner<Role>;
  * @returns - Result indicating successful verification or a list of error messages.
  */
 export function checkSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): CheckResult {
-  const p = JSON.stringify(proto)
-  const s = JSON.stringify(subscriptions)
-  const result = check_swarm(p, s)
-  return JSON.parse(result)
+  return check_swarm(proto, JSON.stringify(subscriptions))
 }
 
 /**

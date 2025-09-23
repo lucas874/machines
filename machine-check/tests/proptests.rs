@@ -1,6 +1,6 @@
 use machine_check::{
-    composition::{check_composed_projection, check_composed_swarm, compose_protocols, composition_types::{CompositionComponent, Granularity, InterfacingProtocols, InterfacingSwarms},
-    exact_well_formed_sub, overapproximated_well_formed_sub, project_combine, revised_projection}, types::{CheckResult, DataResult, Command, EventType, MachineLabel, Role, State, StateName, SwarmLabel, Transition}, EdgeId, Graph, MachineType, NodeId, Subscriptions, SwarmProtocolType
+    check_swarm, composition::{check_composed_projection, check_composed_swarm, compose_protocols, composition_types::{CompositionComponent, Granularity, InterfacingProtocols, InterfacingSwarms},
+    exact_well_formed_sub, overapproximated_well_formed_sub, project_combine, revised_projection}, types::{CheckResult, Command, DataResult, EventType, MachineLabel, Role, State, StateName, SwarmLabel, Transition}, well_formed_sub, EdgeId, Graph, MachineType, NodeId, Subscriptions, SwarmProtocolType
 };
 use petgraph::{
     graph::EdgeReference,
@@ -262,6 +262,7 @@ prop_compose! {
     }
 }
 
+// Aka general pattern
 prop_compose! {
     fn generate_interfacing_swarms_refinement_2(max_roles: usize, max_events: usize, num_protos: usize)
                 (protos in protos_refinement_2(max_roles, max_events, num_protos))
@@ -993,6 +994,30 @@ proptest! {
                     println!("errors: {:?}", e); assert!(false)
                 },
             }
+        }
+    }
+}
+
+proptest! {
+    #[test]
+    fn test_well_formed_from_23(protos in generate_interfacing_swarms_refinement_2(8, 8, 8)) {
+        setup_logger();
+        let protocols: Vec<SwarmProtocolType> = protos.0.into_iter().map(|component| component.protocol).collect();
+        for proto in &protocols {
+            let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+            let subscription: Option<Subscriptions> = match well_formed_sub(proto.clone(), subs) {
+                DataResult::OK{data: subscriptions} => Some(subscriptions),
+                DataResult::ERROR{ .. } => None,
+            };
+            assert!(subscription.is_some());
+            let subscription = subscription.unwrap();
+            let subscription = serde_json::to_string(&subscription).unwrap();
+            let errors = check_swarm(proto.clone(), subscription.clone());
+            let ok = match errors {
+                CheckResult::OK => true,
+                CheckResult::ERROR { .. } => false
+            };
+            assert!(ok);
         }
     }
 }

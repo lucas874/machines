@@ -24,29 +24,21 @@ pub type NodeId = <petgraph::Graph<(), ()> as GraphBase>::NodeId;
 pub type EdgeId = <petgraph::Graph<(), ()> as GraphBase>::EdgeId;
 
 #[wasm_bindgen]
-pub fn check_swarm(proto: String, subs: String) -> String {
-    let proto = match serde_json::from_str::<SwarmProtocolType>(&proto) {
-        Ok(p) => p,
-        Err(e) => return err(vec![format!("parsing swarm protocol: {}", e)]),
-    };
+pub fn check_swarm(proto: SwarmProtocolType, subs: String) -> CheckResult {
     let subs = match serde_json::from_str::<Subscriptions>(&subs) {
         Ok(p) => p,
-        Err(e) => return err(vec![format!("parsing subscriptions: {}", e)]),
+        Err(e) => return CheckResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)] },
     };
     let (graph, _, errors) = swarm::check(proto, &subs);
     if errors.is_empty() {
-        serde_json::to_string(&CheckResult::OK).unwrap()
+        CheckResult::OK
     } else {
-        err(errors.map(swarm::Error::convert(&graph)))
+        CheckResult::ERROR { errors: errors.map(swarm::Error::convert(&graph)) }
     }
 }
 
 #[wasm_bindgen]
-pub fn well_formed_sub(proto: String, subs: String) -> DataResult<Subscriptions> {
-    let proto = match serde_json::from_str::<SwarmProtocolType>(&proto) {
-        Ok(p) => p,
-        Err(e) => return DataResult::ERROR { errors: vec![format!("parsing swarm protocol: {}", e)] },
-    };
+pub fn well_formed_sub(proto: SwarmProtocolType, subs: String) -> DataResult<Subscriptions> {
     let subs = match serde_json::from_str::<Subscriptions>(&subs) {
         Ok(p) => p,
         Err(e) => return DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)] },
