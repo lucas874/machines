@@ -1011,6 +1011,22 @@ proptest! {
             };
             assert!(subscription.is_some());
             let subscription = subscription.unwrap();
+
+            // Check that removing any event type from generated subscription makes wf-check ('Behavioural Types for Local-First Software'-definition) fail.
+            for (role, event_types) in &subscription {
+                for event_type in event_types {
+                    let mut subscription_should_fail = subscription.clone();
+                    subscription_should_fail.entry(role.clone()).and_modify(|ets| { ets.remove(event_type); });
+                    let errors = check_swarm(proto.clone(), serde_json::to_string(&subscription_should_fail).unwrap());
+                    let ok = match errors {
+                        CheckResult::OK => true,
+                        CheckResult::ERROR { .. } => false //{ println!("{:?}", e); false }
+                    };
+                    //println!("hihi in test_well_formed_from_23 inner inner inner loop");
+                    assert!(!ok);
+                }
+            }
+            // Check if generated subscription is well-formed according to the 'Behavioural Types for Local-First Software'-definition
             let subscription = serde_json::to_string(&subscription).unwrap();
             let errors = check_swarm(proto.clone(), subscription.clone());
             let ok = match errors {
