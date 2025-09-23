@@ -1,5 +1,5 @@
 use machine_check::{
-    composition::{composition_types::{DataResult, Granularity, InterfacingProtocols, InterfacingSwarms}, exact_well_formed_sub, overapproximated_well_formed_sub}, types::{EventType, Role}, Subscriptions
+    composition::{composition_types::{Granularity, InterfacingProtocols, InterfacingSwarms}, exact_well_formed_sub, overapproximated_well_formed_sub}, types::{EventType, Role, DataResult}, Subscriptions
 };
 
 use serde::{Deserialize, Serialize};

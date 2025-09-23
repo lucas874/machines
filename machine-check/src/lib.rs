@@ -10,6 +10,8 @@ pub mod composition;
 use petgraph::visit::GraphBase;
 use types::{CheckResult, EventType, MachineLabel, ProtocolType, Role, State, SwarmLabel};
 
+use crate::types::DataResult;
+
 #[declare]
 pub type Subscriptions = BTreeMap<Role, BTreeSet<EventType>>;
 #[declare]
@@ -36,6 +38,26 @@ pub fn check_swarm(proto: String, subs: String) -> String {
         serde_json::to_string(&CheckResult::OK).unwrap()
     } else {
         err(errors.map(swarm::Error::convert(&graph)))
+    }
+}
+
+#[wasm_bindgen]
+pub fn well_formed_sub(proto: String, subs: String) -> DataResult<Subscriptions> {
+    let proto = match serde_json::from_str::<SwarmProtocolType>(&proto) {
+        Ok(p) => p,
+        Err(e) => return DataResult::ERROR { errors: vec![format!("parsing swarm protocol: {}", e)] },
+    };
+    let subs = match serde_json::from_str::<Subscriptions>(&subs) {
+        Ok(p) => p,
+        Err(e) => return DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)] },
+    };
+    match swarm::well_formed_sub(proto, &subs) {
+        Ok(subscriptions) => DataResult::OK {
+            data: subscriptions,
+        },
+        Err((graph, _, errors)) => DataResult::ERROR {
+            errors: errors.map(swarm::Error::convert(&graph))
+        },
     }
 }
 

@@ -1,6 +1,6 @@
 use machine_check::{
-    composition::{check_composed_projection, check_composed_swarm, compose_protocols, composition_types::{CompositionComponent, DataResult, Granularity, InterfacingProtocols, InterfacingSwarms},
-    exact_well_formed_sub, overapproximated_well_formed_sub, project_combine, revised_projection}, types::{CheckResult, Command, EventType, MachineLabel, Role, State, StateName, SwarmLabel, Transition}, EdgeId, Graph, MachineType, NodeId, Subscriptions, SwarmProtocolType
+    composition::{check_composed_projection, check_composed_swarm, compose_protocols, composition_types::{CompositionComponent, Granularity, InterfacingProtocols, InterfacingSwarms},
+    exact_well_formed_sub, overapproximated_well_formed_sub, project_combine, revised_projection}, types::{CheckResult, DataResult, Command, EventType, MachineLabel, Role, State, StateName, SwarmLabel, Transition}, EdgeId, Graph, MachineType, NodeId, Subscriptions, SwarmProtocolType
 };
 use petgraph::{
     graph::EdgeReference,

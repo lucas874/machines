@@ -1,6 +1,6 @@
 use composition_swarm::{proto_info_to_error_report, swarms_to_proto_info, ErrorReport};
 use composition_types::{
-    DataResult, Granularity, ProjectionInfo,
+    Granularity, ProjectionInfo,
 };
 
 use crate::composition::composition_types::InterfacingProtocols;
