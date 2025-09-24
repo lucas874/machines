@@ -135,6 +135,22 @@ fn short_simple_run_bench_sub_sizes_general() {
     }
 }
 
+#[test]
+#[ignore]
+fn write_flattened() {
+    let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
+    let output_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern_flattened");
+    create_directory(&output_dir);
+    let inputs =
+        prepare_simple_inputs_in_directory(input_dir);
+
+    for input in inputs.iter() {
+        //let id = input.id.clone().unwrap_or(String::from("N/A"));
+        let file_name = format!("{output_dir}/{}.json", input.id.clone().unwrap_or(String::from("NA")));
+        write_file(&file_name, serde_json::to_string(input).unwrap());
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BenchMarkInput  {
     pub state_space_size: usize,
