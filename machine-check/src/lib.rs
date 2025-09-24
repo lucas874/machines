@@ -54,24 +54,15 @@ pub fn well_formed_sub(proto: SwarmProtocolType, subs: String) -> DataResult<Sub
 }
 
 #[wasm_bindgen]
-pub fn check_projection(swarm: String, subs: String, role: String, machine: String) -> String {
-    let swarm = match serde_json::from_str::<SwarmProtocolType>(&swarm) {
-        Ok(p) => p,
-        Err(e) => return err(vec![format!("parsing swarm protocol: {}", e)]),
-    };
+pub fn check_projection(swarm: SwarmProtocolType, subs: String, role: Role, machine: MachineType) -> CheckResult {
     let subs = match serde_json::from_str::<Subscriptions>(&subs) {
         Ok(p) => p,
-        Err(e) => return err(vec![format!("parsing subscriptions: {}", e)]),
-    };
-    let role = Role::new(&role);
-    let machine = match serde_json::from_str::<MachineType>(&machine) {
-        Ok(p) => p,
-        Err(e) => return err(vec![format!("parsing machine: {}", e)]),
+        Err(e) => return CheckResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)] },
     };
 
     let (swarm, initial, mut errors) = swarm::from_json(swarm, &subs);
     let Some(initial) = initial else {
-        return err(errors);
+        return CheckResult::ERROR { errors: errors };
     };
     let (proj, proj_initial) = machine::project(&swarm, initial, &subs, role);
     let (machine, json_initial, m_errors) = machine::from_json(machine);
@@ -79,10 +70,10 @@ pub fn check_projection(swarm: String, subs: String, role: String, machine: Stri
     errors.extend(m_errors);
     let Some(json_initial) = json_initial else {
         errors.push(format!("initial machine state has no transitions"));
-        return err(errors);
+        return CheckResult::ERROR { errors: errors };
     };
     if machine_problem {
-        return err(errors);
+        return CheckResult::ERROR { errors: errors };
     }
 
     errors.extend(
@@ -92,14 +83,10 @@ pub fn check_projection(swarm: String, subs: String, role: String, machine: Stri
     );
 
     if errors.is_empty() {
-        serde_json::to_string(&CheckResult::OK).unwrap()
+        CheckResult::OK
     } else {
-        err(errors)
+        CheckResult::ERROR { errors: errors }
     }
-}
-
-fn err(errors: Vec<String>) -> String {
-    serde_json::to_string(&CheckResult::ERROR { errors }).unwrap()
 }
 
 trait MapVec<T> {

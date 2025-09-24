@@ -36,11 +36,7 @@ export function checkProjection(
   role: string,
   machine: MachineType,
 ): CheckResult {
-  const sw = JSON.stringify(swarm)
-  const sub = JSON.stringify(subscriptions)
-  const m = JSON.stringify(machine)
-  const result = check_projection(sw, sub, role, m)
-  return JSON.parse(result)
+  return check_projection(swarm, JSON.stringify(subscriptions), role, machine)
 }
 
 /**
