@@ -461,7 +461,7 @@ namespace ImplMachine {
       designState,
       designEmpty,
       createJSONForAnalysis,
-      projectionInfo: verbose && minimize ? mapProjectionInfoVerbose(projectionInfo) : projectionInfo
+      projectionInfo: verbose && !minimize ? mapProjectionInfoVerbose(projectionInfo) : projectionInfo
     }
   }
 }
