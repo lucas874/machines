@@ -157,7 +157,8 @@ fn to_chained_protos(proto_info: &ProtoInfo) -> ChainedProtos {
             .into_iter()
             .chain([(proto.graph, proto.initial.unwrap(), interfacing_event_types)])
             .collect();
-        (acc, proto.roles)
+
+        (acc,proto.roles.union(&roles_prev).cloned().collect())
     };
     let (chained_protos, _) = proto_info
         .protocols
@@ -720,7 +721,9 @@ fn adapted_projection(
             .into_iter()
             .map(mapper)
             .collect();
-
+    for (_, _, et) in &projections {
+        println!("interface with prev: {:?}", et.clone());
+    }
     //AdaptationGraph{state: n.clone(), machine_state: Some(state.clone())}
     let (machine, machine_initial) = (from_option_graph_to_graph(&machine.0), machine.1);
     let machine = machine.map(
@@ -743,6 +746,11 @@ fn adapted_projection(
         )
         .cloned()
         .collect();
+    println!("MACHINE PROJ INTERSECT: {:?}", machine_proj_intersect);
+    println!("KTH INTERFACE: {:?}", projections[k].2.clone());
+    let option_graph = from_adaptation_graph_to_option_graph(&projections[k].0.clone());
+    let kth_proj = from_option_to_machine(option_graph, projections[k].1);
+    println!("KTH PROJ: {}", serde_json::to_string_pretty(&kth_proj).unwrap());
     let ((machine_and_proj, machine_and_proj_initial), kth_interface) = (
         compose(
             machine,
@@ -761,7 +769,9 @@ fn adapted_projection(
         },
         |_, label| label.clone(),
     );
-
+    let option_graph = from_adaptation_graph_to_option_graph(&machine_and_proj.clone());
+    let machine_and_proj_m = from_option_to_machine(option_graph, machine_and_proj_initial);
+    println!("machine_and_proj_m: {}", serde_json::to_string_pretty(&machine_and_proj_m).unwrap());
     let projections = projections[..k]
         .iter()
         .cloned()
@@ -3052,5 +3062,442 @@ mod tests {
             expected_special_event_types,
             projection_info.special_event_types
         );
+    }
+
+    mod big_example_i_can_be_deleted {
+        use crate::types::DataResult;
+
+        use super::*;
+
+        fn get_steel_press_proto() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        {
+                        "source": "0",
+                        "target": "1",
+                        "label": {
+                            "cmd": "pickUpSteelRoll",
+                            "role": "SteelTransport",
+                            "logType": [
+                            "SteelRoll"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "1",
+                        "target": "2",
+                        "label": {
+                            "cmd": "pressSteel",
+                            "role": "Stamp",
+                            "logType": [
+                            "SteelParts"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "2",
+                        "target": "0",
+                        "label": {
+                            "cmd": "assembleBody",
+                            "role": "BodyAssembler",
+                            "logType": [
+                            "PartialCarBody"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "0",
+                        "target": "3",
+                        "label": {
+                            "cmd": "carBodyDone",
+                            "role": "CarBodyChecker",
+                            "logType": [
+                            "CarBody"
+                            ]
+                        }
+                        }
+                    ]
+                }"#,
+            )
+            .unwrap()
+        }
+
+        fn get_paint_proto() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        {
+                        "source": "0",
+                        "target": "1",
+                        "label": {
+                            "cmd": "carBodyDone",
+                            "role": "CarBodyChecker",
+                            "logType": [
+                            "CarBody"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "1",
+                        "target": "2",
+                        "label": {
+                            "cmd": "applyPaint",
+                            "role": "Painter",
+                            "logType": [
+                            "PaintedCarBody"
+                            ]
+                        }
+                        }
+                    ]
+                    }"#,
+            )
+            .unwrap()
+        }
+        fn get_engine_installation_proto() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        {
+                        "source": "0",
+                        "target": "1",
+                        "label": {
+                            "cmd": "applyPaint",
+                            "role": "Painter",
+                            "logType": [
+                            "PaintedCarBody"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "1",
+                        "target": "2",
+                        "label": {
+                            "cmd": "requestEngine",
+                            "role": "EngineInstaller",
+                            "logType": [
+                            "RequestEngine"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "2",
+                        "target": "3",
+                        "label": {
+                            "cmd": "request",
+                            "role": "Warehouse",
+                            "logType": [
+                            "ItemRequest"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "3",
+                        "target": "4",
+                        "label": {
+                            "cmd": "deliver",
+                            "role": "Warehouse",
+                            "logType": [
+                            "ItemDeliver"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "4",
+                        "target": "5",
+                        "label": {
+                            "cmd": "installEngine",
+                            "role": "EngineInstaller",
+                            "logType": [
+                            "EngineInstalled"
+                            ]
+                        }
+                        }
+                    ]
+                    }"#,
+            )
+            .unwrap()
+        }
+        fn get_warehouse_proto() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        {
+                        "source": "0",
+                        "target": "1",
+                        "label": {
+                            "cmd": "request",
+                            "role": "Warehouse",
+                            "logType": [
+                            "ItemRequest"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "1",
+                        "target": "1",
+                        "label": {
+                            "cmd": "bid",
+                            "role": "Transport",
+                            "logType": [
+                            "Bid"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "1",
+                        "target": "2",
+                        "label": {
+                            "cmd": "select",
+                            "role": "Transport",
+                            "logType": [
+                            "Selected"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "2",
+                        "target": "3",
+                        "label": {
+                            "cmd": "needGuidance",
+                            "role": "Transport",
+                            "logType": [
+                            "ReqGuidance"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "3",
+                        "target": "4",
+                        "label": {
+                            "cmd": "giveGuidance",
+                            "role": "BaseStation",
+                            "logType": [
+                            "GiveGuidance"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "4",
+                        "target": "5",
+                        "label": {
+                            "cmd": "basicPickup",
+                            "role": "Transport",
+                            "logType": [
+                            "ItemPickupBasic"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "2",
+                        "target": "5",
+                        "label": {
+                            "cmd": "smartPickup",
+                            "role": "Transport",
+                            "logType": [
+                            "ItemPickupSmart"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "5",
+                        "target": "6",
+                        "label": {
+                            "cmd": "handover",
+                            "role": "Transport",
+                            "logType": [
+                            "Handover"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "6",
+                        "target": "0",
+                        "label": {
+                            "cmd": "deliver",
+                            "role": "Warehouse",
+                            "logType": [
+                            "ItemDeliver"
+                            ]
+                        }
+                        }
+                    ]
+                    }"#,
+            )
+            .unwrap()
+        }
+        fn get_wheel_installation_proto() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        {
+                        "source": "0",
+                        "target": "1",
+                        "label": {
+                            "cmd": "installEngine",
+                            "role": "EngineInstaller",
+                            "logType": [
+                            "EngineInstalled"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "1",
+                        "target": "2",
+                        "label": {
+                            "cmd": "pickUpWheel",
+                            "role": "WheelInstaller",
+                            "logType": [
+                            "WheelPickup"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "2",
+                        "target": "1",
+                        "label": {
+                            "cmd": "installWheel",
+                            "role": "WheelInstaller",
+                            "logType": [
+                            "WheelInstalled"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "1",
+                        "target": "3",
+                        "label": {
+                            "cmd": "wheelsDone",
+                            "role": "WheelInstaller",
+                            "logType": [
+                            "AllWheelsInstalled"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "3",
+                        "target": "4",
+                        "label": {
+                            "cmd": "carDone",
+                            "role": "QualityTransport",
+                            "logType": [
+                            "FinishedCar"
+                            ]
+                        }
+                        }
+                    ]
+                    } "#,
+            )
+            .unwrap()
+        }
+
+        fn get_interfacing_protocols_1() -> InterfacingProtocols {
+                InterfacingProtocols(vec![
+                    get_steel_press_proto(), 
+                    get_paint_proto(), 
+                    get_engine_installation_proto(), 
+                    get_warehouse_proto(),
+                    get_wheel_installation_proto()])
+            }
+
+        fn get_wheel_installer() -> MachineType {
+            serde_json::from_str::<MachineType>(
+                r#"{
+                    "initial": "s0",
+                    "transitions": [
+                        {
+                        "source": "s1",
+                        "target": "s1",
+                        "label": {
+                            "tag": "Execute",
+                            "cmd": "pickUpWheel",
+                            "logType": [
+                            "WheelPickup"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "s1",
+                        "target": "s1",
+                        "label": {
+                            "tag": "Execute",
+                            "cmd": "wheelsDone",
+                            "logType": [
+                            "AllWheelsInstalled"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "s2",
+                        "target": "s2",
+                        "label": {
+                            "tag": "Execute",
+                            "cmd": "installWheel",
+                            "logType": [
+                            "WheelInstalled"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "s0",
+                        "target": "s1",
+                        "label": {
+                            "tag": "Input",
+                            "eventType": "EngineInstalled"
+                        }
+                        },
+                        {
+                        "source": "s1",
+                        "target": "s2",
+                        "label": {
+                            "tag": "Input",
+                            "eventType": "WheelPickup"
+                        }
+                        },
+                        {
+                        "source": "s1",
+                        "target": "s3",
+                        "label": {
+                            "tag": "Input",
+                            "eventType": "AllWheelsInstalled"
+                        }
+                        },
+                        {
+                        "source": "s2",
+                        "target": "s1",
+                        "label": {
+                            "tag": "Input",
+                            "eventType": "WheelInstalled"
+                        }
+                        }
+                    ]
+                    }"#,
+            )
+            .unwrap()
+        }
+        #[test]
+        #[ignore]
+        fn projection_information_wheel_installer() {
+            let sub_result = overapprox_well_formed_sub(
+                get_interfacing_protocols_1(),
+                &BTreeMap::new(),
+                Granularity::TwoStep,
+            );
+            let subscriptions = sub_result.unwrap();
+            let projection_information =
+                crate::composition::projection_information(Role::new(&format!("WheelInstaller")), get_interfacing_protocols_1(), 4, serde_json::to_string(&subscriptions).unwrap(), get_wheel_installer(), true);
+            println!("ORIGINAL MACHINE: {}", serde_json::to_string_pretty(&get_wheel_installer()).unwrap());
+            match projection_information {
+                DataResult::ERROR {..} => assert!(false),
+                DataResult::OK { data } =>  {
+                    println!("ADAPTED: {}", serde_json::to_string_pretty(&data.projection).unwrap());
+                }
+            }
+        }
     }
 }

@@ -1107,7 +1107,7 @@ fn get_interfacing_event_types(
                 .role_event_map
                 .get(r)
                 .unwrap()
-                .union(&proto_info1.role_event_map.get(r).unwrap())
+                .union(&proto_info2.role_event_map.get(r).unwrap())
         })
         .map(|swarm_label| swarm_label.get_event_type())
         .collect()
@@ -1711,17 +1711,25 @@ fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
     }
 
     let (g, i, _) = proto_info.protocols[0].get_triple();
-    let g_event_types = g.get_event_types();
-    let folder = |(acc_g, acc_i, acc_event_types): (Graph, NodeId, BTreeSet<EventType>),
+    let g_roles = g.get_roles();
+    let folder = |(acc_g, acc_i, acc_roles): (Graph, NodeId, BTreeSet<Role>),
                   p: ProtoStruct|
-     -> (Graph, NodeId, BTreeSet<EventType>) {
-        let interface = acc_event_types
-            .intersection(&p.graph.get_event_types())
+     -> (Graph, NodeId, BTreeSet<Role>) {
+        let empty = BTreeSet::new();
+        let interface = acc_roles
+            .intersection(&p.graph.get_roles())
             .cloned()
+            .flat_map(|role| { 
+                proto_info.role_event_map
+                    .get(&role)
+                    .unwrap_or(&empty)
+                    .iter()
+                    .map(|label| label.get_event_type())
+            })
             .collect();
-        let acc_event_types = acc_event_types
+        let acc_roles = acc_roles
             .into_iter()
-            .chain(p.graph.get_event_types())
+            .chain(p.graph.get_roles())
             .collect();
         let (graph, initial) = crate::composition::composition_machine::compose(
             acc_g,
@@ -1731,12 +1739,12 @@ fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
             interface,
             crate::composition::composition_machine::gen_state_name,
         );
-        (graph, initial, acc_event_types)
+        (graph, initial, acc_roles)
     };
     let (graph, initial, _) = proto_info.protocols[1..]
         .to_vec()
         .into_iter()
-        .fold((g, i.unwrap(), g_event_types), folder);
+        .fold((g, i.unwrap(), g_roles), folder);
     (graph, initial)
 }
 
@@ -3809,6 +3817,183 @@ mod tests {
                 overapprox_well_formed_sub(InterfacingProtocols(vec![proto1()]), &BTreeMap::new(), Granularity::Fine)
                     .unwrap();
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
+        }
+    }
+    mod big_example_2 {
+        use crate::{composition::project_combine, types::DataResult};
+
+        use super::*;
+
+        fn request_deliver() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                    r#"
+                    {
+                        "initial": "0",
+                        "transitions": [
+                        { "label": { "cmd": "request", "logType": ["itemReq"], "role": "Warehouse" }, "source": "0", "target": "1" },
+                        { "label": { "cmd": "bid", "logType": ["bid"], "role": "Transport" }, "source": "1", "target": "1" },
+                        { "label": { "cmd": "select", "logType": ["selected"], "role": "Transport" }, "source": "1", "target": "2" },
+                        { "label": { "cmd": "needGuidance", "logType": ["guidanceReq"], "role": "Transport" }, "source": "2", "target": "3" },
+                        { "label": { "cmd": "giveGuidance", "logType": ["route"], "role": "BaseStation" }, "source": "3", "target": "4" },
+                        { "label": { "cmd": "basicPickup", "logType": ["itemPickupB"], "role": "Transport" }, "source": "4", "target": "5" },
+                        { "label": { "cmd": "smartPickup", "logType": ["itemPickupS"], "role": "Transport" }, "source": "2", "target": "5" },
+                        { "label": { "cmd": "handover", "logType": ["itemHandover"], "role": "Transport" }, "source": "5", "target": "6" },
+                        { "label": { "cmd": "deliver", "logType": ["itemDeliver"], "role": "Warehouse" }, "source": "6", "target": "0" }
+                        ]
+                    }
+                "#,
+            )
+            .unwrap()
+
+        }
+
+        fn press_body() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                    r#"
+                    {
+                        "initial": "0",
+                        "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "pickupSteelRoll", "role": "SteelTransport", "logType": ["steelRoll"] } },
+                        { "source": "1", "target": "2", "label": { "cmd": "pressSteel", "role": "Stamp", "logType": ["steelParts"] } },
+                        { "source": "2", "target": "0", "label": { "cmd": "assembleBody", "role": "BodyAssembler", "logType": ["partialCarBody"] } },
+                        { "source": "0", "target": "3", "label": { "cmd": "carBodyDone", "role": "CarBodyChecker", "logType": ["carBody"] } }
+                        ]
+                    }
+                "#,
+            )
+            .unwrap()
+
+        }
+
+        fn paint_body() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                    r#"
+                    {
+                        "initial": "0",
+                        "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "carBodyDone", "role": "CarBodyChecker", "logType": ["carBody"] } },
+                        { "source": "1", "target": "2", "label": { "cmd": "applyPaint", "role": "Painter", "logType": ["paintedCarBody"] } }
+                        ]
+                }
+                "#,
+            )
+            .unwrap()
+
+        }
+
+        fn engine_installation() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                    r#"
+                    {
+                        "initial": "0",
+                        "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "applyPaint", "role": "Painter", "logType": ["paintedCarBody"] } },
+                        { "source": "1", "target": "2", "label": { "cmd": "requestEngine", "role": "EngineInstaller", "logType": ["reqEngine"] } },
+                        { "source": "2", "target": "3", "label": { "cmd": "request" , "role": "Warehouse", "logType": ["itemReq"] } },
+                        { "source": "3", "target": "4", "label": { "cmd": "deliver", "role": "Warehouse", "logType": ["itemDeliver"] } },
+                        { "source": "4", "target": "5", "label": { "cmd": "installEngine", "role": "EngineInstaller", "logType": ["engineInstalled"] } }
+                        ]
+                }
+                "#,
+            )
+            .unwrap()
+
+        }
+
+        fn window_installation() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                    r#"
+                    {
+                        "initial": "0",
+                        "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "installEngine", "role": "EngineInstaller", "logType": ["engineInstalled"] } },
+                        { "source": "1", "target": "2", "label": { "cmd": "pickupWindow", "role": "WindowInstaller", "logType": ["windowPickedUp"] } },
+                        { "source": "2", "target": "1", "label": { "cmd": "installWindow", "role": "WindowInstaller", "logType": ["windowInstalled"] } },
+                        { "source": "1", "target": "3", "label": { "cmd": "windowsDone", "role": "WindowInstaller", "logType": ["allWindowsInstalled"] } },
+                        { "source": "3", "target": "4", "label": { "cmd": "carDone", "role": "QualityTransport", "logType": ["FinishedCar"] } }
+                        ]
+                }
+                "#,
+            )
+            .unwrap()
+
+        }
+
+        fn wheel_installation() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                    r#"
+                    {
+
+                        "initial": "0",
+                        "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "installEngine", "role": "EngineInstaller", "logType": ["engineInstalled"] } },
+                        { "source": "1", "target": "2", "label": { "cmd": "pickupWheel", "role": "WheelInstaller", "logType": ["wheelPickedUp"] } },
+                        { "source": "2", "target": "1", "label": { "cmd": "installWheel", "role": "WheelInstaller", "logType": ["wheelInstalled"] } },
+                        { "source": "1", "target": "3", "label": { "cmd": "wheelsDone", "role": "WheelInstaller", "logType": ["allWheelsInstalled"] } },
+                        { "source": "3", "target": "4", "label": { "cmd": "carDone", "role": "QualityTransport", "logType": ["FinishedCar"] } }
+                        ]
+                }
+                "#,
+            )
+            .unwrap()
+
+        }
+
+        #[test]
+        #[ignore]
+        fn print_all_big_example() {
+            setup_logger();
+            //let steel_press_proto = request_deliver();
+            //let paint_proto = get_paint_proto();
+
+            let interfacing_swarms = InterfacingProtocols(vec![
+                request_deliver(),
+                press_body(),
+                paint_body(),
+                engine_installation(),
+                window_installation(),
+                wheel_installation()
+            ]);
+
+            for p in &interfacing_swarms.0 {
+                println!("{}", serde_json::to_string_pretty(&p).unwrap());
+            }
+
+            match compose_protocols(interfacing_swarms.clone()) {
+                Err(e) => {
+                    println!("Error composing protocols: {}", error_report_to_strings(e).join("\n"));
+                }
+                Ok((composition, composition_initial)) => {
+                    println!("Composition of protocols:\n{}", serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap());
+                }
+            }
+        }
+
+        #[test]
+        #[ignore]
+        fn print_request_delive_projections() {
+            setup_logger();
+            //let steel_press_proto = request_deliver();
+            //let paint_proto = get_paint_proto();
+
+
+            let sub =
+                overapprox_well_formed_sub(InterfacingProtocols(vec![request_deliver()]), &BTreeMap::new(), Granularity::TwoStep)
+                    .unwrap();
+            for r in sub.keys() {
+                match project_combine(
+                    InterfacingProtocols(vec![request_deliver()]),
+                    serde_json::to_string(&sub).unwrap(),
+                    r.clone(),
+                    true
+                ) {
+                    DataResult::OK{data: projection} => println!("{}", serde_json::to_string_pretty(&projection).unwrap()),
+                    DataResult::ERROR { errors } => println!("{}", errors.join(","))
+
+                }
+                println!("$$$$")
+
+            }
         }
     }
 }

@@ -157,7 +157,7 @@ export namespace SwarmProtocol {
       tagWithEntityId: (id) => tag.withId(id),
       makeMachine: (machineName) => ImplMachine.make(swarmName, machineName, eventFactories),
       adaptMachine: (role, protocols, k, subscriptions, oldMachine, verbose?) => {
-        const minimize = false
+        const minimize = true
         const [mOld, mOldInitial] = oldMachine
         const projectionInfo = projectionInformation(role, protocols, k, subscriptions, mOld.createJSONForAnalysis(mOldInitial), minimize)
         if (projectionInfo.type == 'ERROR') {
