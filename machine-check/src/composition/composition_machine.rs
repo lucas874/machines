@@ -721,9 +721,7 @@ fn adapted_projection(
             .into_iter()
             .map(mapper)
             .collect();
-    for (_, _, et) in &projections {
-        println!("interface with prev: {:?}", et.clone());
-    }
+    
     //AdaptationGraph{state: n.clone(), machine_state: Some(state.clone())}
     let (machine, machine_initial) = (from_option_graph_to_graph(&machine.0), machine.1);
     let machine = machine.map(
@@ -746,11 +744,7 @@ fn adapted_projection(
         )
         .cloned()
         .collect();
-    println!("MACHINE PROJ INTERSECT: {:?}", machine_proj_intersect);
-    println!("KTH INTERFACE: {:?}", projections[k].2.clone());
-    let option_graph = from_adaptation_graph_to_option_graph(&projections[k].0.clone());
-    let kth_proj = from_option_to_machine(option_graph, projections[k].1);
-    println!("KTH PROJ: {}", serde_json::to_string_pretty(&kth_proj).unwrap());
+
     let ((machine_and_proj, machine_and_proj_initial), kth_interface) = (
         compose(
             machine,
@@ -769,9 +763,7 @@ fn adapted_projection(
         },
         |_, label| label.clone(),
     );
-    let option_graph = from_adaptation_graph_to_option_graph(&machine_and_proj.clone());
-    let machine_and_proj_m = from_option_to_machine(option_graph, machine_and_proj_initial);
-    println!("machine_and_proj_m: {}", serde_json::to_string_pretty(&machine_and_proj_m).unwrap());
+
     let projections = projections[..k]
         .iter()
         .cloned()

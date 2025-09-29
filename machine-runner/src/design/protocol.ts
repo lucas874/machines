@@ -163,7 +163,7 @@ export namespace SwarmProtocol {
         if (projectionInfo.type == 'ERROR') {
           return {data: undefined, ... projectionInfo}
         }
-        return MachineAdaptation.adaptMachine(ImplMachine.makeAdapted(swarmName, role, eventFactories, projectionInfo.data, verbose && !minimize), eventFactories, mOldInitial, verbose)
+        return MachineAdaptation.adaptMachine(ImplMachine.makeAdapted(swarmName, role, eventFactories, projectionInfo.data, minimize, verbose), eventFactories, mOldInitial, verbose)
       }
     }
   }
@@ -365,8 +365,11 @@ namespace ImplMachine {
    * and set of 'special event types' used for branch tracking.
    * This function is used to create 'empty machines' serving as
    * a base for creating 'adapted machines'.
+   * @param swarmName - name of swarm protocol.
    * @param machineName - name of the machine protocol.
    * @param registeredEventFactories - tuple of MachineEventFactories.
+   * @param minimize - should be true if projectionInfo contains a minimized projection, false otherwise
+   * @param verbose - if true a 'verbose' machine printing event transmissions and receptions is generated, 'silent' machine otherwise.
    * @see MachineEvent.design to get started on creating MachineEventFactories
    * for the registeredEventFactories parameter.
    * @example
@@ -381,6 +384,7 @@ namespace ImplMachine {
     machineName: MachineName,
     registeredEventFactories: MachineEventFactories[],
     projectionInfo: ProjectionInfo,
+    minimize: boolean,
     verbose?: boolean
   ): AdaptedMachine<SwarmProtocolName, MachineName, MachineEventFactories> => {
     type Self = Machine<SwarmProtocolName, MachineName, MachineEventFactories>
@@ -457,7 +461,7 @@ namespace ImplMachine {
       designState,
       designEmpty,
       createJSONForAnalysis,
-      projectionInfo: verbose ? mapProjectionInfoVerbose(projectionInfo) : projectionInfo
+      projectionInfo: verbose && minimize ? mapProjectionInfoVerbose(projectionInfo) : projectionInfo
     }
   }
 }
