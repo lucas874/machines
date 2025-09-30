@@ -436,7 +436,7 @@ namespace ImplMachine {
       if (match?.groups) {
         const { prefix, _, projState, suffix } = match.groups;
         return `${prefix}${projState}${suffix}`
-  }
+      }
 
       return stateName
     }
@@ -451,8 +451,27 @@ namespace ImplMachine {
       return Object.fromEntries(
         Object.entries(projToMachineStates).map(([projState, machineStates]) => [mapStateNameVerbose(projState), machineStates]));
     }
+    // Used if machine is not minimized and verbose option is set
     const mapProjectionInfoVerbose = (projectionInfo: ProjectionInfo): ProjectionInfo => {
       return {... projectionInfo, projection: mapProjectionVerbose(projectionInfo.projection), projToMachineStates: mapProjStateToMachineStatesVerbose(projectionInfo.projToMachineStates)}
+    }
+
+    // Used if machine is minimized and verbose option is set.
+    const mapProjectionInfoVerboseMinimized = (projectionInfo: ProjectionInfo): ProjectionInfo => {
+      const projStatesToRenamed = new Map(Object.entries(projectionInfo.projToMachineStates).map(([projState, _], index) => [projState, index.toString()]))
+
+      const mapProjection = (projection: ProjectionType): ProjectionType => {
+        const transitionMapper = (transition: {source: string, target: string, label: any}): {source: string, target: string, label: any} => {
+          return {source: projStatesToRenamed.get(transition.source)!, target: projStatesToRenamed.get(transition.target)!, label: transition.label}
+        }
+        return {initial: projStatesToRenamed.get(projection.initial)!, transitions: projection.transitions.map(transition => transitionMapper(transition))}
+      }
+      const mapProjStateToMachineStatesVerbose = (projToMachineStates: ProjToMachineStates): ProjToMachineStates => {
+        return Object.fromEntries(
+          Object.entries(projToMachineStates).map(([projState, machineStates]) => [projStatesToRenamed.get(projState)!, machineStates]));
+      }
+
+      return {... projectionInfo, projection: mapProjection(projectionInfo.projection), projToMachineStates: mapProjStateToMachineStatesVerbose(projectionInfo.projToMachineStates)}
     }
 
     return {
@@ -461,7 +480,9 @@ namespace ImplMachine {
       designState,
       designEmpty,
       createJSONForAnalysis,
-      projectionInfo: verbose && !minimize ? mapProjectionInfoVerbose(projectionInfo) : projectionInfo
+      projectionInfo: verbose ?
+        minimize ? mapProjectionInfoVerboseMinimized(projectionInfo) : mapProjectionInfoVerbose(projectionInfo)
+        : projectionInfo
     }
   }
 }
