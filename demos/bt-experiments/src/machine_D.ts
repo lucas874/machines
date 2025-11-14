@@ -21,7 +21,7 @@ const checkProjResult = checkComposedProjection(protocol_2, subs_proto2, "roleD"
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Adapted machine
-const [machineDAdapted, s0Adapted] = Composition.adaptMachine('roleD', interfacing_protocols, 0, subs_composition, [machineD, s0], true).data!
+const [machineDAdapted, s0Adapted] = Composition.adaptMachine('roleD', interfacing_protocols, 1, subs_composition, [machineD, s0], true).data!
 
 // Run the adapted machine
 async function main() {

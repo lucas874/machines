@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import { MachineEvent, SwarmProtocol } from '@actyx/machine-runner'
-import { SwarmProtocolType, Subscriptions, Result, DataResult, overapproxWFSubscriptions, checkComposedSwarmProtocol, InterfacingProtocols } from '@actyx/machine-check'
+import { SwarmProtocolType, Subscriptions, Result, DataResult, overapproxWFSubscriptions, checkComposedSwarmProtocol, InterfacingProtocols, exactWFSubscriptions } from '@actyx/machine-check'
 import chalk from "chalk";
 
 export const manifest = {
@@ -147,13 +147,13 @@ export const interfacing_protocols: InterfacingProtocols = [proto1, proto2]
 
 // Well-formed subscription for the warehouse protocol
 const result_subs_proto1: DataResult<Subscriptions>
-  = overapproxWFSubscriptions(protocol_1, {}, 'TwoStep')
+  = exactWFSubscriptions(protocol_1, {})
 if (result_subs_proto1.type === 'ERROR') throw new Error(result_subs_proto1.errors.join(', '))
 export var subs_proto1: Subscriptions = result_subs_proto1.data
 
 // Well-formed subscription for the factory protocol
 const result_subs_proto2: DataResult<Subscriptions>
-  = overapproxWFSubscriptions(protocol_2, {}, 'TwoStep')
+  = exactWFSubscriptions(protocol_2, {})
 if (result_subs_proto2.type === 'ERROR') throw new Error(result_subs_proto2.errors.join(', '))
 export var subs_proto2: Subscriptions = result_subs_proto2.data
 

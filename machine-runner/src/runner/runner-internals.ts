@@ -446,7 +446,7 @@ export namespace RunnerInternalsBT {
       failure: null,
       branchTracker: initBranchTracker(factory.mechanism.protocol.registeredEvents.map(e => e.type), specialEventTypes, branches)
     }
-
+    console.log(JSON.stringify(internals.branchTracker, null, 2))
     return internals
   }
 
@@ -468,7 +468,9 @@ export namespace RunnerInternalsBT {
     const matchingReaction = reactions.get(firstEvent.payload.type)
 
     if (!matchingReaction) return { shouldQueue: false }
-
+    console.log("in shouldEventBeEnqueued")
+    console.log("newEvent.payload.lbj: ", newEvent.payload.lbj)
+    console.log("branchTracker.jbLast.get(newEvent.payload.type): ", branchTracker.jbLast.get(newEvent.payload.type))
     if (newEvent.payload.lbj != branchTracker.jbLast.get(newEvent.payload.type) ) { return { shouldQueue: false } }
 
     // Asserted as non-nullish because it is impossible for `queue`'s length to
@@ -506,6 +508,7 @@ export namespace RunnerInternalsBT {
     internals.caughtUpFirstTime = false
     internals.commandLock = null
     internals.branchTracker = initBranchTracker(Array.from(internals.branchTracker.jbLast.keys()), internals.branchTracker.specialEventTypes, internals.branchTracker.branches)
+    console.log(JSON.stringify(internals.branchTracker, null, 2))
   }
 
   export const pushEvent = <StatePayload>(
@@ -552,6 +555,10 @@ export namespace RunnerInternalsBT {
           )
           // Update branch tracker and transfer the possibly updated jbLast to the next state
           internals.branchTracker = updateJBLast(internals.branchTracker, event)
+
+          for (const [e, es] of internals.branchTracker.jbLast) {
+            console.log(`jbLast[${e}] = ${es}`)
+          }
           internals.current = {
             data: {
               type: nextFactory.mechanism.name,

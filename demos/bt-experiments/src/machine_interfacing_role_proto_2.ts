@@ -1,6 +1,6 @@
 import { Actyx } from '@actyx/sdk'
 import { createMachineRunnerBT } from '@actyx/machine-runner'
-import { Events, manifest, Composition, interfacing_protocols, protocol_1, subs_proto1, subs_composition, printState  } from './protocol'
+import { Events, manifest, Composition, interfacing_protocols, protocol_2, subs_proto2, subs_composition, printState  } from './protocol'
 import * as readline from 'readline';
 import { checkComposedProjection } from '@actyx/machine-check';
 
@@ -16,16 +16,16 @@ export const s3 = machineInterfaceProto1.designEmpty('s3').finish()
 export const s4 = machineInterfaceProto1.designEmpty('s4').finish()
 
 s0.react([Events.I1], s1, () => s1.make())
-s0.react([Events.E], s4, () => s4.make())
+s1.react([Events.E], s4, () => s4.make())
 s1.react([Events.D], s2, () => s2.make())
 s2.react([Events.I2], s3, () => s3.make())
 
 // Check that the original machine is a correct implementation. A prerequisite for reusing it.
-const checkProjResult = checkComposedProjection(protocol_1, subs_proto1, "roleInterface", machineInterfaceProto1.createJSONForAnalysis(s0))
+const checkProjResult = checkComposedProjection(protocol_2, subs_proto2, "roleInterface", machineInterfaceProto1.createJSONForAnalysis(s0))
 if (checkProjResult.type == 'ERROR') throw new Error(checkProjResult.errors.join(", \n"))
 
 // Adapted machine
-const [machineInterfaceAdapted, s0Adapted] = Composition.adaptMachine('roleInterface', interfacing_protocols, 0, subs_composition, [machineInterfaceProto1, s0], true).data!
+const [machineInterfaceAdapted, s0Adapted] = Composition.adaptMachine('roleInterface', interfacing_protocols, 1, subs_composition, [machineInterfaceProto1, s0], true).data!
 
 // Run the adapted machine
 async function main() {
