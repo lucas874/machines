@@ -1,0 +1,26 @@
+{
+  "name": "warehouse_factory_demo",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start-machineA": "node dist/machine_A.js",
+    "start-interface-p1": "node dist/machine_interfacing_role_proto_1.js",
+    "start-machineD": "node dist/machine_D.js",
+    "start-interface-p2": "node dist/machine_interfacing_role_proto_2.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@babel/preset-typescript": "^7.26.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "@actyx/machine-check": "file:../../machine-check",
+    "@actyx/machine-runner": "file:../../machine-runner",
+    "@actyx/sdk": "^0.5.9"
+  }
+}

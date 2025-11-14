@@ -440,6 +440,13 @@ pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> Bra
         .difference(&after_pairs)
         .cloned()
         .collect();
+    let concurrent_events = proto_info.concurrent_events.clone();
+
+    println!("In paths_from_event_types");
+    println!("proto_info.concurrent_events: {:?}", proto_info.concurrent_events.iter().map(|s| s.iter().map(|e| e.to_string()).collect::<BTreeSet<String>>()).collect::<Vec<BTreeSet<String>>>());
+    println!("Using proto_info.concurrent_events for branches: {:?}", concurrent_events.iter().map(|s| s.iter().map(|e| e.to_string()).collect::<BTreeSet<String>>()).collect::<Vec<BTreeSet<String>>>());
+    //println!("Using this smaller set of concurrent events for branches: {:?}", concurrent_events.iter().map(|s| s.iter().map(|e| e.to_string()).collect::<BTreeSet<String>>()).collect::<Vec<BTreeSet<String>>>());
+
 
     for node in proj.node_indices() {
         for edge in proj.edges_directed(node, Outgoing) {
@@ -721,7 +728,7 @@ fn adapted_projection(
             .into_iter()
             .map(mapper)
             .collect();
-    
+
     //AdaptationGraph{state: n.clone(), machine_state: Some(state.clone())}
     let (machine, machine_initial) = (from_option_graph_to_graph(&machine.0), machine.1);
     let machine = machine.map(
@@ -3390,9 +3397,9 @@ mod tests {
 
         fn get_interfacing_protocols_1() -> InterfacingProtocols {
                 InterfacingProtocols(vec![
-                    get_steel_press_proto(), 
-                    get_paint_proto(), 
-                    get_engine_installation_proto(), 
+                    get_steel_press_proto(),
+                    get_paint_proto(),
+                    get_engine_installation_proto(),
                     get_warehouse_proto(),
                     get_wheel_installation_proto()])
             }
@@ -3490,6 +3497,207 @@ mod tests {
                     println!("ADAPTED: {}", serde_json::to_string_pretty(&data.projection).unwrap());
                 }
             }
+        }
+    }
+
+    mod overapprox_not_working {
+        use std::collections::BTreeMap;
+
+        use crate::{Subscriptions, SwarmProtocolType, composition::{composition_machine::project, composition_swarm::{compose_protocols, exact_well_formed_sub, overapprox_well_formed_sub, swarms_to_proto_info, to_swarm_json}, composition_types::{Granularity, InterfacingProtocols}, error_report_to_strings, project_combine, revised_projection}, types::Role};
+
+        fn get_proto_1() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        {
+                        "source": "0",
+                        "target": "1",
+                        "label": {
+                            "cmd": "cmdA",
+                            "role": "roleA",
+                            "logType": [
+                            "A"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "0",
+                        "target": "5",
+                        "label": {
+                            "cmd": "cmdB",
+                            "role": "roleA",
+                            "logType": [
+                            "B"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "1",
+                        "target": "2",
+                        "label": {
+                            "cmd": "cmdI1",
+                            "role": "roleInterface",
+                            "logType": [
+                            "I1"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "2",
+                        "target": "3",
+                        "label": {
+                            "cmd": "cmdI2",
+                            "role": "roleInterface",
+                            "logType": [
+                            "I2"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "3",
+                        "target": "4",
+                        "label": {
+                            "cmd": "cmdC",
+                            "role": "roleA",
+                            "logType": [
+                            "C"
+                            ]
+                        }
+                        }
+                    ]
+                    }"#,
+            )
+            .unwrap()
+        }
+
+        fn get_proto_2() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        {
+                        "source": "0",
+                        "target": "1",
+                        "label": {
+                            "cmd": "cmdI1",
+                            "role": "roleInterface",
+                            "logType": [
+                            "I1"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "1",
+                        "target": "4",
+                        "label": {
+                            "cmd": "cmdE",
+                            "role": "roleD",
+                            "logType": [
+                            "E"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "1",
+                        "target": "2",
+                        "label": {
+                            "cmd": "cmdD",
+                            "role": "roleD",
+                            "logType": [
+                            "D"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "2",
+                        "target": "3",
+                        "label": {
+                            "cmd": "cmdI2",
+                            "role": "roleInterface",
+                            "logType": [
+                            "I2"
+                            ]
+                        }
+                        }
+                    ]
+                    }"#,
+            )
+            .unwrap()
+        }
+
+        fn print_projection_information(role: Role, subscription_own_proto: &Subscriptions, subscription_composition: &Subscriptions, interfacing_protocols: InterfacingProtocols, index: usize) {
+            println!("---------");
+            println!("Role is: {}", role.to_string());
+            let proj_result = revised_projection(
+                interfacing_protocols.0[index].clone(),
+                serde_json::to_string(&subscription_own_proto).unwrap(),
+                role.clone(),
+                true
+            );
+
+            let proj = match proj_result {
+                crate::types::DataResult::ERROR { errors } => { println!("errors: {:?}", errors); unimplemented!() },
+                crate::types::DataResult::OK { data } => { println!("proj: {}", serde_json::to_string_pretty(&data).unwrap()); data }
+            };
+            let projection_information =
+                crate::composition::projection_information(role.clone(), interfacing_protocols.clone(), index, serde_json::to_string(&subscription_composition).unwrap(), proj, true);
+
+            match projection_information {
+                crate::types::DataResult::ERROR { errors } => { println!("errors: {:?}", errors); unimplemented!() },
+                crate::types::DataResult::OK { data } => {
+                    println!("Branches: {}", serde_json::to_string_pretty(&data.branches).unwrap());
+                    println!("UP: {:?}", data.special_event_types);
+                }
+            }
+            println!("---------");
+        }
+
+        #[test]
+        fn print_things() {
+            let interfacing_protocols = InterfacingProtocols(vec![get_proto_1(), get_proto_2()]);
+            println!("Protocol 1:\n{}", serde_json::to_string_pretty(&get_proto_1()).unwrap());
+            println!("Protocol 2:\n{}", serde_json::to_string_pretty(&get_proto_2()).unwrap());
+            match compose_protocols(interfacing_protocols.clone()) {
+                Err(e) => {
+                    println!("Error composing protocols: {:?}", error_report_to_strings(e));
+                }
+                Ok((composition, composition_initial)) => {
+                    println!("Composition of protocols:\n{}", serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap());
+                }
+            }
+
+            /* let proto_info = swarms_to_proto_info(interfacing_swarms.clone());
+            println!("Overapprox concurrent events: {:?}", proto_info.concurrent_events); */
+            let sub_result = overapprox_well_formed_sub(
+                interfacing_protocols.clone(),
+                &BTreeMap::new(),
+                Granularity::TwoStep,
+            );
+            let subscriptions = sub_result.unwrap();
+            let sub_proto1_result = exact_well_formed_sub(
+                InterfacingProtocols(vec![get_proto_1()]),
+                &BTreeMap::new()
+            );
+            let subscriptions_proto_1_exact = sub_proto1_result.unwrap();
+            println!("subs for proto 1: {}", serde_json::to_string_pretty(&subscriptions_proto_1_exact).unwrap());
+
+            let sub_proto2_result = exact_well_formed_sub(
+                InterfacingProtocols(vec![get_proto_2()]),
+                &BTreeMap::new()
+            );
+            let subscriptions_proto_2_exact = sub_proto2_result.unwrap();
+            println!("subs for proto 2: {}", serde_json::to_string_pretty(&subscriptions_proto_2_exact).unwrap());
+
+            println!("subs for composition: {}", serde_json::to_string_pretty(&subscriptions).unwrap());
+
+            println!("Proto 1 things: ");
+            print_projection_information(Role::new(&format!("roleInterface")), &subscriptions_proto_1_exact, &subscriptions, interfacing_protocols.clone(), 0);
+            print_projection_information(Role::new(&format!("roleA")), &subscriptions_proto_1_exact, &subscriptions, interfacing_protocols.clone(), 0);
+
+            println!("Proto 2 things: ");
+            print_projection_information(Role::new(&format!("roleInterface")), &subscriptions_proto_2_exact, &subscriptions, interfacing_protocols.clone(), 1);
+            print_projection_information(Role::new(&format!("roleD")), &subscriptions_proto_2_exact, &subscriptions, interfacing_protocols.clone(), 1);
         }
     }
 }
