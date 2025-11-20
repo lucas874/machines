@@ -440,12 +440,12 @@ pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> Bra
         .difference(&after_pairs)
         .cloned()
         .collect();
-    let concurrent_events = proto_info.concurrent_events.clone();
+    //let concurrent_events = proto_info.concurrent_events.clone();
 
     println!("In paths_from_event_types");
     println!("proto_info.concurrent_events: {:?}", proto_info.concurrent_events.iter().map(|s| s.iter().map(|e| e.to_string()).collect::<BTreeSet<String>>()).collect::<Vec<BTreeSet<String>>>());
-    println!("Using proto_info.concurrent_events for branches: {:?}", concurrent_events.iter().map(|s| s.iter().map(|e| e.to_string()).collect::<BTreeSet<String>>()).collect::<Vec<BTreeSet<String>>>());
-    //println!("Using this smaller set of concurrent events for branches: {:?}", concurrent_events.iter().map(|s| s.iter().map(|e| e.to_string()).collect::<BTreeSet<String>>()).collect::<Vec<BTreeSet<String>>>());
+    //println!("Using proto_info.concurrent_events for branches: {:?}", concurrent_events.iter().map(|s| s.iter().map(|e| e.to_string()).collect::<BTreeSet<String>>()).collect::<Vec<BTreeSet<String>>>());
+    println!("Using this smaller set of concurrent events for branches: {:?}", concurrent_events.iter().map(|s| s.iter().map(|e| e.to_string()).collect::<BTreeSet<String>>()).collect::<Vec<BTreeSet<String>>>());
 
 
     for node in proj.node_indices() {
@@ -3505,7 +3505,7 @@ mod tests {
 
         use crate::{Subscriptions, SwarmProtocolType, composition::{composition_machine::project, composition_swarm::{compose_protocols, exact_well_formed_sub, overapprox_well_formed_sub, swarms_to_proto_info, to_swarm_json}, composition_types::{Granularity, InterfacingProtocols}, error_report_to_strings, project_combine, revised_projection}, types::Role};
 
-        fn get_proto_1() -> SwarmProtocolType {
+        fn get_proto_1_old() -> SwarmProtocolType {
             serde_json::from_str::<SwarmProtocolType>(
                 r#"{
                     "initial": "0",
@@ -3571,7 +3571,7 @@ mod tests {
             .unwrap()
         }
 
-        fn get_proto_2() -> SwarmProtocolType {
+        fn get_proto_2_old() -> SwarmProtocolType {
             serde_json::from_str::<SwarmProtocolType>(
                 r#"{
                     "initial": "0",
@@ -3617,6 +3617,83 @@ mod tests {
                             "role": "roleInterface",
                             "logType": [
                             "I2"
+                            ]
+                        }
+                        }
+                    ]
+                    }"#,
+            )
+            .unwrap()
+        }
+
+        fn get_proto_1() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        {
+                        "source": "0",
+                        "target": "1",
+                        "label": {
+                            "cmd": "cmdA",
+                            "role": "role1",
+                            "logType": [
+                            "a"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "0",
+                        "target": "3",
+                        "label": {
+                            "cmd": "cmdB",
+                            "role": "role1",
+                            "logType": [
+                            "b"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "1",
+                        "target": "2",
+                        "label": {
+                            "cmd": "cmdI",
+                            "role": "IR",
+                            "logType": [
+                            "i"
+                            ]
+                        }
+                        }
+                    ]
+                    }"#,
+            )
+            .unwrap()
+        }
+
+        fn get_proto_2() -> SwarmProtocolType {
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        {
+                        "source": "0",
+                        "target": "1",
+                        "label": {
+                            "cmd": "cmdI",
+                            "role": "IR",
+                            "logType": [
+                            "i"
+                            ]
+                        }
+                        },
+                        {
+                        "source": "1",
+                        "target": "2",
+                        "label": {
+                            "cmd": "cmdC",
+                            "role": "role2",
+                            "logType": [
+                            "c"
                             ]
                         }
                         }
@@ -3692,12 +3769,12 @@ mod tests {
             println!("subs for composition: {}", serde_json::to_string_pretty(&subscriptions).unwrap());
 
             println!("Proto 1 things: ");
-            print_projection_information(Role::new(&format!("roleInterface")), &subscriptions_proto_1_exact, &subscriptions, interfacing_protocols.clone(), 0);
-            print_projection_information(Role::new(&format!("roleA")), &subscriptions_proto_1_exact, &subscriptions, interfacing_protocols.clone(), 0);
+            print_projection_information(Role::new(&format!("IR")), &subscriptions_proto_1_exact, &subscriptions, interfacing_protocols.clone(), 0);
+            print_projection_information(Role::new(&format!("role1")), &subscriptions_proto_1_exact, &subscriptions, interfacing_protocols.clone(), 0);
 
             println!("Proto 2 things: ");
-            print_projection_information(Role::new(&format!("roleInterface")), &subscriptions_proto_2_exact, &subscriptions, interfacing_protocols.clone(), 1);
-            print_projection_information(Role::new(&format!("roleD")), &subscriptions_proto_2_exact, &subscriptions, interfacing_protocols.clone(), 1);
+            print_projection_information(Role::new(&format!("IR")), &subscriptions_proto_2_exact, &subscriptions, interfacing_protocols.clone(), 1);
+            print_projection_information(Role::new(&format!("role2")), &subscriptions_proto_2_exact, &subscriptions, interfacing_protocols.clone(), 1);
         }
     }
 }
