@@ -90,32 +90,47 @@ fn full_simple_run_bench_sub_sizes_general() {
     let inputs =
         prepare_simple_inputs_in_directory(input_dir);
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let two_step_granularity = Granularity::TwoStep;
 
     for input in inputs.iter() {
-        let subscriptions = match well_formed_sub(input.proto.clone(), subs.clone()) {
+        let subscriptions_wf_kmt = match well_formed_sub(input.proto.clone(), subs.clone()) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
-        match check_swarm(input.proto.clone(), serde_json::to_string(&subscriptions.clone().unwrap()).unwrap()) {
+        match check_swarm(input.proto.clone(), serde_json::to_string(&subscriptions_wf_kmt.clone().unwrap()).unwrap()) {
             CheckResult::OK => (),
             CheckResult::ERROR { errors } => { println!("id: {}, cause: {},\n subscriptions: {}",
-            input.id.clone().unwrap_or(String::from("")), errors.join(", "), serde_json::to_string_pretty(&subscriptions.clone()).unwrap());
+            input.id.clone().unwrap_or(String::from("")), errors.join(", "), serde_json::to_string_pretty(&subscriptions_wf_kmt.clone()).unwrap());
             panic!("Not ok compositional") }
         }
-        wrap_and_write_sub_out_simple(&input, subscriptions.unwrap(), Version::KMT23, &output_dir);
+        wrap_and_write_sub_out_simple(&input, subscriptions_wf_kmt.unwrap(), Version::KMT23, &output_dir);
 
-        let subscriptions = match exact_well_formed_sub(InterfacingProtocols(vec![input.proto.clone()]), subs.clone()) {
+        let subscriptions_compositional_exact = match exact_well_formed_sub(InterfacingProtocols(vec![input.proto.clone()]), subs.clone()) {
             DataResult::OK{data: subscriptions} => {
                 Some(subscriptions) },
             DataResult::ERROR{ .. } => None,
         };
-        match check_composed_swarm(InterfacingProtocols(vec![input.proto.clone()]), serde_json::to_string(&subscriptions.clone().unwrap()).unwrap()) {
+        match check_composed_swarm(InterfacingProtocols(vec![input.proto.clone()]), serde_json::to_string(&subscriptions_compositional_exact.clone().unwrap()).unwrap()) {
             CheckResult::OK => (),
             CheckResult::ERROR { errors } => { println!("id: {}, cause: {},\n subscriptions: {}",
-            input.id.clone().unwrap_or(String::from("")), errors.join(", "), serde_json::to_string_pretty(&subscriptions.clone()).unwrap());
+            input.id.clone().unwrap_or(String::from("")), errors.join(", "), serde_json::to_string_pretty(&subscriptions_compositional_exact.clone()).unwrap());
             panic!("Not ok compositional") }
         }
-        wrap_and_write_sub_out_simple(&input, subscriptions.unwrap(), Version::Compositional, &output_dir);
+        wrap_and_write_sub_out_simple(&input, subscriptions_compositional_exact.unwrap(), Version::CompositionalExact, &output_dir);
+
+        let subscriptions_compositional_approx = match overapproximated_well_formed_sub(InterfacingProtocols(vec![input.proto.clone()]), subs.clone(), two_step_granularity.clone()) {
+            DataResult::OK{data: subscriptions} => {
+                Some(subscriptions) },
+            DataResult::ERROR{ .. } => None,
+        };
+        match check_composed_swarm(InterfacingProtocols(vec![input.proto.clone()]), serde_json::to_string(&subscriptions_compositional_approx.clone().unwrap()).unwrap()) {
+            CheckResult::OK => (),
+            CheckResult::ERROR { errors } => { println!("id: {}, cause: {},\n subscriptions: {}",
+            input.id.clone().unwrap_or(String::from("")), errors.join(", "), serde_json::to_string_pretty(&subscriptions_compositional_approx.clone()).unwrap());
+            panic!("Not ok compositional") }
+        }
+        wrap_and_write_sub_out_simple(&input, subscriptions_compositional_approx.unwrap(), Version::CompositionalOverapprox, &output_dir);
+
         println!("{}", SPECIAL_SYMBOL);
     }
 }
@@ -129,32 +144,47 @@ fn short_simple_run_bench_sub_sizes_general() {
     let inputs =
         prepare_simple_inputs_in_directory(input_dir);
     let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let two_step_granularity = Granularity::TwoStep;
     let step: usize = 120;
     for input in inputs.iter().step_by(step) {
-        let subscriptions = match well_formed_sub(input.proto.clone(), subs.clone()) {
+        let subscriptions_wf_kmt = match well_formed_sub(input.proto.clone(), subs.clone()) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
-        match check_swarm(input.proto.clone(), serde_json::to_string(&subscriptions.clone().unwrap()).unwrap()) {
+        match check_swarm(input.proto.clone(), serde_json::to_string(&subscriptions_wf_kmt.clone().unwrap()).unwrap()) {
             CheckResult::OK => (),
             CheckResult::ERROR { errors } => { println!("id: {}, cause: {},\n subscriptions: {}",
-            input.id.clone().unwrap_or(String::from("")), errors.join(", "), serde_json::to_string_pretty(&subscriptions.clone()).unwrap());
+            input.id.clone().unwrap_or(String::from("")), errors.join(", "), serde_json::to_string_pretty(&subscriptions_wf_kmt.clone()).unwrap());
             panic!("Not ok compositional") }
         }
-        wrap_and_write_sub_out_simple(&input, subscriptions.unwrap(), Version::KMT23, &output_dir);
+        wrap_and_write_sub_out_simple(&input, subscriptions_wf_kmt.unwrap(), Version::KMT23, &output_dir);
 
-        let subscriptions = match exact_well_formed_sub(InterfacingProtocols(vec![input.proto.clone()]), subs.clone()) {
+        let subscriptions_compositional_exact = match exact_well_formed_sub(InterfacingProtocols(vec![input.proto.clone()]), subs.clone()) {
             DataResult::OK{data: subscriptions} => {
                 Some(subscriptions) },
             DataResult::ERROR{ .. } => None,
         };
-        match check_composed_swarm(InterfacingProtocols(vec![input.proto.clone()]), serde_json::to_string(&subscriptions.clone().unwrap()).unwrap()) {
+        match check_composed_swarm(InterfacingProtocols(vec![input.proto.clone()]), serde_json::to_string(&subscriptions_compositional_exact.clone().unwrap()).unwrap()) {
             CheckResult::OK => (),
             CheckResult::ERROR { errors } => { println!("id: {}, cause: {},\n subscriptions: {}",
-            input.id.clone().unwrap_or(String::from("")), errors.join(", "), serde_json::to_string_pretty(&subscriptions.clone()).unwrap());
+            input.id.clone().unwrap_or(String::from("")), errors.join(", "), serde_json::to_string_pretty(&subscriptions_compositional_exact.clone()).unwrap());
             panic!("Not ok compositional") }
         }
-        wrap_and_write_sub_out_simple(&input, subscriptions.unwrap(), Version::Compositional, &output_dir);
+        wrap_and_write_sub_out_simple(&input, subscriptions_compositional_exact.unwrap(), Version::CompositionalExact, &output_dir);
+
+        let subscriptions_compositional_approx = match overapproximated_well_formed_sub(InterfacingProtocols(vec![input.proto.clone()]), subs.clone(), two_step_granularity.clone()) {
+            DataResult::OK{data: subscriptions} => {
+                Some(subscriptions) },
+            DataResult::ERROR{ .. } => None,
+        };
+        match check_composed_swarm(InterfacingProtocols(vec![input.proto.clone()]), serde_json::to_string(&subscriptions_compositional_approx.clone().unwrap()).unwrap()) {
+            CheckResult::OK => (),
+            CheckResult::ERROR { errors } => { println!("id: {}, cause: {},\n subscriptions: {}",
+            input.id.clone().unwrap_or(String::from("")), errors.join(", "), serde_json::to_string_pretty(&subscriptions_compositional_approx.clone()).unwrap());
+            panic!("Not ok compositional") }
+        }
+        wrap_and_write_sub_out_simple(&input, subscriptions_compositional_approx.unwrap(), Version::CompositionalOverapprox, &output_dir);
+
         println!("{}", SPECIAL_SYMBOL);
     }
 }
@@ -209,7 +239,8 @@ pub struct SimpleProtoBenchMarkInput  {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Version {
     KMT23, // Kuhn, Melgratti, Tuosto 23
-    Compositional,
+    CompositionalExact, // expand protocol and compute subscription
+    CompositionalOverapprox // overapproximated well formed -- 'Algorithm 1'
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
