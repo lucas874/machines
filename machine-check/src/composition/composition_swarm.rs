@@ -25,6 +25,8 @@ use std::{
     fmt,
 };
 
+use std::time::Instant;
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Error {
     SwarmError(crate::swarm::Error),
@@ -200,18 +202,28 @@ pub fn exact_well_formed_sub(
     protos: InterfacingProtocols,
     subs: &Subscriptions,
 ) -> Result<Subscriptions, ErrorReport> {
+    let start = Instant::now();
     let _span = tracing::info_span!("exact_well_formed_sub").entered();
     let combined_proto_info = swarms_to_proto_info(protos);
     if !combined_proto_info.no_errors() {
         return Err(proto_info_to_error_report(combined_proto_info));
     }
 
+    let start_expand_composition = Instant::now(); // Kind of a sketchy coarse way of doing it but ok.
     // If we reach this point the protocols can interface and are all confusion free.
     // We construct a ProtoInfo with the composition as the only protocol and all the
     // information about branches etc. from combined_proto_info
     // and the succeeding_events field updated using the expanded composition.
     let composition = explicit_composition_proto_info(combined_proto_info);
+    let dur_expand_composition = start_expand_composition.elapsed();
+
+    let start_compute_sub = Instant::now();
     let sub = exact_wf_sub(composition, 0, subs);
+    let dur_compute_sub = start_compute_sub.elapsed();
+
+    println!("Expanding composition: {:?}", dur_expand_composition);
+    println!("Computing subscription: {:?}", dur_compute_sub);
+    println!("Total: {:?}", start.elapsed());
 
     Ok(sub)
 }
@@ -1719,7 +1731,7 @@ fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
         let interface = acc_roles
             .intersection(&p.graph.get_roles())
             .cloned()
-            .flat_map(|role| { 
+            .flat_map(|role| {
                 proto_info.role_event_map
                     .get(&role)
                     .unwrap_or(&empty)
