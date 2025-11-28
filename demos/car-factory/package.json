@@ -1,0 +1,41 @@
+{
+  "name": "car-factory",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start-steel-transport": "node dist/machine_drivers/steel_press_protocol/steel_transport.js",
+    "start-stamp": "node dist/machine_drivers/steel_press_protocol/stamp.js",
+    "start-body-assembler": "node dist/machine_drivers/steel_press_protocol/body_assembler.js",
+    "start-car-body-checker": "node dist/machine_drivers/steel_press_protocol/car_body_checker.js",
+    "start-painter": "node dist/machine_drivers/paint_shop_protocol/painter.js",
+    "start-basic-transport": "node dist/machine_drivers/warehouse_protocol/basic_transport.js",
+    "start-smart-transport": "node dist/machine_drivers/warehouse_protocol/smart_transport.js",
+    "start-base-station": "node dist/machine_drivers/warehouse_protocol/base_station.js",
+    "start-engine-installer": "node dist/machine_drivers/engine_installation_protocol/engine_installer.js",
+    "start-engine-checker": "node dist/machine_drivers/engine_installation_protocol/engine_checker.js",
+    "start-warehouse": "node dist/machine_drivers/engine_installation_protocol/warehouse.js",
+    "start-wheel-installer": "node dist/machine_drivers/wheel_installation_protocol/wheel_installer.js",
+    "start-wheel-checker": "node dist/machine_drivers/wheel_installation_protocol/wheel_checker.js",
+    "start-window-installer": "node dist/machine_drivers/window_installation_protocol/window_installer.js",
+    "start-window-checker": "node dist/machine_drivers/window_installation_protocol/window_checker.js",
+    "start-quality-control": "node dist/machine_drivers/quality_control_protocol/quality_control.js"
+  },
+  "devDependencies": {
+    "@protobuf-ts/plugin": "^2.11.1",
+    "@protobuf-ts/runtime": "^2.11.1",
+    "@types/lodash.camelcase": "^4.3.9",
+    "@types/node": "^24.3.0",
+    "@types/yargs": "^17.0.33",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@actyx/machine-check": "file:../../machine-check",
+    "@actyx/machine-runner": "file:../../machine-runner",
+    "@actyx/sdk": "^0.5.10",
+    "chalk": "^5.6.0",
+    "lodash.camelcase": "^4.3.0",
+    "yargs": "^18.0.0"
+  }
+}
