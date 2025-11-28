@@ -44,7 +44,6 @@ import { deepEqual } from 'fast-equals'
 import { deepCopy } from '../utils/object-utils.js'
 import * as globals from '../globals.js'
 import { MachineRunnerFailure } from '../errors.js'
-import { ProjectionInfo } from '@actyx/machine-check'
 
 /**
  * Contains and manages the state of a machine by subscribing and publishing
@@ -1497,6 +1496,11 @@ export interface StateOpaque<
    * Return true when the commands of its state counterpart is available; otherwise return false.
    */
   commandsAvailable(): boolean
+
+  /**
+   * Return true when the state counterpart does not enable any commands and does not have any reactions attached; otherwise return false.
+   */
+  isFinal(): boolean
 }
 
 export namespace StateOpaque {
@@ -1632,6 +1636,11 @@ export namespace ImplStateOpaque {
           Object.keys(factory.mechanism.commandDefinitions).every((cmdName) => cmdName in factoryAtSnapshot.mechanism.commandDefinitions)
     }
 
+    const isFinal: ThisStateOpaque['isFinal'] = (): boolean => {
+      return Object.keys(factoryAtSnapshot.mechanism.commands).length == 0
+        && factoryAtSnapshot.mechanism.protocol.reactionMap.get(factoryAtSnapshot.mechanism).size == 0
+    }
+
     return {
       is,
       as,
@@ -1642,6 +1651,7 @@ export namespace ImplStateOpaque {
       commandsAvailable: () =>
         commandEnabledAtSnapshot && CommandGeneratorCriteria.allOk(commandGeneratorCriteria),
       [InternalAccess]: () => ({ data: stateAtSnapshot, factory: factoryAtSnapshot }),
+      isFinal
     }
   }
 }

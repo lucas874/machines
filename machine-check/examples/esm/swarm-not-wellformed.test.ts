@@ -53,7 +53,7 @@ describe('checkSwarmProtocol', () => {
       type: 'ERROR',
       errors: [
         `guard event type ${Events.Opening.type} appears in transitions from multiple states`,
-        `guard event type ${Events.Closing.type} appears in transitions from multiple states`,
+        `guard event type ${Events.Closing.type} appears in transitions from multiple states`
       ],
     })
   })

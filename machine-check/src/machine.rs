@@ -316,6 +316,7 @@ pub fn equivalent(left: &Graph, li: NodeId, right: &Graph, ri: NodeId) -> Vec<Er
 mod tests {
     use pretty_assertions::assert_eq;
     use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
+    use crate::{types::{CheckResult, Role}, MachineType, SwarmProtocolType};
 
     fn setup_logger() {
         fmt()
@@ -371,14 +372,18 @@ mod tests {
             ]}"#;
 
         let result = crate::check_projection(
-            swarm.to_owned(),
+            serde_json::from_str::<SwarmProtocolType>(swarm).unwrap(),
             subs.to_owned(),
-            "P".to_owned(),
-            machine.to_owned(),
+            Role::new("P"),
+            serde_json::from_str::<MachineType>(machine).unwrap(),
         );
+        let errors = match result {
+            CheckResult::OK => vec![],
+            CheckResult::ERROR { errors } => errors
+        };
         assert_eq!(
-            result,
-            r#"{"type":"ERROR","errors":["guard event type Bid appears in transitions from multiple states"]}"#
+            errors,
+            ["guard event type Bid appears in transitions from multiple states"]
         );
     }
 }

@@ -1,0 +1,35 @@
+{
+  "name": "warehouse_factory_demo",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "start-door": "node dist/machine_drivers/door.js",
+    "start-forklift": "node dist/machine_drivers/forklift.js",
+    "start-transport": "node dist/machine_drivers/transport.js",
+    "start-factory-robot": "node dist/machine_drivers/factory_robot.js",
+    "start-quality-control": "node dist/machine_drivers/quality_control.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@babel/preset-typescript": "^7.26.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.7.3",
+    "@protobuf-ts/plugin": "^2.11.1",
+    "@protobuf-ts/runtime": "^2.11.1",
+    "tsx": "^4.20.5",
+    "@types/lodash.camelcase": "^4.3.9",
+    "@types/yargs": "^17.0.33"
+  },
+  "dependencies": {
+    "@actyx/machine-check": "file:../../machine-check",
+    "@actyx/machine-runner": "file:../../machine-runner",
+    "@actyx/sdk": "^0.5.10",
+    "lodash.camelcase": "^4.3.0",
+    "yargs": "^18.0.0"
+  }
+}

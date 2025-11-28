@@ -10,14 +10,6 @@ use crate::{
 
 use super::{NodeId, SwarmProtocolType};
 
-#[derive(Tsify, Serialize, Deserialize)]
-#[serde(tag = "type")]
-#[tsify(into_wasm_abi)]
-pub enum DataResult<T> {
-    OK { data: T },
-    ERROR { errors: Vec<String> },
-}
-
 pub type RoleEventMap = BTreeMap<Role, BTreeSet<SwarmLabel>>;
 
 pub type UnordEventPair = BTreeSet<EventType>;

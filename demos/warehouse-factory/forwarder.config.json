@@ -1,0 +1,8 @@
+{
+    "manifest": { "type": "import", "manifest": {"item": "manifest", "file": "../protocol"}},
+    "swarmProtocolImport": {"item": "Protocol", "file": "../protocol"},
+    "eventDefinitionImport": {"item": "Events", "file": "../protocol"},
+    "tsProtoBufTypes": {"item": "Event", "file": "../generated/warehouse_factory"},
+    "entityId": "warehouse-factory"
+}
+

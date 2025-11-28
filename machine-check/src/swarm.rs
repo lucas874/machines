@@ -179,6 +179,24 @@ pub fn check(
     (to_swarm(&graph), Some(initial), errors)
 }
 
+pub fn well_formed_sub(
+    proto: SwarmProtocolType,
+    subs: &Subscriptions,
+) -> Result<Subscriptions, (super::Graph, Option<NodeId>, Vec<Error>)> {
+    let (graph, initial, mut errors) = match prepare_graph(proto, &subs) {
+        (g, Some(i), e) => (g, i, e),
+        (g, None, e) => return Err((to_swarm(&g), None, e)),
+    };
+
+    match wf_sub(graph, initial, subs) {
+        Err((g, _, mut e)) => {
+            errors.append(&mut e);
+            return Err((to_swarm(&g), Some(initial), errors))
+        },
+        Ok(subs) => return Ok(subs)
+    }
+}
+
 fn to_swarm(graph: &Graph) -> super::Graph {
     graph.map(|_, n| n.name.clone(), |_, x| x.clone())
 }
@@ -262,6 +280,135 @@ fn well_formed(graph: &Graph, initial: NodeId, subs: &Subscriptions) -> Vec<Erro
         }
     }
     errors
+}
+
+// Generate (one of) the smallest subscriptions s such that graph is well-formed w.r.t. s.
+// One of the smallest, since some conditions require a subscription to *one of* the event types
+// in the log emitted by a transition.
+// If not already satisfied by subs, we add the first event type in the log in such cases.
+// Problem: We do not have the roles field of nodes. So we repeat until stable.
+// Precondition (not checked, assumed since created with prepare_graph): protocol is confusion-free.
+fn wf_sub(mut graph: Graph, initial: NodeId, subs: &Subscriptions) -> Result<Subscriptions, (Graph, NodeId, Vec<Error>)> {
+    let _span = tracing::info_span!("wf_sub").entered();
+    let mut errors = Vec::new();
+    // subscriptions to construct
+    let mut subs = subs.clone();
+
+    // visit all reachable nodes of checking determinism; order doesn’t matter
+    for node in Dfs::new(&graph, initial).iter(&graph) {
+        let mut guards = BTreeMap::new();
+        let mut commands = BTreeSet::new();
+        for edge in graph.edges_directed(node, Outgoing) {
+            let log = edge.weight().log_type.as_slice();
+
+            // event determinism
+            let guard = &log[0];
+            if *guards
+                .entry(guard.clone())
+                .and_modify(|count| *count += 1)
+                .or_insert(1)
+                == 2
+            {
+                errors.push(Error::NonDeterministicGuard(edge.id()));
+            }
+            // command determinism
+            let command = &edge.weight().cmd;
+            let role = &edge.weight().role;
+            if !commands.insert((role.clone(), command.clone())) {
+                errors.push(Error::NonDeterministicCommand(edge.id()));
+            }
+        }
+    }
+    // stop subscription generation if protocol is not deterministic.
+    if !errors.is_empty() {
+        return Err((graph, initial, errors))
+    }
+    tracing::debug!("initial sub is: {}", serde_json::to_string_pretty(&subs).unwrap());
+    let mut is_stable = wf_sub_step(&mut graph, initial, &mut subs);
+    while !is_stable {
+        tracing::debug!("did a step sub is: {}", serde_json::to_string_pretty(&subs).unwrap());
+        is_stable = wf_sub_step(&mut graph, initial, &mut subs);
+    }
+
+    Ok(subs)
+}
+
+// Precondition (not checked, assumed since created with prepare_graph): the nodes of the graph contain their active roles.
+fn wf_sub_step(graph: &mut Graph, initial: NodeId, subs: &mut Subscriptions) -> bool {
+    let _span = tracing::info_span!("wf_sub_step").entered();
+    if graph.node_count() == 0 || initial == NodeId::end() {
+        return true
+    }
+    let mut is_stable = true;
+    let sub = |r: &Role, subs: &Subscriptions| subs.get(r).cloned().unwrap_or_default();
+    let add_to_sub =
+        |role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subscriptions| -> bool {
+            if subs.contains_key(&role) && event_types.iter().all(|e| subs[&role].contains(e)) {
+                return true;
+            }
+            tracing::debug!("adding {} to sub({})", serde_json::to_string(&event_types).unwrap(), role);
+            subs.entry(role)
+                .and_modify(|curr| {
+                    curr.append(&mut event_types);
+                })
+                .or_insert(event_types);
+            false
+        };
+
+        let mut dfs = DfsPostOrder::new(&*graph, initial);
+        while let Some(node) = dfs.next(&*graph) {
+            // `active` field of current node is set, but `roles` field is not. add `active` to `roles`
+            tracing::debug!("current node is: {}", graph[node].state_name());
+            let mut active_roles = graph[node].active.clone();
+            tracing::debug!("adding {} to {}.roles", serde_json::to_string(&active_roles).unwrap(), graph[node].state_name());
+            graph[node].roles.append(&mut active_roles);
+
+            let edges: Vec<(NodeId, SwarmLabel, NodeId)> = graph.edges_directed(node, Outgoing)
+                .map(|e| (e.source(), e.weight().clone(), e.target()))
+                .collect();
+
+            for (_source, label, target) in edges {
+                let log = label.log_type.as_slice();
+                // causal consistency
+                tracing::debug!("causal consistency for: {} --({})--> {}", graph[_source].state_name(), label, graph[target].state_name());
+                // role in graph[target].active implies log \cap sub(role) != empty set
+                for role in &graph[target].active {
+                    // check before adding first event type in transition -> role might already subscribe to another event type in the transition.
+                    if log_filter(log, &sub(role, subs)).first_one().is_none() {
+                        is_stable = add_to_sub(role.clone(), BTreeSet::from([log[0].clone()]), subs) && is_stable;
+                    }
+                }
+
+                // update roles of node: add active and roles of graph[target] to graph[node].roles
+                let mut roles_of_target: BTreeSet<Role> = graph[target].active.clone().union(&graph[target].roles.clone()).cloned().collect();
+                tracing::debug!("adding {} to {}.roles", serde_json::to_string(&roles_of_target).unwrap(), graph[node].state_name());
+                graph[node].roles.append(&mut roles_of_target);
+
+                // for all roles r' in graph[target].roles: log \cap sub(r') \subseteq log \cap sub(label.role)
+                //      -> set sub(label.role) = \bigcup (sub(r') \cap log) for all r' graph[target].roles
+                //      -> add log[0] instead if \bigcup (sub(r') \cap log) for all r' graph[target].roles is empty (target is a final state)
+                let event_types: BTreeSet<EventType> = graph[target]
+                    .roles
+                    .iter()
+                    .flat_map(|r|
+                        log
+                            .iter()
+                            .filter(|event_type| sub(r, subs).contains(*event_type))
+                            .cloned()
+                        )
+                        .collect();
+                is_stable = add_to_sub(label.role.clone(), if event_types.is_empty() { BTreeSet::from([log[0].clone()]) } else { event_types }, subs)
+                    && is_stable;
+
+                // determinacy
+                // role in graph[target].roles implies log[0] in sub(role)
+                tracing::debug!("determinacy for: {} --({})--> {}", graph[_source].state_name(), label, graph[target].state_name());
+                for role in &graph[target].roles {
+                    is_stable = add_to_sub(role.clone(), BTreeSet::from([log[0].clone()]), subs) && is_stable;
+                }
+        }
+    }
+    is_stable
 }
 
 pub fn from_json(
@@ -738,6 +885,125 @@ mod tests {
         .unwrap();
         let (g, _, errors) = check(proto, &BTreeMap::new());
         let mut errors = errors.map(Error::convert(&g));
+        errors.sort();
+        assert_eq!(
+            errors,
+            vec![
+                "initial swarm protocol state has no transitions",
+                "log type must not be empty (S1)--[b@R2<>]-->(S2)",
+            ]
+        );
+    }
+
+    #[test]
+    fn basics_sub_gen() {
+        setup_logger();
+        let proto = serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "S0",
+                "transitions": [
+                    { "source": "S0", "target": "S1", "label": { "cmd": "a", "logType": ["A", "B", "C"], "role": "R1" } },
+                    { "source": "S1", "target": "S2", "label": { "cmd": "b", "logType": ["D", "E"], "role": "R2" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "c", "logType": ["F"], "role": "R3" } },
+                    { "source": "S2", "target": "S4", "label": { "cmd": "d", "logType": ["G"], "role": "R4" } },
+                    { "source": "S4", "target": "S5", "label": { "cmd": "e", "logType": ["H", "I"], "role": "R3" } },
+                    { "source": "S5", "target": "S4", "label": { "cmd": "f", "logType": ["J"], "role": "R5" } }
+                ]
+            }"#,
+        )
+        .unwrap();
+
+        let expected_subs_1 = serde_json::from_str::<Subscriptions>(
+            r#"{
+                "R1": ["A"],
+                "R2": ["A", "D"],
+                "R3": ["A", "D", "F", "G", "H", "J"],
+                "R4": ["A", "D", "G"],
+                "R5": ["A", "D", "G", "H", "J"]
+            }"#,
+        )
+        .unwrap();
+        let result_subs_generated_1 = well_formed_sub(proto.clone(), &BTreeMap::new());
+        assert!(result_subs_generated_1.is_ok());
+        let subs_generated_1 = result_subs_generated_1.unwrap();
+        assert_eq!(expected_subs_1, subs_generated_1);
+        let (_, _, errors_1) = check(proto.clone(), &subs_generated_1);
+        assert!(errors_1.is_empty());
+
+        // Some starting point. Should be contained in output subscription. The subscriptions of some roles in output
+        // will also contain other event types not present in subs_generated_1 due to the extra initial event types.
+        let initial_subs_2 = serde_json::from_str::<Subscriptions>(
+            r#"{
+                "R1": ["B"],
+                "R5": ["I"]
+            }"#,
+        )
+        .unwrap();
+        let expected_subs_2 = serde_json::from_str::<Subscriptions>(
+            r#"{
+                "R1": ["A", "B"],
+                "R2": ["A", "D"],
+                "R3": ["A", "D", "F", "G", "H", "I", "J"],
+                "R4": ["A", "D", "G"],
+                "R5": ["A", "D", "G", "H", "I", "J"]
+            }"#,
+        )
+        .unwrap();
+        let result_subs_generated_2 = well_formed_sub(proto.clone(), &initial_subs_2);
+        assert!(result_subs_generated_2.is_ok());
+        let subs_generated_2 = result_subs_generated_2.unwrap();
+        assert_eq!(expected_subs_2, subs_generated_2);
+        let (_, _, errors_2) = check(proto.clone(), &subs_generated_1);
+        assert!(errors_2.is_empty());
+    }
+
+    #[test]
+    fn deterministic_sub_gen() {
+        setup_logger();
+        let proto = serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "S0",
+                "transitions": [
+                    { "source": "S0", "target": "S1", "label": { "cmd": "a", "logType": ["A"], "role": "R" } },
+                    { "source": "S1", "target": "S2", "label": { "cmd": "b", "logType": ["B", "A"], "role": "R" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "c", "logType": ["A"], "role": "R" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "c", "logType": ["C"], "role": "R" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "d", "logType": ["A"], "role": "R" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "c", "logType": ["A"], "role": "S" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "d", "logType": ["A"], "role": "S" } }
+                ]
+            }"#,
+        )
+        .unwrap();
+        let result_subs_generated = well_formed_sub(proto.clone(), &BTreeMap::new());
+        assert!(result_subs_generated.is_err());
+        let (g, _, e) = result_subs_generated.unwrap_err();
+        let mut errors = e.map(Error::convert(&g));
+        errors.sort();
+        assert_eq!(errors, vec![
+            "guard event type A appears in transitions from multiple states",
+            "non-deterministic command c for role R in state S2",
+            "non-deterministic event guard type A in state S2",
+        ]);
+    }
+
+    #[test]
+    fn disconnected_initial_sub_gen() {
+        setup_logger();
+        let proto = serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "S5",
+                "transitions": [
+                    { "source": "S0", "target": "S1", "label": { "cmd": "a", "logType": ["A", "B", "C"], "role": "R1" } },
+                    { "source": "S1", "target": "S2", "label": { "cmd": "b", "logType": [], "role": "R2" } }
+                ]
+            }"#,
+        )
+        .unwrap();
+        let result_subs_generated = well_formed_sub(proto.clone(), &BTreeMap::new());
+        assert!(result_subs_generated.is_err());
+        let (g, _, e) = result_subs_generated.unwrap_err();
+        let mut errors = e.map(Error::convert(&g));
         errors.sort();
         assert_eq!(
             errors,
