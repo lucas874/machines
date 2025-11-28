@@ -45,6 +45,9 @@ if [ "$#" -lt 2 ]; then
     exit 1
 fi
 
+# kill any running tmux processes...
+pkill tmux;
+
 session=$1
 # shift arguments making the old $2 the new $1 etc.
 shift
@@ -59,13 +62,4 @@ fi
 # TODO: wait for ax to start. Right now by sleeping 1 sec
 sleep 1;
 
-#pgrep ax > /dev/null
-#echo "$?"
-#while [ "$?" -ne 0 ];
-#    do
-#    sleep 1;
-#    echo "hej"
-#    done
-
-#tmux new-session -d -s "$session" "$CMD_START_AX"
 split_and_run "$@"
