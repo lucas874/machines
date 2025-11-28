@@ -1,6 +1,7 @@
 import { DataResult, overapproxWFSubscriptions, Subscriptions } from "@actyx/machine-check";
 import { MachineEvent, SwarmProtocol } from "@actyx/machine-runner";
 import chalk from "chalk";
+import * as fs from 'fs';
 
 export const manifest = {
   appId: 'com.example.car-factory',
@@ -128,3 +129,6 @@ export const throwMachineImplementationErrors = (errors: { type: "ERROR"; errors
     throw new Error(errors.errors.join(", \n"))
 }
 
+export const logToFile = (filename: string, contents: string): void => {
+  fs.writeFileSync(filename, contents)
+}

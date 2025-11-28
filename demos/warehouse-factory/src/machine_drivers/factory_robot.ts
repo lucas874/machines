@@ -1,6 +1,6 @@
 import { Actyx, Tags } from '@actyx/sdk'
 import { createMachineRunnerBT, MachineRunner } from '@actyx/machine-runner'
-import { manifest, Protocol, printState, getRandomInt, machineRunnerProtoName } from '../protocol'
+import { manifest, Protocol, printState, getRandomInt, machineRunnerProtoName, logToFile } from '../protocol'
 import { initialStateWarehouseFactory, robotWarehouseFactory, buildState, initialStateWarehouseFactoryQuality, robotWarehouseFactoryQuality } from '../machines/robot_machine';
 import { isValidVersion, VersionSelector } from '../version_selector';
 
@@ -9,9 +9,11 @@ async function main() {
   if (!isValidVersion(process.argv[2])) {
     throw Error(`Invalid version: ${process.argv[2]}`)
   }
+  const version = process.argv[2]
   const app = await Actyx.of(manifest)
   const tags = Protocol.tagWithEntityId(machineRunnerProtoName)
-  const machine = selectMachine(process.argv[2], app, tags)
+  const machine = selectMachine(version, app, tags)
+
   for await (const state of machine) {
     if(state.isLike(buildState)) {
       setTimeout(() => {
@@ -23,6 +25,9 @@ async function main() {
       }, getRandomInt(3000, 4500))
     }
     if (state.isFinal()) {
+      if (version === VersionSelector.KickTheTires) {
+        logToFile(process.argv[3], "Factory robot is ok.")
+      }
       console.log("Final state reached, press CTRL + C to quit.")
     }
   }
