@@ -8,7 +8,7 @@ use petgraph::{
     Direction::{Incoming, Outgoing},
 };
 use proptest::prelude::*;
-use rand::{distributions::Bernoulli, prelude::*};
+use rand::{Rng, distributions::Bernoulli, prelude::*};
 use std::{
     cmp, collections::{BTreeMap, BTreeSet}, iter::zip, sync::Mutex
 };
