@@ -1,7 +1,8 @@
 use crate::{
-    types::{Command, EventType, MachineLabel, Role, State},
     EdgeId, MachineType, NodeId, Subscriptions,
 };
+use machine_types::typescript_types::{Command, EventType, MachineLabel, Role, State};
+
 use itertools::Itertools;
 use petgraph::{
     visit::{Dfs, EdgeFiltered, EdgeRef, IntoEdgeReferences, IntoEdgesDirected, Walker},
@@ -316,8 +317,8 @@ pub fn equivalent(left: &Graph, li: NodeId, right: &Graph, ri: NodeId) -> Vec<Er
 mod tests {
     use pretty_assertions::assert_eq;
     use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
-    use crate::{types::{CheckResult, Role}, MachineType, SwarmProtocolType};
-
+    use machine_types::typescript_types::{CheckResult, Role};
+    use crate::{MachineType, SwarmProtocolType};
     fn setup_logger() {
         fmt()
             .with_env_filter(EnvFilter::from_default_env())

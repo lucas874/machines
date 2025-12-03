@@ -1,5 +1,5 @@
+use machine_types::typescript_types::{EventType, Role, State, StateName, SwarmLabel};
 use crate::{
-    types::{EventType, Role, State, StateName, SwarmLabel},
     EdgeId, MapVec, NodeId, Subscriptions, SwarmProtocolType,
 };
 use bitvec::{bitvec, vec::BitVec};

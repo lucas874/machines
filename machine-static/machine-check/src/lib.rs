@@ -4,13 +4,11 @@ use tsify::{declare};
 
 mod machine;
 mod swarm;
-pub mod types;
+//pub mod types;
 pub mod composition;
 
 use petgraph::visit::GraphBase;
-use types::{CheckResult, EventType, MachineLabel, ProtocolType, Role, State, SwarmLabel};
-
-use crate::types::DataResult;
+use machine_types::typescript_types::{CheckResult, EventType, MachineLabel, ProtocolType, Role, State, SwarmLabel, DataResult};
 
 #[declare]
 pub type Subscriptions = BTreeMap<Role, BTreeSet<EventType>>;

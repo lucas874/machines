@@ -3,13 +3,13 @@ use super::{
         get_branching_joining_proto_info, unord_event_pair, BranchMap, EventLabel,
         ProjToMachineStates, ProjectionInfo, ProtoInfo, ProtoStruct, UnordEventPair,
     },
-    types::{Command, StateName, Transition},
     EventType, MachineLabel, MachineType, NodeId, Role, State, Subscriptions, SwarmLabel,
 };
 use crate::{
     composition::composition_swarm::transitive_closure_succeeding,
     machine::{Error, Side},
 };
+use machine_types::typescript_types::{Command, StateName, Transition};
 use itertools::Itertools;
 use petgraph::{
     graph::EdgeReference,
@@ -24,12 +24,6 @@ use std::{
 type Graph = petgraph::Graph<State, MachineLabel>;
 type OptionGraph = petgraph::Graph<Option<State>, MachineLabel>;
 type ERef<'a> = <&'a super::Graph as IntoEdgeReferences>::EdgeRef;
-
-impl From<String> for State {
-    fn from(value: String) -> State {
-        State::new(&value)
-    }
-}
 
 // Used for creating adapted machine.
 // A composed state in an adapted machine contains some
@@ -897,9 +891,9 @@ mod tests {
             composition_types::{Granularity, InterfacingProtocols},
         },
         machine::{self},
-        types::{Command, EventType, Role, Transition},
         MachineType, Subscriptions, SwarmProtocolType,
     };
+    use machine_types::typescript_types::{Command, EventType, Role, Transition};
     use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
 
     fn setup_logger() {
@@ -3057,7 +3051,7 @@ mod tests {
     }
 
     mod big_example_i_can_be_deleted {
-        use crate::types::DataResult;
+        use machine_types::typescript_types::DataResult;
 
         use super::*;
 

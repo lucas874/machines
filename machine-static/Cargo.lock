@@ -440,6 +440,7 @@ dependencies = [
  "criterion",
  "intern-arc",
  "itertools 0.10.5",
+ "machine-types",
  "maplit",
  "petgraph",
  "pretty_assertions",
@@ -458,6 +459,15 @@ dependencies = [
 [[package]]
 name = "machine-types"
 version = "0.1.0"
+dependencies = [
+ "intern-arc",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "tracing",
+ "tsify",
+ "wasm-bindgen",
+]
 
 [[package]]
 name = "maplit"

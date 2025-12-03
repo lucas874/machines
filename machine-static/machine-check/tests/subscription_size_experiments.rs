@@ -1,7 +1,8 @@
 use machine_check::{
-    check_swarm, composition::{check_composed_swarm, composition_types::{Granularity, InterfacingProtocols, InterfacingSwarms}, exact_well_formed_sub, overapproximated_well_formed_sub}, types::{CheckResult, DataResult, EventType, Role, State}, well_formed_sub, Subscriptions, SwarmProtocolType
+    check_swarm, composition::{check_composed_swarm, composition_types::{Granularity, InterfacingProtocols, InterfacingSwarms}, exact_well_formed_sub, overapproximated_well_formed_sub}, well_formed_sub, Subscriptions, SwarmProtocolType
 };
 
+use machine_types::typescript_types::{CheckResult, DataResult, EventType, Role, State};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet}, fs::{create_dir_all, File}, path::Path, io::prelude::*

@@ -5,11 +5,10 @@ use super::{
     Graph,
 };
 use crate::composition::composition_types::{InterfacingProtocols, ProtoLabel};
-use crate::types::Command;
 use crate::{
-    types::{EventType, Role, State, StateName, SwarmLabel, Transition},
     EdgeId, NodeId, Subscriptions, SwarmProtocolType,
 };
+use machine_types::typescript_types::{Command, EventType, Role, State, StateName, SwarmLabel, Transition};
 use itertools::Itertools;
 use petgraph::algo::floyd_warshall;
 use petgraph::visit::{DfsPostOrder, Reversed};
@@ -1774,7 +1773,8 @@ pub fn to_swarm_json(graph: crate::Graph, initial: NodeId) -> SwarmProtocolType 
 
 #[cfg(test)]
 mod tests {
-    use crate::{composition::error_report_to_strings, types::Command, MapVec};
+    use crate::{composition::error_report_to_strings, MapVec};
+    use machine_types::typescript_types::Command;
 
     use super::*;
     use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
@@ -3820,8 +3820,8 @@ mod tests {
         }
     }
     mod big_example_2 {
-        use crate::{composition::project_combine, types::DataResult};
-
+        use crate::composition::project_combine;
+        use machine_types::typescript_types::DataResult;
         use super::*;
 
         fn request_deliver() -> SwarmProtocolType {
