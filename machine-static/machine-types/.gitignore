@@ -1,0 +1,7 @@
+/pkg/
+/target/
+/node_modules/
+/lib/
+/actyx-machine*.tgz
+/bench_and_results/
+/err.out
