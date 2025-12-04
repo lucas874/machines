@@ -4,7 +4,7 @@ use machine_check::composition::{
     composition_types::InterfacingSwarms, exact_well_formed_sub,
     overapproximated_well_formed_sub,
 };
-use machine_types::typescript_types::{EventType, Role};
+use machine_types::types::typescript_types::{EventType, Role};
 use serde::{Deserialize, Serialize};
 extern crate machine_check;
 use std::collections::{BTreeMap, BTreeSet};

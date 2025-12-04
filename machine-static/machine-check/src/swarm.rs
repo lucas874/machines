@@ -1,4 +1,4 @@
-use machine_types::typescript_types::{EventType, Role, State, StateName, SwarmLabel};
+use machine_types::types::typescript_types::{EventType, Role, State, StateName, SwarmLabel};
 use crate::{
     EdgeId, MapVec, NodeId, Subscriptions, SwarmProtocolType,
 };

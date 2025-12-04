@@ -9,7 +9,7 @@ use crate::{
     composition::composition_swarm::transitive_closure_succeeding,
     machine::{Error, Side},
 };
-use machine_types::typescript_types::{Command, StateName, Transition};
+use machine_types::types::typescript_types::{Command, StateName, Transition};
 use itertools::Itertools;
 use petgraph::{
     graph::EdgeReference,
@@ -715,7 +715,7 @@ fn adapted_projection(
             .into_iter()
             .map(mapper)
             .collect();
-    
+
     //AdaptationGraph{state: n.clone(), machine_state: Some(state.clone())}
     let (machine, machine_initial) = (from_option_graph_to_graph(&machine.0), machine.1);
     let machine = machine.map(
@@ -893,7 +893,7 @@ mod tests {
         machine::{self},
         MachineType, Subscriptions, SwarmProtocolType,
     };
-    use machine_types::typescript_types::{Command, EventType, Role, Transition};
+    use machine_types::types::typescript_types::{Command, EventType, Role, Transition};
     use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
 
     fn setup_logger() {
@@ -3051,7 +3051,7 @@ mod tests {
     }
 
     mod big_example_i_can_be_deleted {
-        use machine_types::typescript_types::DataResult;
+        use machine_types::types::typescript_types::DataResult;
 
         use super::*;
 
@@ -3384,9 +3384,9 @@ mod tests {
 
         fn get_interfacing_protocols_1() -> InterfacingProtocols {
                 InterfacingProtocols(vec![
-                    get_steel_press_proto(), 
-                    get_paint_proto(), 
-                    get_engine_installation_proto(), 
+                    get_steel_press_proto(),
+                    get_paint_proto(),
+                    get_engine_installation_proto(),
                     get_warehouse_proto(),
                     get_wheel_installation_proto()])
             }

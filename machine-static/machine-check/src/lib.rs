@@ -8,7 +8,7 @@ mod swarm;
 pub mod composition;
 
 use petgraph::visit::GraphBase;
-use machine_types::typescript_types::{CheckResult, EventType, MachineLabel, ProtocolType, Role, State, SwarmLabel, DataResult};
+use machine_types::types::typescript_types::{CheckResult, EventType, MachineLabel, ProtocolType, Role, State, SwarmLabel, DataResult};
 
 #[declare]
 pub type Subscriptions = BTreeMap<Role, BTreeSet<EventType>>;

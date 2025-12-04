@@ -6,7 +6,7 @@ use crate::{
     composition::composition_swarm::Error,
     Graph, MachineType,
 };
-use machine_types::typescript_types::{Command, EventType, MachineLabel, Role, State, SwarmLabel};
+use machine_types::types::typescript_types::{Command, EventType, MachineLabel, Role, State, SwarmLabel};
 
 use super::{NodeId, SwarmProtocolType};
 

@@ -1,7 +1,7 @@
 use crate::{
     EdgeId, MachineType, NodeId, Subscriptions,
 };
-use machine_types::typescript_types::{Command, EventType, MachineLabel, Role, State};
+use machine_types::types::typescript_types::{Command, EventType, MachineLabel, Role, State};
 
 use itertools::Itertools;
 use petgraph::{
@@ -317,7 +317,7 @@ pub fn equivalent(left: &Graph, li: NodeId, right: &Graph, ri: NodeId) -> Vec<Er
 mod tests {
     use pretty_assertions::assert_eq;
     use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
-    use machine_types::typescript_types::{CheckResult, Role};
+    use machine_types::types::typescript_types::{CheckResult, Role};
     use crate::{MachineType, SwarmProtocolType};
     fn setup_logger() {
         fmt()

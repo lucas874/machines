@@ -1,1 +1,1 @@
-pub mod typescript_types;
+pub mod types;
