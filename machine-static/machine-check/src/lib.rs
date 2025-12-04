@@ -2,15 +2,9 @@ use wasm_bindgen::prelude::*;
 
 mod machine;
 mod swarm;
-//pub mod types;
 pub mod composition;
 
-use petgraph::visit::GraphBase;
-use machine_types::types::typescript_types::{CheckResult, DataResult, MachineType, Role, State, Subscriptions, SwarmLabel, SwarmProtocolType};
-
-pub type Graph = petgraph::Graph<State, SwarmLabel>;
-pub type NodeId = <petgraph::Graph<(), ()> as GraphBase>::NodeId;
-pub type EdgeId = <petgraph::Graph<(), ()> as GraphBase>::EdgeId;
+use machine_types::types::typescript_types::{CheckResult, DataResult, MachineType, Role, Subscriptions, SwarmProtocolType};
 
 #[wasm_bindgen]
 pub fn check_swarm(proto: SwarmProtocolType, subs: String) -> CheckResult {

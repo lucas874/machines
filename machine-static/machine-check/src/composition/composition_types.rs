@@ -4,11 +4,12 @@ use tsify::{declare, Tsify};
 
 use crate::{
     composition::composition_swarm::Error,
-    Graph,
 };
-use machine_types::types::typescript_types::{Command, EventType, MachineLabel, Role, State, SwarmLabel, MachineType};
+use machine_types::types::{
+    typescript_types::{Command, EventType, MachineLabel, Role, State, SwarmLabel, MachineType, SwarmProtocolType},
+    Graph, NodeId,
+};
 
-use super::{NodeId, SwarmProtocolType};
 
 pub type RoleEventMap = BTreeMap<Role, BTreeSet<SwarmLabel>>;
 

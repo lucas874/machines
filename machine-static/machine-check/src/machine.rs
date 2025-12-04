@@ -1,5 +1,7 @@
-use crate::{EdgeId, NodeId};
-use machine_types::types::typescript_types::{Command, EventType, MachineLabel, Role, State, MachineType, Subscriptions};
+use machine_types::types::{
+    typescript_types::{Command, EventType, MachineLabel, Role, State, MachineType, Subscriptions},
+    EdgeId, NodeId
+};
 
 use itertools::Itertools;
 use petgraph::{
@@ -14,10 +16,10 @@ use std::{
 };
 
 type Graph = petgraph::Graph<Option<State>, MachineLabel>;
-type ERef<'a> = <&'a super::Graph as IntoEdgeReferences>::EdgeRef;
+type ERef<'a> = <&'a machine_types::types::Graph as IntoEdgeReferences>::EdgeRef;
 
 pub fn project(
-    swarm: &super::Graph,
+    swarm: &machine_types::types::Graph,
     initial: NodeId,
     subs: &Subscriptions,
     role: Role,

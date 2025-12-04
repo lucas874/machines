@@ -2,11 +2,12 @@ use super::composition_types::{Granularity, ProtoStruct};
 use super::MapVec;
 use super::{
     composition_types::{unord_event_pair, EventLabel, ProtoInfo, RoleEventMap, UnordEventPair},
-    Graph,
 };
 use crate::composition::composition_types::{InterfacingProtocols, ProtoLabel};
-use crate::{EdgeId, NodeId};
-use machine_types::types::typescript_types::{Command, EventType, Role, State, StateName, SwarmLabel, Transition, Subscriptions, SwarmProtocolType,};
+use machine_types::types::{
+    typescript_types::{Command, EventType, Role, State, StateName, SwarmLabel, Transition, Subscriptions, SwarmProtocolType,},
+    EdgeId, NodeId, Graph
+};
 use itertools::Itertools;
 use petgraph::algo::floyd_warshall;
 use petgraph::visit::{DfsPostOrder, Reversed};
@@ -1607,7 +1608,7 @@ fn infinitely_looping_event_types(graph: &Graph, succ_map: &BTreeMap<EventType, 
 // all pairs of incoming/outgoing events from a node
 fn event_pairs_from_node(
     node: NodeId,
-    graph: &crate::Graph,
+    graph: &machine_types::types::Graph,
     direction: Direction,
 ) -> Vec<BTreeSet<EventType>> {
     graph
@@ -1745,9 +1746,9 @@ fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
     (graph, initial)
 }
 
-pub fn to_swarm_json(graph: crate::Graph, initial: NodeId) -> SwarmProtocolType {
+pub fn to_swarm_json(graph: machine_types::types::Graph, initial: NodeId) -> SwarmProtocolType {
     let _span = tracing::info_span!("to_swarm_json").entered();
-    let machine_label_mapper = |g: &crate::Graph, eref: EdgeReference<'_, SwarmLabel>| {
+    let machine_label_mapper = |g: &machine_types::types::Graph, eref: EdgeReference<'_, SwarmLabel>| {
         let label = eref.weight().clone();
         let source = g[eref.source()].state_name().clone();
         let target = g[eref.target()].state_name().clone();

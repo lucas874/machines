@@ -7,6 +7,7 @@ edition = "2024"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+petgraph = "0.6.3"
 intern-arc = "0.6.0"
 tsify = "0.5.5"
 serde = { version = "1.0.159", features = ["derive"] }

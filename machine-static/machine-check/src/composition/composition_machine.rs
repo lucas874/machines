@@ -3,13 +3,15 @@ use super::{
         get_branching_joining_proto_info, unord_event_pair, BranchMap, EventLabel,
         ProjToMachineStates, ProjectionInfo, ProtoInfo, ProtoStruct, UnordEventPair,
     },
-    NodeId,
 };
 use crate::{
     composition::composition_swarm::transitive_closure_succeeding,
     machine::{Error, Side},
 };
-use machine_types::types::typescript_types::{Command, StateName, Transition, EventType, MachineLabel, MachineType, Role, State, Subscriptions, SwarmLabel,};
+use machine_types::types::{
+    typescript_types::{Command, StateName, Transition, EventType, MachineLabel, MachineType, Role, State, Subscriptions, SwarmLabel,},
+    NodeId,
+};
 use itertools::Itertools;
 use petgraph::{
     graph::EdgeReference,
@@ -23,7 +25,7 @@ use std::{
 // types more or less copied from machine.rs.
 type Graph = petgraph::Graph<State, MachineLabel>;
 type OptionGraph = petgraph::Graph<Option<State>, MachineLabel>;
-type ERef<'a> = <&'a super::Graph as IntoEdgeReferences>::EdgeRef;
+type ERef<'a> = <&'a machine_types::types::Graph as IntoEdgeReferences>::EdgeRef;
 
 // Used for creating adapted machine.
 // A composed state in an adapted machine contains some
@@ -53,7 +55,7 @@ type ChainedProjections = Vec<(Graph, NodeId, BTreeSet<EventType>)>;
 // Similar to machine::project, except that transitions with event types
 // not subscribed to by role are skipped.
 pub fn project(
-    swarm: &super::Graph,
+    swarm: &machine_types::types::Graph,
     initial: NodeId,
     subs: &Subscriptions,
     role: Role,
