@@ -25,7 +25,7 @@ use std::{
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Error {
-    SwarmError(crate::swarm::Error),
+    SwarmError(machine_types::errors::swarm_errors::Error),
     SwarmErrorString(String), // bit ugly but instead of making prepare graph public or making another from_json returning Error type in swarm.rs
     InvalidInterfaceRole(Role),
     InterfaceEventNotInBothProtocols(EventType),
@@ -45,7 +45,7 @@ pub enum Error {
 impl Error {
     fn to_string<N: StateName>(&self, graph: &petgraph::Graph<N, SwarmLabel>) -> String {
         match self {
-            Error::SwarmError(e) => crate::swarm::Error::convert(&graph)(e.clone()),
+            Error::SwarmError(e) => machine_types::errors::swarm_errors::Error::convert(&graph)(e.clone()),
             Error::SwarmErrorString(s) => s.clone(),
             Error::InvalidInterfaceRole(role) => {
                 format!("role {role} can not be used as interface")
@@ -326,7 +326,7 @@ fn well_formed(
             // Check if role subscribes to own emitted event.
             if !sub(&edge.weight().role).contains(&event_type) {
                 errors.push(Error::SwarmError(
-                    crate::swarm::Error::ActiveRoleNotSubscribed(edge.id()),
+                    machine_types::errors::swarm_errors::Error::ActiveRoleNotSubscribed(edge.id()),
                 ));
             }
 
@@ -342,7 +342,7 @@ fn well_formed(
             ) {
                 if !sub(&successor.role).contains(&event_type) {
                     errors.push(Error::SwarmError(
-                        crate::swarm::Error::LaterActiveRoleNotSubscribed(
+                        machine_types::errors::swarm_errors::Error::LaterActiveRoleNotSubscribed(
                             edge.id(),
                             successor.role,
                         ),
@@ -1492,7 +1492,7 @@ fn swarm_to_graph(proto: &SwarmProtocolType) -> (Graph, Option<NodeId>, Vec<Erro
             .or_insert_with(|| graph.add_node(t.target.clone()));
         let edge = graph.add_edge(source, target, t.label.clone());
         if t.label.log_type.len() == 0 {
-            errors.push(Error::SwarmError(crate::swarm::Error::LogTypeEmpty(edge)));
+            errors.push(Error::SwarmError(machine_types::errors::swarm_errors::Error::LogTypeEmpty(edge)));
         } else if t.label.log_type.len() > 1 {
             errors.push(Error::MoreThanOneEventTypeInCommand(edge)) // Come back here and implement splitting command into multiple 'artificial' ones emitting one event type if time instead of reporting it as an error.
         }
@@ -1505,7 +1505,7 @@ fn swarm_to_graph(proto: &SwarmProtocolType) -> (Graph, Option<NodeId>, Vec<Erro
         // strictly speaking we have all_nodes_reachable errors here too...
         // if there is only an initial state no transitions whatsoever then thats ok? but gives an error here.
         errors.push(Error::SwarmError(
-            crate::swarm::Error::InitialStateDisconnected,
+            machine_types::errors::swarm_errors::Error::InitialStateDisconnected,
         ));
         None
     };
@@ -1551,7 +1551,7 @@ fn all_nodes_reachable(graph: &Graph, initial: NodeId) -> Vec<Error> {
     graph
         .node_indices()
         .filter(|node| !visited.contains(node))
-        .map(|node| Error::SwarmError(crate::swarm::Error::StateUnreachable(node)))
+        .map(|node| Error::SwarmError(machine_types::errors::swarm_errors::Error::StateUnreachable(node)))
         .collect()
 }
 

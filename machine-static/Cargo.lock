@@ -461,6 +461,7 @@ name = "machine-types"
 version = "0.1.0"
 dependencies = [
  "intern-arc",
+ "itertools 0.10.5",
  "petgraph",
  "serde",
  "serde-wasm-bindgen",
