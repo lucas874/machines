@@ -1,12 +1,11 @@
-use super::composition_types::{Granularity, ProtoStruct};
+use super::composition_types::Granularity;
 use super::MapVec;
-use super::{
-    composition_types::{unord_event_pair, EventLabel, ProtoInfo, RoleEventMap, UnordEventPair},
-};
-use crate::composition::composition_types::{InterfacingProtocols, ProtoLabel};
+use crate::composition::composition_types::{InterfacingProtocols};
 use machine_types::errors::composition_errors::{Error, ErrorReport};
 use machine_types::types::{
-    typescript_types::{Command, EventType, Role, StateName, SwarmLabel, Transition, Subscriptions, SwarmProtocolType,},
+    typescript_types::{Command, EventType, Role, StateName, SwarmLabel, Transition, Subscriptions, SwarmProtocolType, EventLabel,},
+    proto_info::{ProtoStruct, ProtoInfo, RoleEventMap, UnordEventPair, unord_event_pair},
+    proto_label::ProtoLabel,
     EdgeId, NodeId, Graph
 };
 use itertools::Itertools;

@@ -169,3 +169,23 @@ pub type Subscriptions = BTreeMap<Role, BTreeSet<EventType>>;
 pub type SwarmProtocolType = ProtocolType<SwarmLabel>;
 #[declare]
 pub type MachineType = ProtocolType<MachineLabel>;
+
+/* Used when combining machines and protocols */
+pub trait EventLabel: Clone + Ord {
+    fn get_event_type(&self) -> EventType;
+}
+
+impl EventLabel for SwarmLabel {
+    fn get_event_type(&self) -> EventType {
+        self.log_type[0].clone()
+    }
+}
+
+impl EventLabel for MachineLabel {
+    fn get_event_type(&self) -> EventType {
+        match self {
+            Self::Execute { log_type, .. } => log_type[0].clone(),
+            Self::Input { event_type } => event_type.clone(),
+        }
+    }
+}

@@ -1,7 +1,7 @@
 use super::{
     composition_types::{
-        get_branching_joining_proto_info, unord_event_pair, BranchMap, EventLabel,
-        ProjToMachineStates, ProjectionInfo, ProtoInfo, ProtoStruct, UnordEventPair,
+        BranchMap,
+        ProjToMachineStates, ProjectionInfo,
     },
 };
 use crate::{
@@ -9,7 +9,8 @@ use crate::{
     machine::{Error, Side},
 };
 use machine_types::types::{
-    typescript_types::{Command, StateName, Transition, EventType, MachineLabel, MachineType, Role, State, Subscriptions, SwarmLabel,},
+    typescript_types::{Command, StateName, Transition, EventType, MachineLabel, MachineType, Role, State, Subscriptions, SwarmLabel, EventLabel,},
+    proto_info::{get_branching_joining_proto_info, unord_event_pair, ProtoInfo, ProtoStruct, UnordEventPair},
     NodeId,
 };
 use itertools::Itertools;
