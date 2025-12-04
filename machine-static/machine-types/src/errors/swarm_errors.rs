@@ -1,7 +1,8 @@
 use itertools::Itertools;
-use std::{collections::BTreeSet, fmt};
+use std::collections::BTreeSet;
 
 use crate::types::{EdgeId, NodeId, typescript_types::{EventType, Role, StateName, SwarmLabel}};
+use super::{Edge, INVALID_EDGE};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Error {
@@ -21,8 +22,6 @@ pub enum Error {
     NonDeterministicCommand(EdgeId),
     GuardNotInvariant(EventType),
 }
-
-const INVALID_EDGE: &str = "[invalid EdgeId]";
 
 impl Error {
     fn to_string<N: StateName>(&self, graph: &petgraph::Graph<N, SwarmLabel>) -> String {
@@ -93,26 +92,3 @@ impl Error {
         |err| err.to_string(graph)
     }
 }
-
-/// helper for printing a transition
-struct Edge<'a, N: StateName>(&'a petgraph::Graph<N, SwarmLabel>, EdgeId);
-
-impl<'a, N: StateName> fmt::Display for Edge<'a, N> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Some((source, target)) = self.0.edge_endpoints(self.1) else {
-            return f.write_str(INVALID_EDGE);
-        };
-        let source = self.0[source].state_name();
-        let target = self.0[target].state_name();
-        let label = &self.0[self.1];
-        write!(f, "({source})--[{label}]-->({target})")
-    }
-}
-
-// use pub struct Edge... for this to work. Right now just copied whole edge and fmt implemenation to that ONE place outside of here that needed it it.
-// -- tests in machine-check
-/* impl<'a, N: StateName> Edge<'a, N> {
-    pub fn new(graph: &'a petgraph::Graph<N, SwarmLabel>, edge_id: EdgeId) -> Self {
-        Self(graph, edge_id)
-    }
-} */

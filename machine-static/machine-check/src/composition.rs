@@ -1,4 +1,5 @@
-use composition_swarm::{proto_info_to_error_report, swarms_to_proto_info, ErrorReport};
+use composition_swarm::{proto_info_to_error_report, swarms_to_proto_info};
+use machine_types::errors::composition_errors::error_report_to_strings;
 use composition_types::{
     Granularity, ProjectionInfo,
 };
@@ -221,12 +222,4 @@ pub fn compose_protocols(protos: InterfacingProtocols) -> DataResult<SwarmProtoc
             errors: error_report_to_strings(errors),
         },
     }
-}
-
-fn error_report_to_strings(error_report: ErrorReport) -> Vec<String> {
-    error_report
-        .errors()
-        .into_iter()
-        .flat_map(|(g, e)| e.map(composition::composition_swarm::Error::convert(&g)))
-        .collect()
 }

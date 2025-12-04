@@ -2,9 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use tsify::{declare, Tsify};
 
-use crate::{
-    composition::composition_swarm::Error,
-};
+use machine_types::errors::composition_errors::Error;
 use machine_types::types::{
     typescript_types::{Command, EventType, MachineLabel, Role, State, SwarmLabel, MachineType, SwarmProtocolType},
     Graph, NodeId,
