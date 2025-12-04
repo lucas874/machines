@@ -4,9 +4,9 @@ use tsify::{declare, Tsify};
 
 use crate::{
     composition::composition_swarm::Error,
-    Graph, MachineType,
+    Graph,
 };
-use machine_types::types::typescript_types::{Command, EventType, MachineLabel, Role, State, SwarmLabel};
+use machine_types::types::typescript_types::{Command, EventType, MachineLabel, Role, State, SwarmLabel, MachineType};
 
 use super::{NodeId, SwarmProtocolType};
 

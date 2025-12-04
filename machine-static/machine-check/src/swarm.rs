@@ -1,6 +1,6 @@
-use machine_types::types::typescript_types::{EventType, Role, State, StateName, SwarmLabel};
+use machine_types::types::typescript_types::{EventType, Role, State, StateName, SwarmLabel, Subscriptions, SwarmProtocolType};
 use crate::{
-    EdgeId, MapVec, NodeId, Subscriptions, SwarmProtocolType,
+    EdgeId, MapVec, NodeId,
 };
 use bitvec::{bitvec, vec::BitVec};
 use itertools::Itertools;

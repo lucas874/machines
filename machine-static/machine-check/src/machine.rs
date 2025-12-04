@@ -1,7 +1,5 @@
-use crate::{
-    EdgeId, MachineType, NodeId, Subscriptions,
-};
-use machine_types::types::typescript_types::{Command, EventType, MachineLabel, Role, State};
+use crate::{EdgeId, NodeId};
+use machine_types::types::typescript_types::{Command, EventType, MachineLabel, Role, State, MachineType, Subscriptions};
 
 use itertools::Itertools;
 use petgraph::{

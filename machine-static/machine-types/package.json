@@ -1,9 +1,9 @@
 {
-  "name": "@actyx/machine-check",
-  "version": "0.3.1",
-  "description": "Behavioural typechecking for @actyx/machine-runner machines",
-  "repository": "https://github.com/Actyx/machines",
-  "author": "Actyx AG",
+  "name": "machine-types",
+  "version": "0.1.0",
+  "description": "Types and utitilities for behavioural typechecking for @actyx/machine-runner machines",
+  "repository": "https://github.com/lucas874/machines",
+  "author": "",
   "keywords": [
     "local-first"
   ],
@@ -36,7 +36,6 @@
     "test:cjs:remove": "npx tsx scripts/test/cjs-remove.ts"
   },
   "devDependencies": {
-    "@actyx/machine-runner": "file:../../machine-runner",
     "@jest/globals": "^29.5.0",
     "@types/glob": "^8.1.0",
     "@typescript-eslint/eslint-plugin": "^5.45.0",
@@ -54,8 +53,5 @@
     "tsx": "^4.19.2",
     "typedoc": "^0.28.12",
     "typescript": "^5.0.2"
-  },
-  "dependencies": {
-    "machine-types": "file:../machine-types"
   }
 }

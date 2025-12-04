@@ -1,7 +1,7 @@
 use intern_arc::{global::hash_interner, InternedHash};
 use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, fmt, ops::Deref};
-use tsify::Tsify;
+use std::{borrow::Borrow, collections::{BTreeMap, BTreeSet}, fmt, ops::Deref};
+use tsify::{Tsify, declare};
 
 macro_rules! decl_str {
     ($n:ident) => {
@@ -162,3 +162,10 @@ pub enum DataResult<T> {
     OK { data: T },
     ERROR { errors: Vec<String> },
 }
+
+#[declare]
+pub type Subscriptions = BTreeMap<Role, BTreeSet<EventType>>;
+#[declare]
+pub type SwarmProtocolType = ProtocolType<SwarmLabel>;
+#[declare]
+pub type MachineType = ProtocolType<MachineLabel>;

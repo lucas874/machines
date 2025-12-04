@@ -1,8 +1,9 @@
+import { CheckResult, DataResult, MachineType, Role, Subscriptions, SwarmProtocolType } from 'machine-types';
 import { check_swarm, check_projection, check_composed_swarm, exact_well_formed_sub, overapproximated_well_formed_sub, check_composed_projection,
   revised_projection, project_combine, compose_protocols, projection_information,
-  CheckResult, MachineType, SwarmProtocolType, Subscriptions, InterfacingSwarms as InterfacingSwarmsInner, CompositionComponent as CompositionComponentInner, Role, DataResult, Granularity,
+  InterfacingSwarms as InterfacingSwarmsInner, CompositionComponent as CompositionComponentInner, Granularity,
   ProjectionInfo, InterfacingProtocols } from '../pkg/machine_check.js'
-export { MachineType, SwarmProtocolType, Subscriptions, Role, CheckResult as Result, DataResult, Granularity, ProjectionInfo, InterfacingProtocols }
+export { Granularity, ProjectionInfo, InterfacingProtocols }
 export type CompositionComponent = CompositionComponentInner<Role>;
 export type InterfacingSwarms = InterfacingSwarmsInner<Role>;
 

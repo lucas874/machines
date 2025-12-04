@@ -3,13 +3,13 @@ use super::{
         get_branching_joining_proto_info, unord_event_pair, BranchMap, EventLabel,
         ProjToMachineStates, ProjectionInfo, ProtoInfo, ProtoStruct, UnordEventPair,
     },
-    EventType, MachineLabel, MachineType, NodeId, Role, State, Subscriptions, SwarmLabel,
+    NodeId,
 };
 use crate::{
     composition::composition_swarm::transitive_closure_succeeding,
     machine::{Error, Side},
 };
-use machine_types::types::typescript_types::{Command, StateName, Transition};
+use machine_types::types::typescript_types::{Command, StateName, Transition, EventType, MachineLabel, MachineType, Role, State, Subscriptions, SwarmLabel,};
 use itertools::Itertools;
 use petgraph::{
     graph::EdgeReference,

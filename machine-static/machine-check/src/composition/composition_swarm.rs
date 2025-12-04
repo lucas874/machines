@@ -5,10 +5,8 @@ use super::{
     Graph,
 };
 use crate::composition::composition_types::{InterfacingProtocols, ProtoLabel};
-use crate::{
-    EdgeId, NodeId, Subscriptions, SwarmProtocolType,
-};
-use machine_types::types::typescript_types::{Command, EventType, Role, State, StateName, SwarmLabel, Transition};
+use crate::{EdgeId, NodeId};
+use machine_types::types::typescript_types::{Command, EventType, Role, State, StateName, SwarmLabel, Transition, Subscriptions, SwarmProtocolType,};
 use itertools::Itertools;
 use petgraph::algo::floyd_warshall;
 use petgraph::visit::{DfsPostOrder, Reversed};
