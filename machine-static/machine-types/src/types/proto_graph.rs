@@ -1,8 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
+use itertools::Itertools;
 use petgraph::{
-    visit::{GraphBase, Dfs, Walker},
+    Direction::{self, Outgoing}, visit::{Dfs, EdgeRef, GraphBase, Reversed, Walker}
 };
-use crate::{errors::composition_errors, errors::swarm_errors, types::typescript_types::{State, SwarmLabel, SwarmProtocolType}};
+
+use crate::{errors::{composition_errors, swarm_errors}, types::{proto_info::ProtoStruct, typescript_types::{EventLabel, EventType, State, SwarmLabel, SwarmProtocolType}}};
+use crate::types::proto_info;
 
 pub type Graph = petgraph::Graph<State, SwarmLabel>;
 pub type NodeId = <petgraph::Graph<(), ()> as GraphBase>::NodeId;
@@ -44,6 +47,22 @@ pub fn swarm_to_graph(proto: &SwarmProtocolType) -> (Graph, Option<NodeId>, Vec<
     (graph, initial, errors)
 }
 
+/* pub fn from_json(proto: SwarmProtocolType) -> (Graph, Option<NodeId>, Vec<String>) {
+    let _span = tracing::info_span!("from_json").entered();
+    let proto_info = proto_info::prepare_proto_info(proto);
+    let (g, i, e) = match proto_info.get_ith_proto(0) {
+        Some(ProtoStruct {
+            graph: g,
+            initial: i,
+            errors: e,
+            roles: _,
+        }) => (g, i, e),
+        _ => return (Graph::new(), None, vec![]),
+    };
+    let e = e.map(Error::convert(&g));
+    (g, i, e)
+} */
+
 // copied from swarm::swarm.rs
 fn all_nodes_reachable(graph: &Graph, initial: NodeId) -> Vec<composition_errors::Error> {
     let _span = tracing::info_span!("all_nodes_reachable").entered();
@@ -56,5 +75,90 @@ fn all_nodes_reachable(graph: &Graph, initial: NodeId) -> Vec<composition_errors
         .node_indices()
         .filter(|node| !visited.contains(node))
         .map(|node| composition_errors::Error::SwarmError(swarm_errors::Error::StateUnreachable(node)))
+        .collect()
+}
+
+// Given some node, return the swarmlabels going out of that node that are not concurrent with 'event_type'.
+pub fn active_transitions_not_conc(
+    node: NodeId,
+    graph: &Graph,
+    event_type: &EventType,
+    concurrent_events: &BTreeSet<BTreeSet<EventType>>,
+) -> Vec<SwarmLabel> {
+    graph
+        .edges_directed(node, Outgoing)
+        .map(|e| e.weight().clone())
+        .filter(|e| {
+            !concurrent_events.contains(&BTreeSet::from([event_type.clone(), e.get_event_type()]))
+        })
+        .collect()
+}
+
+// Return all event types that are part of an infinte loop in a graph (according to succ_map).
+pub fn infinitely_looping_event_types(graph: &Graph, succ_map: &BTreeMap<EventType, BTreeSet<EventType>>) -> BTreeSet<EventType> {
+    let _span = tracing::info_span!("infinitely_looping_event_types").entered();
+    let nodes = nodes_not_reaching_terminal(graph);
+    nodes
+        .into_iter()
+        .flat_map(|n| {
+            graph
+                .edges_directed(n, Outgoing)
+                .map(|e| e.weight().get_event_type())
+                .filter(|t| succ_map.contains_key(t) && succ_map[t].contains(t))
+        })
+        .collect()
+}
+
+fn nodes_not_reaching_terminal(graph: &Graph) -> Vec<NodeId> {
+    let _span = tracing::info_span!("nodes_not_reaching_terminal").entered();
+    // All terminal nodes
+    let terminal_nodes: Vec<_> = graph
+        .node_indices()
+        .filter(|node| graph.edges_directed(*node, Outgoing).count() == 0)
+        .collect();
+    // Reversed adaptor -- all edges have the opposite direction.
+    let reversed = Reversed(&graph);
+
+    // Collect all predecessors of from node using reversed adaptor.
+    let get_predecessors = |node: NodeId| -> BTreeSet<NodeId> {
+        let mut predecessors = BTreeSet::new();
+        let mut dfs = Dfs::new(&reversed, node);
+        while let Some(predecessor) = dfs.next(&reversed) {
+            predecessors.insert(predecessor);
+        }
+        predecessors
+    };
+
+    // Collect all nodes that can reach a terminal node.
+    let can_reach_terminal_nodes: BTreeSet<_> = terminal_nodes
+        .into_iter()
+        .map(get_predecessors)
+        .flatten()
+        .collect();
+
+    // Collect nodes that can not reach a terminal node and transform to a vec of errors.
+    graph
+        .node_indices()
+        .into_iter()
+        .filter(|node| !can_reach_terminal_nodes.contains(node))
+        .collect()
+}
+
+// all pairs of incoming/outgoing events from a node
+pub fn event_pairs_from_node(
+    node: NodeId,
+    graph: &Graph,
+    direction: Direction,
+) -> Vec<BTreeSet<EventType>> {
+    graph
+        .edges_directed(node, direction)
+        .map(|e| e.id())
+        .combinations(2)
+        .map(|pair| {
+            proto_info::unord_event_pair(
+                graph[pair[0]].get_event_type(),
+                graph[pair[1]].get_event_type(),
+            )
+        }) //BTreeSet::from([graph[pair[0]].get_event_type(), graph[pair[1]].get_event_type()]))
         .collect()
 }

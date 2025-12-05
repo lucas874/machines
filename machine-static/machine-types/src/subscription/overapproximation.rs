@@ -1,0 +1,260 @@
+use std::collections::{BTreeMap, BTreeSet};
+
+use crate::{errors::composition_errors::ErrorReport, types::{proto_info::ProtoInfo, typescript_types::{EventLabel, EventType, Granularity, InterfacingProtocols, Role, Subscriptions}}};
+use crate::{types::proto_info, util};
+
+// Construct wf-subscription compositionally.
+// Overapproximates the subscription one would obtain from exact_well_formed_sub().
+pub fn overapprox_well_formed_sub(
+    protos: InterfacingProtocols,
+    subs: &Subscriptions,
+    granularity: Granularity,
+) -> Result<Subscriptions, ErrorReport> {
+    let _span = tracing::info_span!("overapprox_well_formed_sub").entered();
+    let combined_proto_info = proto_info::swarms_to_proto_info(protos);
+    if !combined_proto_info.no_errors() {
+        return Err(proto_info::proto_info_to_error_report(combined_proto_info));
+    }
+
+    // If we reach this point the protocols can interface and are all confusion free.
+    // We construct a ProtoInfo with the composition as the only protocol and all the
+    // information about branches etc. from combined_proto_info
+    let sub = overapprox_wf_sub(&mut combined_proto_info.clone(), subs, granularity);
+    Ok(sub)
+}
+
+fn overapprox_wf_sub(
+    proto_info: &mut ProtoInfo,
+    subscription: &Subscriptions,
+    granularity: Granularity,
+) -> Subscriptions {
+    let _span = tracing::info_span!("overapprox_wf_sub").entered();
+    match granularity {
+        Granularity::Fine => finer_overapprox_wf_sub(proto_info, subscription, false),
+        Granularity::Medium => finer_overapprox_wf_sub(proto_info, subscription, true),
+        Granularity::Coarse => coarse_overapprox_wf_sub(proto_info, subscription),
+        Granularity::TwoStep => two_step_overapprox_wf_sub(proto_info, &mut subscription.clone()),
+    }
+}
+
+fn coarse_overapprox_wf_sub(
+    proto_info: &ProtoInfo,
+    subscription: &Subscriptions,
+) -> Subscriptions {
+    let _span = tracing::info_span!("coarse_overapprox_wf_sub").entered();
+    // for each role add:
+    //      all branching.
+    //      all joining and immediately pre joining that are concurrent
+    //      all interfacing
+    //      own events and the events immediately preceding these
+    let events_to_add_to_all: BTreeSet<EventType> = proto_info
+        .branching_events
+        .clone()
+        .into_iter()
+        .flatten()
+        .chain(proto_info::flatten_joining_map(&proto_info.joining_events))
+        .chain(proto_info.interfacing_events.clone())
+        .collect();
+
+    let sub: BTreeMap<Role, BTreeSet<EventType>> = proto_info
+        .role_event_map
+        .iter()
+        .map(|(role, labels)| {
+            (
+                role.clone(),
+                labels
+                    .iter()
+                    .flat_map(|label| {
+                        proto_info
+                            .immediately_pre
+                            .get(&label.get_event_type())
+                            .cloned()
+                            .unwrap_or_default()
+                            .clone()
+                            .into_iter()
+                            .chain([label.get_event_type()])
+                    })
+                    .chain(events_to_add_to_all.clone().into_iter())
+                    .collect::<BTreeSet<EventType>>(),
+            )
+        })
+        .collect();
+
+    util::combine_maps(subscription.clone(), sub, None)
+}
+
+fn finer_overapprox_wf_sub(
+    proto_info: &mut ProtoInfo,
+    subscription: &Subscriptions,
+    with_all_interfacing: bool,
+) -> Subscriptions {
+    let _span = tracing::info_span!("finer_overapprox_wf_sub").entered();
+    let mut subscription = subscription.clone();
+    proto_info.succeeding_events =
+        proto_info::transitive_closure_succeeding(proto_info.succeeding_events.clone());
+
+    // Causal consistency
+    for (role, labels) in &proto_info.role_event_map {
+        let event_types: BTreeSet<_> = labels.iter().map(|label| label.get_event_type()).collect();
+        let preceding_event_types: BTreeSet<_> = event_types
+            .iter()
+            .flat_map(|e| {
+                proto_info
+                    .immediately_pre
+                    .get(e)
+                    .cloned()
+                    .unwrap_or_default()
+            })
+            .collect();
+        let mut events_to_add = event_types
+            .into_iter()
+            .chain(preceding_event_types.into_iter())
+            .collect();
+        subscription
+            .entry(role.clone())
+            .and_modify(|set| {
+                set.append(&mut events_to_add);
+            })
+            .or_insert_with(|| events_to_add);
+    }
+
+    // Add all interfacing -- 'Medium granularity'.
+    if with_all_interfacing {
+        for sub in subscription.values_mut() {
+            sub.append(&mut proto_info.interfacing_events.clone());
+        }
+    }
+
+    // Determinacy
+    finer_approx_add_branches_and_joins(proto_info, &mut subscription);
+
+    // Add looping event types to the subscription.
+    super::add_looping_event_types(proto_info, &mut subscription);
+
+    subscription
+}
+
+fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mut Subscriptions) {
+    let _span = tracing::info_span!("finer_approx_add_branches_and_joins").entered();
+    let mut is_stable = false;
+
+    while !is_stable {
+        is_stable = true;
+
+        // Determinacy: joins
+        for (joining_event, pre_joining_event) in &proto_info.joining_events {
+            let interested_roles = proto_info::roles_on_path(joining_event.clone(), proto_info, &subscription);
+            let join_and_prejoin: BTreeSet<EventType> = [joining_event.clone()]
+                .into_iter()
+                .chain(pre_joining_event.clone().into_iter())
+                .collect();
+            for role in interested_roles {
+                is_stable = add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
+            }
+        }
+
+        // Determinacy: branches
+        for branching_events in &proto_info.branching_events {
+            let interested_roles = branching_events
+                .iter()
+                .flat_map(|e| proto_info::roles_on_path(e.clone(), proto_info, &subscription))
+                .collect::<BTreeSet<_>>();
+            for role in interested_roles {
+                is_stable = add_to_sub(role, branching_events.clone(), subscription) && is_stable;
+            }
+        }
+
+        // We do not add looping events, since we only consider terminating protocols.
+    }
+}
+
+// Safe, overapproximating subscription generation as described in paper (Algorithm 1).
+fn two_step_overapprox_wf_sub(
+    proto_info: &ProtoInfo,
+    subscription: &mut Subscriptions,
+) -> Subscriptions {
+    let _span = tracing::info_span!("two_step_overapprox_wf_sub").entered();
+    // Causal consistency
+    for (role, labels) in &proto_info.role_event_map {
+        let event_types: BTreeSet<_> = labels.iter().map(|label| label.get_event_type()).collect();
+        let preceding_event_types: BTreeSet<_> = event_types
+            .iter()
+            .flat_map(|e| {
+                proto_info
+                    .immediately_pre
+                    .get(e)
+                    .cloned()
+                    .unwrap_or_default()
+            })
+            .collect();
+        let mut events_to_add = event_types
+            .into_iter()
+            .chain(preceding_event_types.into_iter())
+            .collect();
+        subscription
+            .entry(role.clone())
+            .and_modify(|set| {
+                set.append(&mut events_to_add);
+            })
+            .or_insert_with(|| events_to_add);
+    }
+
+    let mut is_stable = false;
+    while !is_stable {
+        is_stable = true;
+        // Determinacy: branches
+        for branching_events in &proto_info.branching_events {
+            let interested_roles = branching_events
+                .iter()
+                .flat_map(|e| proto_info::roles_on_path(e.clone(), proto_info, &subscription))
+                .collect::<BTreeSet<_>>();
+            for role in interested_roles {
+                is_stable = add_to_sub(role, branching_events.clone(), subscription) && is_stable;
+            }
+        }
+
+        // Determinacy: joins.
+        for (joining_event, pre_joining_event) in &proto_info.joining_events {
+            let interested_roles = proto_info::roles_on_path(joining_event.clone(), proto_info, &subscription);
+            let join_and_prejoin: BTreeSet<EventType> = [joining_event.clone()]
+                .into_iter()
+                .chain(pre_joining_event.clone().into_iter())
+                .collect();
+            for role in interested_roles {
+                is_stable = add_to_sub(role, join_and_prejoin.clone(), subscription) && is_stable;
+            }
+        }
+
+        // Interfacing rule from algorithm in paper
+        for interfacing_event in &proto_info.interfacing_events {
+            let interested_roles =
+                proto_info::roles_on_path(interfacing_event.clone(), proto_info, &subscription);
+            for role in interested_roles {
+                is_stable = add_to_sub(
+                    role,
+                    BTreeSet::from([interfacing_event.clone()]),
+                    subscription,
+                ) && is_stable;
+            }
+        }
+    }
+
+    // Add looping event types to the subscription.
+    super::add_looping_event_types(proto_info, subscription);
+
+    subscription.clone()
+}
+
+// Add events to a subscription, return true of they were already in the subscription and false otherwise
+// Mutates subs.
+fn add_to_sub(role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subscriptions) -> bool {
+    if subs.contains_key(&role) && event_types.iter().all(|e| subs[&role].contains(e)) {
+        return true;
+    }
+    subs.entry(role)
+        .and_modify(|curr| {
+            curr.append(&mut event_types);
+        })
+        .or_insert(event_types);
+    false
+}

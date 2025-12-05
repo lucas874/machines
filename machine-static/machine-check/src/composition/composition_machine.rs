@@ -1,12 +1,12 @@
 use crate::{
-    composition::composition_swarm::transitive_closure_succeeding,
     machine::{Error, Side},
 };
 use machine_types::types::{
     typescript_types::{Command, StateName, Transition, EventType, MachineLabel, MachineType, Role, State, Subscriptions, SwarmLabel, EventLabel, BranchMap, ProjToMachineStates, ProjectionInfo,},
-    proto_info::{get_branching_joining_proto_info, unord_event_pair, ProtoInfo, ProtoStruct, UnordEventPair},
+    proto_info::{ProtoInfo, ProtoStruct, UnordEventPair},
     proto_graph::NodeId,
 };
+use machine_types::types::proto_info;
 use itertools::Itertools;
 use petgraph::{
     graph::EdgeReference,
@@ -395,7 +395,7 @@ fn visit_successors_stop_on_branch(
         visited.insert(node);
         for e in proj.edges_directed(node, Outgoing) {
             if !concurrent_events
-                .contains(&unord_event_pair(e.weight().get_event_type(), et.clone()))
+                .contains(&proto_info::unord_event_pair(e.weight().get_event_type(), et.clone()))
             {
                 event_types.insert(e.weight().get_event_type());
             }
@@ -412,16 +412,16 @@ fn visit_successors_stop_on_branch(
 pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> BranchMap {
     let _span = tracing::info_span!("paths_from_event_types").entered();
     let mut m: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
-    let special_events = get_branching_joining_proto_info(proto_info);
+    let special_events = proto_info::get_branching_joining_proto_info(proto_info);
 
     // The reason for making set of concurrent events smaller is?
     let after_pairs: BTreeSet<UnordEventPair> =
-        transitive_closure_succeeding(proto_info.succeeding_events.clone())
+        proto_info::transitive_closure_succeeding(proto_info.succeeding_events.clone())
             .into_iter()
             .map(|(e, es)| {
                 [e].into_iter()
                     .cartesian_product(&es)
-                    .map(|(e1, e2)| unord_event_pair(e1, e2.clone()))
+                    .map(|(e1, e2)| proto_info::unord_event_pair(e1, e2.clone()))
                     .collect::<BTreeSet<UnordEventPair>>()
             })
             .flatten()
@@ -457,6 +457,7 @@ pub fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> Bra
         .collect()
 }
 
+// TODO: REMOVE THIS FROM HERE.
 // precondition: both machines are projected from wwf protocols?
 // precondition: m1 and m2 subscribe to all events in interface? Sort of works without but not really?
 // takes type parameters to make it work for machines and protocols.
@@ -797,7 +798,7 @@ pub fn projection_information(
     let proj = from_adaptation_graph_to_option_graph(&proj);
 
     let branches = paths_from_event_types(&proj, &proto_info);
-    let special_event_types = get_branching_joining_proto_info(&proto_info);
+    let special_event_types = proto_info::get_branching_joining_proto_info(&proto_info);
 
     Some(ProjectionInfo {
         projection: from_option_to_machine(proj, proj_initial),

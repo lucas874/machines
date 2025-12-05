@@ -1,15 +1,21 @@
-use std::collections::{BTreeMap, BTreeSet};
-
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use itertools::Itertools;
-
-use crate::errors::composition_errors::Error;
+use petgraph::Directed;
+use crate::errors::composition_errors::{Error, ErrorReport};
+use crate::types::proto_graph;
 use crate::types::proto_label::ProtoLabel;
-use crate::types::typescript_types::{Command, EventLabel};
+use crate::types::typescript_types::{Command, EventLabel, InterfacingProtocols, Subscriptions, SwarmProtocolType};
 use crate::types::{
     typescript_types::{EventType, Role, SwarmLabel},
     proto_graph::{Graph, NodeId},
 };
-use crate::{util, composability_check};
+use crate::{util, composability_check, composition};
+use petgraph::{
+    visit::{Dfs, EdgeRef},
+    Direction::{Incoming, Outgoing},
+};
+use petgraph::algo;
+use petgraph::visit::{DfsPostOrder};
 
 pub type RoleEventMap = BTreeMap<Role, BTreeSet<SwarmLabel>>;
 
@@ -381,4 +387,630 @@ pub fn combine_proto_infos(protos: Vec<ProtoInfo>) -> ProtoInfo {
 
     combined.joining_events = joining_event_types_map(&combined);
     combined
+}
+
+// Construct a ProtoInfo containing all protocols, all branching events, joining events etc.
+// Then add any errors arising from confusion freeness to the proto info and return it.
+// Does not compute transitive closure of combined succeeding_events, simply takes union of component succeeding_events fields.
+pub fn swarms_to_proto_info(protos: InterfacingProtocols) -> ProtoInfo {
+    let _span = tracing::info_span!("swarms_to_proto_info").entered();
+    let combined_proto_info = combine_proto_infos(prepare_proto_infos(protos));
+    composability_check::confusion_free_proto_info(combined_proto_info)
+}
+
+pub fn prepare_proto_infos(protos: InterfacingProtocols) -> Vec<ProtoInfo> {
+    let _span = tracing::info_span!("prepare_proto_infos").entered();
+    protos
+        .0
+        .iter()
+        .map(|p| prepare_proto_info(p.clone()))
+        .collect()
+}
+
+// Precondition: proto does not contain concurrency.
+pub(crate) fn prepare_proto_info(proto: SwarmProtocolType) -> ProtoInfo {
+    let _span = tracing::info_span!("prepare_proto_info").entered();
+    let mut role_event_map: RoleEventMap = BTreeMap::new();
+    let mut branching_events = Vec::new();
+    let mut immediately_pre_map: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
+    let (graph, initial, errors) = proto_graph::swarm_to_graph(&proto);
+    if initial.is_none() || !errors.is_empty() {
+        return ProtoInfo::new_only_proto(vec![ProtoStruct::new(
+            graph,
+            initial,
+            errors,
+            BTreeSet::new(),
+        )]);
+    }
+
+    let mut walk = Dfs::new(&graph, initial.unwrap());
+
+    // Add to set of branching and joining.
+    // Graph contains no concurrency, so:
+    //      Branching event types are all outgoing event types if more than one and if more than one distinct target.
+    //      Immediately preceding to each edge are all incoming event types
+    while let Some(node_id) = walk.next(&graph) {
+        let outgoing_labels: Vec<_> = graph
+            .edges_directed(node_id, Outgoing)
+            .map(|edge| edge.weight())
+            .collect();
+        let incoming_event_types: BTreeSet<EventType> = graph
+            .edges_directed(node_id, Incoming)
+            .map(|edge| edge.weight().get_event_type())
+            .collect();
+
+        if outgoing_labels.len() > 1 && direct_successors(&graph, node_id).len() > 1 {
+            branching_events.push(
+                outgoing_labels
+                    .iter()
+                    .map(|edge| edge.get_event_type())
+                    .collect(),
+            );
+        }
+
+        for label in outgoing_labels {
+            role_event_map
+                .entry(label.role.clone())
+                .and_modify(|role_info| {
+                    role_info.insert(label.clone());
+                })
+                .or_insert_with(|| BTreeSet::from([label.clone()]));
+
+            immediately_pre_map
+                .entry(label.get_event_type())
+                .and_modify(|events| {
+                    events.append(&mut incoming_event_types.clone());
+                })
+                .or_insert_with(|| incoming_event_types.clone());
+        }
+    }
+
+    // Consider changing after_not_concurrent to not take concurrent events as argument. now that we do not consider swarms with concurrency here.
+    let happens_after = after_not_concurrent(&graph, initial.unwrap(), &BTreeSet::new());
+
+    // Nodes that can not reach a terminal node.
+    let infinitely_looping_events = proto_graph::infinitely_looping_event_types(&graph, &happens_after);
+
+    ProtoInfo::new(
+        vec![ProtoStruct::new(
+            graph,
+            initial,
+            errors,
+            role_event_map.keys().cloned().collect(),
+        )],
+        role_event_map,
+        BTreeSet::new(),
+        branching_events,
+        BTreeMap::new(),
+        immediately_pre_map,
+        happens_after,
+        BTreeSet::new(),
+        infinitely_looping_events,
+        vec![],
+    )
+}
+
+// Set of direct successor nodes from node (those reachable in one step).
+fn direct_successors(graph: &Graph, node: NodeId) -> BTreeSet<NodeId> {
+    graph
+        .edges_directed(node, Outgoing)
+        .map(|e| e.target())
+        .collect()
+}
+
+// Compute a map mapping event types to the set of event types that follow it.
+// I.e. for each event type t all those event types t' that can be emitted after t.
+fn after_not_concurrent(
+    graph: &Graph,
+    initial: NodeId,
+    concurrent_events: &BTreeSet<BTreeSet<EventType>>,
+) -> BTreeMap<EventType, BTreeSet<EventType>> {
+    let _span = tracing::info_span!("after_not_concurrent").entered();
+    let mut succ_map: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
+    let mut is_stable = after_not_concurrent_step(graph, initial, concurrent_events, &mut succ_map);
+
+    while !is_stable {
+        is_stable = after_not_concurrent_step(graph, initial, concurrent_events, &mut succ_map);
+    }
+
+    succ_map
+}
+
+// For each event type t we get a set ('active_in_successor') of event types
+// that only contains event types that are immediately after t and not concurrent with t.
+// We then add each event type t' in active_in_successor and all the event types t''
+// that we already know are after t' to the set of event types succeeding t.
+fn after_not_concurrent_step(
+    graph: &Graph,
+    initial: NodeId,
+    concurrent_events: &BTreeSet<BTreeSet<EventType>>,
+    succ_map: &mut BTreeMap<EventType, BTreeSet<EventType>>,
+) -> bool {
+    if graph.node_count() == 0 || initial == NodeId::end() {
+        return true
+    }
+    let mut is_stable = true;
+    let mut walk = DfsPostOrder::new(&graph, initial);
+    while let Some(node) = walk.next(&graph) {
+        for edge in graph.edges_directed(node, Outgoing) {
+            let event_type = edge.weight().get_event_type();
+            let active_in_successor =
+                proto_graph::active_transitions_not_conc(edge.target(), graph, &event_type, concurrent_events)
+                    .into_iter().map(|label| label.get_event_type());
+
+            let mut succ_events: BTreeSet<EventType> = active_in_successor
+                .clone()
+                .into_iter()
+                .flat_map(|e| {
+                    let events = succ_map.get(&e).cloned().unwrap_or_default();
+                    events.clone()
+                })
+                .chain(active_in_successor.into_iter())
+                .collect();
+
+            if !succ_map.contains_key(&event_type)
+                || !succ_events
+                    .iter()
+                    .all(|e| succ_map[&event_type].contains(e))
+            {
+                succ_map
+                    .entry(event_type)
+                    .and_modify(|events| {
+                        events.append(&mut succ_events);
+                    })
+                    .or_insert(succ_events);
+                is_stable = false;
+            }
+        }
+    }
+    is_stable
+}
+
+pub fn transitive_closure_succeeding(
+    succ_map: BTreeMap<EventType, BTreeSet<EventType>>,
+) -> BTreeMap<EventType, BTreeSet<EventType>> {
+    let _span = tracing::info_span!("transitive_closure_succeeding").entered();
+    let mut graph: petgraph::Graph<EventType, (), Directed> = petgraph::Graph::new();
+    let mut node_map = BTreeMap::new();
+    for (event, succeeding) in &succ_map {
+        if !node_map.contains_key(event) {
+            node_map.insert(event.clone(), graph.add_node(event.clone()));
+        }
+        for succ in succeeding {
+            if !node_map.contains_key(succ) {
+                node_map.insert(succ.clone(), graph.add_node(succ.clone()));
+            }
+            graph.add_edge(node_map[event], node_map[succ], ());
+        }
+    }
+
+    let reflexive_transitive_closure = algo::floyd_warshall(&graph, |_| 1);
+    let transitive_closure: Vec<_> = reflexive_transitive_closure
+        .unwrap_or_else(|_| HashMap::new())
+        .into_iter()
+        .filter(|(_, v)| *v != i32::MAX && *v != 0)
+        .map(|(related_pair, _)| related_pair)
+        .collect();
+
+    let mut succ_map_new: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
+    for (i1, i2) in transitive_closure {
+        succ_map_new
+            .entry(graph[i1].clone())
+            .and_modify(|succeeding_events| {
+                succeeding_events.insert(graph[i2].clone());
+            })
+            .or_insert_with(|| BTreeSet::from([graph[i2].clone()]));
+    }
+
+    // do this because of loops. everything reachable from itself in result from floyd_warshall(), but we filter these out. add them again if loops.
+    util::combine_maps(succ_map, succ_map_new, None)
+}
+
+// The involved roles on a path are those roles that subscribe to one or
+// more of the event types emitted in a transition reachable from the transition
+// represented by its emitted event 'event_type'.
+pub fn roles_on_path(
+    event_type: EventType,
+    proto_info: &ProtoInfo,
+    subs: &Subscriptions,
+) -> BTreeSet<Role> {
+    let succeeding_events: BTreeSet<EventType> = proto_info
+        .succeeding_events
+        .get(&event_type)
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .chain([event_type])
+        .collect();
+    subs.iter()
+        .filter(|(_, events)| events.intersection(&succeeding_events).count() != 0)
+        .map(|(r, _)| r.clone())
+        .collect()
+}
+
+pub fn proto_info_to_error_report(proto_info: ProtoInfo) -> ErrorReport {
+    let _span = tracing::info_span!("proto_info_to_error_report").entered();
+    ErrorReport(
+        proto_info
+            .protocols
+            .into_iter()
+            .map(|p| (p.graph, p.errors))
+            .chain([(Graph::new(), proto_info.interface_errors)]) // NO!!! Why not?
+            .collect(),
+    )
+}
+
+pub fn explicit_composition_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
+    let _span = tracing::info_span!("explicit_composition_proto_info").entered();
+    let (composed, composed_initial) = explicit_composition(&proto_info);
+    let succeeding_events =
+        after_not_concurrent(&composed, composed_initial, &proto_info.concurrent_events);
+    let infinitely_looping_events = proto_graph::infinitely_looping_event_types(&composed, &succeeding_events);
+    ProtoInfo {
+        protocols: vec![ProtoStruct::new(
+            composed,
+            Some(composed_initial),
+            vec![],
+            BTreeSet::new(),
+        )],
+        succeeding_events,
+        infinitely_looping_events,
+        ..proto_info
+    }
+}
+
+// precondition: the protocols can interface on the given interfaces
+fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
+    let _span = tracing::info_span!("explicit_composition").entered();
+    if proto_info.protocols.is_empty() {
+        return (Graph::new(), NodeId::end());
+    }
+
+    let (g, i, _) = proto_info.protocols[0].get_triple();
+    let g_roles = g.get_roles();
+    let folder = |(acc_g, acc_i, acc_roles): (Graph, NodeId, BTreeSet<Role>),
+                  p: ProtoStruct|
+     -> (Graph, NodeId, BTreeSet<Role>) {
+        let empty = BTreeSet::new();
+        let interface = acc_roles
+            .intersection(&p.graph.get_roles())
+            .cloned()
+            .flat_map(|role| {
+                proto_info.role_event_map
+                    .get(&role)
+                    .unwrap_or(&empty)
+                    .iter()
+                    .map(|label| label.get_event_type())
+            })
+            .collect();
+        let acc_roles = acc_roles
+            .into_iter()
+            .chain(p.graph.get_roles())
+            .collect();
+        let (graph, initial) = composition::compose(
+            acc_g,
+            acc_i,
+            p.graph,
+            p.initial.unwrap(),
+            interface,
+            composition::gen_state_name,
+        );
+        (graph, initial, acc_roles)
+    };
+    let (graph, initial, _) = proto_info.protocols[1..]
+        .to_vec()
+        .into_iter()
+        .fold((g, i.unwrap(), g_roles), folder);
+    (graph, initial)
+}
+
+// Construct a graph that is the 'expanded' composition of protos.
+pub fn compose_protocols(protos: InterfacingProtocols) -> Result<(Graph, NodeId), ErrorReport> {
+    let _span = tracing::info_span!("compose_protocols").entered();
+    let combined_proto_info = swarms_to_proto_info(protos);
+    if !combined_proto_info.no_errors() {
+        return Err(proto_info_to_error_report(combined_proto_info));
+    }
+
+    let p = explicit_composition_proto_info(combined_proto_info)
+        .get_ith_proto(0)
+        .unwrap();
+    Ok((p.graph, p.initial.unwrap()))
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::errors::composition_errors;
+    use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
+    
+    fn setup_logger() {
+        fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
+            .try_init()
+            .ok();
+    }
+    fn pattern_4_proto_0() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r0", "logType": ["e_r0"], "role": "R0" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir", "logType": ["e_ir"], "role": "IR" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+    fn pattern_4_proto_1() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r1", "logType": ["e_r1"], "role": "R1" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir", "logType": ["e_ir"], "role": "IR" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+    fn pattern_4_proto_2() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r2", "logType": ["e_r2"], "role": "R2" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir", "logType": ["e_ir"], "role": "IR" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+    fn pattern_4_proto_3() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r3", "logType": ["e_r3"], "role": "R3" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir", "logType": ["e_ir"], "role": "IR" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+    fn pattern_4_proto_4() -> SwarmProtocolType {
+        serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "c_r4", "logType": ["e_r4"], "role": "R4" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "c_ir", "logType": ["e_ir"], "role": "IR" } }
+                ]
+            }"#,
+        )
+        .unwrap()
+    }
+    fn get_interfacing_swarms_pat_4() -> InterfacingProtocols {
+        InterfacingProtocols(vec![
+            pattern_4_proto_0(),
+            pattern_4_proto_1(),
+            pattern_4_proto_2(),
+            pattern_4_proto_3(),
+            pattern_4_proto_4(),
+        ])
+    }
+
+    #[test]
+    fn test_after_not_concurrent() {
+        let proto1: SwarmProtocolType =
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "a", "logType": ["a"], "role": "R1" } },
+                        { "source": "2", "target": "3", "label": { "cmd": "b", "logType": ["b"], "role": "R1" } },
+                        { "source": "3", "target": "4", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR" } }
+                    ]
+                }"#,
+            )
+            .unwrap();
+
+        let proto2: SwarmProtocolType =
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "c", "logType": ["c"], "role": "R2" } },
+                        { "source": "2", "target": "3", "label": { "cmd": "d", "logType": ["d"], "role": "R2" } },
+                        { "source": "3", "target": "4", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR" } }
+                    ]
+                }"#,
+            )
+            .unwrap();
+
+        let interfacing_swarms = InterfacingProtocols(vec![proto1, proto2]);
+
+        let expected_after = BTreeMap::from([
+            (
+                EventType::new("i1"),
+                BTreeSet::from([
+                    EventType::new("a"),
+                    EventType::new("b"),
+                    EventType::new("c"),
+                    EventType::new("d"),
+                    EventType::new("i2"),
+                ]),
+            ),
+            (
+                EventType::new("a"),
+                BTreeSet::from([EventType::new("b"), EventType::new("i2")]),
+            ),
+            (EventType::new("b"), BTreeSet::from([EventType::new("i2")])),
+            (
+                EventType::new("c"),
+                BTreeSet::from([EventType::new("d"), EventType::new("i2")]),
+            ),
+            (EventType::new("d"), BTreeSet::from([EventType::new("i2")])),
+            (EventType::new("i2"), BTreeSet::from([])),
+        ]);
+
+        let expected_concurrent = BTreeSet::from([
+            unord_event_pair(EventType::new("a"), EventType::new("c")),
+            unord_event_pair(EventType::new("a"), EventType::new("d")),
+            unord_event_pair(EventType::new("b"), EventType::new("c")),
+            unord_event_pair(EventType::new("b"), EventType::new("d")),
+        ]);
+
+        let combined_proto_info =
+            combine_proto_infos(prepare_proto_infos(interfacing_swarms.clone()));
+
+        assert_eq!(expected_after, combined_proto_info.succeeding_events);
+        assert_eq!(expected_concurrent, combined_proto_info.concurrent_events);
+
+        let (composition, composition_initial) =
+            compose_protocols(interfacing_swarms.clone()).unwrap();
+
+        let after_map = after_not_concurrent(
+            &composition,
+            composition_initial,
+            &combined_proto_info.concurrent_events,
+        );
+        assert_eq!(expected_after, after_map);
+    }
+
+    #[test]
+    fn test_interface() {
+        let proto1: SwarmProtocolType =
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR1" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "a", "logType": ["a"], "role": "R1" } }
+                    ]
+                }"#,
+            )
+            .unwrap();
+
+        let proto2: SwarmProtocolType =
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR1" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR2" } }
+                    ]
+                }"#,
+            )
+            .unwrap();
+
+        let proto3: SwarmProtocolType =
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR2" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "c", "logType": ["i1"], "role": "R3" } }
+                    ]
+                }"#,
+            )
+            .unwrap();
+
+        let interfacing_swarms = InterfacingProtocols(vec![proto1, proto2, proto3]);
+
+        let combined_proto_info =
+            combine_proto_infos(prepare_proto_infos(interfacing_swarms.clone()));
+
+        // The IR1 not used as an interface refers to the composition of (p || proto3) where p = (proto1 || proto2)
+        let expected_errors = vec!["Event type i1 appears as i1@IR1<i1> and as c@R3<i1>"];
+        let mut errors = composition_errors::error_report_to_strings(proto_info_to_error_report(combined_proto_info));
+        errors.sort();
+        assert_eq!(expected_errors, errors);
+
+        let proto1: SwarmProtocolType =
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR1" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "a", "logType": ["a"], "role": "R1" } }
+                    ]
+                }"#,
+            )
+            .unwrap();
+
+        let proto2: SwarmProtocolType =
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "i1", "logType": ["i1"], "role": "IR1" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "i2", "logType": ["i2"], "role": "IR1" } },
+                        { "source": "2", "target": "3", "label": { "cmd": "i3", "logType": ["i3"], "role": "IR2" } },
+                        { "source": "3", "target": "4", "label": { "cmd": "i4", "logType": ["i4"], "role": "IR2" } }
+                    ]
+                }"#,
+            )
+            .unwrap();
+
+        let proto3: SwarmProtocolType =
+            serde_json::from_str::<SwarmProtocolType>(
+                r#"{
+                    "initial": "0",
+                    "transitions": [
+                        { "source": "0", "target": "1", "label": { "cmd": "i3", "logType": ["i3"], "role": "IR2" } },
+                        { "source": "1", "target": "2", "label": { "cmd": "i5", "logType": ["i4"], "role": "IR2" } }
+                    ]
+                }"#,
+            )
+            .unwrap();
+
+        let interfacing_swarms = InterfacingProtocols(vec![proto1, proto2, proto3]);
+
+        let combined_proto_info =
+            combine_proto_infos(prepare_proto_infos(interfacing_swarms.clone()));
+
+        // The IR1 not used as an interface refers to the composition of (p || proto3) where p = (proto1 || proto2)
+        let expected_errors = vec!["Event type i4 appears as i4@IR2<i4> and as i5@IR2<i4>"];
+        let mut errors = composition_errors::error_report_to_strings(proto_info_to_error_report(combined_proto_info));
+        errors.sort();
+        assert_eq!(expected_errors, errors);
+    }
+
+    #[test]
+    fn test_joining_event_types() {
+        // e_r0
+        // e_ir
+        let preceding_events = |range: std::ops::Range<usize>| -> BTreeSet<EventType> {
+            range
+                .into_iter()
+                .map(|u| EventType::new(&format!("e_r{}", u)))
+                .collect()
+        };
+        setup_logger();
+        for i in 1..6 {
+            let index = i as usize;
+            let proto_info = swarms_to_proto_info(InterfacingProtocols(
+                get_interfacing_swarms_pat_4().0[..index].to_vec(),
+            ));
+            if i == 1 {
+                assert_eq!(proto_info.joining_events, BTreeMap::new());
+            } else {
+                assert_eq!(
+                    proto_info.joining_events,
+                    BTreeMap::from([(EventType::new("e_ir"), preceding_events(0..i))])
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_thinggg() {
+        let error_report = proto_info_to_error_report(ProtoInfo::new_only_proto(vec![]));
+        assert!(error_report.is_empty());
+    }
 }
