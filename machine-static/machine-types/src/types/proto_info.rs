@@ -1,11 +1,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use itertools::Itertools;
+
 use crate::errors::composition_errors::Error;
+use crate::types::proto_label::ProtoLabel;
 use crate::types::typescript_types::{Command, EventLabel};
 use crate::types::{
     typescript_types::{EventType, Role, SwarmLabel},
     Graph, NodeId,
 };
+use crate::{util, composability_check};
 
 pub type RoleEventMap = BTreeMap<Role, BTreeSet<SwarmLabel>>;
 
@@ -168,6 +172,42 @@ impl ProtoInfo {
     }
 }
 
+// Overapproximate concurrent events. 
+// Anything from different protocols that are not interfacing events is considered concurrent.
+// Pre: interface has been checked.
+fn get_concurrent_events(
+    proto_info1: &ProtoInfo,
+    proto_info2: &ProtoInfo,
+    interfacing_event_types: &BTreeSet<EventType>,
+) -> BTreeSet<UnordEventPair> {
+    let _span = tracing::info_span!("get_concurrent_events").entered();
+    let concurrent_events_union: BTreeSet<UnordEventPair> = proto_info1
+        .concurrent_events
+        .union(&proto_info2.concurrent_events)
+        .cloned()
+        .collect();
+    let events_proto1: BTreeSet<EventType> = proto_info1
+        .get_event_types()
+        .difference(interfacing_event_types)
+        .cloned()
+        .collect();
+    let events_proto2: BTreeSet<EventType> = proto_info2
+        .get_event_types()
+        .difference(interfacing_event_types)
+        .cloned()
+        .collect();
+    let cartesian_product = events_proto1
+        .into_iter()
+        .cartesian_product(&events_proto2)
+        .map(|(a, b)| unord_event_pair(a, b.clone()))
+        .collect();
+
+    concurrent_events_union
+        .union(&cartesian_product)
+        .cloned()
+        .collect()
+}
+
 pub fn get_branching_joining_proto_info(proto_info: &ProtoInfo) -> BTreeSet<EventType> {
     proto_info
         .branching_events
@@ -182,4 +222,163 @@ pub fn get_branching_joining_proto_info(proto_info: &ProtoInfo) -> BTreeSet<Even
                 .collect::<BTreeSet<EventType>>(),
         )
         .collect()
+}
+
+// Set of interfacing roles between two protocols
+#[inline]
+fn get_interfacing_roles(proto_info1: &ProtoInfo, proto_info2: &ProtoInfo) -> BTreeSet<Role> {
+    proto_info1
+        .protocols
+        .iter()
+        .flat_map(|protostruct| protostruct.roles.clone())
+        .collect::<BTreeSet<Role>>()
+        .intersection(
+            &proto_info2
+                .protocols
+                .iter()
+                .flat_map(|protostruct| protostruct.roles.clone())
+                .collect::<BTreeSet<Role>>(),
+        )
+        .cloned()
+        .collect()
+}
+
+// The interfacing roles are those roles that appear in proto_info1 and in proto_info2
+// The interfacing event types are those emitted by the interfacing role in either proto_info1 or proto_info2.
+// Assumes that proto_info1 and proto_info2 interface correctly.
+#[inline]
+fn get_interfacing_event_types(
+    proto_info1: &ProtoInfo,
+    proto_info2: &ProtoInfo,
+) -> BTreeSet<EventType> {
+    get_interfacing_roles(proto_info1, proto_info2)
+        .iter()
+        .flat_map(|r| {
+            proto_info1
+                .role_event_map
+                .get(r)
+                .unwrap()
+                .union(&proto_info2.role_event_map.get(r).unwrap())
+        })
+        .map(|swarm_label| swarm_label.get_event_type())
+        .collect()
+}
+
+// Construct map from joining event types to concurrent events preceding joining event types.
+#[inline]
+fn joining_event_types_map(proto_info: &ProtoInfo) -> BTreeMap<EventType, BTreeSet<EventType>> {
+    let pre_joins = |e: &EventType| -> BTreeSet<EventType> {
+        let pre = proto_info
+            .immediately_pre
+            .get(e)
+            .cloned()
+            .unwrap_or_default();
+        let product = pre.clone().into_iter().cartesian_product(&pre);
+        product
+            .filter(|(e1, e2)| {
+                *e1 != **e2 // necessary? Not the case if in set of concurrent?
+                    && proto_info
+                        .concurrent_events
+                        .contains(&unord_event_pair(e1.clone(), (*e2).clone()))
+            })
+            .map(|(e1, e2)| [e1, e2.clone()])
+            .flatten()
+            .collect()
+    };
+    // Get those interfacing event types with immediately preceding conucurrent event types and turn it into a map
+    proto_info
+        .interfacing_events
+        .iter()
+        .map(|e| (e.clone(), pre_joins(e)))
+        .filter(|(_, pre)| !pre.is_empty())
+        .collect()
+}
+
+pub fn flatten_joining_map(
+    joining_event_types: &BTreeMap<EventType, BTreeSet<EventType>>,
+) -> BTreeSet<EventType> {
+    joining_event_types
+        .iter()
+        .flat_map(|(join, pre)| pre.clone().into_iter().chain([join.clone()]))
+        .collect()
+}
+
+// Combine fields of two proto infos.
+// Do not compute transitive closure of happens after and do not compute joining event types.
+fn combine_two_proto_infos(proto_info1: ProtoInfo, proto_info2: ProtoInfo) -> ProtoInfo {
+    let _span = tracing::info_span!("combine_proto_infos").entered();
+    let interface_errors = composability_check::check_interface(&proto_info1, &proto_info2);
+    let interfacing_event_types = get_interfacing_event_types(&proto_info1, &proto_info2);
+    let protocols = vec![proto_info1.protocols.clone(), proto_info2.protocols.clone()].concat();
+    let role_event_map = util::combine_maps(
+        proto_info1.role_event_map.clone(),
+        proto_info2.role_event_map.clone(),
+        None,
+    );
+    // get concurrent event types based on current set of interfacing event types.
+    let concurrent_events =
+        get_concurrent_events(&proto_info1, &proto_info2, &interfacing_event_types);
+    let branching_events: Vec<BTreeSet<EventType>> = proto_info1
+        .branching_events
+        .into_iter()
+        .chain(proto_info2.branching_events.into_iter())
+        .collect();
+    let immediately_pre = util::combine_maps(
+        proto_info1.immediately_pre.clone(),
+        proto_info2.immediately_pre.clone(),
+        None,
+    );
+    let happens_after = util::combine_maps(
+        proto_info1.succeeding_events,
+        proto_info2.succeeding_events,
+        None,
+    );
+
+    let interfacing_event_types = [
+        proto_info1.interfacing_events,
+        proto_info2.interfacing_events,
+        interfacing_event_types,
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+
+    let infinitely_looping_events = proto_info1
+        .infinitely_looping_events
+        .into_iter()
+        .chain(proto_info2.infinitely_looping_events.into_iter())
+        .collect();
+
+    ProtoInfo::new(
+        protocols,
+        role_event_map,
+        concurrent_events,
+        branching_events,
+        BTreeMap::new(),
+        immediately_pre,
+        happens_after,
+        interfacing_event_types,
+        infinitely_looping_events,
+        [
+            proto_info1.interface_errors,
+            proto_info2.interface_errors,
+            interface_errors,
+        ]
+        .concat(),
+    )
+}
+
+pub fn combine_proto_infos(protos: Vec<ProtoInfo>) -> ProtoInfo {
+    let _span = tracing::info_span!("combine_proto_infos_fold").entered();
+    if protos.is_empty() {
+        return ProtoInfo::new_only_proto(vec![]);
+    }
+
+    let mut combined = protos[1..]
+        .to_vec()
+        .into_iter()
+        .fold(protos[0].clone(), |acc, p| combine_two_proto_infos(acc, p));
+
+    combined.joining_events = joining_event_types_map(&combined);
+    combined
 }
