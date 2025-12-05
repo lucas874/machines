@@ -7,7 +7,7 @@ use crate::types::proto_label::ProtoLabel;
 use crate::types::typescript_types::{Command, EventLabel};
 use crate::types::{
     typescript_types::{EventType, Role, SwarmLabel},
-    Graph, NodeId,
+    proto_graph::{Graph, NodeId},
 };
 use crate::{util, composability_check};
 

@@ -1,7 +1,7 @@
 use machine_types::{
     types::{
         typescript_types::{EventType, Role, State, StateName, SwarmLabel, Subscriptions, SwarmProtocolType},
-        EdgeId, NodeId
+        proto_graph::{EdgeId, NodeId}
     },
     errors::swarm_errors::Error,
 };
@@ -67,7 +67,7 @@ type Graph = petgraph::Graph<Node, SwarmLabel>;
 pub fn check(
     proto: SwarmProtocolType,
     subs: &Subscriptions,
-) -> (machine_types::types::Graph, Option<NodeId>, Vec<Error>) {
+) -> (machine_types::types::proto_graph::Graph, Option<NodeId>, Vec<Error>) {
     let (graph, initial, mut errors) = match prepare_graph(proto, &subs) {
         (g, Some(i), e) => (g, i, e),
         (g, None, e) => return (to_swarm(&g), None, e),
@@ -80,7 +80,7 @@ pub fn check(
 pub fn well_formed_sub(
     proto: SwarmProtocolType,
     subs: &Subscriptions,
-) -> Result<Subscriptions, (machine_types::types::Graph, Option<NodeId>, Vec<Error>)> {
+) -> Result<Subscriptions, (machine_types::types::proto_graph::Graph, Option<NodeId>, Vec<Error>)> {
     let (graph, initial, mut errors) = match prepare_graph(proto, &subs) {
         (g, Some(i), e) => (g, i, e),
         (g, None, e) => return Err((to_swarm(&g), None, e)),
@@ -95,7 +95,7 @@ pub fn well_formed_sub(
     }
 }
 
-fn to_swarm(graph: &Graph) -> machine_types::types::Graph {
+fn to_swarm(graph: &Graph) -> machine_types::types::proto_graph::Graph {
     graph.map(|_, n| n.name.clone(), |_, x| x.clone())
 }
 
@@ -312,7 +312,7 @@ fn wf_sub_step(graph: &mut Graph, initial: NodeId, subs: &mut Subscriptions) -> 
 pub fn from_json(
     proto: SwarmProtocolType,
     subs: &Subscriptions,
-) -> (machine_types::types::Graph, Option<NodeId>, Vec<String>) {
+) -> (machine_types::types::proto_graph::Graph, Option<NodeId>, Vec<String>) {
     let (g, i, e) = prepare_graph(proto, subs);
     (to_swarm(&g), i, e.map(Error::convert(&g)))
 }

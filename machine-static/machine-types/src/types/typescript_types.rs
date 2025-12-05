@@ -1,3 +1,4 @@
+use crate::types::proto_graph::{Graph, NodeId};
 use intern_arc::{global::hash_interner, InternedHash};
 use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, collections::{BTreeMap, BTreeSet}, fmt, ops::Deref};
@@ -224,9 +225,9 @@ pub struct ProjectionInfo {
     pub proj_to_machine_states: ProjToMachineStates,
 }
 
-pub fn to_swarm_json(graph: super::Graph, initial: super::NodeId) -> SwarmProtocolType {
+pub fn to_swarm_json(graph: Graph, initial: NodeId) -> SwarmProtocolType {
     let _span = tracing::info_span!("to_swarm_json").entered();
-    let machine_label_mapper = |g: &super::Graph, eref: EdgeReference<'_, SwarmLabel>| {
+    let machine_label_mapper = |g: &Graph, eref: EdgeReference<'_, SwarmLabel>| {
         let label = eref.weight().clone();
         let source = g[eref.source()].state_name().clone();
         let target = g[eref.target()].state_name().clone();

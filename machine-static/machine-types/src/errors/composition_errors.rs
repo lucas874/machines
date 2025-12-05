@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use crate::types::{EdgeId, NodeId, typescript_types::{Command, EventType, Role, State, StateName, SwarmLabel}};
+use crate::types::{proto_graph::{EdgeId, NodeId}, typescript_types::{Command, EventType, Role, State, StateName, SwarmLabel}};
 use super::Edge;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

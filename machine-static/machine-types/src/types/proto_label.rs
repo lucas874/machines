@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::types::{Graph, proto_info::ProtoInfo, typescript_types::{Command, EventLabel, EventType, Role}};
+use crate::types::{proto_graph::Graph, proto_info::ProtoInfo, typescript_types::{Command, EventLabel, EventType, Role}};
 
 /* Interface trait things */
 pub trait ProtoLabel {

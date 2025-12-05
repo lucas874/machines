@@ -4,9 +4,9 @@ use machine_types::types::{
     typescript_types::{Command, EventType, Role, SwarmLabel, Subscriptions, SwarmProtocolType, EventLabel, InterfacingProtocols, Granularity,},
     proto_info::{ProtoStruct, ProtoInfo, RoleEventMap, UnordEventPair, unord_event_pair},
     proto_label::ProtoLabel,
-    EdgeId, NodeId, Graph
+    proto_graph::{EdgeId, NodeId, Graph}
 };
-use machine_types::types::proto_info;
+use machine_types::types::{proto_graph, proto_info};
 use itertools::Itertools;
 use petgraph::algo::floyd_warshall;
 use petgraph::visit::{DfsPostOrder, Reversed};
@@ -970,7 +970,7 @@ fn prepare_proto_info(proto: SwarmProtocolType) -> ProtoInfo {
     let mut role_event_map: RoleEventMap = BTreeMap::new();
     let mut branching_events = Vec::new();
     let mut immediately_pre_map: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
-    let (graph, initial, errors) = swarm_to_graph(&proto);
+    let (graph, initial, errors) = proto_graph::swarm_to_graph(&proto);
     if initial.is_none() || !errors.is_empty() {
         return ProtoInfo::new_only_proto(vec![ProtoStruct::new(
             graph,
@@ -1055,42 +1055,6 @@ fn direct_successors(graph: &Graph, node: NodeId) -> BTreeSet<NodeId> {
         .collect()
 }
 
-// turn a SwarmProtocol into a petgraph. perform some checks that are not strictly related to wf, but must be successful for any further analysis to take place
-fn swarm_to_graph(proto: &SwarmProtocolType) -> (Graph, Option<NodeId>, Vec<Error>) {
-    let _span = tracing::info_span!("swarm_to_graph").entered();
-    let mut graph = Graph::new();
-    let mut errors = vec![];
-    let mut nodes = BTreeMap::new();
-
-    for t in &proto.transitions {
-        let source = *nodes
-            .entry(t.source.clone())
-            .or_insert_with(|| graph.add_node(t.source.clone()));
-        let target = *nodes
-            .entry(t.target.clone())
-            .or_insert_with(|| graph.add_node(t.target.clone()));
-        let edge = graph.add_edge(source, target, t.label.clone());
-        if t.label.log_type.len() == 0 {
-            errors.push(Error::SwarmError(machine_types::errors::swarm_errors::Error::LogTypeEmpty(edge)));
-        } else if t.label.log_type.len() > 1 {
-            errors.push(Error::MoreThanOneEventTypeInCommand(edge)) // Come back here and implement splitting command into multiple 'artificial' ones emitting one event type if time instead of reporting it as an error.
-        }
-    }
-
-    let initial = if let Some(idx) = nodes.get(&proto.initial) {
-        errors.append(&mut all_nodes_reachable(&graph, *idx));
-        Some(*idx)
-    } else {
-        // strictly speaking we have all_nodes_reachable errors here too...
-        // if there is only an initial state no transitions whatsoever then thats ok? but gives an error here.
-        errors.push(Error::SwarmError(
-            machine_types::errors::swarm_errors::Error::InitialStateDisconnected,
-        ));
-        None
-    };
-    (graph, initial, errors)
-}
-
 pub fn from_json(proto: SwarmProtocolType) -> (Graph, Option<NodeId>, Vec<String>) {
     let _span = tracing::info_span!("from_json").entered();
     let proto_info = prepare_proto_info(proto);
@@ -1117,21 +1081,6 @@ pub fn proto_info_to_error_report(proto_info: ProtoInfo) -> ErrorReport {
             .chain([(Graph::new(), proto_info.interface_errors)]) // NO!!! Why not?
             .collect(),
     )
-}
-
-// copied from swarm::swarm.rs
-fn all_nodes_reachable(graph: &Graph, initial: NodeId) -> Vec<Error> {
-    let _span = tracing::info_span!("all_nodes_reachable").entered();
-    // Traversal order choice (Bfs vs Dfs vs DfsPostOrder) does not matter
-    let visited = Dfs::new(&graph, initial)
-        .iter(&graph)
-        .collect::<BTreeSet<_>>();
-
-    graph
-        .node_indices()
-        .filter(|node| !visited.contains(node))
-        .map(|node| Error::SwarmError(machine_types::errors::swarm_errors::Error::StateUnreachable(node)))
-        .collect()
 }
 
 fn nodes_not_reaching_terminal(graph: &Graph) -> Vec<NodeId> {
@@ -1187,7 +1136,7 @@ fn infinitely_looping_event_types(graph: &Graph, succ_map: &BTreeMap<EventType, 
 // all pairs of incoming/outgoing events from a node
 fn event_pairs_from_node(
     node: NodeId,
-    graph: &machine_types::types::Graph,
+    graph: &Graph,
     direction: Direction,
 ) -> Vec<BTreeSet<EventType>> {
     graph
@@ -3006,7 +2955,7 @@ mod tests {
             }
 
             // Check states that can not reach terminal state an infinitely looping event types
-            let (graph, _, _) = swarm_to_graph(&proto1());
+            let (graph, _, _) = proto_graph::swarm_to_graph(&proto1());
             let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
             let state_names: Vec<String> = states_not_reaching_terminal
                 .into_iter()
@@ -3063,7 +3012,7 @@ mod tests {
             }
 
             // Check states that can not reach terminal state an infinitely looping event types
-            let (graph, _, _) = swarm_to_graph(&proto1());
+            let (graph, _, _) = proto_graph::swarm_to_graph(&proto1());
             let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
             let state_names: Vec<String> = states_not_reaching_terminal
                 .into_iter()
@@ -3124,7 +3073,7 @@ mod tests {
             }
 
             // Check states that can not reach terminal state an infinitely looping event types
-            let (graph, _, _) = swarm_to_graph(&proto1());
+            let (graph, _, _) = proto_graph::swarm_to_graph(&proto1());
             let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
             let state_names: Vec<String> = states_not_reaching_terminal
                 .into_iter()
@@ -3184,7 +3133,7 @@ mod tests {
             }
 
             // Check states that can not reach terminal state an infinitely looping event types
-            let (graph, _, _) = swarm_to_graph(&proto1());
+            let (graph, _, _) = proto_graph::swarm_to_graph(&proto1());
             let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
             let state_names: Vec<String> = states_not_reaching_terminal
                 .into_iter()
@@ -3244,7 +3193,7 @@ mod tests {
             }
 
             // Check states that can not reach terminal state an infinitely looping event types
-            let (graph, _, _) = swarm_to_graph(&proto1());
+            let (graph, _, _) = proto_graph::swarm_to_graph(&proto1());
             let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
             let state_names: Vec<String> = states_not_reaching_terminal
                 .into_iter()
@@ -3302,7 +3251,7 @@ mod tests {
             }
 
             // Check states that can not reach terminal state an infinitely looping event types
-            let (graph, _, _) = swarm_to_graph(&proto1());
+            let (graph, _, _) = proto_graph::swarm_to_graph(&proto1());
             let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
             let state_names: Vec<String> = states_not_reaching_terminal
                 .into_iter()

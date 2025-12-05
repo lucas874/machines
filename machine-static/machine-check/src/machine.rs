@@ -1,6 +1,6 @@
 use machine_types::types::{
     typescript_types::{Command, EventType, MachineLabel, Role, State, MachineType, Subscriptions},
-    EdgeId, NodeId
+    proto_graph::{EdgeId, NodeId}
 };
 
 use itertools::Itertools;
@@ -16,10 +16,10 @@ use std::{
 };
 
 type Graph = petgraph::Graph<Option<State>, MachineLabel>;
-type ERef<'a> = <&'a machine_types::types::Graph as IntoEdgeReferences>::EdgeRef;
+type ERef<'a> = <&'a machine_types::types::proto_graph::Graph as IntoEdgeReferences>::EdgeRef;
 
 pub fn project(
-    swarm: &machine_types::types::Graph,
+    swarm: &machine_types::types::proto_graph::Graph,
     initial: NodeId,
     subs: &Subscriptions,
     role: Role,

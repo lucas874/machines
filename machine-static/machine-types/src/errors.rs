@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::types::{EdgeId, typescript_types::{StateName, SwarmLabel}};
+use crate::types::{proto_graph::{EdgeId}, typescript_types::{StateName, SwarmLabel}};
 
 pub mod swarm_errors;
 pub mod composition_errors;

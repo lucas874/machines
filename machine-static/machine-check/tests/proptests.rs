@@ -4,7 +4,7 @@ use machine_check::{
 };
 use machine_types::types::{
     typescript_types::{CheckResult, Command, DataResult, EventType, MachineLabel, Role, State, StateName, SwarmLabel, Transition, MachineType, Subscriptions, SwarmProtocolType, Granularity, InterfacingProtocols,},
-    EdgeId, Graph, NodeId,
+    proto_graph::{EdgeId, Graph, NodeId,},
 };
 use petgraph::{
     graph::EdgeReference,

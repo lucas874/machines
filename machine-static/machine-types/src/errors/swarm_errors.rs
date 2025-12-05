@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use std::collections::BTreeSet;
 
-use crate::types::{EdgeId, NodeId, typescript_types::{EventType, Role, StateName, SwarmLabel}};
+use crate::types::{proto_graph::{EdgeId, NodeId}, typescript_types::{EventType, Role, StateName, SwarmLabel}};
 use super::{Edge, INVALID_EDGE};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
