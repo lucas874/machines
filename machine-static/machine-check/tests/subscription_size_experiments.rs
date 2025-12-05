@@ -13,14 +13,6 @@ use walkdir::WalkDir;
 const BENCHMARK_DIR: &str = "./bench_and_results";
 const SPECIAL_SYMBOL: &str = "done-special-symbol";
 
-fn to_interfacing_protocols(interfacing_swarms: InterfacingSwarms<Role>) -> InterfacingProtocols {
-    InterfacingProtocols(interfacing_swarms
-        .0
-        .into_iter()
-        .map(|cc| cc.protocol)
-        .collect())
-}
-
 #[test]
 #[ignore]
 fn full_run_bench_sub_sizes_general() {
@@ -206,12 +198,65 @@ fn write_flattened() {
     }
 }
 
+#[test]
+#[ignore]
+fn rewrite_benchmarks_as_interfacing_protocols() {
+    let input_dir = format!("{BENCHMARK_DIR}/benchmarks/");
+    let output_dir = format!("new/{BENCHMARK_DIR}/benchmarks");
+    create_directory(&output_dir);
+
+        for entry in WalkDir::new(input_dir) {
+        match entry {
+            Ok(entry) => {
+                if entry.file_type().is_file() {
+                    let file_name = entry.path().as_os_str().to_str().unwrap().to_string();
+                    let (_, benchmark_input) = prepare_input(
+                        file_name.clone(),
+                    );
+                    let benchmark_input_new = to_benchmark_input_new(&benchmark_input);
+                    let out_file_name = format!("new/{file_name}");
+                    let out_path = std::path::Path::new(&out_file_name);
+                    let prefix = out_path.parent().unwrap();
+                    std::fs::create_dir_all(prefix).unwrap();
+                    println!("out path: {}", out_path.as_os_str().to_str().unwrap().to_string());
+                    let serialized = serde_json::to_string(&benchmark_input_new).unwrap();
+                    write_file(&out_file_name, serialized);
+                }
+            }
+            Err(e) => panic!("error: {}", e),
+        };
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BenchMarkInput  {
     pub state_space_size: usize,
     pub number_of_edges: usize,
     pub interfacing_swarms: InterfacingSwarms<Role>
 }
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BenchMarkInputNew  {
+    pub state_space_size: usize,
+    pub number_of_edges: usize,
+    pub interfacing_swarms: InterfacingProtocols
+}
+
+fn to_interfacing_protocols(interfacing_swarms: InterfacingSwarms<Role>) -> InterfacingProtocols {
+    InterfacingProtocols(interfacing_swarms
+        .0
+        .into_iter()
+        .map(|cc| cc.protocol)
+        .collect())
+}
+
+fn to_benchmark_input_new(bench_input: &BenchMarkInput) -> BenchMarkInputNew {
+    BenchMarkInputNew {
+        state_space_size: bench_input.state_space_size,
+        number_of_edges: bench_input.number_of_edges,
+        interfacing_swarms: to_interfacing_protocols(bench_input.interfacing_swarms.clone())
+    }
+}
+
 // TODO: give this type a 'Method' field that is either a Granularity or 'Exact'.
 // Use this instead of inspecting file name later.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
