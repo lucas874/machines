@@ -2,6 +2,10 @@ use intern_arc::{global::hash_interner, InternedHash};
 use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, collections::{BTreeMap, BTreeSet}, fmt, ops::Deref};
 use tsify::{Tsify, declare};
+use petgraph::{
+    graph::EdgeReference,
+    visit::EdgeRef,
+};
 
 macro_rules! decl_str {
     ($n:ident) => {
@@ -209,12 +213,6 @@ pub type BranchMap = BTreeMap<EventType, Vec<EventType>>;
 pub type SpecialEventTypes = BTreeSet<EventType>;
 #[declare]
 pub type ProjToMachineStates = BTreeMap<State, Vec<State>>;
-/* #[derive(Serialize, Deserialize)]
-pub struct EventSet(pub BTreeSet<EventType>);
-
-impl Tsify for EventSet {
-    const DECL: &'static str = "Set<string>";
-} */
 
 #[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "camelCase")]
@@ -224,4 +222,28 @@ pub struct ProjectionInfo {
     pub branches: BranchMap,
     pub special_event_types: SpecialEventTypes,
     pub proj_to_machine_states: ProjToMachineStates,
+}
+
+pub fn to_swarm_json(graph: super::Graph, initial: super::NodeId) -> SwarmProtocolType {
+    let _span = tracing::info_span!("to_swarm_json").entered();
+    let machine_label_mapper = |g: &super::Graph, eref: EdgeReference<'_, SwarmLabel>| {
+        let label = eref.weight().clone();
+        let source = g[eref.source()].state_name().clone();
+        let target = g[eref.target()].state_name().clone();
+        Transition {
+            label,
+            source,
+            target,
+        }
+    };
+
+    let transitions: Vec<_> = graph
+        .edge_references()
+        .map(|e| machine_label_mapper(&graph, e))
+        .collect();
+
+    SwarmProtocolType {
+        initial: graph[initial].state_name().clone(),
+        transitions,
+    }
 }

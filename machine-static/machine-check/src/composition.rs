@@ -213,7 +213,7 @@ pub fn compose_protocols(protos: InterfacingProtocols) -> DataResult<SwarmProtoc
 
     match composition {
         Ok((graph, initial)) => DataResult::OK {
-            data: composition_swarm::to_swarm_json(graph, initial),
+            data: machine_types::types::typescript_types::to_swarm_json(graph, initial),
         },
         Err(errors) => DataResult::ERROR {
             errors: error_report_to_strings(errors),

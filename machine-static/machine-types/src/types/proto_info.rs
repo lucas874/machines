@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::errors::composition_errors::Error;
+use crate::types::typescript_types::{Command, EventLabel};
 use crate::types::{
     typescript_types::{EventType, Role, SwarmLabel},
     Graph, NodeId,
@@ -134,6 +135,36 @@ impl ProtoInfo {
 
     pub fn no_errors(&self) -> bool {
         self.protocols.iter().all(|p| p.no_errors()) && self.interface_errors.is_empty()
+    }
+
+    // Return all values from a ProtoInfo.role_event_map field as a set of triples:
+    // (Command, EventType, Role)
+    fn get_labels(&self) -> BTreeSet<(Command, EventType, Role)> {
+        self
+            .role_event_map
+            .values()
+            .flat_map(|role_info| {
+                role_info
+                    .iter()
+                    .map(|sl| (sl.cmd.clone(), sl.get_event_type(), sl.role.clone()))
+            })
+            .collect()
+    }
+
+    // If we accumulate errors this map should really map to a set of (Command, Role)...
+    pub fn event_type_map(&self) -> BTreeMap<EventType, (Command, Role)> {
+        self.get_labels()
+            .into_iter()
+            .map(|(c, t, r)| (t, (c, r)))
+            .collect()
+    }
+
+    // If we accumulate errors this map should really map to a set of (EvenType, Role)...
+    pub fn command_map(&self) -> BTreeMap<Command, (EventType, Role)> {
+        self.get_labels()
+            .into_iter()
+            .map(|(c, t, r)| (c, (t, r)))
+            .collect()
     }
 }
 

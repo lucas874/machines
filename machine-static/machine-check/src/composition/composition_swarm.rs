@@ -1,7 +1,7 @@
 use super::MapVec;
 use machine_types::errors::composition_errors::{Error, ErrorReport};
 use machine_types::types::{
-    typescript_types::{Command, EventType, Role, StateName, SwarmLabel, Transition, Subscriptions, SwarmProtocolType, EventLabel, InterfacingProtocols, Granularity,},
+    typescript_types::{Command, EventType, Role, SwarmLabel, Subscriptions, SwarmProtocolType, EventLabel, InterfacingProtocols, Granularity,},
     proto_info::{ProtoStruct, ProtoInfo, RoleEventMap, UnordEventPair, unord_event_pair},
     proto_label::ProtoLabel,
     EdgeId, NodeId, Graph
@@ -11,7 +11,6 @@ use petgraph::algo::floyd_warshall;
 use petgraph::visit::{DfsPostOrder, Reversed};
 use petgraph::Directed;
 use petgraph::{
-    graph::EdgeReference,
     visit::{Dfs, EdgeRef, Walker},
     Direction::{self, Incoming, Outgoing},
 };
@@ -809,43 +808,14 @@ fn add_to_sub(role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subsc
     false
 }
 
-// Return all values from a ProtoInfo.role_event_map field as a set of triples:
-// (Command, EventType, Role)
-fn get_labels(proto_info: &ProtoInfo) -> BTreeSet<(Command, EventType, Role)> {
-    proto_info
-        .role_event_map
-        .values()
-        .flat_map(|role_info| {
-            role_info
-                .iter()
-                .map(|sl| (sl.cmd.clone(), sl.get_event_type(), sl.role.clone()))
-        })
-        .collect()
-}
-
-// If we accumulate errors this map should really map to a set of (Command, Role)...
-fn event_type_map(proto_info: &ProtoInfo) -> BTreeMap<EventType, (Command, Role)> {
-    get_labels(proto_info)
-        .into_iter()
-        .map(|(c, t, r)| (t, (c, r)))
-        .collect()
-}
-// If we accumulate errors this map should really map to a set of (EvenType, Role)...
-fn command_map(proto_info: &ProtoInfo) -> BTreeMap<Command, (EventType, Role)> {
-    get_labels(proto_info)
-        .into_iter()
-        .map(|(c, t, r)| (c, (t, r)))
-        .collect()
-}
-
 // Check that for any c@R<t> in proto_info1, c'@R'<t> in proto_info2 c = c' and R = R'
 fn cross_protocol_event_type_errors(
     proto_info1: &ProtoInfo,
     proto_info2: &ProtoInfo,
 ) -> Vec<Error> {
     // Map event types to the their associated (command, role) pairs in their protocol.
-    let event_type_map1 = event_type_map(proto_info1);
-    let event_type_map2 = event_type_map(proto_info2);
+    let event_type_map1 = proto_info1.event_type_map();
+    let event_type_map2 = proto_info2.event_type_map();
     let event_type_intersection: Vec<EventType> = event_type_map1
         .keys()
         .cloned()
@@ -890,8 +860,8 @@ fn cross_protocol_event_type_errors(
 // Check that for any c@R<t> in proto_info1, c@R'<t'> in proto_info2 t = t' and R = R'
 fn cross_protocol_command_errors(proto_info1: &ProtoInfo, proto_info2: &ProtoInfo) -> Vec<Error> {
     // Map commands to the their associated (command, role) pairs in their protocol.
-    let command_map1 = command_map(proto_info1);
-    let command_map2 = command_map(proto_info2);
+    let command_map1 = proto_info1.command_map();
+    let command_map2 = proto_info2.command_map();
     let command_intersection: Vec<Command> = command_map1
         .keys()
         .cloned()
@@ -1610,30 +1580,6 @@ fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
         .into_iter()
         .fold((g, i.unwrap(), g_roles), folder);
     (graph, initial)
-}
-
-pub fn to_swarm_json(graph: machine_types::types::Graph, initial: NodeId) -> SwarmProtocolType {
-    let _span = tracing::info_span!("to_swarm_json").entered();
-    let machine_label_mapper = |g: &machine_types::types::Graph, eref: EdgeReference<'_, SwarmLabel>| {
-        let label = eref.weight().clone();
-        let source = g[eref.source()].state_name().clone();
-        let target = g[eref.target()].state_name().clone();
-        Transition {
-            label,
-            source,
-            target,
-        }
-    };
-
-    let transitions: Vec<_> = graph
-        .edge_references()
-        .map(|e| machine_label_mapper(&graph, e))
-        .collect();
-
-    SwarmProtocolType {
-        initial: graph[initial].state_name().clone(),
-        transitions,
-    }
 }
 
 #[cfg(test)]
@@ -3328,6 +3274,7 @@ mod tests {
 
     mod loop_tests {
         use super::*;
+        use machine_types::types::typescript_types::StateName;
 
         // This module contains tests for relating to looping event types.
 
@@ -3829,7 +3776,7 @@ mod tests {
                     println!("Error composing protocols: {}", error_report_to_strings(e).join("\n"));
                 }
                 Ok((composition, composition_initial)) => {
-                    println!("Composition of protocols:\n{}", serde_json::to_string_pretty(&to_swarm_json(composition, composition_initial)).unwrap());
+                    println!("Composition of protocols:\n{}", serde_json::to_string_pretty(&machine_types::types::typescript_types::to_swarm_json(composition, composition_initial)).unwrap());
                 }
             }
         }
