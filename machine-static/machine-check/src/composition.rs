@@ -8,7 +8,6 @@ use super::*;
 
 mod composition_machine;
 mod composition_swarm;
-pub mod composition_types;
 
 macro_rules! deserialize_subs {
     ($subs:expr, $err_exp:expr) => {
