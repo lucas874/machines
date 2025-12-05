@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use machine_check::composition::{
-    composition_types::InterfacingSwarms, exact_well_formed_sub,
+    exact_well_formed_sub,
     overapproximated_well_formed_sub,
 };
 use machine_types::types::typescript_types::{EventType, Role, Granularity, InterfacingProtocols};
@@ -28,7 +28,7 @@ fn setup_logger() {
 pub struct BenchMarkInput {
     pub state_space_size: usize,
     pub number_of_edges: usize,
-    pub interfacing_swarms: InterfacingSwarms<Role>,
+    pub interfacing_swarms: InterfacingProtocols
 }
 
 fn prepare_input(file_name: String) -> (usize, InterfacingProtocols) {
@@ -56,7 +56,7 @@ fn prepare_input(file_name: String) -> (usize, InterfacingProtocols) {
 
     (
         state_space_size,
-        InterfacingProtocols(interfacing_swarms.0.into_iter().map(|cc| cc.protocol).collect()),
+        interfacing_swarms,
     )
 }
 
