@@ -1,9 +1,7 @@
-use super::composition_types::Granularity;
 use super::MapVec;
-use crate::composition::composition_types::{InterfacingProtocols};
 use machine_types::errors::composition_errors::{Error, ErrorReport};
 use machine_types::types::{
-    typescript_types::{Command, EventType, Role, StateName, SwarmLabel, Transition, Subscriptions, SwarmProtocolType, EventLabel,},
+    typescript_types::{Command, EventType, Role, StateName, SwarmLabel, Transition, Subscriptions, SwarmProtocolType, EventLabel, InterfacingProtocols, Granularity,},
     proto_info::{ProtoStruct, ProtoInfo, RoleEventMap, UnordEventPair, unord_event_pair},
     proto_label::ProtoLabel,
     EdgeId, NodeId, Graph

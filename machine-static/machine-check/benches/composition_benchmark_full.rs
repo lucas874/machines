@@ -1,10 +1,9 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use machine_check::composition::composition_types::{Granularity, InterfacingProtocols};
 use machine_check::composition::{
     composition_types::InterfacingSwarms, exact_well_formed_sub,
     overapproximated_well_formed_sub,
 };
-use machine_types::types::typescript_types::{EventType, Role};
+use machine_types::types::typescript_types::{EventType, Role, Granularity, InterfacingProtocols};
 use serde::{Deserialize, Serialize};
 extern crate machine_check;
 use std::collections::{BTreeMap, BTreeSet};

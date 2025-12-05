@@ -1,9 +1,9 @@
 use machine_check::{
-    check_swarm, composition::{check_composed_projection, check_composed_swarm, compose_protocols, composition_types::{CompositionComponent, Granularity, InterfacingProtocols, InterfacingSwarms},
+    check_swarm, composition::{check_composed_projection, check_composed_swarm, compose_protocols, composition_types::{CompositionComponent, InterfacingSwarms},
     exact_well_formed_sub, overapproximated_well_formed_sub, project_combine, revised_projection}, well_formed_sub,
 };
 use machine_types::types::{
-    typescript_types::{CheckResult, Command, DataResult, EventType, MachineLabel, Role, State, StateName, SwarmLabel, Transition, MachineType, Subscriptions, SwarmProtocolType},
+    typescript_types::{CheckResult, Command, DataResult, EventType, MachineLabel, Role, State, StateName, SwarmLabel, Transition, MachineType, Subscriptions, SwarmProtocolType, Granularity, InterfacingProtocols,},
     EdgeId, Graph, NodeId,
 };
 use petgraph::{

@@ -1,15 +1,9 @@
-use super::{
-    composition_types::{
-        BranchMap,
-        ProjToMachineStates, ProjectionInfo,
-    },
-};
 use crate::{
     composition::composition_swarm::transitive_closure_succeeding,
     machine::{Error, Side},
 };
 use machine_types::types::{
-    typescript_types::{Command, StateName, Transition, EventType, MachineLabel, MachineType, Role, State, Subscriptions, SwarmLabel, EventLabel,},
+    typescript_types::{Command, StateName, Transition, EventType, MachineLabel, MachineType, Role, State, Subscriptions, SwarmLabel, EventLabel, BranchMap, ProjToMachineStates, ProjectionInfo,},
     proto_info::{get_branching_joining_proto_info, unord_event_pair, ProtoInfo, ProtoStruct, UnordEventPair},
     NodeId,
 };
@@ -891,12 +885,11 @@ mod tests {
                 compose_protocols, exact_well_formed_sub, from_json,
                 overapprox_well_formed_sub, swarms_to_proto_info,
             },
-            composition_types::{Granularity, InterfacingProtocols},
         },
         machine::{self},
         MachineType, Subscriptions, SwarmProtocolType,
     };
-    use machine_types::types::typescript_types::{Command, EventType, Role, Transition};
+    use machine_types::types::typescript_types::{Command, EventType, Role, Transition, Granularity, InterfacingProtocols};
     use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
 
     fn setup_logger() {

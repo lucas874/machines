@@ -1,10 +1,8 @@
 use composition_swarm::{proto_info_to_error_report, swarms_to_proto_info};
 use machine_types::errors::composition_errors::error_report_to_strings;
-use composition_types::{
-    Granularity, ProjectionInfo,
+use machine_types::types::typescript_types::{
+    Granularity, ProjectionInfo, InterfacingProtocols
 };
-
-use crate::composition::composition_types::InterfacingProtocols;
 
 use super::*;
 
