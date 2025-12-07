@@ -4,7 +4,7 @@ use petgraph::{
     Direction::{self, Outgoing}, visit::{Dfs, EdgeRef, GraphBase, Reversed, Walker}
 };
 
-use crate::{errors::{composition_errors, swarm_errors}, types::{proto_info::ProtoStruct, typescript_types::{EventLabel, EventType, State, SwarmLabel, SwarmProtocolType}}};
+use crate::{errors::{composition_errors, swarm_errors}, types::typescript_types::{EventLabel, EventType, State, SwarmLabel, SwarmProtocolType}};
 use crate::types::proto_info;
 
 pub type Graph = petgraph::Graph<State, SwarmLabel>;

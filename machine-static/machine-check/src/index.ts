@@ -1,5 +1,5 @@
 import { CheckResult, DataResult, MachineType, Role, Subscriptions, SwarmProtocolType } from 'machine-types';
-import { check_swarm, check_projection, check_composed_swarm, exact_well_formed_sub, overapproximated_well_formed_sub, check_composed_projection,
+import { check_swarm, check_projection, check_composed_swarm, check_composed_projection,
   revised_projection, project_combine, compose_protocols, projection_information,
   InterfacingSwarms as InterfacingSwarmsInner, CompositionComponent as CompositionComponentInner, Granularity,
   ProjectionInfo, InterfacingProtocols } from '../pkg/machine_check.js'
@@ -52,32 +52,6 @@ export function checkProjection(
  */
 export function checkComposedSwarmProtocol(protos: InterfacingProtocols, subscriptions: Subscriptions): CheckResult {
   return check_composed_swarm(protos, JSON.stringify(subscriptions))
-}
-
-/**
- * Generate the smallest subscription that is well-formed w.r.t. to
- * a swarm protocol composition and contains an input subscription.
- *
- * @param protos - An array of swarm protocols representing a composition.
- * @param subscriptions - A subscription.
- * @returns - Result containing the computed subscription or a list of error messages.
- */
-export function exactWFSubscriptions(protos: InterfacingProtocols, subscriptions: Subscriptions): DataResult<Subscriptions> {
-  return exact_well_formed_sub(protos, JSON.stringify(subscriptions));
-}
-
-/**
- * Generate an overapproximation of the smallest subscription that
- * is well-formed w.r.t. to a swarm protocol composition and
- * contains an input subscription.
- *
- * @param protos - An array of swarm protocols representing a composition.
- * @param subscriptions - A subscription.
- * @param granularity - The precision of the approximation.
- * @returns - Result containing the computed subscription or a list of error messages.
- */
-export function overapproxWFSubscriptions(protos: InterfacingProtocols, subscriptions: Subscriptions, granularity: Granularity): DataResult<Subscriptions> {
-  return overapproximated_well_formed_sub(protos, JSON.stringify(subscriptions), granularity);
 }
 
 /**

@@ -1,9 +1,7 @@
-use composition_swarm::{proto_info_to_error_report, swarms_to_proto_info};
-use machine_types::errors::composition_errors::error_report_to_strings;
 use machine_types::types::typescript_types::{
     Granularity, ProjectionInfo, InterfacingProtocols
 };
-
+use machine_types::{errors::composition_errors, types::proto_info};
 use super::*;
 
 mod composition_machine;
@@ -28,47 +26,8 @@ pub fn check_composed_swarm(protos: InterfacingProtocols, subs: String) -> Check
         CheckResult::OK
     } else {
         CheckResult::ERROR {
-            errors: error_report_to_strings(error_report),
+            errors: composition_errors::error_report_to_strings(error_report),
         }
-    }
-}
-
-#[wasm_bindgen]
-pub fn exact_well_formed_sub(
-    protos: InterfacingProtocols,
-    subs: String,
-) -> DataResult<Subscriptions> {
-    let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
-        errors: vec![format!("parsing subscriptions: {}", e)]
-    });
-    let result = composition_swarm::exact_well_formed_sub(protos, &subs);
-    match result {
-        Ok(subscriptions) => DataResult::OK {
-            data: subscriptions,
-        }, //dok(subscriptions),
-        Err(error_report) => DataResult::ERROR {
-            errors: error_report_to_strings(error_report),
-        }, //derr::<Subscriptions>(error_report_to_strings(error_report)),
-    }
-}
-
-#[wasm_bindgen]
-pub fn overapproximated_well_formed_sub(
-    protos: InterfacingProtocols,
-    subs: String,
-    granularity: Granularity,
-) -> DataResult<Subscriptions> {
-    let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
-        errors: vec![format!("parsing subscriptions: {}", e)]
-    });
-    let result = composition_swarm::overapprox_well_formed_sub(protos, &subs, granularity);
-    match result {
-        Ok(subscriptions) => DataResult::OK {
-            data: subscriptions,
-        },
-        Err(error_report) => DataResult::ERROR {
-            errors: error_report_to_strings(error_report),
-        },
     }
 }
 
@@ -106,8 +65,8 @@ pub fn project_combine(
     let proto_info = swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
         return DataResult::ERROR {
-            errors: error_report_to_strings(proto_info_to_error_report(proto_info)),
-        }; //derr::<Machine>(error_report_to_strings(proto_info_to_error_report(proto_info)));
+            errors: composition_errors::error_report_to_strings(proto_info_to_error_report(proto_info)),
+        }; //derr::<Machine>(composition_errors::error_report_to_strings(proto_info_to_error_report(proto_info)));
     }
 
     let (proj, proj_initial) =
@@ -132,7 +91,7 @@ pub fn projection_information(
     let proto_info = swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
         return DataResult::ERROR {
-            errors: error_report_to_strings(proto_info_to_error_report(proto_info)),
+            errors: composition_errors::error_report_to_strings(proto_info_to_error_report(proto_info)),
         };
     }
     let (machine, initial, m_errors) = machine::from_json(machine);
@@ -176,7 +135,7 @@ pub fn check_composed_projection(
     let proto_info = swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
         return CheckResult::ERROR {
-            errors: error_report_to_strings(proto_info_to_error_report(proto_info)),
+            errors: composition_errors::error_report_to_strings(proto_info_to_error_report(proto_info)),
         };
     }
 
@@ -216,7 +175,7 @@ pub fn compose_protocols(protos: InterfacingProtocols) -> DataResult<SwarmProtoc
             data: machine_types::types::typescript_types::to_swarm_json(graph, initial),
         },
         Err(errors) => DataResult::ERROR {
-            errors: error_report_to_strings(errors),
+            errors: composition_errors::error_report_to_strings(errors),
         },
     }
 }
