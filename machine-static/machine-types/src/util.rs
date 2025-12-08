@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 // combine maps with sets as values
-pub (crate) fn combine_maps<K: Ord + Clone, V: Ord + Clone>(
+pub(crate) fn combine_maps<K: Ord + Clone, V: Ord + Clone>(
     map1: BTreeMap<K, BTreeSet<V>>,
     map2: BTreeMap<K, BTreeSet<V>>,
     extra: Option<BTreeSet<V>>,

@@ -258,3 +258,221 @@ fn add_to_sub(role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subsc
         .or_insert(event_types);
     false
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::to_string_pretty;
+
+    use super::*;
+    use crate::test_utils;
+
+    fn print_subs(actual: &Subscriptions, expected: &Subscriptions) {
+        for (role, subscriptions) in actual {
+            if expected.contains_key(role) {
+                println!("σ_actual({}) = {}", serde_json::to_string_pretty(role).unwrap(), serde_json::to_string_pretty(subscriptions).unwrap());
+                println!("σ_expected({}) = {}", serde_json::to_string_pretty(role).unwrap(), serde_json::to_string_pretty(expected.get(role).unwrap()).unwrap());
+            }
+        }
+        //println!("actual {}", serde_json::to_string_pretty(&actual).unwrap());
+        //println!("expected {}", serde_json::to_string_pretty(&expected).unwrap());
+    }
+
+    #[test]
+    fn test_well_formed_sub() {
+        test_utils::setup_logger();
+
+        // Test interfacing_swarms_1
+        // Coarse
+        let result_1_coarse = overapprox_well_formed_sub(
+                test_utils::get_interfacing_swarms_1(),
+                &BTreeMap::new(),
+                Granularity::Medium,
+            );
+        assert!(result_1_coarse.is_ok());
+        let subs_1_coarse = result_1_coarse.unwrap();
+        let expected_subs_1_coarse: Subscriptions = BTreeMap::from([
+            (Role::from("T"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("FL"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("D"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("F"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car")])),
+        ]);
+        assert_eq!(subs_1_coarse, expected_subs_1_coarse);
+        
+        // Medium
+        let result_1_medium = overapprox_well_formed_sub(
+            test_utils::get_interfacing_swarms_1(),
+            &BTreeMap::new(),
+            Granularity::Medium,
+        );
+        assert!(result_1_medium.is_ok());
+        let subs_1_medium = result_1_medium.unwrap();
+        let expected_subs_1_medium: Subscriptions = BTreeMap::from([
+            (Role::from("T"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("FL"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("D"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("F"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car")])),
+        ]);
+        assert_eq!(subs_1_medium, expected_subs_1_medium);
+        
+        // Fine. Should be equal to exact for this example.
+        let result_1_fine = overapprox_well_formed_sub(
+            test_utils::get_interfacing_swarms_1(),
+            &BTreeMap::new(),
+            Granularity::Fine,
+        );
+        assert!(result_1_fine.is_ok());
+        let subs_1_fine = result_1_fine.unwrap();
+        let expected_subs_1_fine: Subscriptions = BTreeMap::from([
+            (Role::from("T"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("FL"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("time")])),
+            (Role::from("D"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("F"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car")])),
+        ]);
+        assert_eq!(subs_1_fine, expected_subs_1_fine);
+
+        // 'Algorithm 1'/'Two Step'
+        let result_1_two_step = overapprox_well_formed_sub(
+            test_utils::get_interfacing_swarms_1(),
+            &BTreeMap::new(),
+            Granularity::TwoStep,
+        );
+        assert!(result_1_two_step.is_ok());
+        let subs_1_two_step = result_1_two_step.unwrap();
+        let expected_subs_1_two_step: Subscriptions = BTreeMap::from([
+            (Role::from("T"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("FL"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("D"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("F"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car")])),
+        ]);
+        assert_eq!(subs_1_two_step, expected_subs_1_two_step);
+        assert_eq!(subs_1_two_step, subs_1_medium);
+        assert_eq!(subs_1_two_step, subs_1_coarse);
+
+        
+        // Test interfacing_swarms_2
+        // Coarse
+        let result_2_coarse = overapprox_well_formed_sub(
+            test_utils::get_interfacing_swarms_2(),
+            &BTreeMap::new(),
+            Granularity::Coarse,
+        );
+        assert!(result_2_coarse.is_ok());
+        let subs_2_coarse = result_2_coarse.unwrap();
+        let expected_subs_2_coarse: Subscriptions = BTreeMap::from([
+            (Role::from("T"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1")])),
+            (Role::from("FL"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1")])),
+            (Role::from("D"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1")])),
+            (Role::from("F"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1")])),
+            (Role::from("TR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2")])),
+            (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2"), EventType::from("ok"), EventType::from("notOk")])),
+        ]);
+        assert_eq!(subs_2_coarse, expected_subs_2_coarse);
+        
+        // Medium
+        let result_2_medium = overapprox_well_formed_sub(
+            test_utils::get_interfacing_swarms_2(),
+            &BTreeMap::new(),
+            Granularity::Medium,
+        );
+        assert!(result_2_medium.is_ok());
+        let subs_2_medium = result_2_medium.unwrap();
+        let expected_subs_2_medium: Subscriptions = BTreeMap::from([
+            (Role::from("T"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1")])),
+            (Role::from("FL"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1")])),
+            (Role::from("D"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1")])),
+            (Role::from("F"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1")])),
+            (Role::from("TR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2")])),
+            (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2"), EventType::from("ok"), EventType::from("notOk")])),
+        ]);
+        assert_eq!(subs_2_medium, expected_subs_2_medium);
+        assert_eq!(subs_2_medium, subs_2_coarse);
+
+        // Fine
+        let result_2_fine = overapprox_well_formed_sub(
+            test_utils::get_interfacing_swarms_2(),
+            &BTreeMap::new(),
+            Granularity::Fine,
+        );
+        assert!(result_2_fine.is_ok());
+        let subs_2_fine = result_2_fine.unwrap();
+        let expected_subs_2_fine: Subscriptions = BTreeMap::from([
+            (Role::from("T"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("FL"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("time")])),
+            (Role::from("D"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("F"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1")])),
+            (Role::from("TR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2")])),
+            (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2"), EventType::from("ok"), EventType::from("notOk")])),
+        ]);
+        assert_eq!(subs_2_fine, expected_subs_2_fine);
+        
+        // 'Algorithm 1'/'Two Step'
+        let result_2_two_step = overapprox_well_formed_sub(
+            test_utils::get_interfacing_swarms_2(),
+            &BTreeMap::new(),
+            Granularity::TwoStep,
+        );
+        assert!(result_2_two_step.is_ok());
+        let subs_2_two_step = result_2_two_step.unwrap();
+        let expected_subs_2_two_step: Subscriptions = BTreeMap::from([
+            (Role::from("T"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("FL"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("D"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("F"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1")])),
+            (Role::from("TR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2")])),
+            (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2"), EventType::from("ok"), EventType::from("notOk")])),
+        ]);
+        assert_eq!(subs_2_two_step, expected_subs_2_two_step);
+        /*
+        // Test interfacing_swarms_3
+        let result = exact_well_formed_sub(test_utils::get_interfacing_swarms_3(), &BTreeMap::new());
+        assert!(result.is_ok());
+        let subs1 = result.unwrap();
+        let error_report = check(test_utils::get_interfacing_swarms_3(), &subs1);
+        assert!(error_report.is_empty());
+
+        let result = overapprox_well_formed_sub(
+            test_utils::get_interfacing_swarms_3(),
+            &BTreeMap::new(),
+            Granularity::Coarse,
+        );
+        assert!(result.is_ok());
+        let subs2 = result.unwrap();
+        let error_report = check(test_utils::get_interfacing_swarms_3(), &subs2);
+        assert!(error_report.is_empty());
+        assert!(is_sub_subscription(subs1.clone(), subs2));
+
+        let result = overapprox_well_formed_sub(
+            test_utils::get_interfacing_swarms_3(),
+            &BTreeMap::new(),
+            Granularity::Medium,
+        );
+        assert!(result.is_ok());
+        let subs2 = result.unwrap();
+        let error_report = check(test_utils::get_interfacing_swarms_3(), &subs2);
+        assert!(error_report.is_empty());
+        assert!(is_sub_subscription(subs1.clone(), subs2));
+
+        let result = overapprox_well_formed_sub(
+            test_utils::get_interfacing_swarms_3(),
+            &BTreeMap::new(),
+            Granularity::Fine,
+        );
+        assert!(result.is_ok());
+        let subs2 = result.unwrap();
+        let error_report = check(test_utils::get_interfacing_swarms_3(), &subs2);
+        assert!(error_report.is_empty());
+        assert!(is_sub_subscription(subs1.clone(), subs2));
+
+        let result = overapprox_well_formed_sub(
+            test_utils::get_interfacing_swarms_3(),
+            &BTreeMap::new(),
+            Granularity::TwoStep,
+        );
+        assert!(result.is_ok());
+        let subs2 = result.unwrap();
+        let error_report = check(test_utils::get_interfacing_swarms_3(), &subs2);
+        assert!(error_report.is_empty());
+        assert!(is_sub_subscription(subs1.clone(), subs2)); */
+
+    }
+}

@@ -8,6 +8,8 @@ pub mod composability_check;
 pub mod subscription;
 pub mod composition;
 mod util;
+#[cfg(test)]
+mod test_utils;
 
 use crate::subscription::{exact, overapproximation};
 use crate::errors::composition_errors;
