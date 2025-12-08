@@ -269,4 +269,18 @@ mod tests {
         ]);
         assert_eq!(subs, expected_subs);
     }
+
+    #[test]
+    fn test_extend_subs() {
+        test_utils::setup_logger();
+        let sub_to_extend = BTreeMap::from([
+            (Role::new("D"), BTreeSet::from([EventType::new("pos")])),
+            (Role::new("TR"), BTreeSet::from([EventType::new("ok")])),
+        ]);
+        let result = exact_well_formed_sub(test_utils::get_interfacing_swarms_2(), &sub_to_extend);
+        assert!(result.is_ok());
+        let subs = result.unwrap();
+        assert!(subs[&Role::new("D")].contains(&EventType::new("pos")));
+        assert!(subs[&Role::new("TR")].contains(&EventType::new("ok")));
+    }
 }

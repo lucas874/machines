@@ -711,4 +711,56 @@ mod tests {
         ]);
         assert_eq!(subs_two_step, expected_subs_two_step);
     }
+    #[test]
+    fn test_extend_subs() {
+        test_utils::setup_logger();
+        let sub_to_extend = BTreeMap::from([
+            (Role::new("D"), BTreeSet::from([EventType::new("pos")])),
+            (Role::new("TR"), BTreeSet::from([EventType::new("ok")])),
+        ]);
+        
+        // Coarse
+        let result_coarse = overapprox_well_formed_sub(
+            test_utils::get_interfacing_swarms_2(),
+            &sub_to_extend,
+            Granularity::Coarse,
+        );
+        assert!(result_coarse.is_ok());
+        let subs_coarse = result_coarse.unwrap();
+        assert!(subs_coarse[&Role::new("D")].contains(&EventType::new("pos")));
+        assert!(subs_coarse[&Role::new("TR")].contains(&EventType::new("ok")));
+
+        // Medium
+        let result_medium = overapprox_well_formed_sub(
+            test_utils::get_interfacing_swarms_2(),
+            &sub_to_extend,
+            Granularity::Medium,
+        );
+        assert!(result_medium.is_ok());
+        let subs_medium = result_medium.unwrap();
+        assert!(subs_medium[&Role::new("D")].contains(&EventType::new("pos")));
+        assert!(subs_medium[&Role::new("TR")].contains(&EventType::new("ok")));
+
+        // Fine
+        let result_fine = overapprox_well_formed_sub(
+            test_utils::get_interfacing_swarms_2(),
+            &sub_to_extend,
+            Granularity::Fine,
+        );
+        assert!(result_fine.is_ok());
+        let subs_fine = result_fine.unwrap();
+        assert!(subs_fine[&Role::new("D")].contains(&EventType::new("pos")));
+        assert!(subs_fine[&Role::new("TR")].contains(&EventType::new("ok")));
+        
+        // 'Algorithm 1'/'Two Step'
+        let result_two_step = overapprox_well_formed_sub(
+            test_utils::get_interfacing_swarms_2(),
+            &sub_to_extend,
+            Granularity::TwoStep,
+        );
+        assert!(result_two_step.is_ok());
+        let subs_two_step = result_two_step.unwrap();
+        assert!(subs_two_step[&Role::new("D")].contains(&EventType::new("pos")));
+        assert!(subs_two_step[&Role::new("TR")].contains(&EventType::new("ok")));
+    }
 }
