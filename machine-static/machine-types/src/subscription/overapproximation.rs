@@ -261,21 +261,8 @@ fn add_to_sub(role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subsc
 
 #[cfg(test)]
 mod tests {
-    use serde_json::to_string_pretty;
-
     use super::*;
     use crate::test_utils;
-
-    fn print_subs(actual: &Subscriptions, expected: &Subscriptions) {
-        for (role, subscriptions) in actual {
-            if expected.contains_key(role) {
-                println!("σ_actual({}) = {}", serde_json::to_string_pretty(role).unwrap(), serde_json::to_string_pretty(subscriptions).unwrap());
-                println!("σ_expected({}) = {}", serde_json::to_string_pretty(role).unwrap(), serde_json::to_string_pretty(expected.get(role).unwrap()).unwrap());
-            }
-        }
-        //println!("actual {}", serde_json::to_string_pretty(&actual).unwrap());
-        //println!("expected {}", serde_json::to_string_pretty(&expected).unwrap());
-    }
 
     #[test]
     fn test_well_formed_sub() {
