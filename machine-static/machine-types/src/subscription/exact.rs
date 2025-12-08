@@ -206,7 +206,17 @@ mod tests {
         ]);
         assert_eq!(subs_2, expected_subs_2);
 
-        //println!("actual {}", serde_json::to_string_pretty(&subs_2).unwrap());
-        //println!("expected {}", serde_json::to_string_pretty(&expected_subs_2).unwrap());
+        // Test interfacing_swarms_3
+        let result_3 = exact_well_formed_sub(test_utils::get_interfacing_swarms_3(), &BTreeMap::new());
+        assert!(result_3.is_ok());
+        let subs_3 = result_3.unwrap();
+        let expected_subs_3: Subscriptions = BTreeMap::from([
+            (Role::from("T"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("FL"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("time")])),
+            (Role::from("D"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("F"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report2")])),
+            (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2"), EventType::from("report3")]))
+        ]);
+        assert_eq!(subs_3, expected_subs_3);
     }
 }
