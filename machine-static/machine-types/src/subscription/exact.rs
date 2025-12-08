@@ -219,4 +219,38 @@ mod tests {
         ]);
         assert_eq!(subs_3, expected_subs_3);
     }
+
+    #[test]
+    fn test_well_formed_sub_1() {
+        test_utils::setup_logger();
+
+        // Test empty set of input protocols
+        let empty = exact_well_formed_sub(InterfacingProtocols(vec![]), &BTreeMap::new());
+        assert!(empty.is_ok());
+        assert_eq!(empty.unwrap(), BTreeMap::new());
+
+        // Test interfacing_swarms_4
+        let result_4 = exact_well_formed_sub(test_utils::get_interfacing_swarms_4(), &BTreeMap::new());
+        assert!(result_4.is_ok());
+        let subs_4 = result_4.unwrap();
+        let expected_subs_4: Subscriptions = BTreeMap::from([
+            (Role::from("T"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("FL"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("time")])),
+            (Role::from("D"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time")])),
+            (Role::from("F"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("observing")])),
+            (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("observing"), EventType::from("report")]))
+        ]);
+        assert_eq!(subs_4, expected_subs_4);
+
+        // Test interfacing_swarms_5
+        let result_5 = exact_well_formed_sub(test_utils::get_interfacing_swarms_5(), &BTreeMap::new());
+        assert!(result_5.is_ok());
+        let subs_5 = result_5.unwrap();
+        let expected_subs_5: Subscriptions = BTreeMap::from([
+            (Role::from("IR"), BTreeSet::from([EventType::from("e_ir_0"), EventType::from("e_ir_1"), EventType::from("e_r0_1"), EventType::from("e_r1_0")])),
+            (Role::from("R0"), BTreeSet::from([EventType::from("e_ir_0"), EventType::from("e_ir_1"), EventType::from("e_r0_0"), EventType::from("e_r0_1")])),
+            (Role::from("R1"), BTreeSet::from([EventType::from("e_ir_0"), EventType::from("e_r1_0")])),
+        ]);
+        assert_eq!(subs_5, expected_subs_5);
+    }
 }
