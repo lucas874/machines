@@ -638,10 +638,77 @@ mod tests {
         assert!(result_5_two_step.is_ok());
         let subs_5_two_step = result_5_two_step.unwrap();
         let expected_subs_5_two_step: Subscriptions = BTreeMap::from([
-            (Role::from("IR"), BTreeSet::from([EventType::from("e_ir_0"), EventType::from("e_ir_1"), EventType::from("e_r0_0"), EventType::from("e_r0_1"), EventType::from("e_r1_0")])),
+            (Role::from("IR"), BTreeSet::from([EventType::from("e_ir_0"), EventType::from("e_ir_1"), EventType::from("e_ra"), EventType::from("e_r0_1"), EventType::from("e_r1_0")])),
             (Role::from("R0"), BTreeSet::from([EventType::from("e_ir_0"), EventType::from("e_ir_1"), EventType::from("e_r0_0"), EventType::from("e_r0_1"), EventType::from("e_r1_0")])),
             (Role::from("R1"), BTreeSet::from([EventType::from("e_ir_0"), EventType::from("e_r1_0")])),
         ]);
         assert_eq!(subs_5_two_step, expected_subs_5_two_step);
+    }
+
+
+    #[test]
+    fn test_refinement_pattern() {
+        test_utils::setup_logger();
+        
+        // Coarse 
+        let result_coarse = overapprox_well_formed_sub(
+            test_utils::get_ref_pat_protos(),
+            &BTreeMap::new(),
+            Granularity::Coarse,
+        );
+        assert!(result_coarse.is_ok());
+        let subs_coarse = result_coarse.unwrap();
+        let expected_subs_coarse: Subscriptions = BTreeMap::from([
+            (Role::from("IR0"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir0_1"), EventType::from("e_ir1_0"), EventType::from("e_ir1_1"), EventType::from("e_ra"), EventType::from("e_rb")])),
+            (Role::from("IR1"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir0_1"), EventType::from("e_ir1_0"), EventType::from("e_ir1_1"), EventType::from("e_ra"), EventType::from("e_rc")])),
+            (Role::from("RA"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir0_1"), EventType::from("e_ir1_0"), EventType::from("e_ir1_1"), EventType::from("e_ra")])),
+            (Role::from("RB"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir0_1"), EventType::from("e_ir1_0"), EventType::from("e_ir1_1"), EventType::from("e_ra"), EventType::from("e_rb")])),
+            (Role::from("RC"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir0_1"), EventType::from("e_ir1_0"), EventType::from("e_ir1_1"), EventType::from("e_ra"), EventType::from("e_rc")])),
+        ]);
+        assert_eq!(subs_coarse, expected_subs_coarse);
+    
+        // Medium 
+        let result_medium = overapprox_well_formed_sub(
+            test_utils::get_ref_pat_protos(),
+            &BTreeMap::new(),
+            Granularity::Medium,
+        );
+        assert!(result_medium.is_ok());
+        let subs_medium = result_medium.unwrap();
+        assert_eq!(subs_medium, expected_subs_coarse);
+
+        // Fine 
+        let result_fine = overapprox_well_formed_sub(
+            test_utils::get_ref_pat_protos(),
+            &BTreeMap::new(),
+            Granularity::Fine,
+        );
+        assert!(result_fine.is_ok());
+        let subs_fine = result_fine.unwrap();
+        let expected_subs_fine: Subscriptions = BTreeMap::from([
+            (Role::from("IR0"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir0_1"), EventType::from("e_ir1_0"), EventType::from("e_ra"), EventType::from("e_rb")])),
+            (Role::from("IR1"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir1_0"), EventType::from("e_ir1_1"), EventType::from("e_ra"), EventType::from("e_rc")])),
+            (Role::from("RA"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir1_0"), EventType::from("e_ra")])),
+            (Role::from("RB"), BTreeSet::from([EventType::from("e_ir1_0"), EventType::from("e_ir1_1"), EventType::from("e_ra"), EventType::from("e_rb")])),
+            (Role::from("RC"), BTreeSet::from([EventType::from("e_ir1_0"), EventType::from("e_ra"), EventType::from("e_rc")])),
+        ]);
+        assert_eq!(subs_fine, expected_subs_fine);
+
+        // 'Algorithm 1'/'Two Step' 
+        let result_two_step = overapprox_well_formed_sub(
+            test_utils::get_ref_pat_protos(),
+            &BTreeMap::new(),
+            Granularity::TwoStep,
+        );
+        assert!(result_two_step.is_ok());
+        let subs_two_step = result_two_step.unwrap();
+        let expected_subs_two_step: Subscriptions = BTreeMap::from([
+            (Role::from("IR0"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir0_1"), EventType::from("e_ir1_0"), EventType::from("e_ir1_1"), EventType::from("e_ra"), EventType::from("e_rb")])),
+            (Role::from("IR1"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir1_0"), EventType::from("e_ir1_1"), EventType::from("e_ra"), EventType::from("e_rc")])),
+            (Role::from("RA"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir1_0"), EventType::from("e_ra")])),
+            (Role::from("RB"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir1_0"), EventType::from("e_ir1_1"), EventType::from("e_ra"), EventType::from("e_rb")])),
+            (Role::from("RC"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir1_0"), EventType::from("e_ra"), EventType::from("e_rc")])),
+        ]);
+        assert_eq!(subs_two_step, expected_subs_two_step);
     }
 }

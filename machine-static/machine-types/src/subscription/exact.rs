@@ -253,4 +253,20 @@ mod tests {
         ]);
         assert_eq!(subs_5, expected_subs_5);
     }
+
+    #[test]
+    fn test_refinement_pattern() {
+        test_utils::setup_logger();
+        let result = exact_well_formed_sub(test_utils::get_ref_pat_protos(), &BTreeMap::new());
+        assert!(result.is_ok());
+        let subs = result.unwrap();
+        let expected_subs: Subscriptions = BTreeMap::from([
+            (Role::from("IR0"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir0_1"), EventType::from("e_ir1_0"), EventType::from("e_ra"), EventType::from("e_rb")])),
+            (Role::from("IR1"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir1_0"), EventType::from("e_ir1_1"), EventType::from("e_ra"), EventType::from("e_rc")])),
+            (Role::from("RA"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir1_0"), EventType::from("e_ra")])),
+            (Role::from("RB"), BTreeSet::from([EventType::from("e_ir1_0"), EventType::from("e_ir1_1"), EventType::from("e_ra"), EventType::from("e_rb")])),
+            (Role::from("RC"), BTreeSet::from([EventType::from("e_ir1_0"), EventType::from("e_ra"), EventType::from("e_rc")])),
+        ]);
+        assert_eq!(subs, expected_subs);
+    }
 }
