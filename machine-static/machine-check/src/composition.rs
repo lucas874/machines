@@ -1,5 +1,6 @@
+use machine_types::types::proto_graph;
 use machine_types::types::typescript_types::{
-    Granularity, ProjectionInfo, InterfacingProtocols
+    ProjectionInfo, InterfacingProtocols
 };
 use machine_types::{errors::composition_errors, types::proto_info};
 use super::*;
@@ -41,7 +42,7 @@ pub fn revised_projection(
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
         errors: vec![format!("parsing subscriptions: {}", e)]
     });
-    let (swarm, initial, errors) = composition_swarm::from_json(proto);
+    let (swarm, initial, errors) = proto_graph::from_json(proto);
     let Some(initial) = initial else {
         return DataResult::ERROR { errors };
     };
@@ -62,10 +63,10 @@ pub fn project_combine(
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
         errors: vec![format!("parsing subscriptions: {}", e)]
     });
-    let proto_info = swarms_to_proto_info(protos);
+    let proto_info = proto_info::swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
         return DataResult::ERROR {
-            errors: composition_errors::error_report_to_strings(proto_info_to_error_report(proto_info)),
+            errors: composition_errors::error_report_to_strings(proto_info::proto_info_to_error_report(proto_info)),
         }; //derr::<Machine>(composition_errors::error_report_to_strings(proto_info_to_error_report(proto_info)));
     }
 
@@ -88,10 +89,10 @@ pub fn projection_information(
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
         errors: vec![format!("parsing subscriptions: {}", e)]
     });
-    let proto_info = swarms_to_proto_info(protos);
+    let proto_info = proto_info::swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
         return DataResult::ERROR {
-            errors: composition_errors::error_report_to_strings(proto_info_to_error_report(proto_info)),
+            errors: composition_errors::error_report_to_strings(proto_info::proto_info_to_error_report(proto_info)),
         };
     }
     let (machine, initial, m_errors) = machine::from_json(machine);
@@ -132,10 +133,10 @@ pub fn check_composed_projection(
     let subs = deserialize_subs!(subs, |e| CheckResult::ERROR {
         errors: vec![format!("parsing subscriptions: {}", e)]
     });
-    let proto_info = swarms_to_proto_info(protos);
+    let proto_info = proto_info::swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
         return CheckResult::ERROR {
-            errors: composition_errors::error_report_to_strings(proto_info_to_error_report(proto_info)),
+            errors: composition_errors::error_report_to_strings(proto_info::proto_info_to_error_report(proto_info)),
         };
     }
 
@@ -168,7 +169,7 @@ pub fn check_composed_projection(
 
 #[wasm_bindgen]
 pub fn compose_protocols(protos: InterfacingProtocols) -> DataResult<SwarmProtocolType> {
-    let composition = composition_swarm::compose_protocols(protos);
+    let composition = proto_info::compose_protocols(protos);
 
     match composition {
         Ok((graph, initial)) => DataResult::OK {

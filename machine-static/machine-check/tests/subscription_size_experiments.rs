@@ -1,5 +1,5 @@
 use machine_check::{
-    check_swarm, composition::{check_composed_swarm, exact_well_formed_sub, overapproximated_well_formed_sub}, well_formed_sub
+    check_swarm, composition::{check_composed_swarm}, well_formed_sub
 };
 
 use machine_types::types::typescript_types::{CheckResult, DataResult, EventType, Role, State, Subscriptions, SwarmProtocolType, Granularity, InterfacingProtocols,};
@@ -27,13 +27,13 @@ fn full_run_bench_sub_sizes_general() {
 
     for (_, bi) in interfacing_swarms_general.iter() {
         let swarms = &bi.interfacing_swarms;
-        let subscriptions = match overapproximated_well_formed_sub(swarms.clone(), subs.clone(), two_step_granularity.clone()) {
+        let subscriptions = match machine_types::overapproximated_well_formed_sub(swarms.clone(), subs.clone(), two_step_granularity.clone()) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
         wrap_and_write_sub_out(&bi, subscriptions.unwrap(), serde_json::to_string(&two_step_granularity).unwrap().replace("\"", ""), &output_dir);
 
-        let subscriptions = match exact_well_formed_sub(swarms.clone(), subs.clone()) {
+        let subscriptions = match machine_types::exact_well_formed_sub(swarms.clone(), subs.clone()) {
             DataResult::OK{data: subscriptions} => {
                 Some(subscriptions) },
             DataResult::ERROR{ .. } => None,
@@ -58,13 +58,13 @@ fn short_run_bench_sub_sizes_general() {
 
     for (_, bi) in interfacing_swarms_general.iter().step_by(step) {
         let swarms = &bi.interfacing_swarms;
-        let subscriptions = match overapproximated_well_formed_sub(swarms.clone(), subs.clone(), two_step_granularity.clone()) {
+        let subscriptions = match machine_types::overapproximated_well_formed_sub(swarms.clone(), subs.clone(), two_step_granularity.clone()) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
         wrap_and_write_sub_out(&bi, subscriptions.unwrap(), serde_json::to_string(&two_step_granularity).unwrap().replace("\"", ""), &output_dir);
 
-        let subscriptions = match exact_well_formed_sub(swarms.clone(), subs.clone()) {
+        let subscriptions = match machine_types::exact_well_formed_sub(swarms.clone(), subs.clone()) {
             DataResult::OK{data: subscriptions} => {
                 Some(subscriptions) },
             DataResult::ERROR{ .. } => None,
@@ -98,7 +98,7 @@ fn full_simple_run_bench_sub_sizes_general() {
         }
         wrap_and_write_sub_out_simple(&input, subscriptions_wf_kmt.unwrap(), Version::KMT23, &output_dir);
 
-        let subscriptions_compositional_exact = match exact_well_formed_sub(InterfacingProtocols(vec![input.proto.clone()]), subs.clone()) {
+        let subscriptions_compositional_exact = match machine_types::exact_well_formed_sub(InterfacingProtocols(vec![input.proto.clone()]), subs.clone()) {
             DataResult::OK{data: subscriptions} => {
                 Some(subscriptions) },
             DataResult::ERROR{ .. } => None,
@@ -111,7 +111,7 @@ fn full_simple_run_bench_sub_sizes_general() {
         }
         wrap_and_write_sub_out_simple(&input, subscriptions_compositional_exact.unwrap(), Version::CompositionalExact, &output_dir);
 
-        let subscriptions_compositional_approx = match overapproximated_well_formed_sub(InterfacingProtocols(vec![input.proto.clone()]), subs.clone(), two_step_granularity.clone()) {
+        let subscriptions_compositional_approx = match machine_types::overapproximated_well_formed_sub(InterfacingProtocols(vec![input.proto.clone()]), subs.clone(), two_step_granularity.clone()) {
             DataResult::OK{data: subscriptions} => {
                 Some(subscriptions) },
             DataResult::ERROR{ .. } => None,
@@ -152,7 +152,7 @@ fn short_simple_run_bench_sub_sizes_general() {
         }
         wrap_and_write_sub_out_simple(&input, subscriptions_wf_kmt.unwrap(), Version::KMT23, &output_dir);
 
-        let subscriptions_compositional_exact = match exact_well_formed_sub(InterfacingProtocols(vec![input.proto.clone()]), subs.clone()) {
+        let subscriptions_compositional_exact = match machine_types::exact_well_formed_sub(InterfacingProtocols(vec![input.proto.clone()]), subs.clone()) {
             DataResult::OK{data: subscriptions} => {
                 Some(subscriptions) },
             DataResult::ERROR{ .. } => None,
@@ -165,7 +165,7 @@ fn short_simple_run_bench_sub_sizes_general() {
         }
         wrap_and_write_sub_out_simple(&input, subscriptions_compositional_exact.unwrap(), Version::CompositionalExact, &output_dir);
 
-        let subscriptions_compositional_approx = match overapproximated_well_formed_sub(InterfacingProtocols(vec![input.proto.clone()]), subs.clone(), two_step_granularity.clone()) {
+        let subscriptions_compositional_approx = match machine_types::overapproximated_well_formed_sub(InterfacingProtocols(vec![input.proto.clone()]), subs.clone(), two_step_granularity.clone()) {
             DataResult::OK{data: subscriptions} => {
                 Some(subscriptions) },
             DataResult::ERROR{ .. } => None,

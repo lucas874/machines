@@ -4,7 +4,7 @@ use petgraph::{
     Direction::{self, Outgoing}, visit::{Dfs, EdgeRef, GraphBase, Reversed, Walker}
 };
 
-use crate::{errors::{composition_errors, swarm_errors}, types::typescript_types::{EventLabel, EventType, State, SwarmLabel, SwarmProtocolType}};
+use crate::{errors::{composition_errors::{self, Error}, swarm_errors}, types::{proto_info::ProtoStruct, typescript_types::{EventLabel, EventType, State, SwarmLabel, SwarmProtocolType}}};
 use crate::types::proto_info;
 
 pub type Graph = petgraph::Graph<State, SwarmLabel>;
@@ -47,7 +47,8 @@ pub fn swarm_to_graph(proto: &SwarmProtocolType) -> (Graph, Option<NodeId>, Vec<
     (graph, initial, errors)
 }
 
-/* pub fn from_json(proto: SwarmProtocolType) -> (Graph, Option<NodeId>, Vec<String>) {
+// Consider this one... is it needed?
+pub fn from_json(proto: SwarmProtocolType) -> (Graph, Option<NodeId>, Vec<String>) {
     let _span = tracing::info_span!("from_json").entered();
     let proto_info = proto_info::prepare_proto_info(proto);
     let (g, i, e) = match proto_info.get_ith_proto(0) {
@@ -59,9 +60,9 @@ pub fn swarm_to_graph(proto: &SwarmProtocolType) -> (Graph, Option<NodeId>, Vec<
         }) => (g, i, e),
         _ => return (Graph::new(), None, vec![]),
     };
-    let e = e.map(Error::convert(&g));
+    let e = e.into_iter().map(Error::convert(&g)).collect();
     (g, i, e)
-} */
+}
 
 // copied from swarm::swarm.rs
 fn all_nodes_reachable(graph: &Graph, initial: NodeId) -> Vec<composition_errors::Error> {
