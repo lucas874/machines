@@ -723,84 +723,7 @@ pub fn compose_protocols(protos: InterfacingProtocols) -> Result<(Graph, NodeId)
 mod tests {
     use super::*;
     use crate::errors::composition_errors;
-    use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
-    
-    fn setup_logger() {
-        fmt()
-            .with_env_filter(EnvFilter::from_default_env())
-            .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
-            .try_init()
-            .ok();
-    }
-    fn pattern_4_proto_0() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_r0", "logType": ["e_r0"], "role": "R0" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_ir", "logType": ["e_ir"], "role": "IR" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-    fn pattern_4_proto_1() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_r1", "logType": ["e_r1"], "role": "R1" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_ir", "logType": ["e_ir"], "role": "IR" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-    fn pattern_4_proto_2() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_r2", "logType": ["e_r2"], "role": "R2" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_ir", "logType": ["e_ir"], "role": "IR" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-    fn pattern_4_proto_3() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_r3", "logType": ["e_r3"], "role": "R3" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_ir", "logType": ["e_ir"], "role": "IR" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-    fn pattern_4_proto_4() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "c_r4", "logType": ["e_r4"], "role": "R4" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "c_ir", "logType": ["e_ir"], "role": "IR" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-    fn get_interfacing_swarms_pat_4() -> InterfacingProtocols {
-        InterfacingProtocols(vec![
-            pattern_4_proto_0(),
-            pattern_4_proto_1(),
-            pattern_4_proto_2(),
-            pattern_4_proto_3(),
-            pattern_4_proto_4(),
-        ])
-    }
+    use crate::test_utils;
 
     #[test]
     fn test_after_not_concurrent() {
@@ -991,11 +914,11 @@ mod tests {
                 .map(|u| EventType::new(&format!("e_r{}", u)))
                 .collect()
         };
-        setup_logger();
+        test_utils::setup_logger();
         for i in 1..6 {
             let index = i as usize;
             let proto_info = swarms_to_proto_info(InterfacingProtocols(
-                get_interfacing_swarms_pat_4().0[..index].to_vec(),
+                test_utils::get_interfacing_swarms_pat_4().0[..index].to_vec(),
             ));
             if i == 1 {
                 assert_eq!(proto_info.joining_events, BTreeMap::new());

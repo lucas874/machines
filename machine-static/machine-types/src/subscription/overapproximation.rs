@@ -625,7 +625,7 @@ mod tests {
         assert!(result_5_two_step.is_ok());
         let subs_5_two_step = result_5_two_step.unwrap();
         let expected_subs_5_two_step: Subscriptions = BTreeMap::from([
-            (Role::from("IR"), BTreeSet::from([EventType::from("e_ir_0"), EventType::from("e_ir_1"), EventType::from("e_ra"), EventType::from("e_r0_1"), EventType::from("e_r1_0")])),
+            (Role::from("IR"), BTreeSet::from([EventType::from("e_ir_0"), EventType::from("e_ir_1"), EventType::from("e_r0_0"), EventType::from("e_r0_1"), EventType::from("e_r1_0")])),
             (Role::from("R0"), BTreeSet::from([EventType::from("e_ir_0"), EventType::from("e_ir_1"), EventType::from("e_r0_0"), EventType::from("e_r0_1"), EventType::from("e_r1_0")])),
             (Role::from("R1"), BTreeSet::from([EventType::from("e_ir_0"), EventType::from("e_r1_0")])),
         ]);

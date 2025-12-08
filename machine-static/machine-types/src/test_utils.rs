@@ -12,7 +12,6 @@ pub fn setup_logger() {
         .ok();
 }
 
-// Example from coplaws slides
 pub fn get_proto1() -> SwarmProtocolType {
     serde_json::from_str::<SwarmProtocolType>(
         r#"{
