@@ -163,3 +163,92 @@ pub fn event_pairs_from_node(
         }) //BTreeSet::from([graph[pair[0]].get_event_type(), graph[pair[1]].get_event_type()]))
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils;
+    use crate::types::typescript_types::StateName;
+
+    mod loop_tests {
+        use super::*;
+        // This module contains tests for relating to looping event types.
+        #[test]
+        fn looping_1() {
+            test_utils::setup_logger();
+            // Check states that can not reach terminal state an infinitely looping event types
+            let (graph, _, _) = swarm_to_graph(&test_utils::get_looping_proto_1());
+            let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+            let state_names: Vec<String> = states_not_reaching_terminal
+                .into_iter()
+                .map(|n| graph[n].state_name().to_string())
+                .collect::<Vec<_>>();
+            assert_eq!(state_names, ["2", "3", "4"]);
+        }
+
+        #[test]
+        fn looping_2() {
+            test_utils::setup_logger();
+            // Check states that can not reach terminal state an infinitely looping event types
+            let (graph, _, _) = swarm_to_graph(&test_utils::get_looping_proto_2());
+            let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+            let state_names: Vec<String> = states_not_reaching_terminal
+                .into_iter()
+                .map(|n| graph[n].state_name().to_string())
+                .collect::<Vec<_>>();
+            assert_eq!(state_names, ["2", "3", "4"]);
+        }
+
+        #[test]
+        fn looping_3() {
+            test_utils::setup_logger();
+            // Check states that can not reach terminal state an infinitely looping event types
+            let (graph, _, _) = swarm_to_graph(&test_utils::get_looping_proto_3());
+            let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+            let state_names: Vec<String> = states_not_reaching_terminal
+                .into_iter()
+                .map(|n| graph[n].state_name().to_string())
+                .collect::<Vec<_>>();
+            assert_eq!(state_names, ["0", "1", "2", "3", "4", "5", "6", "7"]);
+        }
+
+        #[test]
+        fn looping_4() {
+            test_utils::setup_logger();
+            // Check states that can not reach terminal state an infinitely looping event types
+            let (graph, _, _) = swarm_to_graph(&test_utils::get_looping_proto_4());
+            let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+            let state_names: Vec<String> = states_not_reaching_terminal
+                .into_iter()
+                .map(|n| graph[n].state_name().to_string())
+                .collect::<Vec<_>>();
+            assert_eq!(state_names, ["0", "1", "2", "3", "4", "5", "6", "7"]);
+        }
+
+        #[test]
+        fn looping_5() {
+            test_utils::setup_logger();
+            // Check states that can not reach terminal state an infinitely looping event types
+            let (graph, _, _) = swarm_to_graph(&test_utils::get_looping_proto_5());
+            let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+            let state_names: Vec<String> = states_not_reaching_terminal
+                .into_iter()
+                .map(|n| graph[n].state_name().to_string())
+                .collect::<Vec<_>>();
+            assert_eq!(state_names, ["0", "1", "2", "3", "4", "5", "6"]);
+        }
+
+        #[test]
+        fn looping_6() {
+            test_utils::setup_logger();
+            // Check states that can not reach terminal state an infinitely looping event types
+            let (graph, _, _) = swarm_to_graph(&test_utils::get_looping_proto_6());
+            let states_not_reaching_terminal = nodes_not_reaching_terminal(&graph);
+            let state_names: Vec<String> = states_not_reaching_terminal
+                .into_iter()
+                .map(|n| graph[n].state_name().to_string())
+                .collect::<Vec<_>>();
+            assert_eq!(state_names, ["0", "1", "2", "3", "4"]);
+        }
+    }
+}

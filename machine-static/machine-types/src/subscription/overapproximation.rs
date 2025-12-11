@@ -284,7 +284,7 @@ mod tests {
             (Role::from("F"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car")])),
         ]);
         assert_eq!(subs_1_coarse, expected_subs_1_coarse);
-        
+
         // Medium
         let result_1_medium = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_1(),
@@ -300,7 +300,7 @@ mod tests {
             (Role::from("F"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car")])),
         ]);
         assert_eq!(subs_1_medium, expected_subs_1_medium);
-        
+
         // Fine. Should be equal to exact for this example.
         let result_1_fine = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_1(),
@@ -335,7 +335,6 @@ mod tests {
         assert_eq!(subs_1_two_step, subs_1_medium);
         assert_eq!(subs_1_two_step, subs_1_coarse);
 
-        
         // Test interfacing_swarms_2
         // Coarse
         let result_2_coarse = overapprox_well_formed_sub(
@@ -354,7 +353,7 @@ mod tests {
             (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2"), EventType::from("ok"), EventType::from("notOk")])),
         ]);
         assert_eq!(subs_2_coarse, expected_subs_2_coarse);
-        
+
         // Medium
         let result_2_medium = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_2(),
@@ -391,7 +390,7 @@ mod tests {
             (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2"), EventType::from("ok"), EventType::from("notOk")])),
         ]);
         assert_eq!(subs_2_fine, expected_subs_2_fine);
-        
+
         // 'Algorithm 1'/'Two Step'
         let result_2_two_step = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_2(),
@@ -409,7 +408,7 @@ mod tests {
             (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2"), EventType::from("ok"), EventType::from("notOk")])),
         ]);
         assert_eq!(subs_2_two_step, expected_subs_2_two_step);
-        
+
         // Test interfacing_swarms_3
         // Coarse
         let result_3_coarse = overapprox_well_formed_sub(
@@ -427,7 +426,7 @@ mod tests {
             (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2"), EventType::from("report3")])),
         ]);
         assert_eq!(subs_3_coarse, expected_subs_3_coarse);
-        
+
         // Medium
         let result_3_medium = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_3(),
@@ -444,7 +443,7 @@ mod tests {
             (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2"), EventType::from("report3")])),
         ]);
         assert_eq!(subs_3_medium, expected_subs_3_medium);
-        
+
         // Fine
         let result_3_fine = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_3(),
@@ -461,7 +460,7 @@ mod tests {
             (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2"), EventType::from("report3")]))
         ]);
         assert_eq!(subs_3_fine, expected_subs_3_fine);
-        
+
         // 'Algorithm 1'/'Two Step'
         let result_3_two_step = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_3(),
@@ -488,19 +487,19 @@ mod tests {
         let empty_coarse = overapprox_well_formed_sub(InterfacingProtocols(vec![]), &BTreeMap::new(), Granularity::Coarse);
         assert!(empty_coarse.is_ok());
         assert_eq!(empty_coarse.unwrap(), BTreeMap::new());
-        
+
         let empty_medium = overapprox_well_formed_sub(InterfacingProtocols(vec![]), &BTreeMap::new(), Granularity::Medium);
         assert!(empty_medium.is_ok());
         assert_eq!(empty_medium.unwrap(), BTreeMap::new());
-        
+
         let empty_fine = overapprox_well_formed_sub(InterfacingProtocols(vec![]), &BTreeMap::new(), Granularity::Fine);
         assert!(empty_fine.is_ok());
         assert_eq!(empty_fine.unwrap(), BTreeMap::new());
-        
+
         let empty_two_step = overapprox_well_formed_sub(InterfacingProtocols(vec![]), &BTreeMap::new(), Granularity::TwoStep);
         assert!(empty_two_step.is_ok());
         assert_eq!(empty_two_step.unwrap(), BTreeMap::new());
-        
+
         // Test interfacing_swarms_4
         // Coarse
         let result_4_coarse = overapprox_well_formed_sub(
@@ -518,7 +517,7 @@ mod tests {
             (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("observing"), EventType::from("report")])),
         ]);
         assert_eq!(subs_4_coarse, expected_subs_4_coarse);
-        
+
         // Medium
         let result_4_medium = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_4(),
@@ -535,7 +534,7 @@ mod tests {
             (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("observing"), EventType::from("report")])),
         ]);
         assert_eq!(subs_4_medium, expected_subs_4_medium);
-        
+
         // Fine
         let result_4_fine = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_4(),
@@ -552,7 +551,7 @@ mod tests {
             (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("observing"), EventType::from("report")]))
         ]);
         assert_eq!(subs_4_fine, expected_subs_4_fine);
-        
+
         // 'Algorithm 1'/'Two Step'
         let result_4_two_step = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_4(),
@@ -571,7 +570,7 @@ mod tests {
         assert_eq!(subs_4_two_step, expected_subs_4_two_step);
 
         // Test interfacing_swarms_5
-        // Coarse 
+        // Coarse
         let result_5_coarse = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_5(),
             &BTreeMap::new(),
@@ -586,7 +585,7 @@ mod tests {
         ]);
         assert_eq!(subs_5_coarse, expected_subs_5_coarse);
 
-        // Medium 
+        // Medium
         let result_5_medium = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_5(),
             &BTreeMap::new(),
@@ -601,7 +600,7 @@ mod tests {
         ]);
         assert_eq!(subs_5_medium, expected_subs_5_medium);
 
-        // Fine 
+        // Fine
         let result_5_fine = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_5(),
             &BTreeMap::new(),
@@ -616,7 +615,7 @@ mod tests {
         ]);
         assert_eq!(subs_5_fine, expected_subs_5_fine);
 
-        // 'Algorithm 1'/'Two Step' 
+        // 'Algorithm 1'/'Two Step'
         let result_5_two_step = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_5(),
             &BTreeMap::new(),
@@ -636,8 +635,8 @@ mod tests {
     #[test]
     fn test_refinement_pattern() {
         test_utils::setup_logger();
-        
-        // Coarse 
+
+        // Coarse
         let result_coarse = overapprox_well_formed_sub(
             test_utils::get_ref_pat_protos(),
             &BTreeMap::new(),
@@ -653,8 +652,8 @@ mod tests {
             (Role::from("RC"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir0_1"), EventType::from("e_ir1_0"), EventType::from("e_ir1_1"), EventType::from("e_ra"), EventType::from("e_rc")])),
         ]);
         assert_eq!(subs_coarse, expected_subs_coarse);
-    
-        // Medium 
+
+        // Medium
         let result_medium = overapprox_well_formed_sub(
             test_utils::get_ref_pat_protos(),
             &BTreeMap::new(),
@@ -664,7 +663,7 @@ mod tests {
         let subs_medium = result_medium.unwrap();
         assert_eq!(subs_medium, expected_subs_coarse);
 
-        // Fine 
+        // Fine
         let result_fine = overapprox_well_formed_sub(
             test_utils::get_ref_pat_protos(),
             &BTreeMap::new(),
@@ -681,7 +680,7 @@ mod tests {
         ]);
         assert_eq!(subs_fine, expected_subs_fine);
 
-        // 'Algorithm 1'/'Two Step' 
+        // 'Algorithm 1'/'Two Step'
         let result_two_step = overapprox_well_formed_sub(
             test_utils::get_ref_pat_protos(),
             &BTreeMap::new(),
@@ -705,7 +704,7 @@ mod tests {
             (Role::new("D"), BTreeSet::from([EventType::new("pos")])),
             (Role::new("TR"), BTreeSet::from([EventType::new("ok")])),
         ]);
-        
+
         // Coarse
         let result_coarse = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_2(),
@@ -738,7 +737,7 @@ mod tests {
         let subs_fine = result_fine.unwrap();
         assert!(subs_fine[&Role::new("D")].contains(&EventType::new("pos")));
         assert!(subs_fine[&Role::new("TR")].contains(&EventType::new("ok")));
-        
+
         // 'Algorithm 1'/'Two Step'
         let result_two_step = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_2(),

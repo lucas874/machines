@@ -178,7 +178,7 @@ impl ProtoInfo {
     }
 }
 
-// Overapproximate concurrent events. 
+// Overapproximate concurrent events.
 // Anything from different protocols that are not interfacing events is considered concurrent.
 // Pre: interface has been checked.
 fn get_concurrent_events(
@@ -932,8 +932,117 @@ mod tests {
     }
 
     #[test]
-    fn test_thinggg() {
+    fn test_empty_set_of_protocols() {
         let error_report = proto_info_to_error_report(ProtoInfo::new_only_proto(vec![]));
         assert!(error_report.is_empty());
     }
+
+    mod loop_tests {
+        use super::*;
+        // This module contains tests for relating to looping event types.
+        #[test]
+        fn looping_1() {
+            test_utils::setup_logger();
+            // Check states that can not reach terminal state an infinitely looping event types
+            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![test_utils::get_looping_proto_1()]));
+            assert!(proto_info.no_errors());
+            assert_eq!(
+                proto_info
+                    .infinitely_looping_events
+                    .clone()
+                    .into_iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>(),
+                vec!["c", "d", "e"]
+            );
+        }
+
+        #[test]
+        fn looping_2() {
+            test_utils::setup_logger();
+            // Check states that can not reach terminal state an infinitely looping event types
+            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![test_utils::get_looping_proto_2()]));
+            assert!(proto_info.no_errors());
+            assert_eq!(
+                proto_info
+                    .infinitely_looping_events
+                    .clone()
+                    .into_iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>(),
+                vec!["c", "d", "e"]
+            );
+        }
+
+        #[test]
+        fn looping_3() {
+            test_utils::setup_logger();
+            // Check states that can not reach terminal state an infinitely looping event types
+            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![test_utils::get_looping_proto_3()]));
+            assert!(proto_info.no_errors());
+            assert_eq!(
+                proto_info
+                    .infinitely_looping_events
+                    .clone()
+                    .into_iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>(),
+                vec!["c", "d", "e", "f", "g", "h", "i"]
+            );
+        }
+
+        #[test]
+        fn looping_4() {
+            test_utils::setup_logger();
+
+            // Check states that can not reach terminal state an infinitely looping event types
+            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![test_utils::get_looping_proto_4()]));
+            assert!(proto_info.no_errors());
+            assert_eq!(
+                proto_info
+                    .infinitely_looping_events
+                    .clone()
+                    .into_iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>(),
+                vec!["c", "d", "e", "f", "g", "h"]
+            );
+        }
+
+        #[test]
+        fn looping_5() {
+            test_utils::setup_logger();
+            // Check states that can not reach terminal state an infinitely looping event types
+            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![test_utils::get_looping_proto_5()]));
+            assert!(proto_info.no_errors());
+            assert_eq!(
+                proto_info
+                    .infinitely_looping_events
+                    .clone()
+                    .into_iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>(),
+                vec!["a", "b", "c", "d", "e", "f", "g", "h"]
+            );
+        }
+
+        #[test]
+        fn looping_6() {
+            test_utils::setup_logger();
+            // Check states that can not reach terminal state an infinitely looping event types
+            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![test_utils::get_looping_proto_6()]));
+            assert!(proto_info.no_errors());
+            assert_eq!(
+                proto_info
+                    .infinitely_looping_events
+                    .clone()
+                    .into_iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>(),
+                vec!["a", "b", "c", "d", "e", "f"]
+            );
+        }
+    }
+
+
 }
