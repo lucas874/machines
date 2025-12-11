@@ -192,44 +192,7 @@ pub fn check_interface(proto_info1: &ProtoInfo, proto_info2: &ProtoInfo) -> Vec<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::typescript_types::SwarmProtocolType;
     use crate::test_utils;
-
-    // pos event type associated with multiple commands and nondeterminism at 0.
-    // No terminal state can be reached from any state -- OK according to confusion freeness
-    fn get_confusionful_proto1() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
-                    { "source": "0", "target": "0", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "get", "logType": ["pos"], "role": "FL" } },
-                    { "source": "2", "target": "0", "label": { "cmd": "request", "logType": ["pos"], "role": "T" } },
-                    { "source": "0", "target": "0", "label": { "cmd": "close", "logType": ["time"], "role": "D" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
-    // No terminal state can be reached from any state -- OK according to confusion freeness
-    fn get_some_nonterminating_proto() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "a", "logType": ["a"], "role": "a" } },
-                    { "source": "0", "target": "2", "label": { "cmd": "c", "logType": ["c"], "role": "c" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "b", "logType": ["b"], "role": "b" } },
-                    { "source": "1", "target": "4", "label": { "cmd": "d", "logType": ["d"], "role": "d" } },
-                    { "source": "4", "target": "5", "label": { "cmd": "e", "logType": ["e"], "role": "e" } },
-                    { "source": "5", "target": "1", "label": { "cmd": "f", "logType": ["f"], "role": "f" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
 
     // Tests relating to confusion-freeness of protocols.
     mod confusion_freeness_tests {
@@ -394,7 +357,7 @@ mod tests {
         #[test]
         fn test_prepare_graph_confusionful() {
             test_utils::setup_logger();
-            let proto = get_confusionful_proto1();
+            let proto = test_utils::get_confusionful_proto1();
 
             let proto_info = proto_info::prepare_proto_info(proto); //proto, None);
             let mut errors: Vec<String> = vec![
@@ -415,7 +378,7 @@ mod tests {
             expected_errors.sort();
             assert_eq!(errors, expected_errors);
 
-            let proto = get_some_nonterminating_proto();
+            let proto = test_utils::get_some_nonterminating_proto();
             let proto_info = proto_info::prepare_proto_info(proto);
             let mut errors: Vec<String> = vec![
                 confusion_free(&proto_info, 0),
