@@ -191,109 +191,10 @@ pub fn check_interface(proto_info1: &ProtoInfo, proto_info2: &ProtoInfo) -> Vec<
 
 #[cfg(test)]
 mod tests {
-    use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
     use super::*;
-    use crate::types::typescript_types::{InterfacingProtocols, SwarmProtocolType};
-    fn setup_logger() {
-        fmt()
-            .with_env_filter(EnvFilter::from_default_env())
-            .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
-            .try_init()
-            .ok();
-    }
+    use crate::types::typescript_types::SwarmProtocolType;
+    use crate::test_utils;
 
-    fn get_proto1() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "get", "logType": ["pos"], "role": "FL" } },
-                    { "source": "2", "target": "0", "label": { "cmd": "deliver", "logType": ["part"], "role": "T" } },
-                    { "source": "0", "target": "3", "label": { "cmd": "close", "logType": ["time"], "role": "D" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-    fn get_proto2() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "deliver", "logType": ["part"], "role": "T" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "build", "logType": ["car"], "role": "F" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-    fn get_proto3() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "observe", "logType": ["report1"], "role": "TR" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "test", "logType": ["report2"], "role": "TR" } },
-                    { "source": "3", "target": "4", "label": { "cmd": "accept", "logType": ["ok"], "role": "QCR" } },
-                    { "source": "3", "target": "4", "label": { "cmd": "reject", "logType": ["notOk"], "role": "QCR" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
-    fn get_interfacing_swarms_1() -> InterfacingProtocols {
-        InterfacingProtocols(vec![get_proto1(), get_proto2()])
-    }
-        
-    // two event types in close, request appears multiple times, get emits no events
-    fn get_malformed_proto1() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
-                    { "source": "1", "target": "2", "label": { "cmd": "get", "logType": [], "role": "FL" } },
-                    { "source": "2", "target": "0", "label": { "cmd": "request", "logType": ["part"], "role": "T" } },
-                    { "source": "0", "target": "0", "label": { "cmd": "close", "logType": ["time", "time2"], "role": "D" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
-    // initial state state unreachable
-    fn get_malformed_proto2() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "1", "target": "2", "label": { "cmd": "get", "logType": ["pos"], "role": "FL" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "deliver", "logType": ["partID"], "role": "T" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-
-    // all states not reachable
-    fn get_malformed_proto3() -> SwarmProtocolType {
-        serde_json::from_str::<SwarmProtocolType>(
-            r#"{
-                "initial": "0",
-                "transitions": [
-                    { "source": "0", "target": "1", "label": { "cmd": "request", "logType": ["partID"], "role": "T" } },
-                    { "source": "2", "target": "3", "label": { "cmd": "deliver", "logType": ["part"], "role": "T" } },
-                    { "source": "4", "target": "5", "label": { "cmd": "build", "logType": ["car"], "role": "F" } }
-                ]
-            }"#,
-        )
-        .unwrap()
-    }
-    
     // pos event type associated with multiple commands and nondeterminism at 0.
     // No terminal state can be reached from any state -- OK according to confusion freeness
     fn get_confusionful_proto1() -> SwarmProtocolType {
@@ -339,8 +240,8 @@ mod tests {
 
         #[test]
         fn test_prepare_graph_confusionfree() {
-            setup_logger();
-            let composition = get_interfacing_swarms_1();
+            test_utils::setup_logger();
+            let composition = test_utils::get_interfacing_swarms_1();
             let proto_info = proto_info::combine_proto_infos(proto_info::prepare_proto_infos(composition));
             let proto_info = proto_info::explicit_composition_proto_info(proto_info);
 
@@ -403,7 +304,7 @@ mod tests {
                 ),
             ]);
             assert_eq!(proto_info.role_event_map, expected_role_event_map);
-            let proto_info = proto_info::prepare_proto_info(get_proto1());
+            let proto_info = proto_info::prepare_proto_info(test_utils::get_proto1());
             assert!(proto_info.get_ith_proto(0).is_some());
             assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
             assert_eq!(proto_info.concurrent_events, BTreeSet::new());
@@ -416,14 +317,14 @@ mod tests {
             );
             assert_eq!(proto_info.joining_events, BTreeMap::new());
 
-            let proto_info = proto_info::prepare_proto_info(get_proto2());
+            let proto_info = proto_info::prepare_proto_info(test_utils::get_proto2());
             assert!(proto_info.get_ith_proto(0).is_some());
             assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
             assert_eq!(proto_info.concurrent_events, BTreeSet::new());
             assert_eq!(proto_info.branching_events, Vec::new());
             assert_eq!(proto_info.joining_events, BTreeMap::new());
 
-            let proto_info = proto_info::prepare_proto_info(get_proto3());
+            let proto_info = proto_info::prepare_proto_info(test_utils::get_proto3());
             assert!(proto_info.get_ith_proto(0).is_some());
             assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
             assert_eq!(proto_info.concurrent_events, BTreeSet::new());
@@ -438,8 +339,8 @@ mod tests {
 
         #[test]
         fn test_prepare_graph_malformed() {
-            setup_logger();
-            let proto1 = get_malformed_proto1();
+            test_utils::setup_logger();
+            let proto1 = test_utils::get_malformed_proto1();
             let proto_info = proto_info::prepare_proto_info(proto1.clone());
             let mut errors: Vec<String> = vec![proto_info.get_ith_proto(0).unwrap().errors]
                 .concat()
@@ -455,7 +356,7 @@ mod tests {
             expected_erros.sort();
             assert_eq!(errors, expected_erros);
 
-            let proto_info = proto_info::prepare_proto_info(get_malformed_proto2());
+            let proto_info = proto_info::prepare_proto_info(test_utils::get_malformed_proto2());
             let errors: Vec<String> = vec![
                 confusion_free(&proto_info, 0),
                 proto_info.get_ith_proto(0).unwrap().errors,
@@ -471,7 +372,7 @@ mod tests {
             ];
             assert_eq!(errors, expected_errors);
 
-            let proto_info = proto_info::prepare_proto_info(get_malformed_proto3());
+            let proto_info = proto_info::prepare_proto_info(test_utils::get_malformed_proto3());
             let errors: Vec<String> = proto_info
                 .get_ith_proto(0)
                 .unwrap()
@@ -492,7 +393,7 @@ mod tests {
         // pos event type associated with multiple commands and nondeterminism at 0
         #[test]
         fn test_prepare_graph_confusionful() {
-            setup_logger();
+            test_utils::setup_logger();
             let proto = get_confusionful_proto1();
 
             let proto_info = proto_info::prepare_proto_info(proto); //proto, None);

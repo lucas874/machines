@@ -1225,7 +1225,7 @@ mod tests {
         use std::collections::BTreeMap;
 
         use super::*;
-        use machine_types::types::typescript_types::{Granularity, StateName};
+        use machine_types::types::typescript_types::Granularity;
         use machine_types::subscription::{exact, overapproximation};
 
         #[test]
