@@ -193,206 +193,202 @@ pub fn check_interface(proto_info1: &ProtoInfo, proto_info2: &ProtoInfo) -> Vec<
 mod tests {
     use super::*;
     use crate::test_utils;
+    use std::collections::{BTreeMap, BTreeSet};
+    use crate::types::{proto_info, typescript_types::{EventType, Role, SwarmLabel}};
+    // Tests relating to composability: confusion-freeness. Interface tests in proto_info, proto_info calls functions defined in composability_check.
 
-    // Tests relating to confusion-freeness of protocols.
-    mod confusion_freeness_tests {
-        use std::collections::{BTreeMap, BTreeSet};
+    #[test]
+    fn test_prepare_graph_confusionfree() {
+        test_utils::setup_logger();
+        let composition = test_utils::get_interfacing_swarms_1();
+        let proto_info = proto_info::combine_proto_infos(proto_info::prepare_proto_infos(composition));
+        let proto_info = proto_info::explicit_composition_proto_info(proto_info);
 
-        use super::*;
-        use crate::types::{proto_info, typescript_types::{EventType, Role, SwarmLabel}};
-
-        #[test]
-        fn test_prepare_graph_confusionfree() {
-            test_utils::setup_logger();
-            let composition = test_utils::get_interfacing_swarms_1();
-            let proto_info = proto_info::combine_proto_infos(proto_info::prepare_proto_infos(composition));
-            let proto_info = proto_info::explicit_composition_proto_info(proto_info);
-
-            assert!(proto_info.get_ith_proto(0).is_some());
-            assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
-            assert_eq!(
-                proto_info.concurrent_events,
+        assert!(proto_info.get_ith_proto(0).is_some());
+        assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
+        assert_eq!(
+            proto_info.concurrent_events,
+            BTreeSet::from([
+                proto_info::unord_event_pair(EventType::new("time"), EventType::new("car")),
+                proto_info::unord_event_pair(EventType::new("pos"), EventType::new("car"))
+            ])
+        );
+        assert_eq!(
+            proto_info.branching_events,
+            vec![BTreeSet::from([
+                EventType::new("time"),
+                EventType::new("partID")
+            ])]
+        );
+        assert_eq!(proto_info.joining_events, BTreeMap::new());
+        let expected_role_event_map = BTreeMap::from([
+            (
+                Role::from("T"),
                 BTreeSet::from([
-                    proto_info::unord_event_pair(EventType::new("time"), EventType::new("car")),
-                    proto_info::unord_event_pair(EventType::new("pos"), EventType::new("car"))
-                ])
-            );
-            assert_eq!(
-                proto_info.branching_events,
-                vec![BTreeSet::from([
-                    EventType::new("time"),
-                    EventType::new("partID")
-                ])]
-            );
-            assert_eq!(proto_info.joining_events, BTreeMap::new());
-            let expected_role_event_map = BTreeMap::from([
-                (
-                    Role::from("T"),
-                    BTreeSet::from([
-                        SwarmLabel {
-                            cmd: Command::new("deliver"),
-                            log_type: vec![EventType::new("part")],
-                            role: Role::new("T"),
-                        },
-                        SwarmLabel {
-                            cmd: Command::new("request"),
-                            log_type: vec![EventType::new("partID")],
-                            role: Role::new("T"),
-                        },
-                    ]),
-                ),
-                (
-                    Role::from("FL"),
-                    BTreeSet::from([SwarmLabel {
-                        cmd: Command::new("get"),
-                        log_type: vec![EventType::new("pos")],
-                        role: Role::new("FL"),
-                    }]),
-                ),
-                (
-                    Role::from("D"),
-                    BTreeSet::from([SwarmLabel {
-                        cmd: Command::new("close"),
-                        log_type: vec![EventType::new("time")],
-                        role: Role::new("D"),
-                    }]),
-                ),
-                (
-                    Role::from("F"),
-                    BTreeSet::from([SwarmLabel {
-                        cmd: Command::new("build"),
-                        log_type: vec![EventType::new("car")],
-                        role: Role::new("F"),
-                    }]),
-                ),
-            ]);
-            assert_eq!(proto_info.role_event_map, expected_role_event_map);
-            let proto_info = proto_info::prepare_proto_info(test_utils::get_proto1());
-            assert!(proto_info.get_ith_proto(0).is_some());
-            assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
-            assert_eq!(proto_info.concurrent_events, BTreeSet::new());
-            assert_eq!(
-                proto_info.branching_events,
-                vec![BTreeSet::from([
-                    EventType::new("time"),
-                    EventType::new("partID")
-                ])]
-            );
-            assert_eq!(proto_info.joining_events, BTreeMap::new());
+                    SwarmLabel {
+                        cmd: Command::new("deliver"),
+                        log_type: vec![EventType::new("part")],
+                        role: Role::new("T"),
+                    },
+                    SwarmLabel {
+                        cmd: Command::new("request"),
+                        log_type: vec![EventType::new("partID")],
+                        role: Role::new("T"),
+                    },
+                ]),
+            ),
+            (
+                Role::from("FL"),
+                BTreeSet::from([SwarmLabel {
+                    cmd: Command::new("get"),
+                    log_type: vec![EventType::new("pos")],
+                    role: Role::new("FL"),
+                }]),
+            ),
+            (
+                Role::from("D"),
+                BTreeSet::from([SwarmLabel {
+                    cmd: Command::new("close"),
+                    log_type: vec![EventType::new("time")],
+                    role: Role::new("D"),
+                }]),
+            ),
+            (
+                Role::from("F"),
+                BTreeSet::from([SwarmLabel {
+                    cmd: Command::new("build"),
+                    log_type: vec![EventType::new("car")],
+                    role: Role::new("F"),
+                }]),
+            ),
+        ]);
+        assert_eq!(proto_info.role_event_map, expected_role_event_map);
+        let proto_info = proto_info::prepare_proto_info(test_utils::get_proto1());
+        assert!(proto_info.get_ith_proto(0).is_some());
+        assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
+        assert_eq!(proto_info.concurrent_events, BTreeSet::new());
+        assert_eq!(
+            proto_info.branching_events,
+            vec![BTreeSet::from([
+                EventType::new("time"),
+                EventType::new("partID")
+            ])]
+        );
+        assert_eq!(proto_info.joining_events, BTreeMap::new());
 
-            let proto_info = proto_info::prepare_proto_info(test_utils::get_proto2());
-            assert!(proto_info.get_ith_proto(0).is_some());
-            assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
-            assert_eq!(proto_info.concurrent_events, BTreeSet::new());
-            assert_eq!(proto_info.branching_events, Vec::new());
-            assert_eq!(proto_info.joining_events, BTreeMap::new());
+        let proto_info = proto_info::prepare_proto_info(test_utils::get_proto2());
+        assert!(proto_info.get_ith_proto(0).is_some());
+        assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
+        assert_eq!(proto_info.concurrent_events, BTreeSet::new());
+        assert_eq!(proto_info.branching_events, Vec::new());
+        assert_eq!(proto_info.joining_events, BTreeMap::new());
 
-            let proto_info = proto_info::prepare_proto_info(test_utils::get_proto3());
-            assert!(proto_info.get_ith_proto(0).is_some());
-            assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
-            assert_eq!(proto_info.concurrent_events, BTreeSet::new());
+        let proto_info = proto_info::prepare_proto_info(test_utils::get_proto3());
+        assert!(proto_info.get_ith_proto(0).is_some());
+        assert!(proto_info.get_ith_proto(0).unwrap().errors.is_empty());
+        assert_eq!(proto_info.concurrent_events, BTreeSet::new());
 
-            // Should not contain any branching event types since only state with two outgoing is 3
-            // and both of these outgoing transitions go to state 4:
-            // { "source": "3", "target": "4", "label": { "cmd": "accept", "logType": ["ok"], "role": "QCR" } },
-            // { "source": "3", "target": "4", "label": { "cmd": "reject", "logType": ["notOk"], "role": "QCR" } }
-            assert_eq!(proto_info.branching_events, vec![]);
-            assert_eq!(proto_info.joining_events, BTreeMap::new());
-        }
-
-        #[test]
-        fn test_prepare_graph_malformed() {
-            test_utils::setup_logger();
-            let proto1 = test_utils::get_malformed_proto1();
-            let proto_info = proto_info::prepare_proto_info(proto1.clone());
-            let mut errors: Vec<String> = vec![proto_info.get_ith_proto(0).unwrap().errors]
-                .concat()
-                .into_iter()
-                .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph))
-                .collect();
-
-            let mut expected_erros = vec![
-                "transition (0)--[close@D<time,time2>]-->(0) emits more than one event type",
-                "log type must not be empty (1)--[get@FL<>]-->(2)",
-            ];
-            errors.sort();
-            expected_erros.sort();
-            assert_eq!(errors, expected_erros);
-
-            let proto_info = proto_info::prepare_proto_info(test_utils::get_malformed_proto2());
-            let errors: Vec<String> = vec![
-                confusion_free(&proto_info, 0),
-                proto_info.get_ith_proto(0).unwrap().errors,
-            ]
-            .concat()
-            .into_iter()
-            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph))
-            .collect();
-
-            let expected_errors = vec![
-                "initial swarm protocol state has no transitions",
-                "initial swarm protocol state has no transitions",
-            ];
-            assert_eq!(errors, expected_errors);
-
-            let proto_info = proto_info::prepare_proto_info(test_utils::get_malformed_proto3());
-            let errors: Vec<String> = proto_info
-                .get_ith_proto(0)
-                .unwrap()
-                .errors
-                .into_iter()
-                .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph))
-                .collect();
-
-            let expected_errors = vec![
-                "state 2 is unreachable from initial state",
-                "state 3 is unreachable from initial state",
-                "state 4 is unreachable from initial state",
-                "state 5 is unreachable from initial state",
-            ];
-            assert_eq!(errors, expected_errors);
-        }
-
-        // pos event type associated with multiple commands and nondeterminism at 0
-        #[test]
-        fn test_prepare_graph_confusionful() {
-            test_utils::setup_logger();
-            let proto = test_utils::get_confusionful_proto1();
-
-            let proto_info = proto_info::prepare_proto_info(proto); //proto, None);
-            let mut errors: Vec<String> = vec![
-                confusion_free(&proto_info, 0),
-                proto_info.get_ith_proto(0).unwrap().errors,
-            ]
-            .concat()
-            .into_iter()
-            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph))
-            .collect();
-
-            let mut expected_errors = vec![
-                "command request enabled in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0), (2)--[request@T<pos>]-->(0)",
-                "event type partID emitted in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0)",
-                "event type pos emitted in more than one transition: (1)--[get@FL<pos>]-->(2), (2)--[request@T<pos>]-->(0)",
-            ];
-            errors.sort();
-            expected_errors.sort();
-            assert_eq!(errors, expected_errors);
-
-            let proto = test_utils::get_some_nonterminating_proto();
-            let proto_info = proto_info::prepare_proto_info(proto);
-            let mut errors: Vec<String> = vec![
-                confusion_free(&proto_info, 0),
-                proto_info.get_ith_proto(0).unwrap().errors,
-            ]
-            .concat()
-            .into_iter()
-            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph))
-            .collect();
-
-            let mut expected_errors: Vec<String> = vec![];
-            errors.sort();
-            expected_errors.sort();
-            assert_eq!(errors, expected_errors);
-        }
+        // Should not contain any branching event types since only state with two outgoing is 3
+        // and both of these outgoing transitions go to state 4:
+        // { "source": "3", "target": "4", "label": { "cmd": "accept", "logType": ["ok"], "role": "QCR" } },
+        // { "source": "3", "target": "4", "label": { "cmd": "reject", "logType": ["notOk"], "role": "QCR" } }
+        assert_eq!(proto_info.branching_events, vec![]);
+        assert_eq!(proto_info.joining_events, BTreeMap::new());
     }
+
+    #[test]
+    fn test_prepare_graph_malformed() {
+        test_utils::setup_logger();
+        let proto1 = test_utils::get_malformed_proto1();
+        let proto_info = proto_info::prepare_proto_info(proto1.clone());
+        let mut errors: Vec<String> = vec![proto_info.get_ith_proto(0).unwrap().errors]
+            .concat()
+            .into_iter()
+            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph))
+            .collect();
+
+        let mut expected_erros = vec![
+            "transition (0)--[close@D<time,time2>]-->(0) emits more than one event type",
+            "log type must not be empty (1)--[get@FL<>]-->(2)",
+        ];
+        errors.sort();
+        expected_erros.sort();
+        assert_eq!(errors, expected_erros);
+
+        let proto_info = proto_info::prepare_proto_info(test_utils::get_malformed_proto2());
+        let errors: Vec<String> = vec![
+            confusion_free(&proto_info, 0),
+            proto_info.get_ith_proto(0).unwrap().errors,
+        ]
+        .concat()
+        .into_iter()
+        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph))
+        .collect();
+
+        let expected_errors = vec![
+            "initial swarm protocol state has no transitions",
+            "initial swarm protocol state has no transitions",
+        ];
+        assert_eq!(errors, expected_errors);
+
+        let proto_info = proto_info::prepare_proto_info(test_utils::get_malformed_proto3());
+        let errors: Vec<String> = proto_info
+            .get_ith_proto(0)
+            .unwrap()
+            .errors
+            .into_iter()
+            .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph))
+            .collect();
+
+        let expected_errors = vec![
+            "state 2 is unreachable from initial state",
+            "state 3 is unreachable from initial state",
+            "state 4 is unreachable from initial state",
+            "state 5 is unreachable from initial state",
+        ];
+        assert_eq!(errors, expected_errors);
+    }
+
+    // pos event type associated with multiple commands and nondeterminism at 0
+    #[test]
+    fn test_prepare_graph_confusionful() {
+        test_utils::setup_logger();
+        let proto = test_utils::get_confusionful_proto1();
+
+        let proto_info = proto_info::prepare_proto_info(proto); //proto, None);
+        let mut errors: Vec<String> = vec![
+            confusion_free(&proto_info, 0),
+            proto_info.get_ith_proto(0).unwrap().errors,
+        ]
+        .concat()
+        .into_iter()
+        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph))
+        .collect();
+
+        let mut expected_errors = vec![
+            "command request enabled in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0), (2)--[request@T<pos>]-->(0)",
+            "event type partID emitted in more than one transition: (0)--[request@T<partID>]-->(1), (0)--[request@T<partID>]-->(0)",
+            "event type pos emitted in more than one transition: (1)--[get@FL<pos>]-->(2), (2)--[request@T<pos>]-->(0)",
+        ];
+        errors.sort();
+        expected_errors.sort();
+        assert_eq!(errors, expected_errors);
+
+        let proto = test_utils::get_some_nonterminating_proto();
+        let proto_info = proto_info::prepare_proto_info(proto);
+        let mut errors: Vec<String> = vec![
+            confusion_free(&proto_info, 0),
+            proto_info.get_ith_proto(0).unwrap().errors,
+        ]
+        .concat()
+        .into_iter()
+        .map(Error::convert(&proto_info.get_ith_proto(0).unwrap().graph))
+        .collect();
+
+        let mut expected_errors: Vec<String> = vec![];
+        errors.sort();
+        expected_errors.sort();
+        assert_eq!(errors, expected_errors);
+    }
+
 }
