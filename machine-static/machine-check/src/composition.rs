@@ -1,7 +1,5 @@
-use machine_types::types::proto_graph;
-use machine_types::types::typescript_types::{
-    ProjectionInfo, InterfacingProtocols
-};
+use machine_types::machine::projection;
+use machine_types::types::typescript_types::InterfacingProtocols;
 use machine_types::{errors::composition_errors, types::proto_info};
 use super::*;
 
@@ -33,97 +31,6 @@ pub fn check_composed_swarm(protos: InterfacingProtocols, subs: String) -> Check
 }
 
 #[wasm_bindgen]
-pub fn revised_projection(
-    proto: SwarmProtocolType,
-    subs: String,
-    role: Role,
-    minimize: bool,
-) -> DataResult<MachineType> {
-    let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
-        errors: vec![format!("parsing subscriptions: {}", e)]
-    });
-    let (swarm, initial, errors) = proto_graph::from_json(proto);
-    let Some(initial) = initial else {
-        return DataResult::ERROR { errors };
-    };
-    let (proj, initial) =
-        composition::composition_machine::project(&swarm, initial, &subs, role, minimize);
-    DataResult::OK {
-        data: composition::composition_machine::to_json_machine(proj, initial),
-    }
-}
-
-#[wasm_bindgen]
-pub fn project_combine(
-    protos: InterfacingProtocols,
-    subs: String,
-    role: Role,
-    minimize: bool,
-) -> DataResult<MachineType> {
-    let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
-        errors: vec![format!("parsing subscriptions: {}", e)]
-    });
-    let proto_info = proto_info::swarms_to_proto_info(protos);
-    if !proto_info.no_errors() {
-        return DataResult::ERROR {
-            errors: composition_errors::error_report_to_strings(proto_info::proto_info_to_error_report(proto_info)),
-        }; //derr::<Machine>(composition_errors::error_report_to_strings(proto_info_to_error_report(proto_info)));
-    }
-
-    let (proj, proj_initial) =
-        composition_machine::project_combine(&proto_info, &subs, role, minimize);
-    DataResult::OK {
-        data: composition::composition_machine::from_option_to_machine(proj, proj_initial.unwrap()),
-    }
-}
-
-#[wasm_bindgen]
-pub fn projection_information(
-    role: Role,
-    protos: InterfacingProtocols,
-    k: usize,
-    subs: String,
-    machine: MachineType,
-    minimize: bool,
-) -> DataResult<ProjectionInfo> {
-    let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
-        errors: vec![format!("parsing subscriptions: {}", e)]
-    });
-    let proto_info = proto_info::swarms_to_proto_info(protos);
-    if !proto_info.no_errors() {
-        return DataResult::ERROR {
-            errors: composition_errors::error_report_to_strings(proto_info::proto_info_to_error_report(proto_info)),
-        };
-    }
-    let (machine, initial, m_errors) = machine::from_json(machine);
-    let machine_problem = !m_errors.is_empty();
-    let mut errors = vec![];
-    errors.extend(m_errors);
-    let Some(initial) = initial else {
-        errors.push(format!("initial machine state has no transitions"));
-        return DataResult::ERROR { errors };
-    };
-    if machine_problem {
-        return DataResult::ERROR { errors };
-    }
-    match composition::composition_machine::projection_information(
-        &proto_info,
-        &subs,
-        role,
-        (machine, initial),
-        k,
-        minimize,
-    ) {
-        Some(projection_info) => DataResult::OK {
-            data: projection_info,
-        },
-        None => DataResult::ERROR {
-            errors: vec![format!("invalid index {}", k)],
-        },
-    }
-}
-
-#[wasm_bindgen]
 pub fn check_composed_projection(
     protos: InterfacingProtocols,
     subs: String,
@@ -141,7 +48,7 @@ pub fn check_composed_projection(
     }
 
     let (proj, proj_initial) =
-        composition_machine::project_combine(&proto_info, &subs, role, false);
+        projection::project_combine(&proto_info, &subs, role, false);
     let (machine, json_initial, m_errors) = machine::from_json(machine);
     let machine_problem = !m_errors.is_empty();
     let mut errors = vec![];
@@ -164,19 +71,5 @@ pub fn check_composed_projection(
         CheckResult::OK
     } else {
         CheckResult::ERROR { errors }
-    }
-}
-
-#[wasm_bindgen]
-pub fn compose_protocols(protos: InterfacingProtocols) -> DataResult<SwarmProtocolType> {
-    let composition = proto_info::compose_protocols(protos);
-
-    match composition {
-        Ok((graph, initial)) => DataResult::OK {
-            data: machine_types::types::typescript_types::to_swarm_json(graph, initial),
-        },
-        Err(errors) => DataResult::ERROR {
-            errors: composition_errors::error_report_to_strings(errors),
-        },
     }
 }

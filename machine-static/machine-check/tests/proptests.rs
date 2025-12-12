@@ -1,10 +1,14 @@
 use machine_check::{
-    check_swarm, composition::{check_composed_projection, check_composed_swarm, compose_protocols,
-    project_combine, revised_projection}, well_formed_sub,
+    check_swarm, composition::{check_composed_projection, check_composed_swarm}, well_formed_sub,
 };
-use machine_types::types::{
-    typescript_types::{CheckResult, Command, DataResult, EventType, MachineLabel, Role, State, StateName, SwarmLabel, Transition, MachineType, Subscriptions, SwarmProtocolType, Granularity, InterfacingProtocols,},
-    proto_graph::{EdgeId, Graph, NodeId,},
+
+use machine_types::{
+    types::{
+        typescript_types::{CheckResult, Command, DataResult, EventType, MachineLabel, Role, State, StateName, SwarmLabel, Transition, MachineType, Subscriptions, SwarmProtocolType, Granularity, InterfacingProtocols,},
+        proto_graph::{EdgeId, Graph, NodeId,}
+    },
+    compose_protocols,
+    project_combine, revised_projection
 };
 use petgraph::{
     graph::EdgeReference,
