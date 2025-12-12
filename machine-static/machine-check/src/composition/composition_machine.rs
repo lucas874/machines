@@ -844,19 +844,19 @@ mod tests {
         )
         .is_empty());
     }
-/*
+
     #[test]
-    fn test_projection_fail_1() {
+    fn test_equivalent_fail_1() {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
         let result_subs =
-            exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+            exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
-        let (g, i, _) = from_json(proto);
-        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
+        let (g, i, _) = proto_graph::from_json(proto);
+        let (left, left_initial) = projection::project(&g, i.unwrap(), &subs, role.clone(), false);
         let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -919,18 +919,19 @@ mod tests {
         );
         assert!(!errors.is_empty());
     }
+
     #[test]
     fn test_projection_fail_2() {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
         let result_subs =
-            exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+            exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
-        let (g, i, _) = from_json(proto);
-        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
+        let (g, i, _) = proto_graph::from_json(proto);
+        let (left, left_initial) = projection::project(&g, i.unwrap(), &subs, role.clone(), false);
         let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -993,18 +994,19 @@ mod tests {
         );
         assert!(!errors.is_empty());
     }
+
     #[test]
     fn test_projection_fail_3() {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
         let result_subs =
-            exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+            exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
-        let (g, i, _) = from_json(proto);
-        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
+        let (g, i, _) = proto_graph::from_json(proto);
+        let (left, left_initial) = projection::project(&g, i.unwrap(), &subs, role.clone(), false);
         let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -1068,18 +1070,19 @@ mod tests {
         );
         assert!(!errors.is_empty());
     }
+
     #[test]
     fn test_projection_fail_4() {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
         let result_subs =
-            exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+            exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
-        let (g, i, _) = from_json(proto);
-        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
+        let (g, i, _) = proto_graph::from_json(proto);
+        let (left, left_initial) = projection::project(&g, i.unwrap(), &subs, role.clone(), false);
         let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -1135,7 +1138,7 @@ mod tests {
         );
         assert!(!errors.is_empty());
     }
-
+/*
     mod machine_composition_tests {
         use super::*;
 
