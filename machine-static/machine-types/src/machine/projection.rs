@@ -188,3 +188,297 @@ pub(crate) fn combine_projs<N: Clone, E: Clone + EventLabel>(
 fn to_option_machine(graph: &Graph) -> OptionGraph {
     graph.map(|_, n| Some(n.state_name().clone()), |_, x| x.clone())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::*;
+    use crate::subscription::{exact, overapproximation};
+    use crate::types::typescript_types::{Command, Granularity, InterfacingProtocols, MachineType, State, Transition};
+    use crate::{test_utils, types::typescript_types::SwarmProtocolType};
+    use crate::types::{proto_graph, proto_info};
+    use crate::machine;
+
+    fn print_machines(m1: &MachineType, m2: &MachineType) {
+        println!("{}", serde_json::to_string_pretty(&m1).unwrap());
+        println!("{}", serde_json::to_string_pretty(&m2).unwrap());
+    }
+
+    #[test]
+    fn test_projection_1() {
+        test_utils::setup_logger();
+        let proto = serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "request", "logType": ["tireID"], "role": "C" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "retrieve", "logType": ["position"], "role": "W" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "receive", "logType": ["tire"], "role": "C" } },
+                    { "source": "3", "target": "4", "label": { "cmd": "build", "logType": ["car"], "role": "F" } }
+                ]
+            }"#,
+        )
+        .unwrap();
+        let subs = serde_json::from_str::<Subscriptions>(
+            r#"{
+            "C":["tireID","position","tire","car"],
+            "W":["tireID","position","tire"],
+            "F":["tireID","tire","car"]
+        }"#,
+        )
+        .unwrap();
+
+        let role = Role::new("F");
+        let (g, i, _) = proto_graph::from_json(proto);
+        let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role, false);
+        let mut proj_machine = machine::util::to_json_machine(proj, proj_initial);
+        let mut expected_machine = MachineType {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("tireID"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("tire"),
+                    },
+                    source: State::new("1"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("build"),
+                        log_type: vec![EventType::new("car")],
+                    },
+                    source: State::new("3"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("car"),
+                    },
+                    source: State::new("3"),
+                    target: State::new("4"),
+                },
+            ],
+        };
+        proj_machine.transitions.sort();
+        expected_machine.transitions.sort();
+        assert_eq!(proj_machine, expected_machine)
+    }
+
+    #[test]
+    fn test_projection_2() {
+        test_utils::setup_logger();
+        // warehouse example from coplaws slides
+        let proto = test_utils::get_proto1();
+        let result_subs =
+            exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
+        let role = Role::new("FL");
+        let (g, i, _) = proto_graph::from_json(proto);
+        let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
+        let mut proj_machine = machine::util::to_json_machine(proj, proj_initial);
+        let mut expected_machine = MachineType {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                    },
+                    source: State::new("1"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("1"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("3"),
+                },
+            ],
+        };
+        proj_machine.transitions.sort();
+        expected_machine.transitions.sort();
+        assert_eq!(proj_machine, expected_machine);
+    }
+
+    #[test]
+    fn test_projection_3() {
+        test_utils::setup_logger();
+        // car factory from coplaws example
+        let proto = test_utils::get_proto2();
+        let result_subs =
+            exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
+        let role = Role::new("F");
+        let (g, i, _) = proto_graph::from_json(proto);
+        let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role, false);
+        let mut proj_machine = machine::util::to_json_machine(proj, proj_initial);
+        let mut expected_machine = MachineType {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("part"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("build"),
+                        log_type: vec![EventType::new("car")],
+                    },
+                    source: State::new("2"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("car"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("3"),
+                },
+            ],
+        };
+        proj_machine.transitions.sort();
+        expected_machine.transitions.sort();
+        assert_eq!(proj_machine, expected_machine);
+    }
+
+    #[test]
+    fn test_projection_4() {
+        test_utils::setup_logger();
+        // car factory from coplaws example
+        let protos = test_utils::get_interfacing_swarms_1();
+        let result_subs = overapproximation::overapprox_well_formed_sub(
+            protos.clone(),
+            &BTreeMap::from([(Role::new("T"), BTreeSet::from([EventType::new("car")]))]),
+            Granularity::Coarse,
+        );
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
+
+        let role = Role::new("T");
+        let (g, i) = proto_info::compose_protocols(protos).unwrap();
+        let (proj, proj_initial) = project(&g, i, &subs, role, false);
+        let mut proj_machine = machine::util::to_json_machine(proj, proj_initial);
+        let mut expected_machine = MachineType {
+            initial: State::new("0 || 0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("request"),
+                        log_type: vec![EventType::new("partID")],
+                    },
+                    source: State::new("0 || 0"),
+                    target: State::new("0 || 0"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("0 || 0"),
+                    target: State::new("1 || 1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0 || 0"),
+                    target: State::new("3 || 0"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("1 || 1"),
+                    target: State::new("2 || 1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("deliver"),
+                        log_type: vec![EventType::new("part")],
+                    },
+                    source: State::new("2 || 1"),
+                    target: State::new("2 || 1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("part"),
+                    },
+                    source: State::new("2 || 1"),
+                    target: State::new("0 || 2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0 || 2"),
+                    target: State::new("3 || 2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("car"),
+                    },
+                    source: State::new("3 || 2"),
+                    target: State::new("3 || 3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("car"),
+                    },
+                    source: State::new("0 || 2"),
+                    target: State::new("0 || 3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0 || 3"),
+                    target: State::new("3 || 3"),
+                },
+            ],
+        };
+        proj_machine.transitions.sort();
+        expected_machine.transitions.sort();
+        assert_eq!(proj_machine, expected_machine);
+    }
+}

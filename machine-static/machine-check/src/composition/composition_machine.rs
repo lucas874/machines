@@ -127,22 +127,17 @@ pub fn equivalent(left: &OptionGraph, li: NodeId, right: &OptionGraph, ri: NodeI
     errors
 }
 
-/* #[cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        composition::{
-            composition_swarm::{
-                compose_protocols, exact_well_formed_sub, from_json,
-                overapprox_well_formed_sub, swarms_to_proto_info,
-            },
-        },
-        machine::{self},
-        MachineType, Subscriptions, SwarmProtocolType,
+    use machine_types::{
+        machine::projection, subscription::{exact, overapproximation}, types::{
+            projection::Graph, proto_graph, proto_info, typescript_types::{
+                Command, EventType, Granularity, InterfacingProtocols, MachineType, Role, StateName, Subscriptions, SwarmProtocolType, Transition
+            }
+        }
     };
-    use machine_types::types::typescript_types::{Command, EventType, Role, Transition, Granularity, InterfacingProtocols};
     use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
-
     fn setup_logger() {
         fmt()
             .with_env_filter(EnvFilter::from_default_env())
@@ -151,15 +146,18 @@ mod tests {
             .ok();
     }
 
-    pub(in crate::composition) fn from_option_machine(graph: &OptionGraph) -> Graph {
+    fn from_option_machine(graph: &OptionGraph) -> Graph {
         graph.map(
             |_, n| n.clone().unwrap().state_name().clone(),
             |_, x| x.clone(),
         )
     }
-    fn from_adaptation_graph_to_graph(graph: &AdaptationGraph) -> Graph {
-        graph.map(|_, n| n.state.state_name().clone(), |_, x| x.clone())
+    fn to_option_machine(graph: &Graph) -> OptionGraph {
+        graph.map(|_, n| Some(n.state_name().clone()), |_, x| x.clone())
     }
+    /* fn from_adaptation_graph_to_graph(graph: &AdaptationGraph) -> Graph {
+        graph.map(|_, n| n.state.state_name().clone(), |_, x| x.clone())
+    } */
 
     fn get_proto1() -> SwarmProtocolType {
         serde_json::from_str::<SwarmProtocolType>(
@@ -533,609 +531,609 @@ mod tests {
         .unwrap()
     }
 
-    mod projection_tests {
-        use super::*;
-            #[test]
-        fn test_projection_1() {
-            setup_logger();
-            // From Combining Swarm Protocols, example 5.
-            let proto = serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        { "source": "0", "target": "1", "label": { "cmd": "request", "logType": ["tireID"], "role": "C" } },
-                        { "source": "1", "target": "2", "label": { "cmd": "retrieve", "logType": ["position"], "role": "W" } },
-                        { "source": "2", "target": "3", "label": { "cmd": "receive", "logType": ["tire"], "role": "C" } },
-                        { "source": "3", "target": "4", "label": { "cmd": "build", "logType": ["car"], "role": "F" } }
-                    ]
-                }"#,
-            )
-            .unwrap();
-            // contains superfluous subscriptions, but to match example in article
-            let subs = serde_json::from_str::<Subscriptions>(
-                r#"{
-                "C":["tireID","position","tire","car"],
-                "W":["tireID","position","tire"],
-                "F":["tireID","tire","car"]
+
+    use machine_types::types::typescript_types::State;
+
+    #[test]
+    fn test_equivalent_1() {
+        setup_logger();
+
+        let proto = serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "0",
+                "transitions": [
+                    { "source": "0", "target": "1", "label": { "cmd": "request", "logType": ["tireID"], "role": "C" } },
+                    { "source": "1", "target": "2", "label": { "cmd": "retrieve", "logType": ["position"], "role": "W" } },
+                    { "source": "2", "target": "3", "label": { "cmd": "receive", "logType": ["tire"], "role": "C" } },
+                    { "source": "3", "target": "4", "label": { "cmd": "build", "logType": ["car"], "role": "F" } }
+                ]
             }"#,
-            )
-            .unwrap();
+        )
+        .unwrap();
 
-            let role = Role::new("F");
-            let (g, i, _) = from_json(proto);
-            let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role, false);
-            let expected_m = MachineType {
-                initial: State::new("0"),
-                transitions: vec![
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("tireID"),
-                        },
-                        source: State::new("0"),
-                        target: State::new("2"),
-                    },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("tire"),
-                        },
-                        source: State::new("2"),
-                        target: State::new("3"),
-                    },
-                    Transition {
-                        label: MachineLabel::Execute {
-                            cmd: Command::new("build"),
-                            log_type: vec![EventType::new("car")],
-                        },
-                        source: State::new("3"),
-                        target: State::new("3"),
-                    },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("car"),
-                        },
-                        source: State::new("3"),
-                        target: State::new("4"),
-                    },
-                ],
-            };
-            let (expected, expected_initial, errors) = crate::machine::from_json(expected_m);
-            assert!(errors.is_empty());
-            assert!(expected_initial.is_some());
-            // from equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
-            assert!(equivalent(
-                &expected,
-                expected_initial.unwrap(),
-                &to_option_machine(&proj),
-                proj_initial
-            )
-            .is_empty());
-        }
+        let subs = serde_json::from_str::<Subscriptions>(
+            r#"{
+            "C":["tireID","position","tire","car"],
+            "W":["tireID","position","tire"],
+            "F":["tireID","tire","car"]
+        }"#,
+        )
+        .unwrap();
 
-        #[test]
-        fn test_projection_2() {
-            setup_logger();
-            // warehouse example from coplaws slides
-            let proto = get_proto1();
-            let result_subs =
-                exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
-            assert!(result_subs.is_ok());
-            let subs = result_subs.unwrap();
-            let role = Role::new("FL");
-            let (g, i, _) = from_json(proto);
-            let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
-            let right_m = MachineType {
-                initial: State::new("0"),
-                transitions: vec![
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("partID"),
-                        },
-                        source: State::new("0"),
-                        target: State::new("1"),
+        let role = Role::new("F");
+        let (g, i, _) = proto_graph::from_json(proto);
+        let (proj, proj_initial) = projection::project(&g, i.unwrap(), &subs, role, false);
+        let expected_m = MachineType {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("tireID"),
                     },
-                    Transition {
-                        label: MachineLabel::Execute {
-                            cmd: Command::new("get"),
-                            log_type: vec![EventType::new("pos")],
-                        },
-                        source: State::new("1"),
-                        target: State::new("1"),
+                    source: State::new("0"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("tire"),
                     },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("pos"),
-                        },
-                        source: State::new("1"),
-                        target: State::new("2"),
+                    source: State::new("2"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("build"),
+                        log_type: vec![EventType::new("car")],
                     },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("partID"),
-                        },
-                        source: State::new("2"),
-                        target: State::new("1"),
+                    source: State::new("3"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("car"),
                     },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("time"),
-                        },
-                        source: State::new("2"),
-                        target: State::new("3"),
-                    },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("time"),
-                        },
-                        source: State::new("0"),
-                        target: State::new("3"),
-                    },
-                ],
-            };
-            let (right, right_initial, errors) = crate::machine::from_json(right_m);
-            let right = from_option_machine(&right);
-            let right = to_option_machine(&right);
+                    source: State::new("3"),
+                    target: State::new("4"),
+                },
+            ],
+        };
+        let (expected, expected_initial, errors) = crate::machine::from_json(expected_m);
+        assert!(errors.is_empty());
+        assert!(expected_initial.is_some());
+        // from equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
+        assert!(equivalent(
+            &expected,
+            expected_initial.unwrap(),
+            &to_option_machine(&proj),
+            proj_initial
+        )
+        .is_empty());
+    }
 
-            assert!(errors.is_empty());
+    #[test]
+    fn test_equivalent_2() {
+        setup_logger();
+        // warehouse example from coplaws slides
+        let proto = get_proto1();
+        let result_subs =
+            exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
+        let role = Role::new("FL");
+        let (g, i, _) = proto_graph::from_json(proto);
+        let (left, left_initial) = projection::project(&g, i.unwrap(), &subs, role.clone(), false);
+        let right_m = MachineType {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                    },
+                    source: State::new("1"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("1"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("3"),
+                },
+            ],
+        };
+        let (right, right_initial, errors) = crate::machine::from_json(right_m);
+        let right = from_option_machine(&right);
+        let right = to_option_machine(&right);
 
-            let errors = equivalent(
-                &to_option_machine(&left),
-                left_initial,
-                &right,
-                right_initial.unwrap(),
-            );
-            assert!(errors.is_empty());
-        }
+        assert!(errors.is_empty());
 
-        #[test]
-        fn test_projection_3() {
-            setup_logger();
-            // car factory from coplaws example
-            let proto = get_proto2();
-            let result_subs =
-                exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
-            assert!(result_subs.is_ok());
-            let subs = result_subs.unwrap();
-            let role = Role::new("F");
-            let (g, i, _) = from_json(proto);
-            let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role, false);
-            let expected_m = MachineType {
-                initial: State::new("1"),
-                transitions: vec![
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("part"),
-                        },
-                        source: State::new("1"),
-                        target: State::new("2"),
-                    },
-                    Transition {
-                        label: MachineLabel::Execute {
-                            cmd: Command::new("build"),
-                            log_type: vec![EventType::new("car")],
-                        },
-                        source: State::new("2"),
-                        target: State::new("2"),
-                    },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("car"),
-                        },
-                        source: State::new("2"),
-                        target: State::new("3"),
-                    },
-                ],
-            };
-            let (expected, expected_initial, errors) = crate::machine::from_json(expected_m);
+        let errors = equivalent(
+            &to_option_machine(&left),
+            left_initial,
+            &right,
+            right_initial.unwrap(),
+        );
+        assert!(errors.is_empty());
+    }
 
-            assert!(errors.is_empty());
-            assert!(expected_initial.is_some());
-            // from equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
-            assert!(equivalent(
-                &expected,
-                expected_initial.unwrap(),
-                &to_option_machine(&proj),
-                proj_initial
-            )
-            .is_empty());
-        }
+    #[test]
+    fn test_equivalent_3() {
+        setup_logger();
+        // car factory from coplaws example
+        let proto = get_proto2();
+        let result_subs =
+            exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
+        let role = Role::new("F");
+        let (g, i, _) = proto_graph::from_json(proto);
+        let (proj, proj_initial) = projection::project(&g, i.unwrap(), &subs, role, false);
+        let expected_m = MachineType {
+            initial: State::new("1"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("part"),
+                    },
+                    source: State::new("1"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("build"),
+                        log_type: vec![EventType::new("car")],
+                    },
+                    source: State::new("2"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("car"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("3"),
+                },
+            ],
+        };
+        let (expected, expected_initial, errors) = crate::machine::from_json(expected_m);
 
-        #[test]
-        fn test_projection_4() {
-            setup_logger();
-            // car factory from coplaws example
-            let protos = get_interfacing_swarms_1();
-            let result_subs = overapprox_well_formed_sub(
-                protos.clone(),
-                &BTreeMap::from([(Role::new("T"), BTreeSet::from([EventType::new("car")]))]),
-                Granularity::Coarse,
-            );
-            assert!(result_subs.is_ok());
-            let subs = result_subs.unwrap();
+        assert!(errors.is_empty());
+        assert!(expected_initial.is_some());
+        // from equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
+        assert!(equivalent(
+            &expected,
+            expected_initial.unwrap(),
+            &to_option_machine(&proj),
+            proj_initial
+        )
+        .is_empty());
+    }
 
-            let role = Role::new("T");
-            let (g, i) = compose_protocols(protos).unwrap();
-            let (proj, proj_initial) = project(&g, i, &subs, role, false);
-            let expected_m = MachineType {
-                initial: State::new("0"),
-                transitions: vec![
-                    Transition {
-                        label: MachineLabel::Execute {
-                            cmd: Command::new("request"),
-                            log_type: vec![EventType::new("partID")],
-                        },
-                        source: State::new("0"),
-                        target: State::new("0"),
-                    },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("partID"),
-                        },
-                        source: State::new("0"),
-                        target: State::new("1"),
-                    },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("time"),
-                        },
-                        source: State::new("0"),
-                        target: State::new("2"),
-                    },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("pos"),
-                        },
-                        source: State::new("1"),
-                        target: State::new("3"),
-                    },
-                    Transition {
-                        label: MachineLabel::Execute {
-                            cmd: Command::new("deliver"),
-                            log_type: vec![EventType::new("part")],
-                        },
-                        source: State::new("3"),
-                        target: State::new("3"),
-                    },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("part"),
-                        },
-                        source: State::new("3"),
-                        target: State::new("4"),
-                    },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("time"),
-                        },
-                        source: State::new("4"),
-                        target: State::new("5"),
-                    },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("car"),
-                        },
-                        source: State::new("5"),
-                        target: State::new("7"),
-                    },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("car"),
-                        },
-                        source: State::new("4"),
-                        target: State::new("6"),
-                    },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("time"),
-                        },
-                        source: State::new("6"),
-                        target: State::new("7"),
-                    },
-                ],
-            };
-            let (expected, expected_initial, errors) = crate::machine::from_json(expected_m);
+    #[test]
+    fn test_equivalent_4() {
+        setup_logger();
+        // car factory from coplaws example
+        let protos = get_interfacing_swarms_1();
+        let result_subs = overapproximation::overapprox_well_formed_sub(
+            protos.clone(),
+            &BTreeMap::from([(Role::new("T"), BTreeSet::from([EventType::new("car")]))]),
+            Granularity::Coarse,
+        );
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
 
-            assert!(errors.is_empty());
-            assert!(expected_initial.is_some());
-            // from equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
-            assert!(equivalent(
-                &expected,
-                expected_initial.unwrap(),
-                &to_option_machine(&proj),
-                proj_initial
-            )
-            .is_empty());
-        }
+        let role = Role::new("T");
+        let (g, i) = proto_info::compose_protocols(protos).unwrap();
+        let (proj, proj_initial) = projection::project(&g, i, &subs, role, false);
+        let expected_m = MachineType {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("request"),
+                        log_type: vec![EventType::new("partID")],
+                    },
+                    source: State::new("0"),
+                    target: State::new("0"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("1"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("deliver"),
+                        log_type: vec![EventType::new("part")],
+                    },
+                    source: State::new("3"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("part"),
+                    },
+                    source: State::new("3"),
+                    target: State::new("4"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("4"),
+                    target: State::new("5"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("car"),
+                    },
+                    source: State::new("5"),
+                    target: State::new("7"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("car"),
+                    },
+                    source: State::new("4"),
+                    target: State::new("6"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("6"),
+                    target: State::new("7"),
+                },
+            ],
+        };
+        let (expected, expected_initial, errors) = crate::machine::from_json(expected_m);
 
-        #[test]
-        fn test_projection_fail_1() {
-            setup_logger();
-            // warehouse example from coplaws slides
-            let proto = get_proto1();
-            let result_subs =
-                exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
-            assert!(result_subs.is_ok());
-            let subs = result_subs.unwrap();
-            let role = Role::new("FL");
-            let (g, i, _) = from_json(proto);
-            let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
-            let right_m = MachineType {
-                initial: State::new("0"),
-                transitions: vec![
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("partID"),
-                        },
-                        source: State::new("0"),
-                        target: State::new("1"),
+        assert!(errors.is_empty());
+        assert!(expected_initial.is_some());
+        // from equivalent(): "error messages are designed assuming that `left` is the reference and `right` the tested"
+        assert!(equivalent(
+            &expected,
+            expected_initial.unwrap(),
+            &to_option_machine(&proj),
+            proj_initial
+        )
+        .is_empty());
+    }
+/*
+    #[test]
+    fn test_projection_fail_1() {
+        setup_logger();
+        // warehouse example from coplaws slides
+        let proto = get_proto1();
+        let result_subs =
+            exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
+        let role = Role::new("FL");
+        let (g, i, _) = from_json(proto);
+        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
+        let right_m = MachineType {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
                     },
-                    Transition {
-                        label: MachineLabel::Execute {
-                            cmd: Command::new("get"),
-                            log_type: vec![EventType::new("pos")],
-                        },
-                        source: State::new("1"),
-                        target: State::new("1"),
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
                     },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("pos"),
-                        },
-                        source: State::new("1"),
-                        target: State::new("2"),
+                    source: State::new("1"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
                     },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("time"),
-                        },
-                        source: State::new("1"),
-                        target: State::new("3"),
+                    source: State::new("1"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
                     },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("time"),
-                        },
-                        source: State::new("2"),
-                        target: State::new("3"),
+                    source: State::new("1"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
                     },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("time"),
-                        },
-                        source: State::new("0"),
-                        target: State::new("3"),
+                    source: State::new("2"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
                     },
-                ],
-            };
-            let (right, right_initial, errors) = crate::machine::from_json(right_m);
-            let right = from_option_machine(&right);
-            let right = to_option_machine(&right);
+                    source: State::new("0"),
+                    target: State::new("3"),
+                },
+            ],
+        };
+        let (right, right_initial, errors) = crate::machine::from_json(right_m);
+        let right = from_option_machine(&right);
+        let right = to_option_machine(&right);
 
-            assert!(errors.is_empty());
+        assert!(errors.is_empty());
 
-            let errors = equivalent(
-                &to_option_machine(&left),
-                left_initial,
-                &right,
-                right_initial.unwrap(),
-            );
-            assert!(!errors.is_empty());
-        }
-        #[test]
-        fn test_projection_fail_2() {
-            setup_logger();
-            // warehouse example from coplaws slides
-            let proto = get_proto1();
-            let result_subs =
-                exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
-            assert!(result_subs.is_ok());
-            let subs = result_subs.unwrap();
-            let role = Role::new("FL");
-            let (g, i, _) = from_json(proto);
-            let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
-            let right_m = MachineType {
-                initial: State::new("0"),
-                transitions: vec![
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("partID"),
-                        },
-                        source: State::new("0"),
-                        target: State::new("1"),
+        let errors = equivalent(
+            &to_option_machine(&left),
+            left_initial,
+            &right,
+            right_initial.unwrap(),
+        );
+        assert!(!errors.is_empty());
+    }
+    #[test]
+    fn test_projection_fail_2() {
+        setup_logger();
+        // warehouse example from coplaws slides
+        let proto = get_proto1();
+        let result_subs =
+            exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
+        let role = Role::new("FL");
+        let (g, i, _) = from_json(proto);
+        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
+        let right_m = MachineType {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
                     },
-                    Transition {
-                        label: MachineLabel::Execute {
-                            cmd: Command::new("get"),
-                            log_type: vec![EventType::new("pos")],
-                        },
-                        source: State::new("1"),
-                        target: State::new("1"),
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
                     },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("pos"),
-                        },
-                        source: State::new("1"),
-                        target: State::new("2"),
+                    source: State::new("1"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
                     },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("partID"),
-                        },
-                        source: State::new("2"),
-                        target: State::new("2"),
+                    source: State::new("1"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
                     },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("time"),
-                        },
-                        source: State::new("2"),
-                        target: State::new("3"),
+                    source: State::new("2"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
                     },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("time"),
-                        },
-                        source: State::new("0"),
-                        target: State::new("3"),
+                    source: State::new("2"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
                     },
-                ],
-            };
-            let (right, right_initial, errors) = crate::machine::from_json(right_m);
-            let right = from_option_machine(&right);
-            let right = to_option_machine(&right);
+                    source: State::new("0"),
+                    target: State::new("3"),
+                },
+            ],
+        };
+        let (right, right_initial, errors) = crate::machine::from_json(right_m);
+        let right = from_option_machine(&right);
+        let right = to_option_machine(&right);
 
-            assert!(errors.is_empty());
+        assert!(errors.is_empty());
 
-            let errors = equivalent(
-                &to_option_machine(&left),
-                left_initial,
-                &right,
-                right_initial.unwrap(),
-            );
-            assert!(!errors.is_empty());
-        }
-        #[test]
-        fn test_projection_fail_3() {
-            setup_logger();
-            // warehouse example from coplaws slides
-            let proto = get_proto1();
-            let result_subs =
-                exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
-            assert!(result_subs.is_ok());
-            let subs = result_subs.unwrap();
-            let role = Role::new("FL");
-            let (g, i, _) = from_json(proto);
-            let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
-            let right_m = MachineType {
-                initial: State::new("0"),
-                transitions: vec![
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("partID"),
-                        },
-                        source: State::new("0"),
-                        target: State::new("1"),
+        let errors = equivalent(
+            &to_option_machine(&left),
+            left_initial,
+            &right,
+            right_initial.unwrap(),
+        );
+        assert!(!errors.is_empty());
+    }
+    #[test]
+    fn test_projection_fail_3() {
+        setup_logger();
+        // warehouse example from coplaws slides
+        let proto = get_proto1();
+        let result_subs =
+            exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
+        let role = Role::new("FL");
+        let (g, i, _) = from_json(proto);
+        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
+        let right_m = MachineType {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
                     },
-                    Transition {
-                        label: MachineLabel::Execute {
-                            cmd: Command::new("get"),
-                            log_type: vec![EventType::new("pos")],
-                        },
-                        source: State::new("1"),
-                        target: State::new("1"),
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
                     },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("pos"),
-                        },
-                        source: State::new("1"),
-                        target: State::new("2"),
+                    source: State::new("1"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
                     },
-                    Transition {
-                        label: MachineLabel::Execute {
-                            cmd: Command::new("get"),
-                            log_type: vec![EventType::new("pos")],
-                        },
-                        source: State::new("2"),
-                        target: State::new("2"),
+                    source: State::new("1"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
                     },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("time"),
-                        },
-                        source: State::new("2"),
-                        target: State::new("3"),
+                    source: State::new("2"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
                     },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("time"),
-                        },
-                        source: State::new("0"),
-                        target: State::new("3"),
+                    source: State::new("2"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
                     },
-                ],
-            };
-            let (right, right_initial, errors) = crate::machine::from_json(right_m);
-            let right = from_option_machine(&right);
-            let right = to_option_machine(&right);
+                    source: State::new("0"),
+                    target: State::new("3"),
+                },
+            ],
+        };
+        let (right, right_initial, errors) = crate::machine::from_json(right_m);
+        let right = from_option_machine(&right);
+        let right = to_option_machine(&right);
 
-            assert!(errors.is_empty());
+        assert!(errors.is_empty());
 
-            let errors = equivalent(
-                &to_option_machine(&left),
-                left_initial,
-                &right,
-                right_initial.unwrap(),
-            );
-            assert!(!errors.is_empty());
-        }
-        #[test]
-        fn test_projection_fail_4() {
-            setup_logger();
-            // warehouse example from coplaws slides
-            let proto = get_proto1();
-            let result_subs =
-                exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
-            assert!(result_subs.is_ok());
-            let subs = result_subs.unwrap();
-            let role = Role::new("FL");
-            let (g, i, _) = from_json(proto);
-            let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
-            let right_m = MachineType {
-                initial: State::new("0"),
-                transitions: vec![
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("partID"),
-                        },
-                        source: State::new("0"),
-                        target: State::new("1"),
+        let errors = equivalent(
+            &to_option_machine(&left),
+            left_initial,
+            &right,
+            right_initial.unwrap(),
+        );
+        assert!(!errors.is_empty());
+    }
+    #[test]
+    fn test_projection_fail_4() {
+        setup_logger();
+        // warehouse example from coplaws slides
+        let proto = get_proto1();
+        let result_subs =
+            exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+        assert!(result_subs.is_ok());
+        let subs = result_subs.unwrap();
+        let role = Role::new("FL");
+        let (g, i, _) = from_json(proto);
+        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
+        let right_m = MachineType {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
                     },
-                    Transition {
-                        label: MachineLabel::Execute {
-                            cmd: Command::new("get"),
-                            log_type: vec![EventType::new("pos")],
-                        },
-                        source: State::new("1"),
-                        target: State::new("1"),
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
                     },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("pos"),
-                        },
-                        source: State::new("1"),
-                        target: State::new("2"),
+                    source: State::new("1"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
                     },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("time"),
-                        },
-                        source: State::new("2"),
-                        target: State::new("3"),
+                    source: State::new("1"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
                     },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("time"),
-                        },
-                        source: State::new("0"),
-                        target: State::new("3"),
+                    source: State::new("2"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
                     },
-                ],
-            };
-            let (right, right_initial, errors) = crate::machine::from_json(right_m);
-            let right = from_option_machine(&right);
-            let right = to_option_machine(&right);
+                    source: State::new("0"),
+                    target: State::new("3"),
+                },
+            ],
+        };
+        let (right, right_initial, errors) = crate::machine::from_json(right_m);
+        let right = from_option_machine(&right);
+        let right = to_option_machine(&right);
 
-            assert!(errors.is_empty());
+        assert!(errors.is_empty());
 
-            let errors = equivalent(
-                &to_option_machine(&left),
-                left_initial,
-                &right,
-                right_initial.unwrap(),
-            );
-            assert!(!errors.is_empty());
-        }
+        let errors = equivalent(
+            &to_option_machine(&left),
+            left_initial,
+            &right,
+            right_initial.unwrap(),
+        );
+        assert!(!errors.is_empty());
     }
 
     mod machine_composition_tests {
@@ -1436,143 +1434,6 @@ mod tests {
     // Add a test somewhere that uses WH || F || QC
 
     #[test]
-    fn test_example_from_text_machine() {
-        setup_logger();
-        let role = Role::new("F");
-        let subs = crate::composition::composition_swarm::overapprox_well_formed_sub(
-            get_interfacing_swarms_3(),
-            &BTreeMap::new(),
-            Granularity::Medium,
-        );
-        assert!(subs.is_ok());
-        let subs = subs.unwrap();
-        let proto_info = swarms_to_proto_info(get_interfacing_swarms_3());
-        assert!(proto_info.no_errors());
-        let (proj, proj_initial) = project_combine(&proto_info, &subs, role.clone(), false);
-        println!(
-            "projection of {}: {}",
-            role.to_string(),
-            serde_json::to_string_pretty(&from_option_to_machine(proj, proj_initial.unwrap()))
-                .unwrap()
-        );
-    }
-
-    #[test]
-    #[ignore]
-    fn combine_with_self() {
-        setup_logger();
-
-        let proto = get_proto1();
-        let result_subs = overapprox_well_formed_sub(
-            InterfacingProtocols(vec![proto.clone(), get_proto2()]),
-            &BTreeMap::new(),
-            Granularity::TwoStep,
-        );
-        assert!(result_subs.is_ok());
-        let subs = result_subs.unwrap();
-        println!("subs: {}", serde_json::to_string_pretty(&subs).unwrap());
-        let role = Role::new("FL");
-        let (g, i, _) = from_json(proto);
-        let (left, left_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
-        let right_m = MachineType {
-            initial: State::new("0"),
-            transitions: vec![
-                Transition {
-                    label: MachineLabel::Input {
-                        event_type: EventType::new("partID"),
-                    },
-                    source: State::new("0"),
-                    target: State::new("1"),
-                },
-                Transition {
-                    label: MachineLabel::Execute {
-                        cmd: Command::new("get"),
-                        log_type: vec![EventType::new("pos")],
-                    },
-                    source: State::new("1"),
-                    target: State::new("1"),
-                },
-                Transition {
-                    label: MachineLabel::Input {
-                        event_type: EventType::new("pos"),
-                    },
-                    source: State::new("1"),
-                    target: State::new("2"),
-                },
-                Transition {
-                    label: MachineLabel::Input {
-                        event_type: EventType::new("partID"),
-                    },
-                    source: State::new("2"),
-                    target: State::new("1"),
-                },
-                Transition {
-                    label: MachineLabel::Input {
-                        event_type: EventType::new("time"),
-                    },
-                    source: State::new("2"),
-                    target: State::new("3"),
-                },
-                Transition {
-                    label: MachineLabel::Input {
-                        event_type: EventType::new("time"),
-                    },
-                    source: State::new("0"),
-                    target: State::new("3"),
-                },
-            ],
-        };
-        let (right, right_initial, errors) = crate::machine::from_json(right_m);
-        let right = from_option_machine(&right);
-        let right_option = to_option_machine(&right);
-
-        println!(
-            "left {:?}: {}",
-            role.clone(),
-            serde_json::to_string_pretty(&to_json_machine(left.clone(), left_initial)).unwrap()
-        );
-        println!(
-            "right {:?}: {}",
-            role,
-            serde_json::to_string_pretty(&from_option_to_machine(
-                right_option.clone(),
-                right_initial.unwrap()
-            ))
-            .unwrap()
-        );
-        assert!(errors.is_empty());
-
-        /* let errors = equivalent(
-            &to_option_machine(&left),
-            left_initial,
-            &right_option,
-            right_initial.unwrap());
-        assert!(errors.is_empty());
-        let errors: Vec<String> = errors.into_iter().map(crate::machine::Error::convert(&to_option_machine(&left), &right_option)).collect(); */
-        println!("{:?}", errors);
-        let interface = BTreeSet::from([
-            EventType::new("partID"),
-            EventType::new("pos"),
-            EventType::new("time"),
-        ]);
-        // right left swapped here on purpose
-        let (combined, combined_initial) = compose(
-            right,
-            right_initial.unwrap(),
-            left,
-            left_initial,
-            interface,
-            gen_state_name,
-        );
-        println!(
-            "combined {:?}: {}",
-            role.clone(),
-            serde_json::to_string_pretty(&to_json_machine(combined.clone(), combined_initial))
-                .unwrap()
-        );
-    }
-
-    #[test]
     #[ignore]
     fn test_adapted_projection_fl() {
         setup_logger();
@@ -1826,108 +1687,6 @@ mod tests {
             ))
             .unwrap()
         );
-    }
-
-    #[test]
-    #[ignore]
-    fn test_det_proj_1() {
-        setup_logger();
-        let composition = compose_protocols(get_interfacing_swarms_1());
-        assert!(composition.is_ok());
-        let (composed_graph, composed_initial) = composition.unwrap();
-        let subs = crate::composition::composition_swarm::exact_well_formed_sub(
-            get_interfacing_swarms_1(),
-            &BTreeMap::new(),
-        );
-        assert!(subs.is_ok());
-        let subs = subs.unwrap();
-        println!(
-            "subscription: {}",
-            serde_json::to_string_pretty(&subs).unwrap()
-        );
-        //let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D"), Role::new("F")];
-        let (proj, proj_initial) = project(
-            &composed_graph,
-            composed_initial,
-            &subs,
-            Role::new("D"),
-            false,
-        );
-        println!(
-            "{}: {}",
-            Role::new("D").to_string(),
-            serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap()
-        );
-        /* for role in all_roles {
-            let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, role.clone());
-            println!("{}: {}", role.clone().to_string(), serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap());
-        } */
-    }
-
-    #[test]
-    #[ignore]
-    fn test_det_proj_2() {
-        setup_logger();
-        let composition = compose_protocols(get_interfacing_swarms_3());
-        assert!(composition.is_ok());
-        let (composed_graph, composed_initial) = composition.unwrap();
-        let subs = crate::composition::composition_swarm::exact_well_formed_sub(
-            get_interfacing_swarms_3(),
-            &BTreeMap::new(),
-        );
-        assert!(subs.is_ok());
-        let subs = subs.unwrap();
-        //println!("subscription: {}", serde_json::to_string_pretty(&subs).unwrap());
-        let (proj, proj_initial) = project(
-            &composed_graph,
-            composed_initial,
-            &subs,
-            Role::new("D"),
-            false,
-        );
-        println!(
-            "{}: {}",
-            Role::new("D").to_string(),
-            serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap()
-        );
-        /* let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D"), Role::new("F"), Role::new("QCR")];
-        for role in all_roles {
-            let (proj, proj_initial) = project(&composed_graph, composed_initial, &subs, role.clone());
-            //println!("{}: {}", role.clone().to_string(), serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap());
-            println!("{}\n$$$$\n", serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap());
-        } */
-    }
-
-    #[test]
-    #[ignore]
-    fn test_det_proj_3() {
-        setup_logger();
-        let composition = compose_protocols(get_interfacing_swarms_warehouse());
-        assert!(composition.is_ok());
-        let (composed_graph, composed_initial) = composition.unwrap();
-        let subs = crate::composition::composition_swarm::exact_well_formed_sub(
-            get_interfacing_swarms_warehouse(),
-            &BTreeMap::new(),
-        );
-        assert!(subs.is_ok());
-        let subs = subs.unwrap();
-        //println!("subscription: {}", serde_json::to_string_pretty(&subs).unwrap());
-        let all_roles = vec![Role::new("T"), Role::new("FL"), Role::new("D")];
-
-        for role in all_roles {
-            let (proj, proj_initial) = project(
-                &composed_graph,
-                composed_initial,
-                &subs,
-                role.clone(),
-                false,
-            );
-            //println!("{}: {}", role.clone().to_string(), serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap());
-            println!(
-                "{}\n$$$$\n",
-                serde_json::to_string_pretty(&to_json_machine(proj, proj_initial)).unwrap()
-            );
-        }
     }
 
     #[test]
@@ -2295,443 +2054,5 @@ mod tests {
             expected_special_event_types,
             projection_info.special_event_types
         );
-    }
-
-    mod big_example_i_can_be_deleted {
-        use machine_types::types::typescript_types::DataResult;
-
-        use super::*;
-
-        fn get_steel_press_proto() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        {
-                        "source": "0",
-                        "target": "1",
-                        "label": {
-                            "cmd": "pickUpSteelRoll",
-                            "role": "SteelTransport",
-                            "logType": [
-                            "SteelRoll"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "1",
-                        "target": "2",
-                        "label": {
-                            "cmd": "pressSteel",
-                            "role": "Stamp",
-                            "logType": [
-                            "SteelParts"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "2",
-                        "target": "0",
-                        "label": {
-                            "cmd": "assembleBody",
-                            "role": "BodyAssembler",
-                            "logType": [
-                            "PartialCarBody"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "0",
-                        "target": "3",
-                        "label": {
-                            "cmd": "carBodyDone",
-                            "role": "CarBodyChecker",
-                            "logType": [
-                            "CarBody"
-                            ]
-                        }
-                        }
-                    ]
-                }"#,
-            )
-            .unwrap()
-        }
-
-        fn get_paint_proto() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        {
-                        "source": "0",
-                        "target": "1",
-                        "label": {
-                            "cmd": "carBodyDone",
-                            "role": "CarBodyChecker",
-                            "logType": [
-                            "CarBody"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "1",
-                        "target": "2",
-                        "label": {
-                            "cmd": "applyPaint",
-                            "role": "Painter",
-                            "logType": [
-                            "PaintedCarBody"
-                            ]
-                        }
-                        }
-                    ]
-                    }"#,
-            )
-            .unwrap()
-        }
-        fn get_engine_installation_proto() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        {
-                        "source": "0",
-                        "target": "1",
-                        "label": {
-                            "cmd": "applyPaint",
-                            "role": "Painter",
-                            "logType": [
-                            "PaintedCarBody"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "1",
-                        "target": "2",
-                        "label": {
-                            "cmd": "requestEngine",
-                            "role": "EngineInstaller",
-                            "logType": [
-                            "RequestEngine"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "2",
-                        "target": "3",
-                        "label": {
-                            "cmd": "request",
-                            "role": "Warehouse",
-                            "logType": [
-                            "ItemRequest"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "3",
-                        "target": "4",
-                        "label": {
-                            "cmd": "deliver",
-                            "role": "Warehouse",
-                            "logType": [
-                            "ItemDeliver"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "4",
-                        "target": "5",
-                        "label": {
-                            "cmd": "installEngine",
-                            "role": "EngineInstaller",
-                            "logType": [
-                            "EngineInstalled"
-                            ]
-                        }
-                        }
-                    ]
-                    }"#,
-            )
-            .unwrap()
-        }
-        fn get_warehouse_proto() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        {
-                        "source": "0",
-                        "target": "1",
-                        "label": {
-                            "cmd": "request",
-                            "role": "Warehouse",
-                            "logType": [
-                            "ItemRequest"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "1",
-                        "target": "1",
-                        "label": {
-                            "cmd": "bid",
-                            "role": "Transport",
-                            "logType": [
-                            "Bid"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "1",
-                        "target": "2",
-                        "label": {
-                            "cmd": "select",
-                            "role": "Transport",
-                            "logType": [
-                            "Selected"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "2",
-                        "target": "3",
-                        "label": {
-                            "cmd": "needGuidance",
-                            "role": "Transport",
-                            "logType": [
-                            "ReqGuidance"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "3",
-                        "target": "4",
-                        "label": {
-                            "cmd": "giveGuidance",
-                            "role": "BaseStation",
-                            "logType": [
-                            "GiveGuidance"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "4",
-                        "target": "5",
-                        "label": {
-                            "cmd": "basicPickup",
-                            "role": "Transport",
-                            "logType": [
-                            "ItemPickupBasic"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "2",
-                        "target": "5",
-                        "label": {
-                            "cmd": "smartPickup",
-                            "role": "Transport",
-                            "logType": [
-                            "ItemPickupSmart"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "5",
-                        "target": "6",
-                        "label": {
-                            "cmd": "handover",
-                            "role": "Transport",
-                            "logType": [
-                            "Handover"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "6",
-                        "target": "0",
-                        "label": {
-                            "cmd": "deliver",
-                            "role": "Warehouse",
-                            "logType": [
-                            "ItemDeliver"
-                            ]
-                        }
-                        }
-                    ]
-                    }"#,
-            )
-            .unwrap()
-        }
-        fn get_wheel_installation_proto() -> SwarmProtocolType {
-            serde_json::from_str::<SwarmProtocolType>(
-                r#"{
-                    "initial": "0",
-                    "transitions": [
-                        {
-                        "source": "0",
-                        "target": "1",
-                        "label": {
-                            "cmd": "installEngine",
-                            "role": "EngineInstaller",
-                            "logType": [
-                            "EngineInstalled"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "1",
-                        "target": "2",
-                        "label": {
-                            "cmd": "pickUpWheel",
-                            "role": "WheelInstaller",
-                            "logType": [
-                            "WheelPickup"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "2",
-                        "target": "1",
-                        "label": {
-                            "cmd": "installWheel",
-                            "role": "WheelInstaller",
-                            "logType": [
-                            "WheelInstalled"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "1",
-                        "target": "3",
-                        "label": {
-                            "cmd": "wheelsDone",
-                            "role": "WheelInstaller",
-                            "logType": [
-                            "AllWheelsInstalled"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "3",
-                        "target": "4",
-                        "label": {
-                            "cmd": "carDone",
-                            "role": "QualityTransport",
-                            "logType": [
-                            "FinishedCar"
-                            ]
-                        }
-                        }
-                    ]
-                    } "#,
-            )
-            .unwrap()
-        }
-
-        fn get_interfacing_protocols_1() -> InterfacingProtocols {
-                InterfacingProtocols(vec![
-                    get_steel_press_proto(),
-                    get_paint_proto(),
-                    get_engine_installation_proto(),
-                    get_warehouse_proto(),
-                    get_wheel_installation_proto()])
-            }
-
-        fn get_wheel_installer() -> MachineType {
-            serde_json::from_str::<MachineType>(
-                r#"{
-                    "initial": "s0",
-                    "transitions": [
-                        {
-                        "source": "s1",
-                        "target": "s1",
-                        "label": {
-                            "tag": "Execute",
-                            "cmd": "pickUpWheel",
-                            "logType": [
-                            "WheelPickup"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "s1",
-                        "target": "s1",
-                        "label": {
-                            "tag": "Execute",
-                            "cmd": "wheelsDone",
-                            "logType": [
-                            "AllWheelsInstalled"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "s2",
-                        "target": "s2",
-                        "label": {
-                            "tag": "Execute",
-                            "cmd": "installWheel",
-                            "logType": [
-                            "WheelInstalled"
-                            ]
-                        }
-                        },
-                        {
-                        "source": "s0",
-                        "target": "s1",
-                        "label": {
-                            "tag": "Input",
-                            "eventType": "EngineInstalled"
-                        }
-                        },
-                        {
-                        "source": "s1",
-                        "target": "s2",
-                        "label": {
-                            "tag": "Input",
-                            "eventType": "WheelPickup"
-                        }
-                        },
-                        {
-                        "source": "s1",
-                        "target": "s3",
-                        "label": {
-                            "tag": "Input",
-                            "eventType": "AllWheelsInstalled"
-                        }
-                        },
-                        {
-                        "source": "s2",
-                        "target": "s1",
-                        "label": {
-                            "tag": "Input",
-                            "eventType": "WheelInstalled"
-                        }
-                        }
-                    ]
-                    }"#,
-            )
-            .unwrap()
-        }
-        #[test]
-        #[ignore]
-        fn projection_information_wheel_installer() {
-            let sub_result = overapprox_well_formed_sub(
-                get_interfacing_protocols_1(),
-                &BTreeMap::new(),
-                Granularity::TwoStep,
-            );
-            let subscriptions = sub_result.unwrap();
-            let projection_information =
-                crate::composition::projection_information(Role::new(&format!("WheelInstaller")), get_interfacing_protocols_1(), 4, serde_json::to_string(&subscriptions).unwrap(), get_wheel_installer(), true);
-            println!("ORIGINAL MACHINE: {}", serde_json::to_string_pretty(&get_wheel_installer()).unwrap());
-            match projection_information {
-                DataResult::ERROR {..} => assert!(false),
-                DataResult::OK { data } =>  {
-                    println!("ADAPTED: {}", serde_json::to_string_pretty(&data.projection).unwrap());
-                }
-            }
-        }
-    }
+    } */
 }
- */

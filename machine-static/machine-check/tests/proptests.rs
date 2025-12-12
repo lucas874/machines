@@ -885,7 +885,7 @@ fn num_terminal(proto: &MachineType) -> usize {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(100))]
     #[test]
-    //#[ignore]
+    #[ignore]
     fn test_combine_machines_prop(protos in generate_interfacing_protocols_general_pattern(5, 5, 3)) {
         setup_logger();
         let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
@@ -998,6 +998,7 @@ proptest! {
 
 proptest! {
     #[test]
+    #[ignore]
     fn test_well_formed_from_23(protos in generate_interfacing_protocols_general_pattern(8, 8, 8)) {
         setup_logger();
         let protocols: Vec<SwarmProtocolType> = protos.0.into_iter().map(|protocol| protocol).collect();

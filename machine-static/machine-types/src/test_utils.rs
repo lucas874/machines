@@ -110,6 +110,21 @@ pub fn get_proto32() -> SwarmProtocolType {
     )
     .unwrap()
 }
+// get_proto_3 from test module of composition_machine
+pub fn get_proto33() -> SwarmProtocolType {
+    serde_json::from_str::<SwarmProtocolType>(
+        r#"{
+            "initial": "0",
+            "transitions": [
+                { "source": "0", "target": "1", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
+                { "source": "1", "target": "2", "label": { "cmd": "test", "logType": ["report"], "role": "TR" } },
+                { "source": "2", "target": "3", "label": { "cmd": "accept", "logType": ["ok"], "role": "QCR" } },
+                { "source": "2", "target": "3", "label": { "cmd": "reject", "logType": ["notOk"], "role": "QCR" } }
+            ]
+        }"#,
+    )
+    .unwrap()
+}
 pub fn get_proto_4() -> SwarmProtocolType {
     serde_json::from_str::<SwarmProtocolType>(
         r#"{
@@ -119,6 +134,20 @@ pub fn get_proto_4() -> SwarmProtocolType {
                 { "source": "1", "target": "2", "label": { "cmd": "c_ir_1", "logType": ["e_ir_1"], "role": "IR" } },
                 { "source": "2", "target": "1", "label": { "cmd": "c_r0_0", "logType": ["e_r0_0"], "role": "R0" } },
                 { "source": "1", "target": "3", "label": { "cmd": "c_r0_1", "logType": ["e_r0_1"], "role": "R0" } }
+            ]
+        }"#,
+    )
+    .unwrap()
+}
+// get_proto_4 from test module of composition_machine
+fn get_proto_41() -> SwarmProtocolType {
+    serde_json::from_str::<SwarmProtocolType>(
+        r#"{
+            "initial": "0",
+            "transitions": [
+                { "source": "0", "target": "1", "label": { "cmd": "observe", "logType": ["observing"], "role": "QCR" } },
+                { "source": "1", "target": "2", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
+                { "source": "2", "target": "3", "label": { "cmd": "test", "logType": ["report"], "role": "QCR" } }
             ]
         }"#,
     )
@@ -448,6 +477,21 @@ pub fn get_interfacing_swarms_pat_4() -> InterfacingProtocols {
         pattern_4_proto_3(),
         pattern_4_proto_4(),
     ])
+}
+
+// get_interfacing_swarms_2 from composition_machine.rs
+fn get_interfacing_swarms_2_machine() -> InterfacingProtocols {
+        InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto3()])
+}
+// get_interfacing_swarms_3 from composition_machine.rs
+fn get_interfacing_swarms_3_machine() -> InterfacingProtocols {
+        InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto_41()])
+}
+fn get_interfacing_swarms_1_reversed() -> InterfacingProtocols {
+        InterfacingProtocols(vec![get_proto2(), get_proto1()])
+}
+fn get_interfacing_swarms_2_machine_reversed() -> InterfacingProtocols {
+        InterfacingProtocols(vec![get_proto33(), get_proto2(), get_proto1()])
 }
 pub fn get_fail_1_swarms() -> InterfacingProtocols {
     InterfacingProtocols(vec![get_fail_1_component_1(), get_fail_1_component_2()])
