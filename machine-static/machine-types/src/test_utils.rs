@@ -479,19 +479,12 @@ pub fn get_interfacing_swarms_pat_4() -> InterfacingProtocols {
     ])
 }
 
-// get_interfacing_swarms_2 from composition_machine.rs
-fn get_interfacing_swarms_2_machine() -> InterfacingProtocols {
-        InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto3()])
-}
 // get_interfacing_swarms_3 from composition_machine.rs
-fn get_interfacing_swarms_3_machine() -> InterfacingProtocols {
+pub fn get_interfacing_swarms_3_machine() -> InterfacingProtocols {
         InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto_41()])
 }
 fn get_interfacing_swarms_1_reversed() -> InterfacingProtocols {
         InterfacingProtocols(vec![get_proto2(), get_proto1()])
-}
-fn get_interfacing_swarms_2_machine_reversed() -> InterfacingProtocols {
-        InterfacingProtocols(vec![get_proto33(), get_proto2(), get_proto1()])
 }
 pub fn get_fail_1_swarms() -> InterfacingProtocols {
     InterfacingProtocols(vec![get_fail_1_component_1(), get_fail_1_component_2()])

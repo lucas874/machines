@@ -2,7 +2,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::machine::util::to_json_machine;
 use crate::machine::{adaptation, projection};
-use crate::types::{proto_graph, proto_info, typescript_types};
+use crate::types::{proto_info, typescript_types};
 use crate::types::typescript_types::{DataResult, Granularity, InterfacingProtocols, MachineType, ProjectionInfo, Role, Subscriptions, SwarmProtocolType};
 
 pub mod types;
