@@ -7,8 +7,7 @@ use machine_types::{
         typescript_types::{CheckResult, Command, DataResult, EventType, MachineLabel, Role, State, StateName, SwarmLabel, Transition, MachineType, Subscriptions, SwarmProtocolType, Granularity, InterfacingProtocols,},
         proto_graph::{EdgeId, Graph, NodeId,}
     },
-    compose_protocols,
-    project_combine, revised_projection
+    compose_protocols
 };
 use petgraph::{
     graph::EdgeReference,
@@ -902,10 +901,10 @@ proptest! {
         assert!(composition.is_some());
         let subscriptions = subscriptions.unwrap();
         let composition = composition.unwrap();
-        //let composition = InterfacingSwarms::<Role>(vec![CompositionComponent{protocol: composition.unwrap(), interface: None}]);
+
         let sub_string = serde_json::to_string(&subscriptions).unwrap();
         for role in subscriptions.keys() {
-            let projection: Option<MachineType> = match revised_projection(composition.clone(), sub_string.clone(), role.clone(), true) {
+            let projection: Option<MachineType> = match machine_types::project(protos.clone(), sub_string.clone(), role.clone(), true, true) {
                 DataResult::OK{data: projection} => {
                 Some(projection) },
                 DataResult::ERROR{ .. } => None,
@@ -916,7 +915,7 @@ proptest! {
             match check_composed_projection(protos.clone(), sub_string.clone(), role.clone(), projection.clone().unwrap()) {
                 CheckResult::OK => (),
                 CheckResult::ERROR {errors: e} => {
-                    match project_combine(protos.clone(), sub_string.clone(), role.clone(), false) {
+                    match machine_types::project(protos.clone(), sub_string.clone(), role.clone(), false, false) {
                         DataResult::OK{data: projection1} => {
                             println!("machine combined: {}", serde_json::to_string_pretty::<MachineType>(&projection1).unwrap());
                         },
@@ -946,18 +945,12 @@ proptest! {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
-        let composition: Option<SwarmProtocolType> = match compose_protocols(protos.clone()) {
-            DataResult::OK{data: composition} => Some(composition),
-            DataResult::ERROR{ .. } => None,
-        };
         assert!(subscriptions.is_some());
-        assert!(composition.is_some());
         let subscriptions = subscriptions.unwrap();
-        let composition = composition.unwrap();
-        //let composition = InterfacingSwarms::<Role>(vec![CompositionComponent{protocol: composition.unwrap(), interface: None}]);
+
         let sub_string = serde_json::to_string(&subscriptions).unwrap();
         for role in subscriptions.keys() {
-            let projection: Option<MachineType> = match revised_projection(composition.clone(), sub_string.clone(), role.clone(), true) {
+            let projection: Option<MachineType> = match machine_types::project(protos.clone(), sub_string.clone(), role.clone(), true, true) {
                 DataResult::OK{data: projection} => {
                 Some(projection) },
                 DataResult::ERROR{ .. } => None,
@@ -966,7 +959,7 @@ proptest! {
             // should work like this projecting over the explicit composition initially and comparing that with combined machines?
             match check_composed_projection(protos.clone(), sub_string.clone(), role.clone(), projection.clone().unwrap()) {
                 CheckResult::OK => {
-                    let combined: Option<MachineType> = match project_combine(protos.clone(), sub_string.clone(), role.clone(), false) {
+                    let combined: Option<MachineType> = match machine_types::project(protos.clone(), sub_string.clone(), role.clone(), false, false) {
                         DataResult::OK{data: combined} => {
                         Some(combined) },
                         DataResult::ERROR{ .. } => None,
@@ -978,7 +971,7 @@ proptest! {
                     println!("");
                 },//(),
                 CheckResult::ERROR {errors: e} => {
-                    match project_combine(protos.clone(), sub_string.clone(), role.clone(), false) {
+                    match machine_types::project(protos.clone(), sub_string.clone(), role.clone(), false, false) {
                         DataResult::OK{data: projection1} => {
                             println!("machine combined: {}", serde_json::to_string_pretty::<MachineType>(&projection1).unwrap());
                         },

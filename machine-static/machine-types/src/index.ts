@@ -1,6 +1,6 @@
 import {
   CheckResult, MachineType, SwarmProtocolType, Subscriptions, Role, DataResult, Granularity, InterfacingProtocols,
-  exact_well_formed_sub, overapproximated_well_formed_sub,
+  exact_well_formed_sub, overapproximated_well_formed_sub, compose_protocols
 } from '../pkg/machine_types.js'
 export { MachineType, SwarmProtocolType, Subscriptions, Role, CheckResult, DataResult }
 
@@ -28,4 +28,14 @@ export function exactWFSubscriptions(protos: InterfacingProtocols, subscriptions
  */
 export function overapproxWFSubscriptions(protos: InterfacingProtocols, subscriptions: Subscriptions, granularity: Granularity): DataResult<Subscriptions> {
   return overapproximated_well_formed_sub(protos, JSON.stringify(subscriptions), granularity);
+}
+
+/**
+ * Construct the composition of a number of swarm protocols.
+ *
+ * @param protos - An array of swarm protocols representing a composition.
+ * @returns - Result containing the expanded composition or a list of error messages.
+ */
+export function composeProtocols(protos: InterfacingProtocols): DataResult<SwarmProtocolType> {
+  return compose_protocols(protos)
 }

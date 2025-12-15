@@ -133,7 +133,7 @@ mod tests {
     use machine_types::{
         machine::projection, subscription::{exact, overapproximation}, types::{
             projection::Graph, proto_graph, proto_info, typescript_types::{
-                Command, EventType, Granularity, InterfacingProtocols, MachineType, Role, StateName, Subscriptions, SwarmProtocolType, Transition
+                Command, DataResult, EventType, Granularity, InterfacingProtocols, MachineType, Role, StateName, Subscriptions, SwarmProtocolType, Transition
             }
         }
     };
@@ -1138,43 +1138,136 @@ mod tests {
         );
         assert!(!errors.is_empty());
     }
-/*
-    mod machine_composition_tests {
-        use super::*;
 
-        #[test]
-        fn test_combine_machines_1() {
-            setup_logger();
-            // Example from coplaws slides. Use generated WWF subscriptions. Project over T.
-            let role = Role::new("T");
-            let subs1 = crate::composition::composition_swarm::overapprox_well_formed_sub(
-                get_interfacing_swarms_1(),
-                &BTreeMap::new(),
-                Granularity::Coarse,
-            );
-            assert!(subs1.is_ok());
-            let subs1 = subs1.unwrap();
-            let proto_info = swarms_to_proto_info(get_interfacing_swarms_1());
-            assert!(proto_info.no_errors());
+    #[test]
+    fn test_combine_machines_equal_1() {
+        setup_logger();
+        // Example from coplaws slides. Use generated WWF subscriptions. Project over T.
+        let role = Role::new("T");
+        let subs1 = match machine_types::overapproximated_well_formed_sub(
+            get_interfacing_swarms_1(),
+            "{}".to_string(),
+            Granularity::TwoStep
+        ) {
+            DataResult::OK { data } => data,
+            DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!() }
+        };
 
-            let (proj_combined1, proj_combined_initial1) =
-                project_combine(&proto_info, &subs1, role.clone(), false);
+        let (proj_combined1, proj_combined_initial1, _) = match machine_types::project(
+            get_interfacing_swarms_1(),
+            serde_json::to_string(&subs1).unwrap(),
+            role.clone(),
+            false,
+            false
+        ) {
+            DataResult::OK { data } => crate::machine::from_json(data),
+            DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
+        };
 
-            let subs2 = crate::composition::composition_swarm::overapprox_well_formed_sub(
-                get_interfacing_swarms_1_reversed(),
-                &BTreeMap::new(),
-                Granularity::Coarse,
-            );
-            assert!(subs2.is_ok());
-            let subs2 = subs2.unwrap();
-            let proto_info = swarms_to_proto_info(get_interfacing_swarms_1_reversed());
-            assert!(proto_info.no_errors());
+        let subs2 = match machine_types::overapproximated_well_formed_sub(
+            get_interfacing_swarms_1_reversed(),
+            "{}".to_string(),
+            Granularity::TwoStep
+        ) {
+            DataResult::OK { data } => data,
+            DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!() }
+        };
 
-            let (proj_combined2, proj_combined_initial2) =
-                project_combine(&proto_info, &subs2, role.clone(), false);
+
+        let (proj_combined2, proj_combined_initial2, _) = match machine_types::project(
+            get_interfacing_swarms_1_reversed(),
+           serde_json::to_string(&subs2).unwrap(),
+           role.clone(),
+           true,
+           false
+        ) {
+            DataResult::OK { data } => crate::machine::from_json(data),
+            DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
+        };
+
+        let (proj_expanded_proto, proj_expanded_proto_initial, _) = match machine_types::project(
+            get_interfacing_swarms_1(),
+            serde_json::to_string(&subs1).unwrap(),
+            role.clone(),
+            true,
+            true
+        ) {
+            DataResult::OK { data } => crate::machine::from_json(data),
+            DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
+        };
+        // compose(a, b) should be equal to compose(b, a)
+        assert_eq!(subs1, subs2);
+        assert!(equivalent(
+            &proj_combined1,
+            proj_combined_initial1.unwrap(),
+            &proj_combined2,
+            proj_combined_initial2.unwrap()
+        )
+        .is_empty());
+
+        assert!(equivalent(
+            &proj_combined2,
+            proj_combined_initial2.unwrap(),
+            &proj_expanded_proto,
+            proj_expanded_proto_initial.unwrap()
+        )
+        .is_empty());
+    }
+
+    #[test]
+    fn test_combine_machines_equal_2() {
+        setup_logger();
+        // Fails when you use the exact subscriptions because that way not all involved roles subscribe to ALL interfaces. Ordering gets messed up.
+        // The projected over the explicit composition may be correct, but the combined projections look weird and out of order.
+        let subs1 = match machine_types::overapproximated_well_formed_sub(
+            get_interfacing_swarms_2(),
+            "{}".to_string(),
+            Granularity::TwoStep
+        ) {
+            DataResult::OK { data } => data,
+            DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!() }
+        };
+        let subs2 = match machine_types::overapproximated_well_formed_sub(
+            get_interfacing_swarms_2_reversed(),
+            "{}".to_string(),
+            Granularity::TwoStep
+        ) {
+            DataResult::OK { data } => data,
+            DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!() }
+        };
+        assert_eq!(subs1, subs2);
+        let all_roles = vec![
+            Role::new("T"),
+            Role::new("FL"),
+            Role::new("D"),
+            Role::new("F"),
+            Role::new("TR"),
+            Role::new("QCR"),
+        ];
+
+        for role in all_roles {
+            let (proj_combined1, proj_combined_initial1, _) = match machine_types::project(
+                get_interfacing_swarms_2(),
+                serde_json::to_string(&subs1).unwrap(),
+                role.clone(),
+                false,
+                false
+            ) {
+                DataResult::OK { data } => crate::machine::from_json(data),
+                DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
+            };
+            let (proj_combined2, proj_combined_initial2, _) = match machine_types::project(
+                get_interfacing_swarms_2_reversed(),
+                serde_json::to_string(&subs2).unwrap(),
+                role.clone(),
+                true,
+                false
+            ) {
+                DataResult::OK { data } => crate::machine::from_json(data),
+                DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
+            };
 
             // compose(a, b) should be equal to compose(b, a)
-            assert_eq!(subs1, subs2);
             assert!(equivalent(
                 &proj_combined1,
                 proj_combined_initial1.unwrap(),
@@ -1182,255 +1275,180 @@ mod tests {
                 proj_combined_initial2.unwrap()
             )
             .is_empty());
-
-            let composition = compose_protocols(get_interfacing_swarms_1());
-            assert!(composition.is_ok());
-            let (composed_graph, composed_initial) = composition.unwrap();
-            let (proj, proj_initial) = project(
-                &composed_graph,
-                composed_initial,
-                &subs1,
+            let (proj_expanded_proto, proj_expanded_proto_initial, _) = match machine_types::project(
+                get_interfacing_swarms_2(),
+                serde_json::to_string(&subs1).unwrap(),
                 role.clone(),
                 true,
-            );
-
-            assert!(equivalent(
+                true
+            ) {
+                DataResult::OK { data } => crate::machine::from_json(data),
+                DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
+            };
+            let errors = equivalent(
                 &proj_combined2,
                 proj_combined_initial2.unwrap(),
-                &to_option_machine(&proj),
-                proj_initial
-            )
-            .is_empty());
-        }
-
-        #[test]
-        fn test_combine_machines_2() {
-            setup_logger();
-            // fails when you use the exact subscriptions because that way not all roles subscribe to ALL interfaces? Ordering gets messed up.
-            // the projected over the explicit composition may be correct, but the combined projections look weird and out of order.
-            let composition = compose_protocols(get_interfacing_swarms_2());
-            assert!(composition.is_ok());
-            let (composed_graph, composed_initial) = composition.unwrap();
-            let subs = crate::composition::composition_swarm::overapprox_well_formed_sub(
-                get_interfacing_swarms_2(),
-                &BTreeMap::new(),
-                Granularity::Coarse,
+                &proj_expanded_proto,
+                proj_expanded_proto_initial.unwrap(),
             );
-            assert!(subs.is_ok());
-            let subs = subs.unwrap();
-            let all_roles = vec![
-                Role::new("T"),
-                Role::new("FL"),
-                Role::new("D"),
-                Role::new("F"),
-                Role::new("TR"),
-                Role::new("QCR"),
-            ];
 
-            for role in all_roles {
-                let subs1 = crate::composition::composition_swarm::overapprox_well_formed_sub(
-                    get_interfacing_swarms_2(),
-                    &BTreeMap::new(),
-                    Granularity::Coarse,
-                );
-                assert!(subs1.is_ok());
-                let subs1 = subs1.unwrap();
-                let proto_info = swarms_to_proto_info(get_interfacing_swarms_2());
-                assert!(proto_info.no_errors());
-
-                let (proj_combined1, proj_combined_initial1) =
-                    project_combine(&proto_info, &subs1, role.clone(), false);
-
-                let subs2 = crate::composition::composition_swarm::overapprox_well_formed_sub(
-                    get_interfacing_swarms_2_reversed(),
-                    &BTreeMap::new(),
-                    Granularity::Coarse,
-                );
-                assert!(subs2.is_ok());
-                let subs2 = subs2.unwrap();
-                let proto_info = swarms_to_proto_info(get_interfacing_swarms_2_reversed());
-                assert!(proto_info.no_errors());
-
-                let (proj_combined2, proj_combined_initial2) =
-                    project_combine(&proto_info, &subs2, role.clone(), false);
-
-                // compose(a, b) should be equal to compose(b, a)
-                assert_eq!(subs1, subs2);
-                assert!(equivalent(
-                    &proj_combined1,
-                    proj_combined_initial1.unwrap(),
-                    &proj_combined2,
-                    proj_combined_initial2.unwrap()
-                )
-                .is_empty());
-                assert_eq!(subs2, subs);
-
-                let (proj, proj_initial) =
-                    project(&composed_graph, composed_initial, &subs, role.clone(), true);
-                let errors = equivalent(
-                    &proj_combined2,
-                    proj_combined_initial2.unwrap(),
-                    &to_option_machine(&proj),
-                    proj_initial,
-                );
-
-                assert!(errors.is_empty());
-            }
-        }
-
-        #[test]
-        fn test_all_projs_whf() {
-            setup_logger();
-            let composition = compose_protocols(get_interfacing_swarms_1());
-            assert!(composition.is_ok());
-            let (composed_graph, composed_initial) = composition.unwrap();
-            let subs = crate::composition::composition_swarm::overapprox_well_formed_sub(
-                get_interfacing_swarms_1(),
-                &BTreeMap::new(),
-                Granularity::TwoStep
-            );
-            assert!(subs.is_ok());
-            let subs = subs.unwrap();
-
-            let all_roles = vec![
-                Role::new("T"),
-                Role::new("FL"),
-                Role::new("D"),
-                Role::new("F"),
-            ];
-
-            let expected_projs = BTreeMap::from([
-                (Role::new("T"), get_whf_transport()),
-                (Role::new("FL"), get_whf_forklift()),
-                (Role::new("D"), get_whf_door()),
-                (Role::new("F"), get_whf_f()),
-            ]);
-
-            for role in all_roles {
-                let (expand_proj, expand_proj_initial) = project(
-                    &composed_graph,
-                    composed_initial,
-                    &subs,
-                    role.clone(),
-                    true,
-                );
-                let (combined_proj, combined_proj_initial) =
-                    project_combine(&swarms_to_proto_info(get_interfacing_swarms_1()), &subs, role.clone(), true);
-
-                assert!(equivalent(
-                    &to_option_machine(&expand_proj),
-                    expand_proj_initial,
-                    &combined_proj,
-                    combined_proj_initial.unwrap())
-                    .is_empty()
-                );
-
-                let (expected, expected_initial, _) = crate::machine::from_json(expected_projs.get(&role).unwrap().clone());
-
-                assert!(equivalent(
-                    &expected,
-                    expected_initial.unwrap(),
-                    &combined_proj,
-                    combined_proj_initial.unwrap())
-                    .is_empty());
-            }
-        }
-
-        #[test]
-        fn test_compose_zero() {
-            let left = MachineType {
-                initial: State::new("left_0"),
-                transitions: vec![
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("a"),
-                        },
-                        source: State::new("left_0"),
-                        target: State::new("left_1"),
-                    },
-                    Transition {
-                        label: MachineLabel::Execute {
-                            cmd: Command::new("cmd_a"),
-                            log_type: vec![EventType::new("a")],
-                        },
-                        source: State::new("left_0"),
-                        target: State::new("left_0"),
-                    },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("b"),
-                        },
-                        source: State::new("left_1"),
-                        target: State::new("left_2"),
-                    },
-                    Transition {
-                        label: MachineLabel::Execute {
-                            cmd: Command::new("cmd_b"),
-                            log_type: vec![EventType::new("b")],
-                        },
-                        source: State::new("left_1"),
-                        target: State::new("left_1"),
-                    },
-                ],
-            };
-            let right = MachineType {
-                initial: State::new("right_0"),
-                transitions: vec![
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("b"),
-                        },
-                        source: State::new("right_0"),
-                        target: State::new("right_1"),
-                    },
-                    Transition {
-                        label: MachineLabel::Execute {
-                            cmd: Command::new("cmd_b"),
-                            log_type: vec![EventType::new("b")],
-                        },
-                        source: State::new("right_0"),
-                        target: State::new("right_0"),
-                    },
-                    Transition {
-                        label: MachineLabel::Input {
-                            event_type: EventType::new("a"),
-                        },
-                        source: State::new("right_1"),
-                        target: State::new("right_2"),
-                    },
-                    Transition {
-                        label: MachineLabel::Execute {
-                            cmd: Command::new("cmd_a"),
-                            log_type: vec![EventType::new("a")],
-                        },
-                        source: State::new("right_1"),
-                        target: State::new("right_1"),
-                    },
-                ],
-            };
-            let (left, left_initial, _) = crate::machine::from_json(left);
-            let left = from_option_graph_to_graph(&left);
-            let (right, right_initial, _) = crate::machine::from_json(right);
-            let right = from_option_graph_to_graph(&right);
-            let interface = BTreeSet::from([EventType::new("a"), EventType::new("b")]);
-            let (combined, combined_initial) = compose(
-                right,
-                right_initial.unwrap(),
-                left,
-                left_initial.unwrap(),
-                interface,
-                gen_state_name,
-            );
-            let combined = to_json_machine(combined, combined_initial);
-
-            let expected = MachineType {
-                initial: State::new("right_0 || left_0"),
-                transitions: vec![],
-            };
-
-            assert_eq!(combined, expected);
+            assert!(errors.is_empty());
         }
     }
+
+    #[test]
+    fn test_all_projs_whf() {
+        setup_logger();
+        let subs = match machine_types::overapproximated_well_formed_sub(
+            get_interfacing_swarms_1(),
+            "{}".to_string(),
+            Granularity::TwoStep
+        ) {
+            DataResult::OK { data } => data,
+            DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!() }
+        };
+        let expected_projs = BTreeMap::from([
+            (Role::new("T"), get_whf_transport()),
+            (Role::new("FL"), get_whf_forklift()),
+            (Role::new("D"), get_whf_door()),
+            (Role::new("F"), get_whf_f()),
+        ]);
+
+        for role in expected_projs.keys() {
+            let (proj_expanded_proto, proj_expanded_proto_initial, _) = match machine_types::project(
+                get_interfacing_swarms_1(),
+                serde_json::to_string(&subs).unwrap(),
+                role.clone(),
+                true,
+                true
+            ) {
+                DataResult::OK { data } => crate::machine::from_json(data),
+                DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
+            };
+            let (proj_combined, proj_combined_initial, _) = match machine_types::project(
+                get_interfacing_swarms_1(),
+                serde_json::to_string(&subs).unwrap(),
+                role.clone(),
+                false,
+                false
+            ) {
+                DataResult::OK { data } => crate::machine::from_json(data),
+                DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
+            };
+            assert!(equivalent(
+                &proj_expanded_proto,
+                proj_expanded_proto_initial.unwrap(),
+                &proj_combined,
+                proj_combined_initial.unwrap())
+                .is_empty()
+            );
+
+            let (expected, expected_initial, _) = crate::machine::from_json(expected_projs.get(role).unwrap().clone());
+
+            assert!(equivalent(
+                &expected,
+                expected_initial.unwrap(),
+                &proj_combined,
+                proj_combined_initial.unwrap())
+                .is_empty());
+        }
+    }
+    /*
+    #[test]
+    fn test_compose_zero() {
+        let left = MachineType {
+            initial: State::new("left_0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("a"),
+                    },
+                    source: State::new("left_0"),
+                    target: State::new("left_1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("cmd_a"),
+                        log_type: vec![EventType::new("a")],
+                    },
+                    source: State::new("left_0"),
+                    target: State::new("left_0"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("b"),
+                    },
+                    source: State::new("left_1"),
+                    target: State::new("left_2"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("cmd_b"),
+                        log_type: vec![EventType::new("b")],
+                    },
+                    source: State::new("left_1"),
+                    target: State::new("left_1"),
+                },
+            ],
+        };
+        let right = MachineType {
+            initial: State::new("right_0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("b"),
+                    },
+                    source: State::new("right_0"),
+                    target: State::new("right_1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("cmd_b"),
+                        log_type: vec![EventType::new("b")],
+                    },
+                    source: State::new("right_0"),
+                    target: State::new("right_0"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("a"),
+                    },
+                    source: State::new("right_1"),
+                    target: State::new("right_2"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("cmd_a"),
+                        log_type: vec![EventType::new("a")],
+                    },
+                    source: State::new("right_1"),
+                    target: State::new("right_1"),
+                },
+            ],
+        };
+        let (left, left_initial, _) = crate::machine::from_json(left);
+        let left = from_option_graph_to_graph(&left);
+        let (right, right_initial, _) = crate::machine::from_json(right);
+        let right = from_option_graph_to_graph(&right);
+        let interface = BTreeSet::from([EventType::new("a"), EventType::new("b")]);
+        let (combined, combined_initial) = compose(
+            right,
+            right_initial.unwrap(),
+            left,
+            left_initial.unwrap(),
+            interface,
+            gen_state_name,
+        );
+        let combined = to_json_machine(combined, combined_initial);
+
+        let expected = MachineType {
+            initial: State::new("right_0 || left_0"),
+            transitions: vec![],
+        };
+
+        assert_eq!(combined, expected);
+    }
+
 
     // TODO:
     // Move tests related to adaptation and adaptation info to a module. Make one more (one that currently just prints).

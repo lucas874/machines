@@ -1,5 +1,6 @@
 use wasm_bindgen::prelude::*;
 
+use crate::machine::util::to_json_machine;
 use crate::machine::{adaptation, projection};
 use crate::types::{proto_graph, proto_info, typescript_types};
 use crate::types::typescript_types::{DataResult, Granularity, InterfacingProtocols, MachineType, ProjectionInfo, Role, Subscriptions, SwarmProtocolType};
@@ -66,8 +67,8 @@ pub fn overapproximated_well_formed_sub(
     }
 }
 
-#[wasm_bindgen]
-pub fn revised_projection(
+/* #[wasm_bindgen]
+pub fn project(
     proto: SwarmProtocolType,
     subs: String,
     role: Role,
@@ -85,29 +86,44 @@ pub fn revised_projection(
     DataResult::OK {
         data: machine::util::to_json_machine(proj, initial),
     }
-}
+} */
 
 #[wasm_bindgen]
-pub fn project_combine(
+pub fn project(
     protos: InterfacingProtocols,
     subs: String,
     role: Role,
     minimize: bool,
+    expand_protos: bool,
 ) -> DataResult<MachineType> {
     let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
         errors: vec![format!("parsing subscriptions: {}", e)]
     });
-    let proto_info = proto_info::swarms_to_proto_info(protos);
-    if !proto_info.no_errors() {
-        return DataResult::ERROR {
-            errors: composition_errors::error_report_to_strings(proto_info::proto_info_to_error_report(proto_info)),
-        };
-    }
 
-    let (proj, proj_initial) =
-        projection::project_combine(&proto_info, &subs, role, minimize);
+    // Expand the protocol composition of expand_protos, otherwise project each protocol and compose machines.
+    let machine = if expand_protos {
+        match proto_info::compose_protocols(protos) {
+            Ok((swarm, initial)) => {
+                let (proj, proj_initial) = projection::project(&swarm, initial, &subs, role, minimize);
+                to_json_machine(proj, proj_initial)
+            },
+            Err(error_report) => return DataResult::ERROR {
+                errors: composition_errors::error_report_to_strings(error_report),
+            }
+        }
+    } else {
+        let proto_info = proto_info::swarms_to_proto_info(protos);
+        match proto_info.no_errors() {
+            true => {
+                let (proj, proj_initial) = projection::project_combine(&proto_info, &subs, role, minimize);
+                machine::util::from_option_to_machine(proj, proj_initial.unwrap())
+            },
+            false => return DataResult::ERROR {
+                errors: composition_errors::error_report_to_strings(proto_info::proto_info_to_error_report(proto_info)) }
+        }
+    };
     DataResult::OK {
-        data: machine::util::from_option_to_machine(proj, proj_initial.unwrap()),
+        data: machine
     }
 }
 
@@ -170,3 +186,20 @@ pub fn compose_protocols(protos: InterfacingProtocols) -> DataResult<SwarmProtoc
         },
     }
 }
+
+/*
+#[wasm_bindgen]
+pub fn compose_protocols(protos: InterfacingProtocols) -> Result<SwarmProtocolType, Vec<String>> {
+    let composition = proto_info::compose_protocols(protos);
+
+    match composition {
+        Ok((graph, initial)) => Ok (
+            typescript_types::to_swarm_json(graph, initial),
+        ),
+        Err(errors) => Err(
+            composition_errors::error_report_to_strings(errors),
+        ),
+    }
+}
+
+*/
