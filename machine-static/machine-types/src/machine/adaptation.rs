@@ -260,10 +260,10 @@ fn from_adaptation_graph_to_option_graph(graph: &AdaptationGraph) -> OptionGraph
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::subscription::{exact, overapproximation};
+    use crate::subscription::overapproximation;
     use crate::types::typescript_types::{Command, Granularity, InterfacingProtocols, MachineType, State, Transition};
-    use crate::{test_utils, types::typescript_types::SwarmProtocolType};
-    use crate::types::{proto_graph, proto_info};
+    use crate::test_utils;
+    use crate::types::proto_info;
     use crate::machine::util;
 
     #[test]
@@ -953,8 +953,163 @@ mod tests {
         let mut proj = projection_info.projection.clone();
         proj.transitions.sort();
         expected_proj.transitions.sort();
-        println!("{}", serde_json::to_string_pretty(&proj).unwrap());
-        println!("{}", serde_json::to_string_pretty(&expected_proj).unwrap());
+        assert_eq!(proj, expected_proj);
+        assert_eq!(
+            expected_proj_to_machine_states,
+            projection_info.proj_to_machine_states
+        );
+        assert_eq!(expected_branches, projection_info.branches);
+        assert_eq!(
+            expected_special_event_types,
+            projection_info.special_event_types
+        );
+    }
+
+    #[test]
+    fn test_projection_information_2() {
+        test_utils::setup_logger();
+
+        let fl_m = MachineType {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                    },
+                    source: State::new("1"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("1"),
+                    target: State::new("0"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("3"),
+                },
+            ],
+        };
+
+        let mut expected_proj = MachineType {
+            initial: State::new("(0 || { { 0 } })"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("(0 || { { 0 } })"),
+                    target: State::new("(3 || { { 3 } })"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("(0 || { { 0 } })"),
+                    target: State::new("(1 || { { 1 } })"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("(1 || { { 1 } })"),
+                    target: State::new("(0 || { { 2 } })"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                    },
+                    source: State::new("(1 || { { 1 } })"),
+                    target: State::new("(1 || { { 1 } })"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("part"),
+                    },
+                    source: State::new("(0 || { { 2 } })"),
+                    target: State::new("(0 || { { 0 } })"),
+                },
+            ],
+        };
+
+        let (fl_m_graph, fl_m_graph_initial, _) = util::from_json(fl_m.clone());
+        let role = Role::new("FL");
+        let swarms: InterfacingProtocols = InterfacingProtocols(vec![test_utils::get_proto1()]);
+        let swarms_for_sub = test_utils::get_interfacing_swarms_1();
+        let larger_than_necessary_sub =
+            overapproximation::overapprox_well_formed_sub(
+                swarms_for_sub,
+                &BTreeMap::new(),
+                Granularity::TwoStep,
+            );
+        assert!(larger_than_necessary_sub.is_ok());
+        let subs1 = larger_than_necessary_sub.unwrap();
+        let proto_info = proto_info::swarms_to_proto_info(swarms.clone());
+
+        let projection_info = projection_information(
+            &proto_info,
+            &subs1,
+            role,
+            (fl_m_graph.clone(), fl_m_graph_initial.unwrap()),
+            0,
+            true,
+        );
+        let projection_info = match projection_info {
+            None => panic!(),
+            Some(projection_info) => {
+                projection_info
+            }
+        };
+        let expected_proj_to_machine_states = BTreeMap::from([
+            (State::new("(0 || { { 0 } })"), vec![State::new("0")]),
+            (State::new("(0 || { { 2 } })"), vec![State::new("0")]),
+            (State::new("(1 || { { 1 } })"), vec![State::new("1")]),
+            (State::new("(3 || { { 3 } })"), vec![State::new("3")]),
+        ]);
+        let expected_branches = BTreeMap::from([
+            (
+                EventType::new("part"),
+                vec![EventType::new("partID"), EventType::new("time")],
+            ),
+            (
+                EventType::new("partID"),
+                vec![
+                    EventType::new("part"),
+                    EventType::new("partID"),
+                    EventType::new("pos"),
+                    EventType::new("time"),
+                ],
+            ),
+            (
+                EventType::new("pos"),
+                vec![
+                    EventType::new("part"),
+                    EventType::new("partID"),
+                    EventType::new("time"),
+                ],
+            ),
+            (EventType::new("time"), vec![]),
+        ]);
+        let expected_special_event_types =
+            BTreeSet::from([EventType::new("partID"), EventType::new("time")]);
+
+        let mut proj = projection_info.projection.clone();
+        proj.transitions.sort();
+        expected_proj.transitions.sort();
         assert_eq!(proj, expected_proj);
         assert_eq!(
             expected_proj_to_machine_states,
