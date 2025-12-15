@@ -1353,107 +1353,11 @@ mod tests {
                 .is_empty());
         }
     }
-    /*
-    #[test]
-    fn test_compose_zero() {
-        let left = MachineType {
-            initial: State::new("left_0"),
-            transitions: vec![
-                Transition {
-                    label: MachineLabel::Input {
-                        event_type: EventType::new("a"),
-                    },
-                    source: State::new("left_0"),
-                    target: State::new("left_1"),
-                },
-                Transition {
-                    label: MachineLabel::Execute {
-                        cmd: Command::new("cmd_a"),
-                        log_type: vec![EventType::new("a")],
-                    },
-                    source: State::new("left_0"),
-                    target: State::new("left_0"),
-                },
-                Transition {
-                    label: MachineLabel::Input {
-                        event_type: EventType::new("b"),
-                    },
-                    source: State::new("left_1"),
-                    target: State::new("left_2"),
-                },
-                Transition {
-                    label: MachineLabel::Execute {
-                        cmd: Command::new("cmd_b"),
-                        log_type: vec![EventType::new("b")],
-                    },
-                    source: State::new("left_1"),
-                    target: State::new("left_1"),
-                },
-            ],
-        };
-        let right = MachineType {
-            initial: State::new("right_0"),
-            transitions: vec![
-                Transition {
-                    label: MachineLabel::Input {
-                        event_type: EventType::new("b"),
-                    },
-                    source: State::new("right_0"),
-                    target: State::new("right_1"),
-                },
-                Transition {
-                    label: MachineLabel::Execute {
-                        cmd: Command::new("cmd_b"),
-                        log_type: vec![EventType::new("b")],
-                    },
-                    source: State::new("right_0"),
-                    target: State::new("right_0"),
-                },
-                Transition {
-                    label: MachineLabel::Input {
-                        event_type: EventType::new("a"),
-                    },
-                    source: State::new("right_1"),
-                    target: State::new("right_2"),
-                },
-                Transition {
-                    label: MachineLabel::Execute {
-                        cmd: Command::new("cmd_a"),
-                        log_type: vec![EventType::new("a")],
-                    },
-                    source: State::new("right_1"),
-                    target: State::new("right_1"),
-                },
-            ],
-        };
-        let (left, left_initial, _) = crate::machine::from_json(left);
-        let left = from_option_graph_to_graph(&left);
-        let (right, right_initial, _) = crate::machine::from_json(right);
-        let right = from_option_graph_to_graph(&right);
-        let interface = BTreeSet::from([EventType::new("a"), EventType::new("b")]);
-        let (combined, combined_initial) = compose(
-            right,
-            right_initial.unwrap(),
-            left,
-            left_initial.unwrap(),
-            interface,
-            gen_state_name,
-        );
-        let combined = to_json_machine(combined, combined_initial);
-
-        let expected = MachineType {
-            initial: State::new("right_0 || left_0"),
-            transitions: vec![],
-        };
-
-        assert_eq!(combined, expected);
-    }
-
 
     // TODO:
     // Move tests related to adaptation and adaptation info to a module. Make one more (one that currently just prints).
     // Add a test somewhere that uses WH || F || QC
-
+    /*
     #[test]
     #[ignore]
     fn test_adapted_projection_fl() {

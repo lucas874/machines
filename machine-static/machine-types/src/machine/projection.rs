@@ -198,12 +198,12 @@ mod tests {
     use crate::types::typescript_types::{Command, Granularity, InterfacingProtocols, MachineType, State, Transition};
     use crate::{test_utils, types::typescript_types::SwarmProtocolType};
     use crate::types::{proto_graph, proto_info};
-    use crate::machine;
+    use crate::machine::util;
 
-    fn print_machines(m1: &MachineType, m2: &MachineType) {
+    /* fn print_machines(m1: &MachineType, m2: &MachineType) {
         println!("{}", serde_json::to_string_pretty(&m1).unwrap());
         println!("{}", serde_json::to_string_pretty(&m2).unwrap());
-    }
+    } */
 
     #[test]
     fn test_projection_1() {
@@ -232,7 +232,7 @@ mod tests {
         let role = Role::new("F");
         let (g, i, _) = proto_graph::from_json(proto);
         let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role, false);
-        let mut proj_machine = machine::util::to_json_machine(proj, proj_initial);
+        let mut proj_machine = util::to_json_machine(proj, proj_initial);
         let mut expected_machine = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -284,7 +284,7 @@ mod tests {
         let role = Role::new("FL");
         let (g, i, _) = proto_graph::from_json(proto);
         let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role.clone(), false);
-        let mut proj_machine = machine::util::to_json_machine(proj, proj_initial);
+        let mut proj_machine = util::to_json_machine(proj, proj_initial);
         let mut expected_machine = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -350,7 +350,7 @@ mod tests {
         let role = Role::new("F");
         let (g, i, _) = proto_graph::from_json(proto);
         let (proj, proj_initial) = project(&g, i.unwrap(), &subs, role, false);
-        let mut proj_machine = machine::util::to_json_machine(proj, proj_initial);
+        let mut proj_machine = util::to_json_machine(proj, proj_initial);
         let mut expected_machine = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -399,7 +399,7 @@ mod tests {
         let role = Role::new("T");
         let (g, i) = proto_info::compose_protocols(protos).unwrap();
         let (proj, proj_initial) = project(&g, i, &subs, role, false);
-        let mut proj_machine = machine::util::to_json_machine(proj, proj_initial);
+        let mut proj_machine = util::to_json_machine(proj, proj_initial);
         let mut expected_machine = MachineType {
             initial: State::new("0 || 0"),
             transitions: vec![
@@ -480,5 +480,106 @@ mod tests {
         proj_machine.transitions.sort();
         expected_machine.transitions.sort();
         assert_eq!(proj_machine, expected_machine);
+    }
+
+#[test]
+    fn test_compose_zero() {
+        let left = MachineType {
+            initial: State::new("left_0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("a"),
+                    },
+                    source: State::new("left_0"),
+                    target: State::new("left_1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("cmd_a"),
+                        log_type: vec![EventType::new("a")],
+                    },
+                    source: State::new("left_0"),
+                    target: State::new("left_0"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("b"),
+                    },
+                    source: State::new("left_1"),
+                    target: State::new("left_2"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("cmd_b"),
+                        log_type: vec![EventType::new("b")],
+                    },
+                    source: State::new("left_1"),
+                    target: State::new("left_1"),
+                },
+            ],
+        };
+        let right = MachineType {
+            initial: State::new("right_0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("b"),
+                    },
+                    source: State::new("right_0"),
+                    target: State::new("right_1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("cmd_b"),
+                        log_type: vec![EventType::new("b")],
+                    },
+                    source: State::new("right_0"),
+                    target: State::new("right_0"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("a"),
+                    },
+                    source: State::new("right_1"),
+                    target: State::new("right_2"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("cmd_a"),
+                        log_type: vec![EventType::new("a")],
+                    },
+                    source: State::new("right_1"),
+                    target: State::new("right_1"),
+                },
+            ],
+        };
+        let from_option_graph_to_graph = |graph: &OptionGraph| -> Graph {
+            graph.map(
+                |_, n| n.clone().unwrap_or_else(|| State::new("")),
+                |_, x| x.clone(),
+            )
+        };
+        let (left, left_initial, _) = util::from_json(left);
+        let left = from_option_graph_to_graph(&left);
+        let (right, right_initial, _) = util::from_json(right);
+        let right = from_option_graph_to_graph(&right);
+        let interface = BTreeSet::from([EventType::new("a"), EventType::new("b")]);
+        let (combined, combined_initial) = composition::compose(
+            right,
+            right_initial.unwrap(),
+            left,
+            left_initial.unwrap(),
+            interface,
+            composition::gen_state_name,
+        );
+        let combined = util::to_json_machine(combined, combined_initial);
+
+        let expected = MachineType {
+            initial: State::new("right_0 || left_0"),
+            transitions: vec![],
+        };
+
+        assert_eq!(combined, expected);
     }
 }
