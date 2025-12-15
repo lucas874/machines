@@ -67,27 +67,6 @@ pub fn overapproximated_well_formed_sub(
     }
 }
 
-/* #[wasm_bindgen]
-pub fn project(
-    proto: SwarmProtocolType,
-    subs: String,
-    role: Role,
-    minimize: bool,
-) -> DataResult<MachineType> {
-    let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
-        errors: vec![format!("parsing subscriptions: {}", e)]
-    });
-    let (swarm, initial, errors) = proto_graph::from_json(proto);
-    let Some(initial) = initial else {
-        return DataResult::ERROR { errors };
-    };
-    let (proj, initial) =
-        projection::project(&swarm, initial, &subs, role, minimize);
-    DataResult::OK {
-        data: machine::util::to_json_machine(proj, initial),
-    }
-} */
-
 #[wasm_bindgen]
 pub fn project(
     protos: InterfacingProtocols,

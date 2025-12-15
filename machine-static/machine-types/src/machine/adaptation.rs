@@ -256,3 +256,244 @@ fn from_option_graph_to_graph(graph: &OptionGraph) -> Graph {
 fn from_adaptation_graph_to_option_graph(graph: &AdaptationGraph) -> OptionGraph {
     graph.map(|_, n| Some(n.state.state_name().clone()), |_, x| x.clone())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::subscription::{exact, overapproximation};
+    use crate::types::typescript_types::{Command, Granularity, InterfacingProtocols, MachineType, State, Transition};
+    use crate::{test_utils, types::typescript_types::SwarmProtocolType};
+    use crate::types::{proto_graph, proto_info};
+    use crate::machine::util;
+
+    #[test]
+    fn test_adapted_projection_fl() {
+        test_utils::setup_logger();
+
+        let fl_m = MachineType {
+            initial: State::new("0"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                    },
+                    source: State::new("1"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("1"),
+                    target: State::new("2"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("1"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("2"),
+                    target: State::new("3"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("0"),
+                    target: State::new("3"),
+                },
+            ],
+        };
+        let mut expected_adapted_fl_m_1 = MachineType {
+            initial: State::new("(0 || { { 0 } }) || { { 0 } }"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("(0 || { { 0 } }) || { { 0 } }"),
+                    target: State::new("(1 || { { 1 } }) || { { 1 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                    },
+                    source: State::new("(1 || { { 1 } }) || { { 1 } }"),
+                    target: State::new("(1 || { { 1 } }) || { { 1 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("(1 || { { 1 } }) || { { 1 } }"),
+                    target: State::new("(2 || { { 2 } }) || { { 1 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("part"),
+                    },
+                    source: State::new("(2 || { { 2 } }) || { { 1 } }"),
+                    target: State::new("(2 || { { 0 } }) || { { 2 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("(2 || { { 0 } }) || { { 2 } }"),
+                    target: State::new("(3 || { { 3 } }) || { { 2 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("(0 || { { 0 } }) || { { 0 } }"),
+                    target: State::new("(3 || { { 3 } }) || { { 0 } }"),
+                },
+            ],
+        };
+        let mut expected_adapted_fl_m_2 = MachineType {
+            initial: State::new("(0 || { { 0 } }) || { { 0 } } || { { 0 } }"),
+            transitions: vec![
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("partID"),
+                    },
+                    source: State::new("(0 || { { 0 } }) || { { 0 } } || { { 0 } }"),
+                    target: State::new("(1 || { { 1 } }) || { { 1 } } || { { 0 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Execute {
+                        cmd: Command::new("get"),
+                        log_type: vec![EventType::new("pos")],
+                    },
+                    source: State::new("(1 || { { 1 } }) || { { 1 } } || { { 0 } }"),
+                    target: State::new("(1 || { { 1 } }) || { { 1 } } || { { 0 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("pos"),
+                    },
+                    source: State::new("(1 || { { 1 } }) || { { 1 } } || { { 0 } }"),
+                    target: State::new("(2 || { { 2 } }) || { { 1 } } || { { 0 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("part"),
+                    },
+                    source: State::new("(2 || { { 2 } }) || { { 1 } } || { { 0 } }"),
+                    target: State::new("(2 || { { 0 } }) || { { 2 } } || { { 0 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("(2 || { { 0 } }) || { { 2 } } || { { 0 } }"),
+                    target: State::new("(3 || { { 3 } }) || { { 2 } } || { { 0 } }"),
+                },
+                Transition {
+                    label: MachineLabel::Input {
+                        event_type: EventType::new("time"),
+                    },
+                    source: State::new("(0 || { { 0 } }) || { { 0 } } || { { 0 } }"),
+                    target: State::new("(3 || { { 3 } }) || { { 0 } } || { { 0 } }"),
+                },
+            ],
+        };
+
+        let (fl_m_graph, fl_m_graph_initial, _) = util::from_json(fl_m);
+
+        let role = Role::new("FL");
+        let swarms = test_utils::get_interfacing_swarms_1();
+        let subs1 = overapproximation::overapprox_well_formed_sub(
+            swarms.clone(),
+            &BTreeMap::new(),
+            Granularity::TwoStep,
+        );
+        assert!(subs1.is_ok());
+        let subs1 = subs1.unwrap();
+        let proto_info = proto_info::swarms_to_proto_info(swarms.clone());
+        assert!(proto_info.no_errors());
+
+        let adapted = adapted_projection(
+            &proto_info,
+            &subs1,
+            role.clone(),
+            (fl_m_graph.clone(), fl_m_graph_initial.unwrap()),
+            0,
+            true,
+        );
+        let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
+        let mut adapted_fl = util::to_json_machine(
+            from_option_graph_to_graph(&from_adaptation_graph_to_option_graph(&adapted_proj.clone())),
+            adapted_proj_initial.unwrap()
+        );
+
+        adapted_fl.transitions.sort();
+        expected_adapted_fl_m_1.transitions.sort();
+        assert_eq!(adapted_fl, expected_adapted_fl_m_1);
+
+        let role = Role::new("FL");
+        let swarms = test_utils::get_interfacing_swarms_3();
+        let subs2 = overapproximation::overapprox_well_formed_sub(
+            swarms.clone(),
+            &BTreeMap::new(),
+            Granularity::TwoStep,
+        );
+        assert!(subs2.is_ok());
+        let subs2 = subs2.unwrap();
+        let proto_info = proto_info::swarms_to_proto_info(swarms.clone());
+        assert!(proto_info.no_errors());
+
+        let adapted = adapted_projection(
+            &proto_info,
+            &subs2,
+            role.clone(),
+            (fl_m_graph.clone(), fl_m_graph_initial.unwrap()),
+            0,
+            true,
+        );
+        let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
+        let mut adapted_fl = util::to_json_machine(
+            from_option_graph_to_graph(&from_adaptation_graph_to_option_graph(&adapted_proj.clone())),
+            adapted_proj_initial.unwrap()
+        );
+
+        adapted_fl.transitions.sort();
+        expected_adapted_fl_m_2.transitions.sort();
+        assert_eq!(adapted_fl, expected_adapted_fl_m_2);
+
+        /* println!(
+            "left {:?}: {}",
+            role.clone(),
+            serde_json::to_string_pretty(&util::from_option_to_machine(
+                fl_m_graph.clone(),
+                fl_m_graph_initial.unwrap()
+            ))
+            .unwrap()
+        );
+        println!(
+            "right {:?}: {}",
+            role,
+            serde_json::to_string_pretty(&util::to_json_machine(
+                from_option_graph_to_graph(&from_adaptation_graph_to_option_graph(&adapted_proj.clone())),
+                adapted_proj_initial.unwrap()
+            ))
+            .unwrap()
+        ); */
+    }
+}
