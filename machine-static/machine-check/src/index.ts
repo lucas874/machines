@@ -1,11 +1,5 @@
-import { CheckResult, DataResult, MachineType, Role, Subscriptions, SwarmProtocolType } from 'machine-core';
-import { check_swarm, check_projection, check_composed_swarm, check_composed_projection,
-  revised_projection, project_combine, compose_protocols, projection_information,
-  InterfacingSwarms as InterfacingSwarmsInner, CompositionComponent as CompositionComponentInner, Granularity,
-  ProjectionInfo, InterfacingProtocols } from '../pkg/machine_check.js'
-export { Granularity, ProjectionInfo, InterfacingProtocols }
-export type CompositionComponent = CompositionComponentInner<Role>;
-export type InterfacingSwarms = InterfacingSwarmsInner<Role>;
+import { CheckResult, MachineType, Role, Subscriptions, SwarmProtocolType } from 'machine-core';
+import { check_swarm, check_projection, check_composed_swarm, check_composed_projection, InterfacingProtocols } from '../pkg/machine_check.js'
 
 /**
  * Check that a swarm protocol is *well-formed* w.r.t. a subscription
@@ -17,7 +11,7 @@ export type InterfacingSwarms = InterfacingSwarmsInner<Role>;
  * @returns - Result indicating successful verification or a list of error messages.
  */
 export function checkSwarmProtocol(proto: SwarmProtocolType, subscriptions: Subscriptions): CheckResult {
-  return check_swarm(proto, JSON.stringify(subscriptions))
+  return check_swarm(proto, subscriptions)
 }
 
 /**
@@ -37,7 +31,7 @@ export function checkProjection(
   role: string,
   machine: MachineType,
 ): CheckResult {
-  return check_projection(swarm, JSON.stringify(subscriptions), role, machine)
+  return check_projection(swarm, subscriptions, role, machine)
 }
 
 /**
@@ -51,7 +45,7 @@ export function checkProjection(
  * @returns - Result indicating successful verification or a list of error messages.
  */
 export function checkComposedSwarmProtocol(protos: InterfacingProtocols, subscriptions: Subscriptions): CheckResult {
-  return check_composed_swarm(protos, JSON.stringify(subscriptions))
+  return check_composed_swarm(protos, subscriptions)
 }
 
 /**
@@ -69,65 +63,5 @@ export function checkComposedProjection(
   role: Role,
   machine: MachineType,
 ): CheckResult {
-  return check_composed_projection(protos, JSON.stringify(subscriptions), role, machine)
-}
-
-/**
- * Compute the projection of a swarm protocol over a role w.r.t. a subscription.
- *
- * @param proto - A swarm protocol.
- * @param subscriptions - A subscription.
- * @param role - A role (given as a string).
- * @returns - Result containing the projection or a list of error messages.
- */
-export function revisedProjection(
-  proto: SwarmProtocolType,
-  subscriptions: Subscriptions,
-  role: Role,
-  minimize: boolean
-): DataResult<MachineType> {
-  return revised_projection(proto, JSON.stringify(subscriptions), role, minimize)
-}
-
-/**
- * Compute the projection of a composed swarm protocol over a role w.r.t. a subscription.
- * Computes the projection of each swarm protocol in the composition over the role and
- * combines the results as opposed to expanding the composition and computing the projection.
- *
- * @param protos - An array of swarm protocols representing a composition.
- * @param subscriptions - A subscription.
- * @param role - A role (given as a string).
- * @param minimize - The projection is minimized if ```minimize``` is true and returned as is otherwise.
- * @returns - Result containing the projection or a list of error messages.
- */
-export function projectCombineMachines(protos: InterfacingProtocols, subscriptions: Subscriptions, role: string, minimize: boolean): DataResult<MachineType> {
-  return project_combine(protos, JSON.stringify(subscriptions), role, minimize)
-}
-
-/**
- * Construct the composition of a number of swarm protocols.
- *
- * @param protos - An array of swarm protocols representing a composition.
- * @returns - Result containing the expanded composition or a list of error messages.
- */
-export function composeProtocols(protos: InterfacingProtocols): DataResult<SwarmProtocolType> {
-  return compose_protocols(protos)
-}
-
-/**
- * Returns a projection of a composed swarm protocol over a role w.r.t. a subscription
- * and information used for running a branch-tracking adapted machine implementing some role.
- * Computes the projection of each swarm protocol in the composition over the role and composes
- * these and the projection given by the ```machine``` argument.
- *
- * @param role - The role
- * @param protos - An array of swarm protocols representing a composition.
- * @param k - The index of the protocol in ```protos``` for which ```machine``` was implemented.
- * @param subscriptions - A subscription.
- * @param machine - The (unadapted) original machine.
- * @param minimize - The projection is minimized if ```minimize``` is true and returned as is otherwise.
- * @returns Result containing the expanded composition or a list of error messages.
- */
-export function projectionInformation(role: Role, protos: InterfacingProtocols, k: number, subscriptions: Subscriptions, machine: MachineType, minimize: boolean): DataResult<ProjectionInfo> {
-  return projection_information(role, protos, k, JSON.stringify(subscriptions), machine, minimize);
+  return check_composed_projection(protos, subscriptions, role, machine)
 }
