@@ -1,7 +1,4 @@
-//use crate::errors::composition_errors;
-//use machine_types::types::typescript_types::SwarmProtocolType;
-use std::collections::BTreeSet;
-use crate::types::typescript_types::{InterfacingProtocols, Role, Subscriptions, SwarmProtocolType};
+use crate::types::typescript_types::{InterfacingProtocols, SwarmProtocolType};
 
 use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
 pub fn setup_logger() {
@@ -26,16 +23,6 @@ pub fn get_proto1() -> SwarmProtocolType {
     )
     .unwrap()
 }
-pub fn get_subs1() -> Subscriptions {
-    serde_json::from_str::<Subscriptions>(
-        r#"{
-            "T": ["partID", "part", "pos", "time"],
-            "FL": ["partID", "pos", "time"],
-            "D": ["partID", "part", "time"]
-        }"#,
-    )
-    .unwrap()
-}
 pub fn get_proto2() -> SwarmProtocolType {
     serde_json::from_str::<SwarmProtocolType>(
         r#"{
@@ -45,15 +32,6 @@ pub fn get_proto2() -> SwarmProtocolType {
                 { "source": "1", "target": "2", "label": { "cmd": "deliver", "logType": ["part"], "role": "T" } },
                 { "source": "2", "target": "3", "label": { "cmd": "build", "logType": ["car"], "role": "F" } }
             ]
-        }"#,
-    )
-    .unwrap()
-}
-pub fn get_subs2() -> Subscriptions {
-    serde_json::from_str::<Subscriptions>(
-        r#"{
-            "T": ["partID", "part"],
-            "F": ["part", "car"]
         }"#,
     )
     .unwrap()
@@ -69,16 +47,6 @@ pub fn get_proto3() -> SwarmProtocolType {
                 { "source": "3", "target": "4", "label": { "cmd": "accept", "logType": ["ok"], "role": "QCR" } },
                 { "source": "3", "target": "4", "label": { "cmd": "reject", "logType": ["notOk"], "role": "QCR" } }
             ]
-        }"#,
-    )
-    .unwrap()
-}
-pub fn get_subs3() -> Subscriptions {
-    serde_json::from_str::<Subscriptions>(
-        r#"{
-            "F": ["car", "report1"],
-            "TR": ["car", "report1", "report2"],
-            "QCR": ["report2", "ok", "notOk"]
         }"#,
     )
     .unwrap()
@@ -105,21 +73,6 @@ pub fn get_proto32() -> SwarmProtocolType {
                 { "source": "0", "target": "1", "label": { "cmd": "observe", "logType": ["observing"], "role": "QCR" } },
                 { "source": "1", "target": "2", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
                 { "source": "2", "target": "3", "label": { "cmd": "test", "logType": ["report"], "role": "QCR" } }
-            ]
-        }"#,
-    )
-    .unwrap()
-}
-// get_proto_3 from test module of composition_machine
-pub fn get_proto33() -> SwarmProtocolType {
-    serde_json::from_str::<SwarmProtocolType>(
-        r#"{
-            "initial": "0",
-            "transitions": [
-                { "source": "0", "target": "1", "label": { "cmd": "build", "logType": ["car"], "role": "F" } },
-                { "source": "1", "target": "2", "label": { "cmd": "test", "logType": ["report"], "role": "TR" } },
-                { "source": "2", "target": "3", "label": { "cmd": "accept", "logType": ["ok"], "role": "QCR" } },
-                { "source": "2", "target": "3", "label": { "cmd": "reject", "logType": ["notOk"], "role": "QCR" } }
             ]
         }"#,
     )
@@ -162,17 +115,6 @@ pub fn get_proto_5() -> SwarmProtocolType {
                 { "source": "1", "target": "2", "label": { "cmd": "c_r1_0", "logType": ["e_r1_0"], "role": "R1" } },
                 { "source": "2", "target": "3", "label": { "cmd": "c_ir_1", "logType": ["e_ir_1"], "role": "IR" } }
             ]
-        }"#,
-    )
-    .unwrap()
-}
-pub fn get_subs_composition_1() -> Subscriptions {
-    serde_json::from_str::<Subscriptions>(
-        r#"{
-            "T": ["partID", "part", "pos", "time"],
-            "FL": ["partID", "pos", "time"],
-            "D": ["partID", "part", "time"],
-            "F": ["partID", "part", "car", "time"]
         }"#,
     )
     .unwrap()
@@ -254,86 +196,6 @@ pub fn get_some_nonterminating_proto() -> SwarmProtocolType {
                 { "source": "5", "target": "1", "label": { "cmd": "f", "logType": ["f"], "role": "f" } }
             ]
         }"#,
-    )
-    .unwrap()
-}
-pub fn get_fail_1_component_1() -> SwarmProtocolType {
-    serde_json::from_str::<SwarmProtocolType>(
-        r#"
-        {
-            "initial": "456",
-            "transitions": [
-                {
-                "label": {
-                    "cmd": "R453_cmd_0",
-                    "logType": [
-                    "R453_e_0"
-                    ],
-                    "role": "R453"
-                },
-                "source": "456",
-                "target": "457"
-                },
-                {
-                "label": {
-                    "cmd": "R454_cmd_0",
-                    "logType": [
-                    "R454_e_0"
-                    ],
-                    "role": "R454"
-                },
-                "source": "457",
-                "target": "458"
-                }
-            ]
-            }
-        "#,
-    )
-    .unwrap()
-}
-
-pub fn get_fail_1_component_2() -> SwarmProtocolType {
-    serde_json::from_str::<SwarmProtocolType>(
-        r#"
-        {
-            "initial": "459",
-            "transitions": [
-                {
-                "label": {
-                    "cmd": "R455_cmd_0",
-                    "logType": [
-                    "R455_e_0"
-                    ],
-                    "role": "R455"
-                },
-                "source": "459",
-                "target": "460"
-                },
-                {
-                "label": {
-                    "cmd": "R455_cmd_1",
-                    "logType": [
-                    "R455_e_1"
-                    ],
-                    "role": "R455"
-                },
-                "source": "460",
-                "target": "459"
-                },
-                {
-                "label": {
-                    "cmd": "R454_cmd_0",
-                    "logType": [
-                    "R454_e_0"
-                    ],
-                    "role": "R454"
-                },
-                "source": "459",
-                "target": "461"
-                }
-            ]
-        }
-        "#,
     )
     .unwrap()
 }
@@ -483,27 +345,6 @@ pub fn get_interfacing_swarms_pat_4() -> InterfacingProtocols {
 pub fn get_interfacing_swarms_3_machine() -> InterfacingProtocols {
         InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto_41()])
 }
-fn get_interfacing_swarms_1_reversed() -> InterfacingProtocols {
-        InterfacingProtocols(vec![get_proto2(), get_proto1()])
-}
-pub fn get_fail_1_swarms() -> InterfacingProtocols {
-    InterfacingProtocols(vec![get_fail_1_component_1(), get_fail_1_component_2()])
-}
-
-// QCR subscribes to car and part because report1 is concurrent with part and they lead to a joining event car/event is joining bc of this.
-pub fn get_subs_composition_2() -> Subscriptions {
-    serde_json::from_str::<Subscriptions>(
-        r#"{
-            "T": ["partID", "part", "pos", "time"],
-            "FL": ["partID", "pos", "time"],
-            "D": ["partID", "part", "time"],
-            "F": ["partID", "part", "car", "time", "report1"],
-            "TR": ["partID", "report1", "report2", "car", "time", "part"],
-            "QCR": ["partID", "part", "report1", "report2", "car", "time", "ok", "notOk"]
-        }"#,
-    )
-    .unwrap()
-}
 
 pub fn get_looping_proto_1() -> SwarmProtocolType {
     serde_json::from_str::<SwarmProtocolType>(
@@ -609,24 +450,4 @@ pub fn get_looping_proto_6() -> SwarmProtocolType {
         }"#,
     )
     .unwrap()
-}
-
-// true if subs1 is a subset of subs2
-pub fn is_sub_subscription(subs1: Subscriptions, subs2: Subscriptions) -> bool {
-    if !subs1
-        .keys()
-        .cloned()
-        .collect::<BTreeSet<Role>>()
-        .is_subset(&subs2.keys().cloned().collect::<BTreeSet<Role>>())
-    {
-        return false;
-    }
-
-    for role in subs1.keys() {
-        if !subs1[role].is_subset(&subs2[role]) {
-            return false;
-        }
-    }
-
-    true
 }

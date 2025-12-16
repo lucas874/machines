@@ -143,20 +143,3 @@ pub fn compose_protocols(protos: InterfacingProtocols) -> DataResult<SwarmProtoc
         },
     }
 }
-
-/*
-#[wasm_bindgen]
-pub fn compose_protocols(protos: InterfacingProtocols) -> Result<SwarmProtocolType, Vec<String>> {
-    let composition = proto_info::compose_protocols(protos);
-
-    match composition {
-        Ok((graph, initial)) => Ok (
-            typescript_types::to_swarm_json(graph, initial),
-        ),
-        Err(errors) => Err(
-            composition_errors::error_report_to_strings(errors),
-        ),
-    }
-}
-
-*/
