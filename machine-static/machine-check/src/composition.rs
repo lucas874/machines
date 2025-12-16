@@ -1,6 +1,6 @@
-use machine_types::machine::projection;
-use machine_types::types::typescript_types::{InterfacingProtocols, SubscriptionsWrapped};
-use machine_types::{errors::composition_errors, types::proto_info};
+use machine_core::machine::projection;
+use machine_core::types::typescript_types::{InterfacingProtocols, SubscriptionsWrapped};
+use machine_core::{errors::composition_errors, types::proto_info};
 use super::*;
 
 mod composition_machine;

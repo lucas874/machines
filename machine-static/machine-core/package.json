@@ -1,5 +1,5 @@
 {
-  "name": "machine-types",
+  "name": "machine-core",
   "version": "0.1.0",
   "description": "Types and utitilities for behavioural typechecking for @actyx/machine-runner machines",
   "repository": "https://github.com/lucas874/machines",

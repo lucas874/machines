@@ -4,7 +4,7 @@ mod machine;
 mod swarm;
 pub mod composition;
 
-use machine_types::types::typescript_types::{CheckResult, DataResult, MachineType, Role, Subscriptions, SubscriptionsWrapped, SwarmProtocolType};
+use machine_core::types::typescript_types::{CheckResult, DataResult, MachineType, Role, Subscriptions, SubscriptionsWrapped, SwarmProtocolType};
 
 #[wasm_bindgen]
 pub fn check_swarm(proto: SwarmProtocolType, subs: SubscriptionsWrapped) -> CheckResult {
@@ -12,7 +12,7 @@ pub fn check_swarm(proto: SwarmProtocolType, subs: SubscriptionsWrapped) -> Chec
     if errors.is_empty() {
         CheckResult::OK
     } else {
-        CheckResult::ERROR { errors: errors.map(machine_types::errors::swarm_errors::Error::convert(&graph)) }
+        CheckResult::ERROR { errors: errors.map(machine_core::errors::swarm_errors::Error::convert(&graph)) }
     }
 }
 
@@ -23,7 +23,7 @@ pub fn well_formed_sub(proto: SwarmProtocolType, subs: SubscriptionsWrapped) -> 
             data: subscriptions,
         },
         Err((graph, _, errors)) => DataResult::ERROR {
-            errors: errors.map(machine_types::errors::swarm_errors::Error::convert(&graph))
+            errors: errors.map(machine_core::errors::swarm_errors::Error::convert(&graph))
         },
     }
 }

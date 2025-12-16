@@ -1,4 +1,4 @@
-use machine_types::{
+use machine_core::{
     types::{
         typescript_types::{EventType, Role, State, StateName, SwarmLabel, Subscriptions, SwarmProtocolType},
         proto_graph::{EdgeId, NodeId}
@@ -67,7 +67,7 @@ type Graph = petgraph::Graph<Node, SwarmLabel>;
 pub fn check(
     proto: SwarmProtocolType,
     subs: &Subscriptions,
-) -> (machine_types::types::proto_graph::Graph, Option<NodeId>, Vec<Error>) {
+) -> (machine_core::types::proto_graph::Graph, Option<NodeId>, Vec<Error>) {
     let (graph, initial, mut errors) = match prepare_graph(proto, &subs) {
         (g, Some(i), e) => (g, i, e),
         (g, None, e) => return (to_swarm(&g), None, e),
@@ -80,7 +80,7 @@ pub fn check(
 pub fn well_formed_sub(
     proto: SwarmProtocolType,
     subs: &Subscriptions,
-) -> Result<Subscriptions, (machine_types::types::proto_graph::Graph, Option<NodeId>, Vec<Error>)> {
+) -> Result<Subscriptions, (machine_core::types::proto_graph::Graph, Option<NodeId>, Vec<Error>)> {
     let (graph, initial, mut errors) = match prepare_graph(proto, &subs) {
         (g, Some(i), e) => (g, i, e),
         (g, None, e) => return Err((to_swarm(&g), None, e)),
@@ -95,7 +95,7 @@ pub fn well_formed_sub(
     }
 }
 
-fn to_swarm(graph: &Graph) -> machine_types::types::proto_graph::Graph {
+fn to_swarm(graph: &Graph) -> machine_core::types::proto_graph::Graph {
     graph.map(|_, n| n.name.clone(), |_, x| x.clone())
 }
 
@@ -312,7 +312,7 @@ fn wf_sub_step(graph: &mut Graph, initial: NodeId, subs: &mut Subscriptions) -> 
 pub fn from_json(
     proto: SwarmProtocolType,
     subs: &Subscriptions,
-) -> (machine_types::types::proto_graph::Graph, Option<NodeId>, Vec<String>) {
+) -> (machine_core::types::proto_graph::Graph, Option<NodeId>, Vec<String>) {
     let (g, i, e) = prepare_graph(proto, subs);
     (to_swarm(&g), i, e.map(Error::convert(&g)))
 }
@@ -513,7 +513,7 @@ mod tests {
             .try_init()
             .ok();
     }
-    /// helper for printing a transition. copied from machine-types::errors::swarm_errors, not nice, but outside of there, only used here.
+    /// helper for printing a transition. copied from machine-core::errors::swarm_errors, not nice, but outside of there, only used here.
     const INVALID_EDGE: &str = "[invalid EdgeId]";
     struct Edge<'a, N: StateName>(&'a petgraph::Graph<N, SwarmLabel>, EdgeId);
 

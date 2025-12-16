@@ -56,6 +56,6 @@
     "typescript": "^5.0.2"
   },
   "dependencies": {
-    "machine-types": "file:../machine-types"
+    "machine-core": "file:../machine-core"
   }
 }

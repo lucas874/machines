@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use machine_types::types::typescript_types::{EventType, Granularity, InterfacingProtocols, Role, SubscriptionsWrapped};
+use machine_core::types::typescript_types::{EventType, Granularity, InterfacingProtocols, Role, SubscriptionsWrapped};
 use serde::{Deserialize, Serialize};
 extern crate machine_check;
 use std::collections::{BTreeMap, BTreeSet};
@@ -89,10 +89,10 @@ fn full_bench_general(c: &mut Criterion) {
 
     for (size, interfacing_swarms) in interfacing_swarms_general.iter() {
         group.bench_with_input(BenchmarkId::new("Algorithm 1", size), interfacing_swarms,
-        |b, input| b.iter(|| machine_types::overapproximated_well_formed_sub(input.clone(), SubscriptionsWrapped(subs.clone()), two_step_granularity.clone())));
+        |b, input| b.iter(|| machine_core::overapproximated_well_formed_sub(input.clone(), SubscriptionsWrapped(subs.clone()), two_step_granularity.clone())));
 
         group.bench_with_input(BenchmarkId::new("Exact", size), interfacing_swarms,
-        |b, input| b.iter(|| machine_types::exact_well_formed_sub(input.clone(), SubscriptionsWrapped(subs.clone()))));
+        |b, input| b.iter(|| machine_core::exact_well_formed_sub(input.clone(), SubscriptionsWrapped(subs.clone()))));
 
         println!("{}", SPECIAL_SYMBOL);
     }

@@ -1,4 +1,4 @@
-use machine_types::types::{
+use machine_core::types::{
     typescript_types::{Command, EventType, MachineLabel, Role, State, MachineType, Subscriptions},
     proto_graph::{EdgeId, NodeId}
 };
@@ -16,10 +16,10 @@ use std::{
 };
 
 type Graph = petgraph::Graph<Option<State>, MachineLabel>;
-type ERef<'a> = <&'a machine_types::types::proto_graph::Graph as IntoEdgeReferences>::EdgeRef;
+type ERef<'a> = <&'a machine_core::types::proto_graph::Graph as IntoEdgeReferences>::EdgeRef;
 
 pub fn project(
-    swarm: &machine_types::types::proto_graph::Graph,
+    swarm: &machine_core::types::proto_graph::Graph,
     initial: NodeId,
     subs: &Subscriptions,
     role: Role,
@@ -317,7 +317,7 @@ pub fn equivalent(left: &Graph, li: NodeId, right: &Graph, ri: NodeId) -> Vec<Er
 mod tests {
     use pretty_assertions::assert_eq;
     use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
-    use machine_types::types::typescript_types::{CheckResult, Role, Subscriptions, SubscriptionsWrapped};
+    use machine_core::types::typescript_types::{CheckResult, Role, Subscriptions, SubscriptionsWrapped};
     use crate::{MachineType, SwarmProtocolType};
     fn setup_logger() {
         fmt()

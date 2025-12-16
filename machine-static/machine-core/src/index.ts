@@ -1,7 +1,7 @@
 import {
   CheckResult, MachineType, SwarmProtocolType, SubscriptionsWrapped as Subscriptions, Role, DataResult, Granularity, InterfacingProtocols,
   exact_well_formed_sub, overapproximated_well_formed_sub, compose_protocols
-} from '../pkg/machine_types.js'
+} from '../pkg/machine_core.js'
 export { MachineType, SwarmProtocolType, Subscriptions, Role, CheckResult, DataResult }
 
 /**

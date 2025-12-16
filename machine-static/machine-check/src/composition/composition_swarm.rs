@@ -1,9 +1,9 @@
-use machine_types::errors::composition_errors::{Error, ErrorReport};
-use machine_types::types::{
+use machine_core::errors::composition_errors::{Error, ErrorReport};
+use machine_core::types::{
     typescript_types::{EventType, Role, Subscriptions, EventLabel, InterfacingProtocols,},
     proto_info::{ProtoStruct, ProtoInfo, UnordEventPair, unord_event_pair}
 };
-use machine_types::types::{proto_graph, proto_info};
+use machine_core::types::{proto_graph, proto_info};
 use petgraph::{
     visit::{Dfs, EdgeRef, Walker},
     Direction::{Incoming, Outgoing},
@@ -98,7 +98,7 @@ fn well_formed(
             // Check if role subscribes to own emitted event.
             if !sub(&edge.weight().role).contains(&event_type) {
                 errors.push(Error::SwarmError(
-                    machine_types::errors::swarm_errors::Error::ActiveRoleNotSubscribed(edge.id()),
+                    machine_core::errors::swarm_errors::Error::ActiveRoleNotSubscribed(edge.id()),
                 ));
             }
 
@@ -114,7 +114,7 @@ fn well_formed(
             ) {
                 if !sub(&successor.role).contains(&event_type) {
                     errors.push(Error::SwarmError(
-                        machine_types::errors::swarm_errors::Error::LaterActiveRoleNotSubscribed(
+                        machine_core::errors::swarm_errors::Error::LaterActiveRoleNotSubscribed(
                             edge.id(),
                             successor.role,
                         ),
@@ -241,7 +241,7 @@ fn well_formed(
 }
 
 // True if there exists an event type in event_types such that all roles in involved_roles subscribe to it.
-// Consider importing the one from machine-types.
+// Consider importing the one from machine-core.
 fn all_roles_sub_to_same(
     event_types: BTreeSet<EventType>,
     involved_roles: &BTreeSet<Role>,
@@ -274,8 +274,8 @@ fn all_roles_sub_to_same(
 
 #[cfg(test)]
 mod tests {
-    use machine_types::errors::composition_errors;
-    use machine_types::types::typescript_types::SwarmProtocolType;
+    use machine_core::errors::composition_errors;
+    use machine_core::types::typescript_types::SwarmProtocolType;
 
     use super::*;
     use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
@@ -483,7 +483,7 @@ mod tests {
         use std::collections::BTreeMap;
 
         use super::*;
-        use machine_types::subscription::exact;
+        use machine_core::subscription::exact;
         // Tests relating to well-formedness checking.
         #[test]
         fn test_wf_ok() {
@@ -939,8 +939,8 @@ mod tests {
         use std::collections::BTreeMap;
 
         use super::*;
-        use machine_types::types::typescript_types::Granularity;
-        use machine_types::subscription::{exact, overapproximation};
+        use machine_core::types::typescript_types::Granularity;
+        use machine_core::subscription::{exact, overapproximation};
 
         #[test]
         fn looping_1() {

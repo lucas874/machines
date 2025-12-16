@@ -2,7 +2,7 @@ use machine_check::{
     check_swarm, composition::{check_composed_projection, check_composed_swarm}, well_formed_sub,
 };
 
-use machine_types::{
+use machine_core::{
     compose_protocols, types::{
         proto_graph::{EdgeId, Graph, NodeId,}, typescript_types::{CheckResult, Command, DataResult, EventType, Granularity, InterfacingProtocols, MachineLabel, MachineType, Role, State, StateName, Subscriptions, SubscriptionsWrapped, SwarmLabel, SwarmProtocolType, Transition}
     }
@@ -557,7 +557,7 @@ proptest! {
     fn test_exact_1(protos in generate_interfacing_protocols(5, 5, 5, false)) {
         setup_logger();
         let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
-        let subscription: Option<Subscriptions> = match machine_types::exact_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs)) {
+        let subscription: Option<Subscriptions> = match machine_core::exact_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs)) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -582,7 +582,7 @@ proptest! {
         setup_logger();
         let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::Coarse;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
+        let subscription: Option<Subscriptions> = match machine_core::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -603,7 +603,7 @@ proptest! {
     fn test_exact_2(protos in generate_interfacing_protocols_refinement(5, 5, 5)) {
         setup_logger();
         let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
-        let subscription: Option<Subscriptions> = match machine_types::exact_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs)) {
+        let subscription: Option<Subscriptions> = match machine_core::exact_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs)) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -624,7 +624,7 @@ proptest! {
         setup_logger();
         let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::Coarse;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
+        let subscription: Option<Subscriptions> = match machine_core::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -645,7 +645,7 @@ proptest! {
     fn test_exact_3(protos in generate_interfacing_protocols_general_pattern(5, 5, 3)) {
         setup_logger();
         let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
-        let subscription: Option<Subscriptions> = match machine_types::exact_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs)) {
+        let subscription: Option<Subscriptions> = match machine_core::exact_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs)) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -666,7 +666,7 @@ proptest! {
         setup_logger();
         let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::Coarse;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
+        let subscription: Option<Subscriptions> = match machine_core::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -687,7 +687,7 @@ proptest! {
         setup_logger();
         let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::Medium;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
+        let subscription: Option<Subscriptions> = match machine_core::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -708,7 +708,7 @@ proptest! {
         setup_logger();
         let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::Fine;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
+        let subscription: Option<Subscriptions> = match machine_core::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -729,7 +729,7 @@ proptest! {
         setup_logger();
         let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::TwoStep;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
+        let subscription: Option<Subscriptions> = match machine_core::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -750,7 +750,7 @@ proptest! {
         setup_logger();
         let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::TwoStep;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
+        let subscription: Option<Subscriptions> = match machine_core::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -772,7 +772,7 @@ proptest! {
         setup_logger();
         let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::Coarse;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
+        let subscription: Option<Subscriptions> = match machine_core::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -797,7 +797,7 @@ proptest! {
         setup_logger();
         let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::Coarse;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs.clone()), granularity) {
+        let subscription: Option<Subscriptions> = match machine_core::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs.clone()), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -812,7 +812,7 @@ proptest! {
 
         };
         assert!(ok); */
-        let subscription: Option<Subscriptions> = match machine_types::exact_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs.clone())) {
+        let subscription: Option<Subscriptions> = match machine_core::exact_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs.clone())) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -877,7 +877,7 @@ proptest! {
         setup_logger();
         let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::TwoStep;
-        let subscriptions: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs.clone()), granularity) {
+        let subscriptions: Option<Subscriptions> = match machine_core::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs.clone()), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -891,7 +891,7 @@ proptest! {
         let composition = composition.unwrap();
 
         for role in subscriptions.keys() {
-            let projection: Option<MachineType> = match machine_types::project(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), true, true) {
+            let projection: Option<MachineType> = match machine_core::project(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), true, true) {
                 DataResult::OK{data: projection} => {
                 Some(projection) },
                 DataResult::ERROR{ .. } => None,
@@ -902,7 +902,7 @@ proptest! {
             match check_composed_projection(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), projection.clone().unwrap()) {
                 CheckResult::OK => (),
                 CheckResult::ERROR {errors: e} => {
-                    match machine_types::project(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), false, false) {
+                    match machine_core::project(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), false, false) {
                         DataResult::OK{data: projection1} => {
                             println!("machine combined: {}", serde_json::to_string_pretty::<MachineType>(&projection1).unwrap());
                         },
@@ -928,7 +928,7 @@ proptest! {
         setup_logger();
         let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::TwoStep;
-        let subscriptions: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
+        let subscriptions: Option<Subscriptions> = match machine_core::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -936,7 +936,7 @@ proptest! {
         let subscriptions = subscriptions.unwrap();
 
         for role in subscriptions.keys() {
-            let projection: Option<MachineType> = match machine_types::project(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), true, true) {
+            let projection: Option<MachineType> = match machine_core::project(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), true, true) {
                 DataResult::OK{data: projection} => {
                 Some(projection) },
                 DataResult::ERROR{ .. } => None,
@@ -945,7 +945,7 @@ proptest! {
             // should work like this projecting over the explicit composition initially and comparing that with combined machines?
             match check_composed_projection(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), projection.clone().unwrap()) {
                 CheckResult::OK => {
-                    let combined: Option<MachineType> = match machine_types::project(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), false, false) {
+                    let combined: Option<MachineType> = match machine_core::project(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), false, false) {
                         DataResult::OK{data: combined} => {
                         Some(combined) },
                         DataResult::ERROR{ .. } => None,
@@ -957,7 +957,7 @@ proptest! {
                     println!("");
                 },//(),
                 CheckResult::ERROR {errors: e} => {
-                    match machine_types::project(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), false, false) {
+                    match machine_core::project(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), false, false) {
                         DataResult::OK{data: projection1} => {
                             println!("machine combined: {}", serde_json::to_string_pretty::<MachineType>(&projection1).unwrap());
                         },

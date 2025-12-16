@@ -1,7 +1,7 @@
 use crate::{
     machine::{Error, Side},
 };
-use machine_types::types::{
+use machine_core::types::{
     projection::OptionGraph, proto_graph::NodeId, typescript_types::{Command, EventType, MachineLabel}
 };
 use petgraph::{
@@ -130,7 +130,7 @@ pub fn equivalent(left: &OptionGraph, li: NodeId, right: &OptionGraph, ri: NodeI
 #[cfg(test)]
 mod tests {
     use super::*;
-    use machine_types::{
+    use machine_core::{
         machine::projection, subscription::{exact, overapproximation}, types::{
             projection::Graph, proto_graph, proto_info, typescript_types::{
                 Command, DataResult, EventType, Granularity, InterfacingProtocols, MachineType, Role, StateName, Subscriptions, SubscriptionsWrapped, SwarmProtocolType, Transition
@@ -511,7 +511,7 @@ mod tests {
     }
 
 
-    use machine_types::types::typescript_types::State;
+    use machine_core::types::typescript_types::State;
 
     #[test]
     fn test_equivalent_1() {
@@ -1121,7 +1121,7 @@ mod tests {
         setup_logger();
         // Example from coplaws slides. Use generated WWF subscriptions. Project over T.
         let role = Role::new("T");
-        let subs1 = match machine_types::overapproximated_well_formed_sub(
+        let subs1 = match machine_core::overapproximated_well_formed_sub(
             get_interfacing_swarms_1(),
             SubscriptionsWrapped(BTreeMap::new()),
             Granularity::TwoStep
@@ -1130,7 +1130,7 @@ mod tests {
             DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!() }
         };
 
-        let (proj_combined1, proj_combined_initial1, _) = match machine_types::project(
+        let (proj_combined1, proj_combined_initial1, _) = match machine_core::project(
             get_interfacing_swarms_1(),
             SubscriptionsWrapped(subs1.clone()),
             role.clone(),
@@ -1141,7 +1141,7 @@ mod tests {
             DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
         };
 
-        let subs2 = match machine_types::overapproximated_well_formed_sub(
+        let subs2 = match machine_core::overapproximated_well_formed_sub(
             get_interfacing_swarms_1_reversed(),
             SubscriptionsWrapped(BTreeMap::new()),
             Granularity::TwoStep
@@ -1151,7 +1151,7 @@ mod tests {
         };
 
 
-        let (proj_combined2, proj_combined_initial2, _) = match machine_types::project(
+        let (proj_combined2, proj_combined_initial2, _) = match machine_core::project(
             get_interfacing_swarms_1_reversed(),
            SubscriptionsWrapped(subs2.clone()),
            role.clone(),
@@ -1162,7 +1162,7 @@ mod tests {
             DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
         };
 
-        let (proj_expanded_proto, proj_expanded_proto_initial, _) = match machine_types::project(
+        let (proj_expanded_proto, proj_expanded_proto_initial, _) = match machine_core::project(
             get_interfacing_swarms_1(),
             SubscriptionsWrapped(subs1.clone()),
             role.clone(),
@@ -1196,7 +1196,7 @@ mod tests {
         setup_logger();
         // Fails when you use the exact subscriptions because that way not all involved roles subscribe to ALL interfaces. Ordering gets messed up.
         // The projected over the explicit composition may be correct, but the combined projections look weird and out of order.
-        let subs1 = match machine_types::overapproximated_well_formed_sub(
+        let subs1 = match machine_core::overapproximated_well_formed_sub(
             get_interfacing_swarms_2(),
             SubscriptionsWrapped(BTreeMap::new()),
             Granularity::TwoStep
@@ -1204,7 +1204,7 @@ mod tests {
             DataResult::OK { data } => data,
             DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!() }
         };
-        let subs2 = match machine_types::overapproximated_well_formed_sub(
+        let subs2 = match machine_core::overapproximated_well_formed_sub(
             get_interfacing_swarms_2_reversed(),
             SubscriptionsWrapped(BTreeMap::new()),
             Granularity::TwoStep
@@ -1223,7 +1223,7 @@ mod tests {
         ];
 
         for role in all_roles {
-            let (proj_combined1, proj_combined_initial1, _) = match machine_types::project(
+            let (proj_combined1, proj_combined_initial1, _) = match machine_core::project(
                 get_interfacing_swarms_2(),
                 SubscriptionsWrapped(subs1.clone()),
                 role.clone(),
@@ -1233,7 +1233,7 @@ mod tests {
                 DataResult::OK { data } => crate::machine::from_json(data),
                 DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
             };
-            let (proj_combined2, proj_combined_initial2, _) = match machine_types::project(
+            let (proj_combined2, proj_combined_initial2, _) = match machine_core::project(
                 get_interfacing_swarms_2_reversed(),
                 SubscriptionsWrapped(subs2.clone()),
                 role.clone(),
@@ -1252,7 +1252,7 @@ mod tests {
                 proj_combined_initial2.unwrap()
             )
             .is_empty());
-            let (proj_expanded_proto, proj_expanded_proto_initial, _) = match machine_types::project(
+            let (proj_expanded_proto, proj_expanded_proto_initial, _) = match machine_core::project(
                 get_interfacing_swarms_2(),
                 SubscriptionsWrapped(subs1.clone()),
                 role.clone(),
@@ -1276,7 +1276,7 @@ mod tests {
     #[test]
     fn test_all_projs_whf() {
         setup_logger();
-        let subs = match machine_types::overapproximated_well_formed_sub(
+        let subs = match machine_core::overapproximated_well_formed_sub(
             get_interfacing_swarms_1(),
             SubscriptionsWrapped(BTreeMap::new()),
             Granularity::TwoStep
@@ -1292,7 +1292,7 @@ mod tests {
         ]);
 
         for role in expected_projs.keys() {
-            let (proj_expanded_proto, proj_expanded_proto_initial, _) = match machine_types::project(
+            let (proj_expanded_proto, proj_expanded_proto_initial, _) = match machine_core::project(
                 get_interfacing_swarms_1(),
                 SubscriptionsWrapped(subs.clone()),
                 role.clone(),
@@ -1302,7 +1302,7 @@ mod tests {
                 DataResult::OK { data } => crate::machine::from_json(data),
                 DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
             };
-            let (proj_combined, proj_combined_initial, _) = match machine_types::project(
+            let (proj_combined, proj_combined_initial, _) = match machine_core::project(
                 get_interfacing_swarms_1(),
                 SubscriptionsWrapped(subs.clone()),
                 role.clone(),

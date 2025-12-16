@@ -440,7 +440,7 @@ dependencies = [
  "criterion",
  "intern-arc",
  "itertools 0.10.5",
- "machine-types",
+ "machine-core",
  "maplit",
  "petgraph",
  "pretty_assertions",
@@ -457,7 +457,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "machine-types"
+name = "machine-core"
 version = "0.1.0"
 dependencies = [
  "intern-arc",
