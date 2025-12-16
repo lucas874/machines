@@ -133,7 +133,7 @@ mod tests {
     use machine_types::{
         machine::projection, subscription::{exact, overapproximation}, types::{
             projection::Graph, proto_graph, proto_info, typescript_types::{
-                Command, DataResult, EventType, Granularity, InterfacingProtocols, MachineType, Role, StateName, Subscriptions, SwarmProtocolType, Transition
+                Command, DataResult, EventType, Granularity, InterfacingProtocols, MachineType, Role, StateName, Subscriptions, SubscriptionsWrapped, SwarmProtocolType, Transition
             }
         }
     };
@@ -592,7 +592,6 @@ mod tests {
     #[test]
     fn test_equivalent_2() {
         setup_logger();
-        // warehouse example from coplaws slides
         let proto = get_proto1();
         let result_subs =
             exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
@@ -667,7 +666,6 @@ mod tests {
     #[test]
     fn test_equivalent_3() {
         setup_logger();
-        // car factory from coplaws example
         let proto = get_proto2();
         let result_subs =
             exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
@@ -1125,7 +1123,7 @@ mod tests {
         let role = Role::new("T");
         let subs1 = match machine_types::overapproximated_well_formed_sub(
             get_interfacing_swarms_1(),
-            "{}".to_string(),
+            SubscriptionsWrapped(BTreeMap::new()),
             Granularity::TwoStep
         ) {
             DataResult::OK { data } => data,
@@ -1134,7 +1132,7 @@ mod tests {
 
         let (proj_combined1, proj_combined_initial1, _) = match machine_types::project(
             get_interfacing_swarms_1(),
-            serde_json::to_string(&subs1).unwrap(),
+            SubscriptionsWrapped(subs1.clone()),
             role.clone(),
             false,
             false
@@ -1145,7 +1143,7 @@ mod tests {
 
         let subs2 = match machine_types::overapproximated_well_formed_sub(
             get_interfacing_swarms_1_reversed(),
-            "{}".to_string(),
+            SubscriptionsWrapped(BTreeMap::new()),
             Granularity::TwoStep
         ) {
             DataResult::OK { data } => data,
@@ -1155,7 +1153,7 @@ mod tests {
 
         let (proj_combined2, proj_combined_initial2, _) = match machine_types::project(
             get_interfacing_swarms_1_reversed(),
-           serde_json::to_string(&subs2).unwrap(),
+           SubscriptionsWrapped(subs2.clone()),
            role.clone(),
            true,
            false
@@ -1166,7 +1164,7 @@ mod tests {
 
         let (proj_expanded_proto, proj_expanded_proto_initial, _) = match machine_types::project(
             get_interfacing_swarms_1(),
-            serde_json::to_string(&subs1).unwrap(),
+            SubscriptionsWrapped(subs1.clone()),
             role.clone(),
             true,
             true
@@ -1200,7 +1198,7 @@ mod tests {
         // The projected over the explicit composition may be correct, but the combined projections look weird and out of order.
         let subs1 = match machine_types::overapproximated_well_formed_sub(
             get_interfacing_swarms_2(),
-            "{}".to_string(),
+            SubscriptionsWrapped(BTreeMap::new()),
             Granularity::TwoStep
         ) {
             DataResult::OK { data } => data,
@@ -1208,7 +1206,7 @@ mod tests {
         };
         let subs2 = match machine_types::overapproximated_well_formed_sub(
             get_interfacing_swarms_2_reversed(),
-            "{}".to_string(),
+            SubscriptionsWrapped(BTreeMap::new()),
             Granularity::TwoStep
         ) {
             DataResult::OK { data } => data,
@@ -1227,7 +1225,7 @@ mod tests {
         for role in all_roles {
             let (proj_combined1, proj_combined_initial1, _) = match machine_types::project(
                 get_interfacing_swarms_2(),
-                serde_json::to_string(&subs1).unwrap(),
+                SubscriptionsWrapped(subs1.clone()),
                 role.clone(),
                 false,
                 false
@@ -1237,7 +1235,7 @@ mod tests {
             };
             let (proj_combined2, proj_combined_initial2, _) = match machine_types::project(
                 get_interfacing_swarms_2_reversed(),
-                serde_json::to_string(&subs2).unwrap(),
+                SubscriptionsWrapped(subs2.clone()),
                 role.clone(),
                 true,
                 false
@@ -1256,7 +1254,7 @@ mod tests {
             .is_empty());
             let (proj_expanded_proto, proj_expanded_proto_initial, _) = match machine_types::project(
                 get_interfacing_swarms_2(),
-                serde_json::to_string(&subs1).unwrap(),
+                SubscriptionsWrapped(subs1.clone()),
                 role.clone(),
                 true,
                 true
@@ -1280,7 +1278,7 @@ mod tests {
         setup_logger();
         let subs = match machine_types::overapproximated_well_formed_sub(
             get_interfacing_swarms_1(),
-            "{}".to_string(),
+            SubscriptionsWrapped(BTreeMap::new()),
             Granularity::TwoStep
         ) {
             DataResult::OK { data } => data,
@@ -1296,7 +1294,7 @@ mod tests {
         for role in expected_projs.keys() {
             let (proj_expanded_proto, proj_expanded_proto_initial, _) = match machine_types::project(
                 get_interfacing_swarms_1(),
-                serde_json::to_string(&subs).unwrap(),
+                SubscriptionsWrapped(subs.clone()),
                 role.clone(),
                 true,
                 true
@@ -1306,7 +1304,7 @@ mod tests {
             };
             let (proj_combined, proj_combined_initial, _) = match machine_types::project(
                 get_interfacing_swarms_1(),
-                serde_json::to_string(&subs).unwrap(),
+                SubscriptionsWrapped(subs.clone()),
                 role.clone(),
                 false,
                 false
@@ -1332,8 +1330,4 @@ mod tests {
                 .is_empty());
         }
     }
-
-    // TODO:
-    // Move tests related to adaptation and adaptation info to a module. Make one more (one that currently just prints).
-    // Add a test somewhere that uses WH || F || QC
 }

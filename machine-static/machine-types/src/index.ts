@@ -1,5 +1,5 @@
 import {
-  CheckResult, MachineType, SwarmProtocolType, Subscriptions, Role, DataResult, Granularity, InterfacingProtocols,
+  CheckResult, MachineType, SwarmProtocolType, SubscriptionsWrapped as Subscriptions, Role, DataResult, Granularity, InterfacingProtocols,
   exact_well_formed_sub, overapproximated_well_formed_sub, compose_protocols
 } from '../pkg/machine_types.js'
 export { MachineType, SwarmProtocolType, Subscriptions, Role, CheckResult, DataResult }
@@ -13,7 +13,7 @@ export { MachineType, SwarmProtocolType, Subscriptions, Role, CheckResult, DataR
  * @returns - Result containing the computed subscription or a list of error messages.
  */
 export function exactWFSubscriptions(protos: InterfacingProtocols, subscriptions: Subscriptions): DataResult<Subscriptions> {
-  return exact_well_formed_sub(protos, JSON.stringify(subscriptions));
+  return exact_well_formed_sub(protos, subscriptions);
 }
 
 /**
@@ -27,7 +27,7 @@ export function exactWFSubscriptions(protos: InterfacingProtocols, subscriptions
  * @returns - Result containing the computed subscription or a list of error messages.
  */
 export function overapproxWFSubscriptions(protos: InterfacingProtocols, subscriptions: Subscriptions, granularity: Granularity): DataResult<Subscriptions> {
-  return overapproximated_well_formed_sub(protos, JSON.stringify(subscriptions), granularity);
+  return overapproximated_well_formed_sub(protos, subscriptions, granularity);
 }
 
 /**

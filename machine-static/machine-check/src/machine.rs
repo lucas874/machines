@@ -317,7 +317,7 @@ pub fn equivalent(left: &Graph, li: NodeId, right: &Graph, ri: NodeId) -> Vec<Er
 mod tests {
     use pretty_assertions::assert_eq;
     use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
-    use machine_types::types::typescript_types::{CheckResult, Role};
+    use machine_types::types::typescript_types::{CheckResult, Role, Subscriptions, SubscriptionsWrapped};
     use crate::{MachineType, SwarmProtocolType};
     fn setup_logger() {
         fmt()
@@ -374,7 +374,7 @@ mod tests {
 
         let result = crate::check_projection(
             serde_json::from_str::<SwarmProtocolType>(swarm).unwrap(),
-            subs.to_owned(),
+            SubscriptionsWrapped(serde_json::from_str::<Subscriptions>(subs).unwrap()),
             Role::new("P"),
             serde_json::from_str::<MachineType>(machine).unwrap(),
         );

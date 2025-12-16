@@ -168,8 +168,18 @@ pub enum DataResult<T> {
     ERROR { errors: Vec<String> },
 }
 
-#[declare]
 pub type Subscriptions = BTreeMap<Role, BTreeSet<EventType>>;
+
+// This type is used because using Subscriptions directly (i.e. by annotating it with #[declare]
+// and using this type for parameters in functions annotated with #[wasm_bindgen]) gives
+// 'the trait bound `BTreeMap<Role, BTreeSet<EventType>>: FromWasmAbi` is not satisfied'
+// Things work if we wrap subscriptions in a struct however.
+// It will become Record<Role, EventType[]> in the generated .d.ts.
+// So would Subscriptions if we annotated it with #[declare].
+// We export SubscriptionsWrapped as Subscriptions in index.ts.
+#[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct SubscriptionsWrapped(pub BTreeMap<Role, BTreeSet<EventType>>);
 #[declare]
 pub type SwarmProtocolType = ProtocolType<SwarmLabel>;
 #[declare]

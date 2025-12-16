@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use machine_types::types::typescript_types::{EventType, Role, Granularity, InterfacingProtocols};
+use machine_types::types::typescript_types::{EventType, Granularity, InterfacingProtocols, Role, SubscriptionsWrapped};
 use serde::{Deserialize, Serialize};
 extern crate machine_check;
 use std::collections::{BTreeMap, BTreeSet};
@@ -84,16 +84,16 @@ fn short_bench_general(c: &mut Criterion) {
         prepare_files_in_directory(input_dir);
     interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
 
-    let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet<EventType>>::new()).unwrap();
+    let subs = BTreeMap::<Role, BTreeSet<EventType>>::new();
     let two_step_granularity = Granularity::TwoStep;
     let step: usize = 120;
 
     for (size, interfacing_swarms) in interfacing_swarms_general.iter().step_by(step) {
         group.bench_with_input(BenchmarkId::new("Algorithm 1", size), interfacing_swarms,
-        |b, input| b.iter(|| machine_types::overapproximated_well_formed_sub(input.clone(), subs.clone(), two_step_granularity.clone())));
+        |b, input| b.iter(|| machine_types::overapproximated_well_formed_sub(input.clone(), SubscriptionsWrapped(subs.clone()), two_step_granularity.clone())));
 
         group.bench_with_input(BenchmarkId::new("Exact", size), interfacing_swarms,
-        |b, input| b.iter(|| machine_types::exact_well_formed_sub(input.clone(), subs.clone())));
+        |b, input| b.iter(|| machine_types::exact_well_formed_sub(input.clone(), SubscriptionsWrapped(subs.clone()))));
 
         println!("{}", SPECIAL_SYMBOL);
     }

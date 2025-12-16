@@ -3,11 +3,9 @@ use machine_check::{
 };
 
 use machine_types::{
-    types::{
-        typescript_types::{CheckResult, Command, DataResult, EventType, MachineLabel, Role, State, StateName, SwarmLabel, Transition, MachineType, Subscriptions, SwarmProtocolType, Granularity, InterfacingProtocols,},
-        proto_graph::{EdgeId, Graph, NodeId,}
-    },
-    compose_protocols
+    compose_protocols, types::{
+        proto_graph::{EdgeId, Graph, NodeId,}, typescript_types::{CheckResult, Command, DataResult, EventType, Granularity, InterfacingProtocols, MachineLabel, MachineType, Role, State, StateName, Subscriptions, SubscriptionsWrapped, SwarmLabel, SwarmProtocolType, Transition}
+    }
 };
 use petgraph::{
     graph::EdgeReference,
@@ -558,15 +556,14 @@ proptest! {
     #[test]
     fn test_exact_1(protos in generate_interfacing_protocols(5, 5, 5, false)) {
         setup_logger();
-        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
-        let subscription: Option<Subscriptions> = match machine_types::exact_well_formed_sub(protos.clone(), subs) {
+        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
+        let subscription: Option<Subscriptions> = match machine_types::exact_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs)) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
-        let subscription = serde_json::to_string(&subscription).unwrap();
-        let errors = check_composed_swarm(protos.clone(), subscription.clone());
+        let errors = check_composed_swarm(protos.clone(), SubscriptionsWrapped(subscription.clone()));
         let ok = match errors {
             CheckResult::OK => true,
             CheckResult::ERROR { .. } => false
@@ -583,16 +580,15 @@ proptest! {
     #[test]
     fn test_overapproximated_1(protos in generate_interfacing_protocols(5, 5, 5, false)) {
         setup_logger();
-        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::Coarse;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), subs, granularity) {
+        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
-        let subscription = serde_json::to_string(&subscription).unwrap();
-        let errors = check_composed_swarm(protos.clone(), subscription.clone());
+        let errors = check_composed_swarm(protos.clone(), SubscriptionsWrapped(subscription));
         let ok = match errors {
             CheckResult::OK => true,
             CheckResult::ERROR { errors: e } => {println!("{:?}", e); false}
@@ -606,15 +602,14 @@ proptest! {
     #[test]
     fn test_exact_2(protos in generate_interfacing_protocols_refinement(5, 5, 5)) {
         setup_logger();
-        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
-        let subscription: Option<Subscriptions> = match machine_types::exact_well_formed_sub(protos.clone(), subs) {
+        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
+        let subscription: Option<Subscriptions> = match machine_types::exact_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs)) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
-        let subscription = serde_json::to_string(&subscription).unwrap();
-        let errors = check_composed_swarm(protos.clone(), subscription.clone());
+        let errors = check_composed_swarm(protos.clone(), SubscriptionsWrapped(subscription.clone()));
         let ok = match errors {
             CheckResult::OK => true,
             CheckResult::ERROR { .. } => false
@@ -627,16 +622,15 @@ proptest! {
     #[test]
     fn test_overapproximated_2(protos in generate_interfacing_protocols_refinement(5, 5, 5)) {
         setup_logger();
-        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::Coarse;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), subs, granularity) {
+        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
-        let subscription = serde_json::to_string(&subscription).unwrap();
-        let errors = check_composed_swarm(protos.clone(), subscription.clone());
+        let errors = check_composed_swarm(protos.clone(), SubscriptionsWrapped(subscription.clone()));
         let ok = match errors {
             CheckResult::OK => true,
             CheckResult::ERROR { .. } => false
@@ -650,15 +644,14 @@ proptest! {
     #[test]
     fn test_exact_3(protos in generate_interfacing_protocols_general_pattern(5, 5, 3)) {
         setup_logger();
-        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
-        let subscription: Option<Subscriptions> = match machine_types::exact_well_formed_sub(protos.clone(), subs) {
+        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
+        let subscription: Option<Subscriptions> = match machine_types::exact_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs)) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
-        let subscription = serde_json::to_string(&subscription).unwrap();
-        let errors = check_composed_swarm(protos.clone(), subscription.clone());
+        let errors = check_composed_swarm(protos.clone(), SubscriptionsWrapped(subscription.clone()));
         let ok = match errors {
             CheckResult::OK => true,
             CheckResult::ERROR { .. } => false
@@ -671,16 +664,15 @@ proptest! {
     #[test]
     fn test_overapproximated_3(protos in generate_interfacing_protocols_general_pattern(5, 5, 3)) {
         setup_logger();
-        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::Coarse;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), subs, granularity) {
+        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
-        let subscription = serde_json::to_string(&subscription).unwrap();
-        let errors = check_composed_swarm(protos.clone(), subscription.clone());
+        let errors = check_composed_swarm(protos.clone(), SubscriptionsWrapped(subscription));
         let ok = match errors {
             CheckResult::OK => true,
             CheckResult::ERROR { .. } => false
@@ -693,16 +685,15 @@ proptest! {
     #[test]
     fn test_overapproximated_4(protos in generate_interfacing_protocols_general_pattern(5, 5, 3)) {
         setup_logger();
-        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::Medium;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), subs, granularity) {
+        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
-        let subscription = serde_json::to_string(&subscription).unwrap();
-        let errors = check_composed_swarm(protos.clone(), subscription.clone());
+        let errors = check_composed_swarm(protos.clone(), SubscriptionsWrapped(subscription));
         let ok = match errors {
             CheckResult::OK => true,
             CheckResult::ERROR { .. } => false
@@ -715,16 +706,15 @@ proptest! {
     #[test]
     fn test_overapproximated_5(protos in generate_interfacing_protocols_general_pattern(5, 5, 3)) {
         setup_logger();
-        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::Fine;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), subs, granularity) {
+        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
-        let subscription = serde_json::to_string(&subscription).unwrap();
-        let errors = check_composed_swarm(protos.clone(), subscription.clone());
+        let errors = check_composed_swarm(protos.clone(), SubscriptionsWrapped(subscription));
         let ok = match errors {
             CheckResult::OK => true,
             CheckResult::ERROR { .. } => false
@@ -737,16 +727,15 @@ proptest! {
     #[test]
     fn test_overapproximated_6(protos in generate_interfacing_protocols_general_pattern(5, 5, 3)) {
         setup_logger();
-        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::TwoStep;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), subs, granularity) {
+        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
-        let subscription = serde_json::to_string(&subscription).unwrap();
-        let errors = check_composed_swarm(protos.clone(), subscription.clone());
+        let errors = check_composed_swarm(protos.clone(), SubscriptionsWrapped(subscription));
         let ok = match errors {
             CheckResult::OK => true,
             CheckResult::ERROR { .. } => false
@@ -759,16 +748,15 @@ proptest! {
     #[test]
     fn test_overapproximated_7(protos in generate_interfacing_protocols_refinement(5, 5, 5)) {
         setup_logger();
-        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::TwoStep;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), subs, granularity) {
+        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
         assert!(subscription.is_some());
         let subscription = subscription.unwrap();
-        let subscription = serde_json::to_string(&subscription).unwrap();
-        let errors = check_composed_swarm(protos.clone(), subscription.clone());
+        let errors = check_composed_swarm(protos.clone(), SubscriptionsWrapped(subscription));
         let ok = match errors {
             CheckResult::OK => true,
             CheckResult::ERROR { .. } => false
@@ -782,9 +770,9 @@ proptest! {
     #[ignore]
     fn test_overapproximated_refinement_2_only_generate(protos in generate_interfacing_protocols_general_pattern(7, 7, 10)) {
         setup_logger();
-        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::Coarse;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), subs, granularity) {
+        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -807,9 +795,9 @@ proptest! {
     #[ignore]
     fn test_sub_sizes(protos in generate_interfacing_protocols_general_pattern(5, 5, 5)) {
         setup_logger();
-        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::Coarse;
-        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), subs.clone(), granularity) {
+        let subscription: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs.clone()), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -824,7 +812,7 @@ proptest! {
 
         };
         assert!(ok); */
-        let subscription: Option<Subscriptions> = match machine_types::exact_well_formed_sub(protos.clone(), subs.clone()) {
+        let subscription: Option<Subscriptions> = match machine_types::exact_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs.clone())) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -887,9 +875,9 @@ proptest! {
     #[ignore]
     fn test_combine_machines_prop(protos in generate_interfacing_protocols_general_pattern(5, 5, 3)) {
         setup_logger();
-        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::TwoStep;
-        let subscriptions: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), subs.clone(), granularity) {
+        let subscriptions: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs.clone()), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
@@ -902,9 +890,8 @@ proptest! {
         let subscriptions = subscriptions.unwrap();
         let composition = composition.unwrap();
 
-        let sub_string = serde_json::to_string(&subscriptions).unwrap();
         for role in subscriptions.keys() {
-            let projection: Option<MachineType> = match machine_types::project(protos.clone(), sub_string.clone(), role.clone(), true, true) {
+            let projection: Option<MachineType> = match machine_types::project(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), true, true) {
                 DataResult::OK{data: projection} => {
                 Some(projection) },
                 DataResult::ERROR{ .. } => None,
@@ -912,10 +899,10 @@ proptest! {
 
             assert!(projection.is_some());
             // should work like this projecting over the explicit composition initially and comparing that with combined machines?
-            match check_composed_projection(protos.clone(), sub_string.clone(), role.clone(), projection.clone().unwrap()) {
+            match check_composed_projection(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), projection.clone().unwrap()) {
                 CheckResult::OK => (),
                 CheckResult::ERROR {errors: e} => {
-                    match machine_types::project(protos.clone(), sub_string.clone(), role.clone(), false, false) {
+                    match machine_types::project(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), false, false) {
                         DataResult::OK{data: projection1} => {
                             println!("machine combined: {}", serde_json::to_string_pretty::<MachineType>(&projection1).unwrap());
                         },
@@ -939,27 +926,26 @@ proptest! {
     #[ignore]
     fn test_combine_machines_prop_more_verbose(protos in generate_interfacing_protocols_general_pattern(5, 5, 3)) {
         setup_logger();
-        let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
+        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
         let granularity = Granularity::TwoStep;
-        let subscriptions: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), subs, granularity) {
+        let subscriptions: Option<Subscriptions> = match machine_types::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
         };
         assert!(subscriptions.is_some());
         let subscriptions = subscriptions.unwrap();
 
-        let sub_string = serde_json::to_string(&subscriptions).unwrap();
         for role in subscriptions.keys() {
-            let projection: Option<MachineType> = match machine_types::project(protos.clone(), sub_string.clone(), role.clone(), true, true) {
+            let projection: Option<MachineType> = match machine_types::project(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), true, true) {
                 DataResult::OK{data: projection} => {
                 Some(projection) },
                 DataResult::ERROR{ .. } => None,
             };
             assert!(projection.is_some());
             // should work like this projecting over the explicit composition initially and comparing that with combined machines?
-            match check_composed_projection(protos.clone(), sub_string.clone(), role.clone(), projection.clone().unwrap()) {
+            match check_composed_projection(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), projection.clone().unwrap()) {
                 CheckResult::OK => {
-                    let combined: Option<MachineType> = match machine_types::project(protos.clone(), sub_string.clone(), role.clone(), false, false) {
+                    let combined: Option<MachineType> = match machine_types::project(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), false, false) {
                         DataResult::OK{data: combined} => {
                         Some(combined) },
                         DataResult::ERROR{ .. } => None,
@@ -971,7 +957,7 @@ proptest! {
                     println!("");
                 },//(),
                 CheckResult::ERROR {errors: e} => {
-                    match machine_types::project(protos.clone(), sub_string.clone(), role.clone(), false, false) {
+                    match machine_types::project(protos.clone(), SubscriptionsWrapped(subscriptions.clone()), role.clone(), false, false) {
                         DataResult::OK{data: projection1} => {
                             println!("machine combined: {}", serde_json::to_string_pretty::<MachineType>(&projection1).unwrap());
                         },
@@ -996,8 +982,8 @@ proptest! {
         setup_logger();
         let protocols: Vec<SwarmProtocolType> = protos.0.into_iter().map(|protocol| protocol).collect();
         for proto in &protocols {
-            let subs = serde_json::to_string(&BTreeMap::<Role, BTreeSet::<EventType>>::new()).unwrap();
-            let subscription: Option<Subscriptions> = match well_formed_sub(proto.clone(), subs) {
+            let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
+            let subscription: Option<Subscriptions> = match well_formed_sub(proto.clone(), SubscriptionsWrapped(subs)) {
                 DataResult::OK{data: subscriptions} => Some(subscriptions),
                 DataResult::ERROR{ .. } => None,
             };
@@ -1009,7 +995,7 @@ proptest! {
                 for event_type in event_types {
                     let mut subscription_should_fail = subscription.clone();
                     subscription_should_fail.entry(role.clone()).and_modify(|ets| { ets.remove(event_type); });
-                    let errors = check_swarm(proto.clone(), serde_json::to_string(&subscription_should_fail).unwrap());
+                    let errors = check_swarm(proto.clone(), SubscriptionsWrapped(subscription_should_fail));
                     let ok = match errors {
                         CheckResult::OK => true,
                         CheckResult::ERROR { .. } => false //{ println!("{:?}", e); false }
@@ -1019,8 +1005,7 @@ proptest! {
                 }
             }
             // Check if generated subscription is well-formed according to the 'Behavioural Types for Local-First Software'-definition
-            let subscription = serde_json::to_string(&subscription).unwrap();
-            let errors = check_swarm(proto.clone(), subscription.clone());
+            let errors = check_swarm(proto.clone(), SubscriptionsWrapped(subscription.clone()));
             let ok = match errors {
                 CheckResult::OK => true,
                 CheckResult::ERROR { .. } => false

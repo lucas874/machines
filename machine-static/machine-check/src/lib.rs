@@ -4,15 +4,11 @@ mod machine;
 mod swarm;
 pub mod composition;
 
-use machine_types::types::typescript_types::{CheckResult, DataResult, MachineType, Role, Subscriptions, SwarmProtocolType};
+use machine_types::types::typescript_types::{CheckResult, DataResult, MachineType, Role, Subscriptions, SubscriptionsWrapped, SwarmProtocolType};
 
 #[wasm_bindgen]
-pub fn check_swarm(proto: SwarmProtocolType, subs: String) -> CheckResult {
-    let subs = match serde_json::from_str::<Subscriptions>(&subs) {
-        Ok(p) => p,
-        Err(e) => return CheckResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)] },
-    };
-    let (graph, _, errors) = swarm::check(proto, &subs);
+pub fn check_swarm(proto: SwarmProtocolType, subs: SubscriptionsWrapped) -> CheckResult {
+    let (graph, _, errors) = swarm::check(proto, &subs.0);
     if errors.is_empty() {
         CheckResult::OK
     } else {
@@ -21,12 +17,8 @@ pub fn check_swarm(proto: SwarmProtocolType, subs: String) -> CheckResult {
 }
 
 #[wasm_bindgen]
-pub fn well_formed_sub(proto: SwarmProtocolType, subs: String) -> DataResult<Subscriptions> {
-    let subs = match serde_json::from_str::<Subscriptions>(&subs) {
-        Ok(p) => p,
-        Err(e) => return DataResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)] },
-    };
-    match swarm::well_formed_sub(proto, &subs) {
+pub fn well_formed_sub(proto: SwarmProtocolType, subs: SubscriptionsWrapped) -> DataResult<Subscriptions> {
+    match swarm::well_formed_sub(proto, &subs.0) {
         Ok(subscriptions) => DataResult::OK {
             data: subscriptions,
         },
@@ -37,17 +29,12 @@ pub fn well_formed_sub(proto: SwarmProtocolType, subs: String) -> DataResult<Sub
 }
 
 #[wasm_bindgen]
-pub fn check_projection(swarm: SwarmProtocolType, subs: String, role: Role, machine: MachineType) -> CheckResult {
-    let subs = match serde_json::from_str::<Subscriptions>(&subs) {
-        Ok(p) => p,
-        Err(e) => return CheckResult::ERROR { errors: vec![format!("parsing subscriptions: {}", e)] },
-    };
-
-    let (swarm, initial, mut errors) = swarm::from_json(swarm, &subs);
+pub fn check_projection(swarm: SwarmProtocolType, subs: SubscriptionsWrapped, role: Role, machine: MachineType) -> CheckResult {
+    let (swarm, initial, mut errors) = swarm::from_json(swarm, &subs.0);
     let Some(initial) = initial else {
         return CheckResult::ERROR { errors: errors };
     };
-    let (proj, proj_initial) = machine::project(&swarm, initial, &subs, role);
+    let (proj, proj_initial) = machine::project(&swarm, initial, &subs.0, role);
     let (machine, json_initial, m_errors) = machine::from_json(machine);
     let machine_problem = !m_errors.is_empty();
     errors.extend(m_errors);

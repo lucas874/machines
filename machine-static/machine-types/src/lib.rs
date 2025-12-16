@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 use crate::machine::util::to_json_machine;
 use crate::machine::{adaptation, projection};
 use crate::types::{proto_info, typescript_types};
-use crate::types::typescript_types::{DataResult, Granularity, InterfacingProtocols, MachineType, ProjectionInfo, Role, Subscriptions, SwarmProtocolType};
+use crate::types::typescript_types::{DataResult, Granularity, InterfacingProtocols, MachineType, ProjectionInfo, Role, Subscriptions, SubscriptionsWrapped, SwarmProtocolType};
 
 pub mod types;
 pub mod errors;
@@ -19,24 +19,12 @@ mod test_utils;
 use crate::subscription::{exact, overapproximation};
 use crate::errors::composition_errors;
 
-macro_rules! deserialize_subs {
-    ($subs:expr, $err_exp:expr) => {
-        match serde_json::from_str::<Subscriptions>(&$subs) {
-            Ok(p) => p,
-            Err(e) => return $err_exp(e),
-        }
-    };
-}
-
 #[wasm_bindgen]
 pub fn exact_well_formed_sub(
     protos: InterfacingProtocols,
-    subs: String,
+    subs: SubscriptionsWrapped,
 ) -> DataResult<Subscriptions> {
-    let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
-        errors: vec![format!("parsing subscriptions: {}", e)]
-    });
-    let result = exact::exact_well_formed_sub(protos, &subs);
+    let result = exact::exact_well_formed_sub(protos, &subs.0);
     match result {
         Ok(subscriptions) => DataResult::OK {
             data: subscriptions,
@@ -50,13 +38,10 @@ pub fn exact_well_formed_sub(
 #[wasm_bindgen]
 pub fn overapproximated_well_formed_sub(
     protos: InterfacingProtocols,
-    subs: String,
+    subs: SubscriptionsWrapped,
     granularity: Granularity,
 ) -> DataResult<Subscriptions> {
-    let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
-        errors: vec![format!("parsing subscriptions: {}", e)]
-    });
-    let result = overapproximation::overapprox_well_formed_sub(protos, &subs, granularity);
+    let result = overapproximation::overapprox_well_formed_sub(protos, &subs.0, granularity);
     match result {
         Ok(subscriptions) => DataResult::OK {
             data: subscriptions,
@@ -70,20 +55,16 @@ pub fn overapproximated_well_formed_sub(
 #[wasm_bindgen]
 pub fn project(
     protos: InterfacingProtocols,
-    subs: String,
+    subs: SubscriptionsWrapped,
     role: Role,
     minimize: bool,
     expand_protos: bool,
 ) -> DataResult<MachineType> {
-    let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
-        errors: vec![format!("parsing subscriptions: {}", e)]
-    });
-
     // Expand the protocol composition of expand_protos, otherwise project each protocol and compose machines.
     let machine = if expand_protos {
         match proto_info::compose_protocols(protos) {
             Ok((swarm, initial)) => {
-                let (proj, proj_initial) = projection::project(&swarm, initial, &subs, role, minimize);
+                let (proj, proj_initial) = projection::project(&swarm, initial, &subs.0, role, minimize);
                 to_json_machine(proj, proj_initial)
             },
             Err(error_report) => return DataResult::ERROR {
@@ -94,7 +75,7 @@ pub fn project(
         let proto_info = proto_info::swarms_to_proto_info(protos);
         match proto_info.no_errors() {
             true => {
-                let (proj, proj_initial) = projection::project_combine(&proto_info, &subs, role, minimize);
+                let (proj, proj_initial) = projection::project_combine(&proto_info, &subs.0, role, minimize);
                 machine::util::from_option_to_machine(proj, proj_initial.unwrap())
             },
             false => return DataResult::ERROR {
@@ -111,13 +92,10 @@ pub fn projection_information(
     role: Role,
     protos: InterfacingProtocols,
     k: usize,
-    subs: String,
+    subs: SubscriptionsWrapped,
     machine: MachineType,
     minimize: bool,
 ) -> DataResult<ProjectionInfo> {
-    let subs = deserialize_subs!(subs, |e| DataResult::ERROR {
-        errors: vec![format!("parsing subscriptions: {}", e)]
-    });
     let proto_info = proto_info::swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
         return DataResult::ERROR {
@@ -137,7 +115,7 @@ pub fn projection_information(
     }
     match adaptation::projection_information(
         &proto_info,
-        &subs,
+        &subs.0,
         role,
         (machine, initial),
         k,

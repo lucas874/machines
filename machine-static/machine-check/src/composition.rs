@@ -1,26 +1,14 @@
 use machine_types::machine::projection;
-use machine_types::types::typescript_types::InterfacingProtocols;
+use machine_types::types::typescript_types::{InterfacingProtocols, SubscriptionsWrapped};
 use machine_types::{errors::composition_errors, types::proto_info};
 use super::*;
 
 mod composition_machine;
 mod composition_swarm;
 
-macro_rules! deserialize_subs {
-    ($subs:expr, $err_exp:expr) => {
-        match serde_json::from_str::<Subscriptions>(&$subs) {
-            Ok(p) => p,
-            Err(e) => return $err_exp(e),
-        }
-    };
-}
-
 #[wasm_bindgen]
-pub fn check_composed_swarm(protos: InterfacingProtocols, subs: String) -> CheckResult {
-    let subs = deserialize_subs!(subs, |e| CheckResult::ERROR {
-        errors: vec![format!("parsing subscriptions: {}", e)]
-    });
-    let error_report = composition::composition_swarm::check(protos, &subs);
+pub fn check_composed_swarm(protos: InterfacingProtocols, subs: SubscriptionsWrapped) -> CheckResult {
+    let error_report = composition::composition_swarm::check(protos, &subs.0);
     if error_report.is_empty() {
         CheckResult::OK
     } else {
@@ -33,13 +21,10 @@ pub fn check_composed_swarm(protos: InterfacingProtocols, subs: String) -> Check
 #[wasm_bindgen]
 pub fn check_composed_projection(
     protos: InterfacingProtocols,
-    subs: String,
+    subs: SubscriptionsWrapped,
     role: Role,
     machine: MachineType,
 ) -> CheckResult {
-    let subs = deserialize_subs!(subs, |e| CheckResult::ERROR {
-        errors: vec![format!("parsing subscriptions: {}", e)]
-    });
     let proto_info = proto_info::swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
         return CheckResult::ERROR {
@@ -48,7 +33,7 @@ pub fn check_composed_projection(
     }
 
     let (proj, proj_initial) =
-        projection::project_combine(&proto_info, &subs, role, false);
+        projection::project_combine(&proto_info, &subs.0, role, false);
     let (machine, json_initial, m_errors) = machine::from_json(machine);
     let machine_problem = !m_errors.is_empty();
     let mut errors = vec![];
