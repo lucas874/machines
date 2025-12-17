@@ -1,9 +1,10 @@
 import {
-  CheckResult, MachineType, SwarmProtocolType, SubscriptionsWrapped as Subscriptions, Role, DataResult, Granularity, InterfacingProtocols,
-  exact_well_formed_sub, overapproximated_well_formed_sub, projection_information, project, compose_protocols,
-  ProjectionInfo, ProjToMachineStates
+  SwarmLabel, MachineLabel, CheckResult, MachineType, SwarmProtocolType, SubscriptionsWrapped as Subscriptions, 
+  Role, DataResult, Granularity, InterfacingProtocols, exact_well_formed_sub, overapproximated_well_formed_sub, 
+  projection_information, project as wasm_project, compose_protocols, ProjectionInfo, ProjToMachineStates
 } from '../pkg/machine_core.js'
-export { MachineType, SwarmProtocolType, Subscriptions, Role, CheckResult, DataResult, ProjectionInfo, InterfacingProtocols, ProjToMachineStates, Granularity }
+export { SwarmLabel, MachineLabel, MachineType, SwarmProtocolType, Subscriptions, Role, CheckResult, DataResult, 
+  ProjectionInfo, InterfacingProtocols, ProjToMachineStates, Granularity }
 
 /**
  * Generate the smallest subscription that is well-formed w.r.t. to
@@ -62,8 +63,8 @@ export function projectionInformation(role: Role, protos: InterfacingProtocols, 
  * @param expandProtos - Composition of protocols in ```protos``` is expanded before projection if true, otherwise projection of each swarm protocol is computed and then composed.
  * @returns - Result containing the projection or a list of error messages.
  */
-export function projectCombineMachines(protos: InterfacingProtocols, subscriptions: Subscriptions, role: string, minimize: boolean, expandProtos: boolean): DataResult<MachineType> {
-  return project(protos, subscriptions, role, minimize, expandProtos)
+export function project(protos: InterfacingProtocols, subscriptions: Subscriptions, role: string, minimize: boolean, expandProtos: boolean): DataResult<MachineType> {
+  return wasm_project(protos, subscriptions, role, minimize, expandProtos)
 }
 
 /**

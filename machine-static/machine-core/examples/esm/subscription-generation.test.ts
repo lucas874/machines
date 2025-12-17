@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals'
 import { WarehouseFactory } from './proto.js'
-import { exactWFSubscriptions, Subscriptions, DataResult, overapproxWFSubscriptions, Granularity } from '../..'
+import { exactWFSubscriptions, Subscriptions, DataResult, overapproxWFSubscriptions } from '../..'
 
 /*
  * This file tests subscription generation for the compositition described in proto.ts.
