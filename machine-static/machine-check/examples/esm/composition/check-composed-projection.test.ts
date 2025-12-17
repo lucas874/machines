@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, Subscriptions, DataResult, InterfacingProtocols, checkComposedProjection, overapproxWFSubscriptions} from '../../..'
+import { checkComposedProjection } from '../../..'
+import { SwarmProtocolType, Subscriptions, DataResult, InterfacingProtocols, overapproxWFSubscriptions } from 'machine-core'
 import { Events, Composition } from './car-factory-protos.js'
 
 

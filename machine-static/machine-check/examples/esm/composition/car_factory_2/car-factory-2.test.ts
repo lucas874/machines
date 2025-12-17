@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import { MachineEvent, SwarmProtocol } from '@actyx/machine-runner'
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, Subscriptions, checkComposedSwarmProtocol, DataResult, InterfacingProtocols, overapproxWFSubscriptions, checkComposedProjection} from '../../../..'
+import { checkComposedSwarmProtocol, checkComposedProjection } from '../../../..'
+import { SwarmProtocolType, Subscriptions, DataResult, InterfacingProtocols, overapproxWFSubscriptions } from 'machine-core'
 
 /*
  * Example from CoPLaWS slides by Florian Furbach

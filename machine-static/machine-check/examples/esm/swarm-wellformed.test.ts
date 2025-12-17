@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals'
 import { Events, HangarBay } from './proto.js'
-import { SwarmProtocolType, checkSwarmProtocol, checkProjection } from '../..'
+import { checkSwarmProtocol, checkProjection } from '../..'
+import { SwarmProtocolType } from 'machine-core'
 
 /*
  * This file holds the code for the README, see there for a description of the protocol.

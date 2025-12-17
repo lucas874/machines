@@ -1,5 +1,7 @@
 import { describe, expect, it } from '@jest/globals'
-import { SwarmProtocolType, checkSwarmProtocol, Subscriptions, checkComposedSwarmProtocol, DataResult, InterfacingProtocols, exactWFSubscriptions, overapproxWFSubscriptions} from '../../..'
+import { checkSwarmProtocol, checkComposedSwarmProtocol } from '../../..'
+import { SwarmProtocolType, Subscriptions, DataResult, InterfacingProtocols, exactWFSubscriptions, overapproxWFSubscriptions} from 'machine-core'
+
 import { Events } from './car-factory-protos.js'
 
 /*
