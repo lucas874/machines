@@ -22,7 +22,7 @@
     }
   },
   "scripts": {
-    "clean": "rimraf pkg lib",
+    "clean": "rimraf pkg lib && npm run test:cjs:remove",
     "build:rs": "wasm-pack build --target nodejs --release && cpy pkg lib",
     "build:ts": "npm run build:ts:esm && npm run build:ts:cjs",
     "build:ts:esm": "tsc --build tsconfig.esm.json && cpy package.esm.json lib/esm --rename package.json",
