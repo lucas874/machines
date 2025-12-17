@@ -2,6 +2,6 @@
 /target/
 /node_modules/
 /lib/
-/actyx-machine*.tgz
+/machine-core*.tgz
 /bench_and_results/
 /err.out
