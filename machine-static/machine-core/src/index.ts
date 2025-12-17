@@ -1,9 +1,9 @@
 import {
   CheckResult, MachineType, SwarmProtocolType, SubscriptionsWrapped as Subscriptions, Role, DataResult, Granularity, InterfacingProtocols,
   exact_well_formed_sub, overapproximated_well_formed_sub, projection_information, project, compose_protocols,
-  ProjectionInfo
+  ProjectionInfo, ProjToMachineStates
 } from '../pkg/machine_core.js'
-export { MachineType, SwarmProtocolType, Subscriptions, Role, CheckResult, DataResult, ProjectionInfo }
+export { MachineType, SwarmProtocolType, Subscriptions, Role, CheckResult, DataResult, ProjectionInfo, InterfacingProtocols, ProjToMachineStates }
 
 /**
  * Generate the smallest subscription that is well-formed w.r.t. to
