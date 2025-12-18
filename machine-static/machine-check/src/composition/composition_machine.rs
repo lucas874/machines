@@ -131,8 +131,8 @@ pub fn equivalent(left: &OptionGraph, li: NodeId, right: &OptionGraph, ri: NodeI
 mod tests {
     use super::*;
     use machine_core::{
-        machine::projection, subscription::{exact, overapproximation}, types::{
-            projection::Graph, proto_graph, proto_info, typescript_types::{
+        subscription::{exact, overapproximation}, types::{
+            projection::Graph, typescript_types::{
                 Command, DataResult, EventType, Granularity, InterfacingProtocols, MachineType, Role, StateName, Subscriptions, SubscriptionsWrapped, SwarmProtocolType, Transition
             }
         }
@@ -155,9 +155,6 @@ mod tests {
     fn to_option_machine(graph: &Graph) -> OptionGraph {
         graph.map(|_, n| Some(n.state_name().clone()), |_, x| x.clone())
     }
-    /* fn from_adaptation_graph_to_graph(graph: &AdaptationGraph) -> Graph {
-        graph.map(|_, n| n.state.state_name().clone(), |_, x| x.clone())
-    } */
 
     fn get_proto1() -> SwarmProtocolType {
         serde_json::from_str::<SwarmProtocolType>(
@@ -540,8 +537,11 @@ mod tests {
         .unwrap();
 
         let role = Role::new("F");
-        let (g, i, _) = proto_graph::from_json(proto);
-        let (proj, proj_initial) = projection::project(&g, i.unwrap(), &subs, role, false);
+        let (proj, proj_initial, _) =
+            match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => crate::machine::from_json(data),
+            };
         let expected_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -583,8 +583,8 @@ mod tests {
         assert!(equivalent(
             &expected,
             expected_initial.unwrap(),
-            &to_option_machine(&proj),
-            proj_initial
+            &proj,
+            proj_initial.unwrap()
         )
         .is_empty());
     }
@@ -598,8 +598,11 @@ mod tests {
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
-        let (g, i, _) = proto_graph::from_json(proto);
-        let (left, left_initial) = projection::project(&g, i.unwrap(), &subs, role.clone(), false);
+        let (left, left_initial, _) =
+            match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => crate::machine::from_json(data),
+            };
         let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -655,8 +658,8 @@ mod tests {
         assert!(errors.is_empty());
 
         let errors = equivalent(
-            &to_option_machine(&left),
-            left_initial,
+            &left,
+            left_initial.unwrap(),
             &right,
             right_initial.unwrap(),
         );
@@ -672,8 +675,11 @@ mod tests {
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("F");
-        let (g, i, _) = proto_graph::from_json(proto);
-        let (proj, proj_initial) = projection::project(&g, i.unwrap(), &subs, role, false);
+        let (proj, proj_initial, _) =
+            match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => crate::machine::from_json(data),
+            };
         let expected_m = MachineType {
             initial: State::new("1"),
             transitions: vec![
@@ -709,8 +715,8 @@ mod tests {
         assert!(equivalent(
             &expected,
             expected_initial.unwrap(),
-            &to_option_machine(&proj),
-            proj_initial
+            &proj,
+            proj_initial.unwrap()
         )
         .is_empty());
     }
@@ -718,7 +724,6 @@ mod tests {
     #[test]
     fn test_equivalent_4() {
         setup_logger();
-        // car factory from coplaws example
         let protos = get_interfacing_swarms_1();
         let result_subs = overapproximation::overapprox_well_formed_sub(
             protos.clone(),
@@ -729,8 +734,11 @@ mod tests {
         let subs = result_subs.unwrap();
 
         let role = Role::new("T");
-        let (g, i) = proto_info::compose_protocols(protos).unwrap();
-        let (proj, proj_initial) = projection::project(&g, i, &subs, role, false);
+        let (proj, proj_initial, _) =
+            match machine_core::project(protos, SubscriptionsWrapped(subs), role, false, false) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => crate::machine::from_json(data),
+            };
         let expected_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -816,8 +824,8 @@ mod tests {
         assert!(equivalent(
             &expected,
             expected_initial.unwrap(),
-            &to_option_machine(&proj),
-            proj_initial
+            &proj,
+            proj_initial.unwrap()
         )
         .is_empty());
     }
@@ -832,8 +840,11 @@ mod tests {
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
-        let (g, i, _) = proto_graph::from_json(proto);
-        let (left, left_initial) = projection::project(&g, i.unwrap(), &subs, role.clone(), false);
+        let (left, left_initial, _) =
+            match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => crate::machine::from_json(data),
+            };
         let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -889,8 +900,8 @@ mod tests {
         assert!(errors.is_empty());
 
         let errors = equivalent(
-            &to_option_machine(&left),
-            left_initial,
+            &left,
+            left_initial.unwrap(),
             &right,
             right_initial.unwrap(),
         );
@@ -907,8 +918,11 @@ mod tests {
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
-        let (g, i, _) = proto_graph::from_json(proto);
-        let (left, left_initial) = projection::project(&g, i.unwrap(), &subs, role.clone(), false);
+        let (left, left_initial, _) =
+            match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => crate::machine::from_json(data),
+            };
         let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -964,8 +978,8 @@ mod tests {
         assert!(errors.is_empty());
 
         let errors = equivalent(
-            &to_option_machine(&left),
-            left_initial,
+            &left,
+            left_initial.unwrap(),
             &right,
             right_initial.unwrap(),
         );
@@ -982,8 +996,11 @@ mod tests {
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
-        let (g, i, _) = proto_graph::from_json(proto);
-        let (left, left_initial) = projection::project(&g, i.unwrap(), &subs, role.clone(), false);
+        let (left, left_initial, _) =
+            match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => crate::machine::from_json(data),
+            };
         let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -1040,8 +1057,8 @@ mod tests {
         assert!(errors.is_empty());
 
         let errors = equivalent(
-            &to_option_machine(&left),
-            left_initial,
+            &left,
+            left_initial.unwrap(),
             &right,
             right_initial.unwrap(),
         );
@@ -1058,8 +1075,11 @@ mod tests {
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
-        let (g, i, _) = proto_graph::from_json(proto);
-        let (left, left_initial) = projection::project(&g, i.unwrap(), &subs, role.clone(), false);
+        let (left, left_initial, _) =
+            match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => crate::machine::from_json(data),
+            };
         let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -1108,8 +1128,8 @@ mod tests {
         assert!(errors.is_empty());
 
         let errors = equivalent(
-            &to_option_machine(&left),
-            left_initial,
+            &left,
+            left_initial.unwrap(),
             &right,
             right_initial.unwrap(),
         );
