@@ -7,10 +7,10 @@ use crate::types::typescript_types::{DataResult, Granularity, InterfacingProtoco
 
 pub mod types;
 pub mod errors;
-pub mod composability_check;
-pub mod subscription;
-pub mod composition;
-pub mod machine;
+mod composability_check;
+mod subscription;
+mod composition;
+mod machine;
 mod util;
 
 #[cfg(test)]

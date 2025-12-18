@@ -1,4 +1,3 @@
-use machine_core::machine::projection;
 use machine_core::types::typescript_types::{InterfacingProtocols, SubscriptionsWrapped};
 use machine_core::{errors::composition_errors, types::proto_info};
 use super::*;
@@ -25,15 +24,18 @@ pub fn check_composed_projection(
     role: Role,
     machine: MachineType,
 ) -> CheckResult {
-    let proto_info = proto_info::swarms_to_proto_info(protos);
+    let proto_info = proto_info::swarms_to_proto_info(protos.clone());
     if !proto_info.no_errors() {
         return CheckResult::ERROR {
             errors: composition_errors::error_report_to_strings(proto_info::proto_info_to_error_report(proto_info)),
         };
     }
+    let proj_machine = match machine_core::project(protos, subs, role.clone(), false, false) {
+        DataResult::OK { data } => data,
+        DataResult::ERROR { errors } => return CheckResult::ERROR { errors },
 
-    let (proj, proj_initial) =
-        projection::project_combine(&proto_info, &subs.0, role, false);
+    };
+    let (proj, proj_initial, _) = machine::from_json(proj_machine);
     let (machine, json_initial, m_errors) = machine::from_json(machine);
     let machine_problem = !m_errors.is_empty();
     let mut errors = vec![];
