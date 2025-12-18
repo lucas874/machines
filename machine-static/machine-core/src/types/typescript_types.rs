@@ -69,14 +69,6 @@ decl_str!(Role);
 decl_str!(Command);
 decl_str!(EventType);
 
-#[derive(Tsify, Serialize)]
-#[serde(tag = "type")]
-#[tsify(into_wasm_abi)]
-pub enum CheckResult {
-    OK,
-    ERROR { errors: Vec<String> },
-}
-
 #[derive(Tsify, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct ProtocolType<L> {

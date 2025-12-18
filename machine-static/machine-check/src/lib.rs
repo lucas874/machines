@@ -1,10 +1,20 @@
+use serde::Serialize;
+use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
 mod machine;
 mod swarm;
 pub mod composition;
 
-use machine_core::types::typescript_types::{CheckResult, DataResult, MachineType, Role, Subscriptions, SubscriptionsWrapped, SwarmProtocolType};
+use machine_core::types::typescript_types::{DataResult, MachineType, Role, Subscriptions, SubscriptionsWrapped, SwarmProtocolType};
+
+#[derive(Tsify, Serialize)]
+#[serde(tag = "type")]
+#[tsify(into_wasm_abi)]
+pub enum CheckResult {
+    OK,
+    ERROR { errors: Vec<String> },
+}
 
 #[wasm_bindgen]
 pub fn check_swarm(proto: SwarmProtocolType, subs: SubscriptionsWrapped) -> CheckResult {

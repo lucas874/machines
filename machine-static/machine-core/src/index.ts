@@ -1,10 +1,10 @@
 import {
-  ProtocolType, SwarmLabel, MachineLabel, CheckResult, MachineType, SwarmProtocolType, SubscriptionsWrapped as Subscriptions,
+  ProtocolType, SwarmLabel, MachineLabel, MachineType, SwarmProtocolType, SubscriptionsWrapped as Subscriptions,
   Role, EventType, DataResult, Granularity, InterfacingProtocols, exact_well_formed_sub, overapproximated_well_formed_sub,
   projection_information, project as wasm_project, compose_protocols, ProjectionInfo, BranchMap, SpecialEventTypes, ProjToMachineStates
 } from '../pkg/machine_core.js'
 export { ProtocolType, SwarmLabel, MachineLabel, SwarmProtocolType, MachineType, Subscriptions, Role, EventType,
-  InterfacingProtocols, Granularity, CheckResult, DataResult,
+  InterfacingProtocols, Granularity, DataResult,
   ProjectionInfo, BranchMap, SpecialEventTypes, ProjToMachineStates }
 
 /**

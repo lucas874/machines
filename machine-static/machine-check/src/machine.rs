@@ -317,8 +317,8 @@ pub fn equivalent(left: &Graph, li: NodeId, right: &Graph, ri: NodeId) -> Vec<Er
 mod tests {
     use pretty_assertions::assert_eq;
     use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
-    use machine_core::types::typescript_types::{CheckResult, Role, Subscriptions, SubscriptionsWrapped};
-    use crate::{MachineType, SwarmProtocolType};
+    use machine_core::types::typescript_types::{Role, Subscriptions, SubscriptionsWrapped};
+    use crate::{CheckResult, MachineType, SwarmProtocolType};
     fn setup_logger() {
         fmt()
             .with_env_filter(EnvFilter::from_default_env())

@@ -1,5 +1,6 @@
-import { CheckResult, MachineType, Role, Subscriptions, SwarmProtocolType } from 'machine-core';
-import { check_swarm, check_projection, check_composed_swarm, check_composed_projection, InterfacingProtocols } from '../pkg/machine_check.js'
+import { MachineType, Role, Subscriptions, SwarmProtocolType } from 'machine-core';
+import { check_swarm, check_projection, check_composed_swarm, check_composed_projection, InterfacingProtocols, CheckResult } from '../pkg/machine_check.js'
+export { CheckResult }
 
 /**
  * Check that a swarm protocol is *well-formed* w.r.t. a subscription

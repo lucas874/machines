@@ -1,10 +1,10 @@
 use machine_check::{
-    check_swarm, composition::{check_composed_projection, check_composed_swarm}, well_formed_sub,
+    check_swarm, CheckResult, composition::{check_composed_projection, check_composed_swarm}, well_formed_sub
 };
 
 use machine_core::{
     compose_protocols, types::{
-        proto_graph::{EdgeId, Graph, NodeId,}, typescript_types::{CheckResult, Command, DataResult, EventType, Granularity, InterfacingProtocols, MachineLabel, MachineType, Role, State, StateName, Subscriptions, SubscriptionsWrapped, SwarmLabel, SwarmProtocolType, Transition}
+        proto_graph::{EdgeId, Graph, NodeId,}, typescript_types::{Command, DataResult, EventType, Granularity, InterfacingProtocols, MachineLabel, MachineType, Role, State, StateName, Subscriptions, SubscriptionsWrapped, SwarmLabel, SwarmProtocolType, Transition}
     }
 };
 use petgraph::{
