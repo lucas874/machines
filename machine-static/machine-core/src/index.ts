@@ -1,10 +1,11 @@
 import {
-  SwarmLabel, MachineLabel, CheckResult, MachineType, SwarmProtocolType, SubscriptionsWrapped as Subscriptions, 
-  Role, DataResult, Granularity, InterfacingProtocols, exact_well_formed_sub, overapproximated_well_formed_sub, 
-  projection_information, project as wasm_project, compose_protocols, ProjectionInfo, ProjToMachineStates
+  ProtocolType, SwarmLabel, MachineLabel, CheckResult, MachineType, SwarmProtocolType, SubscriptionsWrapped as Subscriptions,
+  Role, EventType, DataResult, Granularity, InterfacingProtocols, exact_well_formed_sub, overapproximated_well_formed_sub,
+  projection_information, project as wasm_project, compose_protocols, ProjectionInfo, BranchMap, SpecialEventTypes, ProjToMachineStates
 } from '../pkg/machine_core.js'
-export { SwarmLabel, MachineLabel, MachineType, SwarmProtocolType, Subscriptions, Role, CheckResult, DataResult, 
-  ProjectionInfo, InterfacingProtocols, ProjToMachineStates, Granularity }
+export { ProtocolType, SwarmLabel, MachineLabel, SwarmProtocolType, MachineType, Subscriptions, Role, EventType,
+  InterfacingProtocols, Granularity, CheckResult, DataResult,
+  ProjectionInfo, BranchMap, SpecialEventTypes, ProjToMachineStates }
 
 /**
  * Generate the smallest subscription that is well-formed w.r.t. to
