@@ -131,7 +131,7 @@ pub fn equivalent(left: &OptionGraph, li: NodeId, right: &OptionGraph, ri: NodeI
 mod tests {
     use super::*;
     use machine_core::{
-        subscription::{exact, overapproximation}, types::{
+        types::{
             projection::Graph, typescript_types::{
                 Command, DataResult, EventType, Granularity, InterfacingProtocols, MachineType, Role, StateName, Subscriptions, SubscriptionsWrapped, SwarmProtocolType, Transition
             }
@@ -593,10 +593,11 @@ mod tests {
     fn test_equivalent_2() {
         setup_logger();
         let proto = get_proto1();
-        let result_subs =
-            exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
-        assert!(result_subs.is_ok());
-        let subs = result_subs.unwrap();
+        let subs =
+            match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), SubscriptionsWrapped(BTreeMap::new())) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data
+            };
         let role = Role::new("FL");
         let (left, left_initial, _) =
             match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
@@ -670,10 +671,11 @@ mod tests {
     fn test_equivalent_3() {
         setup_logger();
         let proto = get_proto2();
-        let result_subs =
-            exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
-        assert!(result_subs.is_ok());
-        let subs = result_subs.unwrap();
+        let subs =
+            match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), SubscriptionsWrapped(BTreeMap::new())) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data
+            };
         let role = Role::new("F");
         let (proj, proj_initial, _) =
             match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
@@ -725,13 +727,14 @@ mod tests {
     fn test_equivalent_4() {
         setup_logger();
         let protos = get_interfacing_swarms_1();
-        let result_subs = overapproximation::overapprox_well_formed_sub(
+        let subs = match machine_core::overapproximated_well_formed_sub(
             protos.clone(),
-            &BTreeMap::from([(Role::new("T"), BTreeSet::from([EventType::new("car")]))]),
+            SubscriptionsWrapped(BTreeMap::from([(Role::new("T"), BTreeSet::from([EventType::new("car")]))])),
             Granularity::Coarse,
-        );
-        assert!(result_subs.is_ok());
-        let subs = result_subs.unwrap();
+        ) {
+            DataResult::ERROR { errors: _ } => panic!(),
+            DataResult::OK { data } => data,
+        };
 
         let role = Role::new("T");
         let (proj, proj_initial, _) =
@@ -835,10 +838,11 @@ mod tests {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let result_subs =
-            exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
-        assert!(result_subs.is_ok());
-        let subs = result_subs.unwrap();
+        let subs =
+            match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), SubscriptionsWrapped(BTreeMap::new())) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data
+            };
         let role = Role::new("FL");
         let (left, left_initial, _) =
             match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
@@ -913,10 +917,11 @@ mod tests {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let result_subs =
-            exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
-        assert!(result_subs.is_ok());
-        let subs = result_subs.unwrap();
+        let subs =
+            match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), SubscriptionsWrapped(BTreeMap::new())) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data
+            };
         let role = Role::new("FL");
         let (left, left_initial, _) =
             match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
@@ -991,10 +996,11 @@ mod tests {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let result_subs =
-            exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
-        assert!(result_subs.is_ok());
-        let subs = result_subs.unwrap();
+        let subs =
+            match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), SubscriptionsWrapped(BTreeMap::new())) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data
+            };
         let role = Role::new("FL");
         let (left, left_initial, _) =
             match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
@@ -1070,10 +1076,11 @@ mod tests {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let result_subs =
-            exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
-        assert!(result_subs.is_ok());
-        let subs = result_subs.unwrap();
+        let subs =
+            match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), SubscriptionsWrapped(BTreeMap::new())) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data
+            };
         let role = Role::new("FL");
         let (left, left_initial, _) =
             match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
