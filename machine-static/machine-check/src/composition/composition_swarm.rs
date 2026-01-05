@@ -1,4 +1,4 @@
-use machine_core::errors::composition_errors::{Error, ErrorReport};
+use machine_core::errors::{swarm_errors::{Error, ErrorReport}};
 use machine_core::types::{
     typescript_types::{EventType, Role, Subscriptions, EventLabel, InterfacingProtocols,},
     proto_info::{ProtoStruct, ProtoInfo, UnordEventPair, unord_event_pair}
@@ -97,9 +97,7 @@ fn well_formed(
             // Causal consistency
             // Check if role subscribes to own emitted event.
             if !sub(&edge.weight().role).contains(&event_type) {
-                errors.push(Error::SwarmError(
-                    machine_core::errors::swarm_errors::Error::ActiveRoleNotSubscribed(edge.id()),
-                ));
+                errors.push(Error::ActiveRoleNotSubscribed(edge.id()));
             }
 
             // Causal consistency
@@ -113,12 +111,11 @@ fn well_formed(
                 &proto_info.concurrent_events,
             ) {
                 if !sub(&successor.role).contains(&event_type) {
-                    errors.push(Error::SwarmError(
-                        machine_core::errors::swarm_errors::Error::LaterActiveRoleNotSubscribed(
-                            edge.id(),
-                            successor.role,
+                    errors.push(Error::LaterActiveRoleNotSubscribed(
+                        edge.id(),
+                        successor.role,
                         ),
-                    ));
+                    );
                 }
             }
 
@@ -274,7 +271,6 @@ fn all_roles_sub_to_same(
 
 #[cfg(test)]
 mod tests {
-    use machine_core::errors::composition_errors;
     use machine_core::types::typescript_types::SwarmProtocolType;
 
     use super::*;
@@ -483,7 +479,7 @@ mod tests {
         use std::collections::BTreeMap;
 
         use super::*;
-        use machine_core::types::typescript_types::{DataResult, SubscriptionsWrapped};
+        use machine_core::{errors::swarm_errors, types::typescript_types::{DataResult, SubscriptionsWrapped}};
         // Tests relating to well-formedness checking.
         #[test]
         fn test_wf_ok() {
@@ -544,7 +540,7 @@ mod tests {
                 (Role::new("FL"), BTreeSet::from([EventType::new("partID")])),
             ]);
             let error_report = check(input, &subs);
-            let mut errors = composition_errors::error_report_to_strings(error_report);
+            let mut errors = swarm_errors::error_report_to_strings(error_report);
             errors.sort();
             let mut expected_errors = vec![
                 "active role does not subscribe to any of its emitted event types in transition (0)--[close@D<time>]-->(3)",
@@ -563,7 +559,7 @@ mod tests {
 
             let input: InterfacingProtocols = InterfacingProtocols(vec![get_proto2()]);
             let error_report = check(input, &get_subs3());
-            let mut errors = composition_errors::error_report_to_strings(error_report);
+            let mut errors = swarm_errors::error_report_to_strings(error_report);
             errors.sort();
             let mut expected_errors = vec![
                 "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
@@ -578,7 +574,7 @@ mod tests {
             let input: InterfacingProtocols = InterfacingProtocols(vec![get_proto3()]);
 
             let error_report = check(input, &get_subs1());
-            let mut errors = composition_errors::error_report_to_strings(error_report);
+            let mut errors = swarm_errors::error_report_to_strings(error_report);
             errors.sort();
             let mut expected_errors = vec![
                 "active role does not subscribe to any of its emitted event types in transition (0)--[observe@TR<report1>]-->(1)",
@@ -607,7 +603,7 @@ mod tests {
                 (Role::new("F"), BTreeSet::from([EventType::new("part")])),
             ]);
             let error_report = check(input, &subs);
-            let mut errors = composition_errors::error_report_to_strings(error_report);
+            let mut errors = swarm_errors::error_report_to_strings(error_report);
             errors.sort();
             let mut expected_errors = vec![
                 "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
@@ -639,7 +635,7 @@ mod tests {
             assert!(error_report.is_empty());
 
             let error_report = check(get_fail_1_swarms(), &BTreeMap::new());
-            let mut errors = composition_errors::error_report_to_strings(error_report);
+            let mut errors = swarm_errors::error_report_to_strings(error_report);
             errors.sort();
             let mut expected_errors = vec![
                 "active role does not subscribe to any of its emitted event types in transition (456 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(456 || 460)",
@@ -681,7 +677,7 @@ mod tests {
                 s.remove(&EventType::new("report1"));
             });
             let error_report = check(composition.clone(), &subs_composition);
-            let mut errors = composition_errors::error_report_to_strings(error_report);
+            let mut errors = swarm_errors::error_report_to_strings(error_report);
             let mut expected_errors = vec![
                 "role F does not subscribe to event types report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)",
                 "subsequently active role F does not subscribe to events in transition (0 || 2 || 0)--[observe@TR<report1>]-->(0 || 2 || 1)",

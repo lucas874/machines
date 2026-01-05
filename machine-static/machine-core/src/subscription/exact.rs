@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use petgraph::{Direction::{Incoming, Outgoing}, visit::{Dfs, EdgeRef, Walker}};
 
-use crate::{errors::composition_errors::ErrorReport, types::{proto_graph::{Graph, NodeId}, proto_info::{ProtoInfo, ProtoStruct, UnordEventPair}, typescript_types::{EventLabel, EventType, InterfacingProtocols, Role, Subscriptions}}};
+use crate::{errors::swarm_errors::ErrorReport, types::{proto_graph::{Graph, NodeId}, proto_info::{ProtoInfo, ProtoStruct, UnordEventPair}, typescript_types::{EventLabel, EventType, InterfacingProtocols, Role, Subscriptions}}};
 use crate::types::{proto_graph, proto_info};
 
 // Construct a wf-subscription by constructing the composition of all protocols in protos and analyzing the result

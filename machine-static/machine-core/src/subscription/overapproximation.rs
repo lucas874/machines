@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{errors::composition_errors::ErrorReport, types::{proto_info::ProtoInfo, typescript_types::{EventLabel, EventType, Granularity, InterfacingProtocols, Role, Subscriptions}}};
+use crate::{errors::swarm_errors::ErrorReport, types::{proto_info::ProtoInfo, typescript_types::{EventLabel, EventType, Granularity, InterfacingProtocols, Role, Subscriptions}}};
 use crate::{types::proto_info, util};
 
 // Construct wf-subscription compositionally.

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use petgraph::visit::EdgeRef;
 
-use crate::{errors::composition_errors::Error, types::{proto_graph::EdgeId, proto_info::{ProtoInfo, ProtoStruct}, typescript_types::{Command, EventLabel, EventType}}};
+use crate::{errors::swarm_errors::Error, types::{proto_graph::EdgeId, proto_info::{ProtoInfo, ProtoStruct}, typescript_types::{Command, EventLabel, EventType}}};
 
 // Retrieve a graph or return an error.
 macro_rules! get_ith_or_error {

@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use itertools::Itertools;
 use petgraph::Directed;
-use crate::errors::composition_errors::{Error, ErrorReport};
+use crate::errors::swarm_errors::{Error, ErrorReport};
 use crate::types::proto_graph;
 use crate::types::proto_label::ProtoLabel;
 use crate::types::typescript_types::{Command, EventLabel, InterfacingProtocols, Subscriptions, SwarmProtocolType};
@@ -722,7 +722,7 @@ pub fn compose_protocols(protos: InterfacingProtocols) -> Result<(Graph, NodeId)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::errors::composition_errors;
+    use crate::errors::swarm_errors;
     use crate::test_utils;
 
     #[test]
@@ -850,7 +850,7 @@ mod tests {
 
         // The IR1 not used as an interface refers to the composition of (p || proto3) where p = (proto1 || proto2)
         let expected_errors = vec!["Event type i1 appears as i1@IR1<i1> and as c@R3<i1>"];
-        let mut errors = composition_errors::error_report_to_strings(proto_info_to_error_report(combined_proto_info));
+        let mut errors = swarm_errors::error_report_to_strings(proto_info_to_error_report(combined_proto_info));
         errors.sort();
         assert_eq!(expected_errors, errors);
 
@@ -899,7 +899,7 @@ mod tests {
 
         // The IR1 not used as an interface refers to the composition of (p || proto3) where p = (proto1 || proto2)
         let expected_errors = vec!["Event type i4 appears as i4@IR2<i4> and as i5@IR2<i4>"];
-        let mut errors = composition_errors::error_report_to_strings(proto_info_to_error_report(combined_proto_info));
+        let mut errors = swarm_errors::error_report_to_strings(proto_info_to_error_report(combined_proto_info));
         errors.sort();
         assert_eq!(expected_errors, errors);
     }

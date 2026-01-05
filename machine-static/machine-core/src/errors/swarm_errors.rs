@@ -1,14 +1,11 @@
 use itertools::Itertools;
 use std::collections::BTreeSet;
 
-use crate::types::{proto_graph::{EdgeId, NodeId}, typescript_types::{EventType, Role, StateName, SwarmLabel}};
+use crate::types::{proto_graph::{EdgeId, Graph, NodeId}, typescript_types::{Command, EventType, Role, StateName, SwarmLabel}};
 use super::{Edge, INVALID_EDGE};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Error {
-    InitialStateDisconnected,
-    StateUnreachable(NodeId),
-    LogTypeEmpty(EdgeId),
     ActiveRoleNotSubscribed(EdgeId),
     LaterActiveRoleNotSubscribed(EdgeId, Role),
     LaterInvolvedRoleMoreSubscribed {
@@ -21,23 +18,24 @@ pub enum Error {
     NonDeterministicGuard(EdgeId),
     NonDeterministicCommand(EdgeId),
     GuardNotInvariant(EventType),
+    RoleNotSubscribedToBranch(Vec<EventType>, EdgeId, NodeId, Role),
+    RoleNotSubscribedToJoin(Vec<EventType>, EdgeId, Role),
+    LoopingError(EdgeId, Vec<Role>),
+    //StructuralError(super::composition_errors::Error),
+    EventTypeOnDifferentLabels(EventType, Command, Role, Command, Role),
+    CommandOnDifferentLabels(Command, EventType, Role, EventType, Role),
+    MoreThanOneEventTypeInCommand(EdgeId),
+    EventEmittedMultipleTimes(EventType, Vec<EdgeId>),
+    CommandOnMultipleTransitions(Command, Vec<EdgeId>),
+    InitialStateDisconnected,
+    StateUnreachable(NodeId),
+    LogTypeEmpty(EdgeId),
+    InvalidArg, // weird error. not related to shape of protocol, but ok.
 }
 
 impl Error {
     fn to_string<N: StateName>(&self, graph: &petgraph::Graph<N, SwarmLabel>) -> String {
         match self {
-            Error::InitialStateDisconnected => {
-                format!("initial swarm protocol state has no transitions")
-            }
-            Error::StateUnreachable(node) => {
-                format!(
-                    "state {} is unreachable from initial state",
-                    &graph[*node].state_name()
-                )
-            }
-            Error::LogTypeEmpty(edge) => {
-                format!("log type must not be empty {}", Edge(graph, *edge))
-            }
             Error::ActiveRoleNotSubscribed(edge) => {
                 format!("active role does not subscribe to any of its emitted event types in transition {}", Edge(graph, *edge))
             }
@@ -83,6 +81,70 @@ impl Error {
             Error::GuardNotInvariant(ev) => {
                 format!("guard event type {ev} appears in transitions from multiple states")
             }
+            Error::RoleNotSubscribedToBranch(event_types, edge, node, role) => {
+                let events = event_types.join(", ");
+                format!(
+                    "role {role} does not subscribe to event types {events} in branching transitions at state {}, but is involved after transition {}",
+                    &graph[*node].state_name(),
+                    Edge(graph, *edge)
+                )
+            }
+            Error::RoleNotSubscribedToJoin(preceding_events, edge, role) => {
+                let events = preceding_events.join(", ");
+                format!(
+                    "role {role} does not subscribe to event types {events} leading to or in joining event in transition {}",
+                    Edge(graph, *edge),
+                )
+            }
+            Error::LoopingError(edge, roles) => {
+                format!(
+                    "transition {} is part of loop that can not reach a terminal state, but no looping event type in the loop is subscribed to by roles {} involved in the loop",
+                    Edge(graph, *edge),
+                    roles.join(", ")
+                )
+            }
+//            Error::StructuralError(e) => super::composition_errors::Error::convert(&graph)(e.clone()),
+            Error::EventTypeOnDifferentLabels(event_type, command1, role1, command2, role2) => {
+                format!("Event type {event_type} appears as {command1}@{role1}<{event_type}> and as {command2}@{role2}<{event_type}>")
+            }
+            Error::CommandOnDifferentLabels(command, event_type1, role1, event_type2, role2) => {
+                format!("Command {command} appears as {command}@{role1}<{event_type1}> and as {command}@{role2}<{event_type2}>")
+            }
+            Error::MoreThanOneEventTypeInCommand(edge) => {
+                format!(
+                    "transition {} emits more than one event type",
+                    Edge(graph, *edge)
+                )
+            }
+            Error::EventEmittedMultipleTimes(event_type, edges) => {
+                let edges_pretty = edges.iter().map(|edge| Edge(graph, *edge)).join(", ");
+                format!(
+                    "event type {event_type} emitted in more than one transition: {}",
+                    edges_pretty
+                )
+            }
+            Error::CommandOnMultipleTransitions(command, edges) => {
+                let edges_pretty = edges.iter().map(|edge| Edge(graph, *edge)).join(", ");
+                format!(
+                    "command {command} enabled in more than one transition: {}",
+                    edges_pretty
+                )
+            }
+            Error::InitialStateDisconnected => {
+                format!("initial swarm protocol state has no transitions")
+            }
+            Error::StateUnreachable(node) => {
+                format!(
+                    "state {} is unreachable from initial state",
+                    &graph[*node].state_name()
+                )
+            }
+            Error::LogTypeEmpty(edge) => {
+                format!("log type must not be empty {}", Edge(graph, *edge))
+            }
+            Error::InvalidArg => {
+                format!("invalid argument",)
+            }
         }
     }
 
@@ -91,4 +153,26 @@ impl Error {
     ) -> impl Fn(Error) -> String + '_ {
         |err| err.to_string(graph)
     }
+}
+
+// Container for errors accumulated while processing protocols
+#[derive(Debug)]
+pub struct ErrorReport(pub Vec<(Graph, Vec<Error>)>);
+
+impl ErrorReport {
+    pub fn is_empty(&self) -> bool {
+        self.0.iter().all(|(_, es)| es.is_empty())
+    }
+
+    pub fn errors(&self) -> Vec<(Graph, Vec<Error>)> {
+        self.0.clone()
+    }
+}
+
+pub fn error_report_to_strings(error_report: ErrorReport) -> Vec<String> {
+    error_report
+        .errors()
+        .into_iter()
+        .flat_map(|(g, e)| e.into_iter().map(Error::convert(&g)).collect::<Vec<_>>())
+        .collect()
 }

@@ -1,68 +1,34 @@
-use itertools::Itertools;
+/* use itertools::Itertools;
 
 use crate::types::{proto_graph::{EdgeId, NodeId}, typescript_types::{Command, EventType, Role, State, StateName, SwarmLabel}};
 use super::Edge;
 
+pub trait SummarizeError {
+    fn to_string<N: StateName>(&self, graph: &petgraph::Graph<N, SwarmLabel>) -> String;
+    fn convert<N: StateName>(graph: &petgraph::Graph<N, SwarmLabel>) -> impl Fn(Error) -> String + '_;
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Error {
-    SwarmError(super::swarm_errors::Error),
-    SwarmErrorString(String), // bit ugly but instead of making prepare graph public or making another from_json returning Error type in swarm.rs
-    InvalidInterfaceRole(Role),
-    InterfaceEventNotInBothProtocols(EventType),
-    SpuriousInterface(Command, EventType, Role),
     EventTypeOnDifferentLabels(EventType, Command, Role, Command, Role),
     CommandOnDifferentLabels(Command, EventType, Role, EventType, Role),
-    RoleNotSubscribedToBranch(Vec<EventType>, EdgeId, NodeId, Role),
-    RoleNotSubscribedToJoin(Vec<EventType>, EdgeId, Role),
-    LoopingError(EdgeId, Vec<Role>),
     MoreThanOneEventTypeInCommand(EdgeId),
     EventEmittedMultipleTimes(EventType, Vec<EdgeId>),
     CommandOnMultipleTransitions(Command, Vec<EdgeId>),
-    StateCanNotReachTerminal(NodeId),
+    InitialStateDisconnected,
+    StateUnreachable(NodeId),
+    LogTypeEmpty(EdgeId),
     InvalidArg, // weird error. not related to shape of protocol, but ok.
 }
 
 impl Error {
     fn to_string<N: StateName>(&self, graph: &petgraph::Graph<N, SwarmLabel>) -> String {
         match self {
-            Error::SwarmError(e) => super::swarm_errors::Error::convert(&graph)(e.clone()),
-            Error::SwarmErrorString(s) => s.clone(),
-            Error::InvalidInterfaceRole(role) => {
-                format!("role {role} can not be used as interface")
-            }
-            Error::InterfaceEventNotInBothProtocols(event_type) => {
-                format!("event type {event_type} does not appear in both protocols")
-            }
-            Error::SpuriousInterface(command, event_type, role) => {
-                format!("Role {role} is not used as an interface, but the command {command} or the event type {event_type} appear in both protocols")
-            }
             Error::EventTypeOnDifferentLabels(event_type, command1, role1, command2, role2) => {
                 format!("Event type {event_type} appears as {command1}@{role1}<{event_type}> and as {command2}@{role2}<{event_type}>")
             }
             Error::CommandOnDifferentLabels(command, event_type1, role1, event_type2, role2) => {
                 format!("Command {command} appears as {command}@{role1}<{event_type1}> and as {command}@{role2}<{event_type2}>")
-            }
-            Error::RoleNotSubscribedToBranch(event_types, edge, node, role) => {
-                let events = event_types.join(", ");
-                format!(
-                    "role {role} does not subscribe to event types {events} in branching transitions at state {}, but is involved after transition {}",
-                    &graph[*node].state_name(),
-                    Edge(graph, *edge)
-                )
-            }
-            Error::RoleNotSubscribedToJoin(preceding_events, edge, role) => {
-                let events = preceding_events.join(", ");
-                format!(
-                    "role {role} does not subscribe to event types {events} leading to or in joining event in transition {}",
-                    Edge(graph, *edge),
-                )
-            }
-            Error::LoopingError(edge, roles) => {
-                format!(
-                    "transition {} is part of loop that can not reach a terminal state, but no looping event type in the loop is subscribed to by roles {} involved in the loop",
-                    Edge(graph, *edge),
-                    roles.join(", ")
-                )
             }
             Error::MoreThanOneEventTypeInCommand(edge) => {
                 format!(
@@ -84,11 +50,17 @@ impl Error {
                     edges_pretty
                 )
             }
-            Error::StateCanNotReachTerminal(node) => {
+            Error::InitialStateDisconnected => {
+                format!("initial swarm protocol state has no transitions")
+            }
+            Error::StateUnreachable(node) => {
                 format!(
-                    "state {} can not reach terminal node",
+                    "state {} is unreachable from initial state",
                     &graph[*node].state_name()
                 )
+            }
+            Error::LogTypeEmpty(edge) => {
+                format!("log type must not be empty {}", Edge(graph, *edge))
             }
             Error::InvalidArg => {
                 format!("invalid argument",)
@@ -123,4 +95,4 @@ pub fn error_report_to_strings(error_report: ErrorReport) -> Vec<String> {
         .into_iter()
         .flat_map(|(g, e)| e.into_iter().map(Error::convert(&g)).collect::<Vec<_>>())
         .collect()
-}
+} */
