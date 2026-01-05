@@ -1,4 +1,4 @@
-use machine_check::{check_swarm, composition::check_composed_swarm, well_formed_sub, CheckResult};
+use machine_check::{check_swarm, check_composed_swarm, well_formed_sub, CheckResult};
 
 use machine_core::types::typescript_types::{
     DataResult, EventType, Granularity, InterfacingProtocols, Role, State, Subscriptions,

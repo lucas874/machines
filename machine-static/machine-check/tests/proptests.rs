@@ -1,6 +1,7 @@
 use machine_check::{
     check_swarm,
-    composition::{check_composed_projection, check_composed_swarm},
+    check_composed_projection,
+    check_composed_swarm,
     well_formed_sub, CheckResult,
 };
 
