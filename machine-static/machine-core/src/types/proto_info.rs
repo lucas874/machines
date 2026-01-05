@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use itertools::Itertools;
 use petgraph::Directed;
-use crate::errors::swarm_errors::{Error, ErrorReport};
+use crate::errors::{Error, ErrorReport};
 use crate::types::proto_graph;
 use crate::types::proto_label::ProtoLabel;
 use crate::types::typescript_types::{Command, EventLabel, InterfacingProtocols, Subscriptions, SwarmProtocolType};

@@ -1,4 +1,4 @@
-use machine_core::errors::{swarm_errors::{Error, ErrorReport}};
+use machine_core::errors::{Error, ErrorReport};
 use machine_core::types::{
     typescript_types::{EventType, Role, Subscriptions, EventLabel, InterfacingProtocols,},
     proto_info::{ProtoStruct, ProtoInfo, UnordEventPair, unord_event_pair}

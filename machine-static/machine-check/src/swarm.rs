@@ -3,7 +3,7 @@ use machine_core::{
         typescript_types::{EventType, Role, State, StateName, SwarmLabel, Subscriptions, SwarmProtocolType},
         proto_graph::{EdgeId, NodeId}
     },
-    errors::swarm_errors::Error,
+    errors::Error,
 };
 use crate::{
     MapVec
