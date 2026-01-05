@@ -1,5 +1,5 @@
 use machine_core::types::typescript_types::{InterfacingProtocols, SubscriptionsWrapped};
-use machine_core::{errors::swarm_errors, types::proto_info};
+use machine_core::types::proto_info;
 use super::*;
 
 mod composition_machine;
@@ -12,7 +12,7 @@ pub fn check_composed_swarm(protos: InterfacingProtocols, subs: SubscriptionsWra
         CheckResult::OK
     } else {
         CheckResult::ERROR {
-            errors: swarm_errors::error_report_to_strings(error_report),
+            errors: error_report.to_strings(),
         }
     }
 }
@@ -27,7 +27,7 @@ pub fn check_composed_projection(
     let proto_info = proto_info::swarms_to_proto_info(protos.clone());
     if !proto_info.no_errors() {
         return CheckResult::ERROR {
-            errors: swarm_errors::error_report_to_strings(proto_info::proto_info_to_error_report(proto_info)),
+            errors: proto_info.to_error_report().to_strings(),
         };
     }
     let proj_machine = match machine_core::project(protos, subs, role.clone(), false, false) {

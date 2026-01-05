@@ -36,7 +36,7 @@ pub fn check(protos: InterfacingProtocols, subs: &Subscriptions) -> ErrorReport 
     let _span = tracing::info_span!("check").entered();
     let combined_proto_info = proto_info::swarms_to_proto_info(protos);
     if !combined_proto_info.no_errors() {
-        return proto_info::proto_info_to_error_report(combined_proto_info);
+        return combined_proto_info.to_error_report();
     }
 
     // If we reach this point the protocols can interface and are all confusion free.
@@ -45,8 +45,7 @@ pub fn check(protos: InterfacingProtocols, subs: &Subscriptions) -> ErrorReport 
     // and the succeeding_events field updated using the expanded composition.
     let composition = proto_info::explicit_composition_proto_info(combined_proto_info);
     let composition_checked = well_formed_proto_info(composition, subs);
-
-    proto_info::proto_info_to_error_report(composition_checked)
+    composition_checked.to_error_report()
 }
 
 // Perform wf checks on every protocol in a ProtoInfo.
@@ -479,7 +478,7 @@ mod tests {
         use std::collections::BTreeMap;
 
         use super::*;
-        use machine_core::{errors::swarm_errors, types::typescript_types::{DataResult, SubscriptionsWrapped}};
+        use machine_core::{types::typescript_types::{DataResult, SubscriptionsWrapped}};
         // Tests relating to well-formedness checking.
         #[test]
         fn test_wf_ok() {
@@ -540,7 +539,7 @@ mod tests {
                 (Role::new("FL"), BTreeSet::from([EventType::new("partID")])),
             ]);
             let error_report = check(input, &subs);
-            let mut errors = swarm_errors::error_report_to_strings(error_report);
+            let mut errors = error_report.to_strings();
             errors.sort();
             let mut expected_errors = vec![
                 "active role does not subscribe to any of its emitted event types in transition (0)--[close@D<time>]-->(3)",
@@ -559,7 +558,7 @@ mod tests {
 
             let input: InterfacingProtocols = InterfacingProtocols(vec![get_proto2()]);
             let error_report = check(input, &get_subs3());
-            let mut errors = swarm_errors::error_report_to_strings(error_report);
+            let mut errors = error_report.to_strings();
             errors.sort();
             let mut expected_errors = vec![
                 "active role does not subscribe to any of its emitted event types in transition (0)--[request@T<partID>]-->(1)",
@@ -574,7 +573,7 @@ mod tests {
             let input: InterfacingProtocols = InterfacingProtocols(vec![get_proto3()]);
 
             let error_report = check(input, &get_subs1());
-            let mut errors = swarm_errors::error_report_to_strings(error_report);
+            let mut errors = error_report.to_strings();
             errors.sort();
             let mut expected_errors = vec![
                 "active role does not subscribe to any of its emitted event types in transition (0)--[observe@TR<report1>]-->(1)",
@@ -603,7 +602,7 @@ mod tests {
                 (Role::new("F"), BTreeSet::from([EventType::new("part")])),
             ]);
             let error_report = check(input, &subs);
-            let mut errors = swarm_errors::error_report_to_strings(error_report);
+            let mut errors = error_report.to_strings();
             errors.sort();
             let mut expected_errors = vec![
                 "active role does not subscribe to any of its emitted event types in transition (0 || 0)--[request@T<partID>]-->(1 || 1)",
@@ -635,7 +634,7 @@ mod tests {
             assert!(error_report.is_empty());
 
             let error_report = check(get_fail_1_swarms(), &BTreeMap::new());
-            let mut errors = swarm_errors::error_report_to_strings(error_report);
+            let mut errors = error_report.to_strings();
             errors.sort();
             let mut expected_errors = vec![
                 "active role does not subscribe to any of its emitted event types in transition (456 || 459)--[R455_cmd_0@R455<R455_e_0>]-->(456 || 460)",
@@ -677,7 +676,7 @@ mod tests {
                 s.remove(&EventType::new("report1"));
             });
             let error_report = check(composition.clone(), &subs_composition);
-            let mut errors = swarm_errors::error_report_to_strings(error_report);
+            let mut errors = error_report.to_strings();
             let mut expected_errors = vec![
                 "role F does not subscribe to event types report1 leading to or in joining event in transition (0 || 2 || 1)--[build@F<car>]-->(0 || 3 || 2)",
                 "subsequently active role F does not subscribe to events in transition (0 || 2 || 0)--[observe@TR<report1>]-->(0 || 2 || 1)",

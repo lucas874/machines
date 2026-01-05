@@ -176,6 +176,18 @@ impl ProtoInfo {
             .map(|(c, t, r)| (c, (t, r)))
             .collect()
     }
+
+    // Consumes the proto info instance to create an error report.
+    pub fn to_error_report(self) -> ErrorReport {
+        ErrorReport(
+            self
+                .protocols
+                .into_iter()
+                .map(|p| (p.graph, p.errors))
+                .chain([(Graph::new(), self.interface_errors)]) // NO!!! Why not?
+                .collect(),
+        )
+    }
 }
 
 // Overapproximate concurrent events.
@@ -628,18 +640,6 @@ pub fn roles_on_path(
         .collect()
 }
 
-pub fn proto_info_to_error_report(proto_info: ProtoInfo) -> ErrorReport {
-    let _span = tracing::info_span!("proto_info_to_error_report").entered();
-    ErrorReport(
-        proto_info
-            .protocols
-            .into_iter()
-            .map(|p| (p.graph, p.errors))
-            .chain([(Graph::new(), proto_info.interface_errors)]) // NO!!! Why not?
-            .collect(),
-    )
-}
-
 pub fn explicit_composition_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
     let _span = tracing::info_span!("explicit_composition_proto_info").entered();
     let (composed, composed_initial) = explicit_composition(&proto_info);
@@ -709,7 +709,7 @@ pub fn compose_protocols(protos: InterfacingProtocols) -> Result<(Graph, NodeId)
     let _span = tracing::info_span!("compose_protocols").entered();
     let combined_proto_info = swarms_to_proto_info(protos);
     if !combined_proto_info.no_errors() {
-        return Err(proto_info_to_error_report(combined_proto_info));
+        return Err(combined_proto_info.to_error_report());
     }
 
     let p = explicit_composition_proto_info(combined_proto_info)
@@ -722,7 +722,6 @@ pub fn compose_protocols(protos: InterfacingProtocols) -> Result<(Graph, NodeId)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::errors::swarm_errors;
     use crate::test_utils;
 
     #[test]
@@ -850,7 +849,7 @@ mod tests {
 
         // The IR1 not used as an interface refers to the composition of (p || proto3) where p = (proto1 || proto2)
         let expected_errors = vec!["Event type i1 appears as i1@IR1<i1> and as c@R3<i1>"];
-        let mut errors = swarm_errors::error_report_to_strings(proto_info_to_error_report(combined_proto_info));
+        let mut errors = combined_proto_info.to_error_report().to_strings();
         errors.sort();
         assert_eq!(expected_errors, errors);
 
@@ -899,7 +898,7 @@ mod tests {
 
         // The IR1 not used as an interface refers to the composition of (p || proto3) where p = (proto1 || proto2)
         let expected_errors = vec!["Event type i4 appears as i4@IR2<i4> and as i5@IR2<i4>"];
-        let mut errors = swarm_errors::error_report_to_strings(proto_info_to_error_report(combined_proto_info));
+        let mut errors = combined_proto_info.to_error_report().to_strings();
         errors.sort();
         assert_eq!(expected_errors, errors);
     }
@@ -933,7 +932,7 @@ mod tests {
 
     #[test]
     fn test_empty_set_of_protocols() {
-        let error_report = proto_info_to_error_report(ProtoInfo::new_only_proto(vec![]));
+        let error_report = ProtoInfo::new_only_proto(vec![]).to_error_report();
         assert!(error_report.is_empty());
     }
 

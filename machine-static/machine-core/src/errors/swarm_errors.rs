@@ -21,7 +21,6 @@ pub enum Error {
     RoleNotSubscribedToBranch(Vec<EventType>, EdgeId, NodeId, Role),
     RoleNotSubscribedToJoin(Vec<EventType>, EdgeId, Role),
     LoopingError(EdgeId, Vec<Role>),
-    //StructuralError(super::composition_errors::Error),
     EventTypeOnDifferentLabels(EventType, Command, Role, Command, Role),
     CommandOnDifferentLabels(Command, EventType, Role, EventType, Role),
     MoreThanOneEventTypeInCommand(EdgeId),
@@ -103,7 +102,6 @@ impl Error {
                     roles.join(", ")
                 )
             }
-//            Error::StructuralError(e) => super::composition_errors::Error::convert(&graph)(e.clone()),
             Error::EventTypeOnDifferentLabels(event_type, command1, role1, command2, role2) => {
                 format!("Event type {event_type} appears as {command1}@{role1}<{event_type}> and as {command2}@{role2}<{event_type}>")
             }
@@ -167,12 +165,20 @@ impl ErrorReport {
     pub fn errors(&self) -> Vec<(Graph, Vec<Error>)> {
         self.0.clone()
     }
+
+    pub fn to_strings(&self) -> Vec<String> {
+        self
+            .errors()
+            .into_iter()
+            .flat_map(|(g, e)| e.into_iter().map(Error::convert(&g)).collect::<Vec<_>>())
+            .collect()
+    }
 }
 
-pub fn error_report_to_strings(error_report: ErrorReport) -> Vec<String> {
+/* pub fn error_report_to_strings(error_report: ErrorReport) -> Vec<String> {
     error_report
         .errors()
         .into_iter()
         .flat_map(|(g, e)| e.into_iter().map(Error::convert(&g)).collect::<Vec<_>>())
         .collect()
-}
+} */

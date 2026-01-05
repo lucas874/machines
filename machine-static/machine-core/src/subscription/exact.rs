@@ -13,7 +13,7 @@ pub fn exact_well_formed_sub(
     let _span = tracing::info_span!("exact_well_formed_sub").entered();
     let combined_proto_info = proto_info::swarms_to_proto_info(protos);
     if !combined_proto_info.no_errors() {
-        return Err(proto_info::proto_info_to_error_report(combined_proto_info));
+        return Err(combined_proto_info.to_error_report());
     }
 
     // If we reach this point the protocols can interface and are all confusion free.

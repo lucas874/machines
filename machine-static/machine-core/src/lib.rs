@@ -17,7 +17,6 @@ mod util;
 mod test_utils;
 
 use crate::subscription::{exact, overapproximation};
-use crate::errors::swarm_errors;
 
 #[wasm_bindgen]
 pub fn exact_well_formed_sub(
@@ -30,7 +29,7 @@ pub fn exact_well_formed_sub(
             data: subscriptions,
         },
         Err(error_report) => DataResult::ERROR {
-            errors: swarm_errors::error_report_to_strings(error_report),
+            errors: error_report.to_strings(),
         },
     }
 }
@@ -47,7 +46,7 @@ pub fn overapproximated_well_formed_sub(
             data: subscriptions,
         },
         Err(error_report) => DataResult::ERROR {
-            errors: swarm_errors::error_report_to_strings(error_report),
+            errors: error_report.to_strings(),
         },
     }
 }
@@ -68,7 +67,7 @@ pub fn project(
                 to_json_machine(proj, proj_initial)
             },
             Err(error_report) => return DataResult::ERROR {
-                errors: swarm_errors::error_report_to_strings(error_report),
+                errors: error_report.to_strings(),
             }
         }
     } else {
@@ -79,7 +78,7 @@ pub fn project(
                 machine::util::from_option_to_machine(proj, proj_initial.unwrap())
             },
             false => return DataResult::ERROR {
-                errors: swarm_errors::error_report_to_strings(proto_info::proto_info_to_error_report(proto_info)) }
+                errors: proto_info.to_error_report().to_strings() }
         }
     };
     DataResult::OK {
@@ -99,7 +98,7 @@ pub fn projection_information(
     let proto_info = proto_info::swarms_to_proto_info(protos);
     if !proto_info.no_errors() {
         return DataResult::ERROR {
-            errors: swarm_errors::error_report_to_strings(proto_info::proto_info_to_error_report(proto_info)),
+            errors: proto_info.to_error_report().to_strings(),
         };
     }
     let (machine, initial, m_errors) = machine::util::from_json(machine);
@@ -139,7 +138,7 @@ pub fn compose_protocols(protos: InterfacingProtocols) -> DataResult<SwarmProtoc
             data: typescript_types::to_swarm_json(graph, initial),
         },
         Err(errors) => DataResult::ERROR {
-            errors: swarm_errors::error_report_to_strings(errors),
+            errors: errors.to_strings(),
         },
     }
 }
