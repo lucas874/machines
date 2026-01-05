@@ -1,9 +1,9 @@
 use machine_core::errors::{Error, ErrorReport};
-use machine_core::types::{
-    typescript_types::{EventType, Role, Subscriptions, EventLabel, InterfacingProtocols,},
-    proto_info::{ProtoStruct, ProtoInfo, UnordEventPair, unord_event_pair}
-};
 use machine_core::types::{proto_graph, proto_info};
+use machine_core::types::{
+    proto_info::{unord_event_pair, ProtoInfo, ProtoStruct, UnordEventPair},
+    typescript_types::{EventLabel, EventType, InterfacingProtocols, Role, Subscriptions},
+};
 use petgraph::{
     visit::{Dfs, EdgeRef, Walker},
     Direction::{Incoming, Outgoing},
@@ -77,11 +77,7 @@ fn well_formed_proto_info(proto_info: ProtoInfo, subs: &Subscriptions) -> ProtoI
  *
  * Does not check confusion freeness.
  */
-fn well_formed(
-    proto_info: &ProtoInfo,
-    proto_pointer: usize,
-    subs: &Subscriptions,
-) -> Vec<Error> {
+fn well_formed(proto_info: &ProtoInfo, proto_pointer: usize, subs: &Subscriptions) -> Vec<Error> {
     let _span = tracing::info_span!("well_formed").entered();
     let mut errors = Vec::new();
     let empty = BTreeSet::new();
@@ -113,8 +109,7 @@ fn well_formed(
                     errors.push(Error::LaterActiveRoleNotSubscribed(
                         edge.id(),
                         successor.role,
-                        ),
-                    );
+                    ));
                 }
             }
 
@@ -218,15 +213,19 @@ fn well_formed(
                     .chain(
                         proto_info
                             .succeeding_events
-                        .get(&event_type)
-                        .cloned()
-                        .unwrap_or_else(|| BTreeSet::new()),
-                )
-                .collect();
+                            .get(&event_type)
+                            .cloned()
+                            .unwrap_or_else(|| BTreeSet::new()),
+                    )
+                    .collect();
 
-                let involved_roles = proto_info::roles_on_path(event_type.clone(), &proto_info, subs);
+                let involved_roles =
+                    proto_info::roles_on_path(event_type.clone(), &proto_info, subs);
                 if !all_roles_sub_to_same(t_and_after_t, &involved_roles, subs) {
-                    errors.push(Error::LoopingError(edge.id(), involved_roles.clone().into_iter().collect()));
+                    errors.push(Error::LoopingError(
+                        edge.id(),
+                        involved_roles.clone().into_iter().collect(),
+                    ));
                 }
             }
         }
@@ -245,11 +244,11 @@ fn all_roles_sub_to_same(
 ) -> bool {
     let _span = tracing::info_span!("all_roles_sub_to_same").entered();
     let empty = BTreeSet::new();
-    event_types
-        .into_iter()
-        .any(|t_|  involved_roles
+    event_types.into_iter().any(|t_| {
+        involved_roles
             .iter()
-            .all(|r| subs.get(r).unwrap_or(&empty).contains(&t_)))
+            .all(|r| subs.get(r).unwrap_or(&empty).contains(&t_))
+    })
 }
 
 /* pub fn from_json(proto: SwarmProtocolType) -> (Graph, Option<NodeId>, Vec<String>) {
@@ -478,13 +477,16 @@ mod tests {
         use std::collections::BTreeMap;
 
         use super::*;
-        use machine_core::{types::typescript_types::{DataResult, SubscriptionsWrapped}};
+        use machine_core::types::typescript_types::{DataResult, SubscriptionsWrapped};
         // Tests relating to well-formedness checking.
         #[test]
         fn test_wf_ok() {
             setup_logger();
             let proto1: InterfacingProtocols = InterfacingProtocols(vec![get_proto1()]);
-            let subs1 = match machine_core::exact_well_formed_sub(proto1.clone(), SubscriptionsWrapped(BTreeMap::new())) {
+            let subs1 = match machine_core::exact_well_formed_sub(
+                proto1.clone(),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
                 DataResult::ERROR { errors: _ } => panic!(),
                 DataResult::OK { data } => data,
             };
@@ -493,7 +495,10 @@ mod tests {
             assert_eq!(get_subs1(), subs1);
 
             let proto2: InterfacingProtocols = InterfacingProtocols(vec![get_proto2()]);
-            let subs2 = match machine_core::exact_well_formed_sub(proto2.clone(), SubscriptionsWrapped(BTreeMap::new())) {
+            let subs2 = match machine_core::exact_well_formed_sub(
+                proto2.clone(),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
                 DataResult::ERROR { errors: _ } => panic!(),
                 DataResult::OK { data } => data,
             };
@@ -502,7 +507,10 @@ mod tests {
             assert_eq!(get_subs2(), subs2);
 
             let proto3: InterfacingProtocols = InterfacingProtocols(vec![get_proto3()]);
-            let subs3 = match machine_core::exact_well_formed_sub(proto3.clone(), SubscriptionsWrapped(BTreeMap::new())) {
+            let subs3 = match machine_core::exact_well_formed_sub(
+                proto3.clone(),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
                 DataResult::ERROR { errors: _ } => panic!(),
                 DataResult::OK { data } => data,
             };
@@ -511,7 +519,10 @@ mod tests {
             assert_eq!(get_subs3(), subs3);
 
             let composition1: InterfacingProtocols = get_interfacing_swarms_1();
-            let subs_composition = match machine_core::exact_well_formed_sub(composition1.clone(), SubscriptionsWrapped(BTreeMap::new())) {
+            let subs_composition = match machine_core::exact_well_formed_sub(
+                composition1.clone(),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
                 DataResult::ERROR { errors: _ } => panic!(),
                 DataResult::OK { data } => data,
             };
@@ -520,7 +531,10 @@ mod tests {
             assert_eq!(get_subs_composition_1(), subs_composition);
 
             let composition2: InterfacingProtocols = get_interfacing_swarms_2();
-            let subs_composition = match machine_core::exact_well_formed_sub(composition2.clone(), SubscriptionsWrapped(BTreeMap::new())) {
+            let subs_composition = match machine_core::exact_well_formed_sub(
+                composition2.clone(),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
                 DataResult::ERROR { errors: _ } => panic!(),
                 DataResult::OK { data } => data,
             };
@@ -626,7 +640,10 @@ mod tests {
         #[test]
         fn test_fail1() {
             setup_logger();
-            let subs1 = match machine_core::exact_well_formed_sub(get_fail_1_swarms(), SubscriptionsWrapped(BTreeMap::new())) {
+            let subs1 = match machine_core::exact_well_formed_sub(
+                get_fail_1_swarms(),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
                 DataResult::ERROR { errors: _ } => panic!(),
                 DataResult::OK { data } => data,
             };
@@ -659,7 +676,10 @@ mod tests {
         fn test_join_errors() {
             setup_logger();
             let composition: InterfacingProtocols = get_interfacing_swarms_2();
-            let mut subs_composition = match machine_core::exact_well_formed_sub(composition.clone(), SubscriptionsWrapped(BTreeMap::new())) {
+            let mut subs_composition = match machine_core::exact_well_formed_sub(
+                composition.clone(),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
                 DataResult::ERROR { errors: _ } => panic!(),
                 DataResult::OK { data } => data,
             };
@@ -730,7 +750,10 @@ mod tests {
             }
 
             assert!(check(as_interfacing_protocols(), &subs()).is_empty());
-            let smallest_sub = match machine_core::exact_well_formed_sub(as_interfacing_protocols(), SubscriptionsWrapped(BTreeMap::new())) {
+            let smallest_sub = match machine_core::exact_well_formed_sub(
+                as_interfacing_protocols(),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
                 DataResult::ERROR { errors: _ } => panic!(),
                 DataResult::OK { data } => data,
             };
@@ -782,7 +805,10 @@ mod tests {
                 InterfacingProtocols(vec![proto1(), proto2()])
             }
             assert!(check(as_interfacing_protocols(), &subs()).is_empty());
-            let smallest_sub = match machine_core::exact_well_formed_sub(as_interfacing_protocols(), SubscriptionsWrapped(BTreeMap::new())) {
+            let smallest_sub = match machine_core::exact_well_formed_sub(
+                as_interfacing_protocols(),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
                 DataResult::ERROR { errors: _ } => panic!(),
                 DataResult::OK { data } => data,
             };
@@ -835,7 +861,10 @@ mod tests {
             }
 
             assert!(check(as_interfacing_protocols(), &subs()).is_empty());
-            let smallest_sub = match machine_core::exact_well_formed_sub(as_interfacing_protocols(), SubscriptionsWrapped(BTreeMap::new())) {
+            let smallest_sub = match machine_core::exact_well_formed_sub(
+                as_interfacing_protocols(),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
                 DataResult::ERROR { errors: _ } => panic!(),
                 DataResult::OK { data } => data,
             };
@@ -886,7 +915,10 @@ mod tests {
             }
 
             assert!(check(as_interfacing_protocols(), &subs()).is_empty());
-            let smallest_sub = match machine_core::exact_well_formed_sub(as_interfacing_protocols(), SubscriptionsWrapped(BTreeMap::new())) {
+            let smallest_sub = match machine_core::exact_well_formed_sub(
+                as_interfacing_protocols(),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
                 DataResult::ERROR { errors: _ } => panic!(),
                 DataResult::OK { data } => data,
             };
@@ -936,7 +968,10 @@ mod tests {
             }
 
             assert!(check(as_interfacing_protocols(), &subs()).is_empty());
-            let smallest_sub = match machine_core::exact_well_formed_sub(as_interfacing_protocols(), SubscriptionsWrapped(BTreeMap::new())) {
+            let smallest_sub = match machine_core::exact_well_formed_sub(
+                as_interfacing_protocols(),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
                 DataResult::ERROR { errors: _ } => panic!(),
                 DataResult::OK { data } => data,
             };
@@ -949,7 +984,9 @@ mod tests {
         use std::collections::BTreeMap;
 
         use super::*;
-        use machine_core::types::typescript_types::{DataResult, Granularity, SubscriptionsWrapped};
+        use machine_core::types::typescript_types::{
+            DataResult, Granularity, SubscriptionsWrapped,
+        };
 
         #[test]
         fn looping_1() {
@@ -970,26 +1007,34 @@ mod tests {
                 .unwrap()
             }
             // Check exact well-formed subscriptions
-            let sub =
-                match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new())) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::exact_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
 
             // Check overapprox well-formed subscriptions
-            let sub =
-                match machine_core::overapproximated_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new()), Granularity::TwoStep) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::overapproximated_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+                Granularity::TwoStep,
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
 
-            let sub =
-                match machine_core::overapproximated_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new()), Granularity::Fine) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::overapproximated_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+                Granularity::Fine,
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
         }
 
@@ -1013,26 +1058,34 @@ mod tests {
             }
 
             // Check exact well-formed subscriptions
-            let sub =
-                match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new())) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::exact_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
 
             // Check overapprox well-formed subscriptions
-            let sub =
-                match machine_core::overapproximated_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new()), Granularity::TwoStep) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::overapproximated_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+                Granularity::TwoStep,
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
 
-            let sub =
-                match machine_core::overapproximated_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new()), Granularity::Fine) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::overapproximated_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+                Granularity::Fine,
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
         }
 
@@ -1060,26 +1113,34 @@ mod tests {
             }
 
             // Check exact well-formed subscriptions
-            let sub =
-                match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new())) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::exact_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
 
             // Check overapprox well-formed subscriptions
-            let sub =
-                match machine_core::overapproximated_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new()), Granularity::TwoStep) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::overapproximated_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+                Granularity::TwoStep,
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
 
-            let sub =
-                match machine_core::overapproximated_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new()), Granularity::Fine) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::overapproximated_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+                Granularity::Fine,
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
         }
 
@@ -1106,26 +1167,34 @@ mod tests {
             }
 
             // Check exact well-formed subscriptions
-            let sub =
-                match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new())) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::exact_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
 
             // Check overapprox well-formed subscriptions
-            let sub =
-                match machine_core::overapproximated_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new()), Granularity::TwoStep) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::overapproximated_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+                Granularity::TwoStep,
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
 
-            let sub =
-                match machine_core::overapproximated_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new()), Granularity::Fine) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::overapproximated_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+                Granularity::Fine,
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
         }
 
@@ -1152,26 +1221,34 @@ mod tests {
             }
 
             // Check exact well-formed subscriptions
-            let sub =
-                match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new())) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::exact_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
 
             // Check overapprox well-formed subscriptions
-            let sub =
-                match machine_core::overapproximated_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new()), Granularity::TwoStep) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::overapproximated_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+                Granularity::TwoStep,
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
 
-            let sub =
-                match machine_core::overapproximated_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new()), Granularity::Fine) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::overapproximated_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+                Granularity::Fine,
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
         }
 
@@ -1196,26 +1273,34 @@ mod tests {
             }
 
             // Check exact well-formed subscriptions
-            let sub =
-                match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new())) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::exact_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
 
             // Check overapprox well-formed subscriptions
-            let sub =
-                match machine_core::overapproximated_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new()), Granularity::TwoStep) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::overapproximated_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+                Granularity::TwoStep,
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
 
-            let sub =
-                match machine_core::overapproximated_well_formed_sub(InterfacingProtocols(vec![proto1()]), SubscriptionsWrapped(BTreeMap::new()), Granularity::Fine) {
-                    DataResult::ERROR { errors: _ } => panic!(),
-                    DataResult::OK { data } => data,
-                };
+            let sub = match machine_core::overapproximated_well_formed_sub(
+                InterfacingProtocols(vec![proto1()]),
+                SubscriptionsWrapped(BTreeMap::new()),
+                Granularity::Fine,
+            ) {
+                DataResult::ERROR { errors: _ } => panic!(),
+                DataResult::OK { data } => data,
+            };
             assert!(check(InterfacingProtocols(vec![proto1()]), &sub).is_empty());
         }
     }

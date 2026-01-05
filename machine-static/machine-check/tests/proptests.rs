@@ -1,11 +1,19 @@
 use machine_check::{
-    check_swarm, CheckResult, composition::{check_composed_projection, check_composed_swarm}, well_formed_sub
+    check_swarm,
+    composition::{check_composed_projection, check_composed_swarm},
+    well_formed_sub, CheckResult,
 };
 
 use machine_core::{
-    compose_protocols, types::{
-        proto_graph::{EdgeId, Graph, NodeId,}, typescript_types::{Command, DataResult, EventType, Granularity, InterfacingProtocols, MachineLabel, MachineType, Role, State, StateName, Subscriptions, SubscriptionsWrapped, SwarmLabel, SwarmProtocolType, Transition}
-    }
+    compose_protocols,
+    types::{
+        proto_graph::{EdgeId, Graph, NodeId},
+        typescript_types::{
+            Command, DataResult, EventType, Granularity, InterfacingProtocols, MachineLabel,
+            MachineType, Role, State, StateName, Subscriptions, SubscriptionsWrapped, SwarmLabel,
+            SwarmProtocolType, Transition,
+        },
+    },
 };
 use petgraph::{
     graph::EdgeReference,
@@ -13,9 +21,12 @@ use petgraph::{
     Direction::{Incoming, Outgoing},
 };
 use proptest::prelude::*;
-use rand::{Rng, distributions::Bernoulli, prelude::*};
+use rand::{distributions::Bernoulli, prelude::*, Rng};
 use std::{
-    cmp, collections::{BTreeMap, BTreeSet}, iter::zip, sync::Mutex
+    cmp,
+    collections::{BTreeMap, BTreeSet},
+    iter::zip,
+    sync::Mutex,
 };
 use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
 
@@ -40,7 +51,6 @@ static R_BASE: &str = "R";
 static IR_BASE: &str = "IR";
 static CMD_BASE: &str = "cmd";
 static E_BASE: &str = "e";
-
 
 fn setup_logger() {
     fmt()
@@ -859,7 +869,12 @@ fn num_terminal(proto: &MachineType) -> usize {
     for t in &proto.transitions {
         states.insert(t.source.clone());
         states.insert(t.target.clone());
-        states_to_outgoing.entry(t.source.clone()).and_modify(|ts: &mut BTreeSet<Transition<MachineLabel>>| {ts.insert(t.clone());}).or_insert_with(|| BTreeSet::new());
+        states_to_outgoing
+            .entry(t.source.clone())
+            .and_modify(|ts: &mut BTreeSet<Transition<MachineLabel>>| {
+                ts.insert(t.clone());
+            })
+            .or_insert_with(|| BTreeSet::new());
     }
     for state in &states {
         if !states_to_outgoing.contains_key(state) {

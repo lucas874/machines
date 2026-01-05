@@ -1,13 +1,15 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use machine_core::types::typescript_types::{EventType, Granularity, InterfacingProtocols, Role, SubscriptionsWrapped};
+use machine_core::types::typescript_types::{
+    EventType, Granularity, InterfacingProtocols, Role, SubscriptionsWrapped,
+};
 use serde::{Deserialize, Serialize};
 extern crate machine_check;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
-use walkdir::WalkDir;
 use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
+use walkdir::WalkDir;
 
 const BENCHMARK_DIR: &str = "./bench_and_results";
 const SPECIAL_SYMBOL: &str = "done-special-symbol";
@@ -24,7 +26,7 @@ fn setup_logger() {
 pub struct BenchMarkInput {
     pub state_space_size: usize,
     pub number_of_edges: usize,
-    pub interfacing_swarms: InterfacingProtocols
+    pub interfacing_swarms: InterfacingProtocols,
 }
 
 fn prepare_input(file_name: String) -> (usize, InterfacingProtocols) {
@@ -50,10 +52,7 @@ fn prepare_input(file_name: String) -> (usize, InterfacingProtocols) {
             Err(e) => panic!("error parsing input file: {}", e),
         };
 
-    (
-        state_space_size,
-        interfacing_swarms,
-    )
+    (state_space_size, interfacing_swarms)
 }
 
 fn prepare_files_in_directory(directory: String) -> Vec<(usize, InterfacingProtocols)> {
@@ -80,8 +79,7 @@ fn short_bench_general(c: &mut Criterion) {
     let mut group = c.benchmark_group("General-pattern-algorithm1-vs.-exact-short-run");
     group.sample_size(10);
     let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
-    let mut interfacing_swarms_general =
-        prepare_files_in_directory(input_dir);
+    let mut interfacing_swarms_general = prepare_files_in_directory(input_dir);
     interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
 
     let subs = BTreeMap::<Role, BTreeSet<EventType>>::new();
@@ -89,11 +87,32 @@ fn short_bench_general(c: &mut Criterion) {
     let step: usize = 120;
 
     for (size, interfacing_swarms) in interfacing_swarms_general.iter().step_by(step) {
-        group.bench_with_input(BenchmarkId::new("Algorithm 1", size), interfacing_swarms,
-        |b, input| b.iter(|| machine_core::overapproximated_well_formed_sub(input.clone(), SubscriptionsWrapped(subs.clone()), two_step_granularity.clone())));
+        group.bench_with_input(
+            BenchmarkId::new("Algorithm 1", size),
+            interfacing_swarms,
+            |b, input| {
+                b.iter(|| {
+                    machine_core::overapproximated_well_formed_sub(
+                        input.clone(),
+                        SubscriptionsWrapped(subs.clone()),
+                        two_step_granularity.clone(),
+                    )
+                })
+            },
+        );
 
-        group.bench_with_input(BenchmarkId::new("Exact", size), interfacing_swarms,
-        |b, input| b.iter(|| machine_core::exact_well_formed_sub(input.clone(), SubscriptionsWrapped(subs.clone()))));
+        group.bench_with_input(
+            BenchmarkId::new("Exact", size),
+            interfacing_swarms,
+            |b, input| {
+                b.iter(|| {
+                    machine_core::exact_well_formed_sub(
+                        input.clone(),
+                        SubscriptionsWrapped(subs.clone()),
+                    )
+                })
+            },
+        );
 
         println!("{}", SPECIAL_SYMBOL);
     }

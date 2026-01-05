@@ -1,13 +1,10 @@
-use crate::{
-    machine::{Error, Side},
-};
+use crate::machine::{Error, Side};
 use machine_core::types::{
-    projection::OptionGraph, proto_graph::NodeId, typescript_types::{Command, EventType, MachineLabel}
+    projection::OptionGraph,
+    proto_graph::NodeId,
+    typescript_types::{Command, EventType, MachineLabel},
 };
-use petgraph::{
-    visit::EdgeRef,
-    Direction::Outgoing,
-};
+use petgraph::{visit::EdgeRef, Direction::Outgoing};
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
@@ -130,12 +127,12 @@ pub fn equivalent(left: &OptionGraph, li: NodeId, right: &OptionGraph, ri: NodeI
 #[cfg(test)]
 mod tests {
     use super::*;
-    use machine_core::{
-        types::{
-            projection::Graph, typescript_types::{
-                Command, DataResult, EventType, Granularity, InterfacingProtocols, MachineType, Role, StateName, Subscriptions, SubscriptionsWrapped, SwarmProtocolType, Transition
-            }
-        }
+    use machine_core::types::{
+        projection::Graph,
+        typescript_types::{
+            Command, DataResult, EventType, Granularity, InterfacingProtocols, MachineType, Role,
+            StateName, Subscriptions, SubscriptionsWrapped, SwarmProtocolType, Transition,
+        },
     };
     use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
     fn setup_logger() {
@@ -507,7 +504,6 @@ mod tests {
         .unwrap()
     }
 
-
     use machine_core::types::typescript_types::State;
 
     #[test]
@@ -537,11 +533,16 @@ mod tests {
         .unwrap();
 
         let role = Role::new("F");
-        let (proj, proj_initial, _) =
-            match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
-                DataResult::ERROR { errors: _ } => panic!(),
-                DataResult::OK { data } => crate::machine::from_json(data),
-            };
+        let (proj, proj_initial, _) = match machine_core::project(
+            InterfacingProtocols(vec![proto]),
+            SubscriptionsWrapped(subs),
+            role,
+            false,
+            false,
+        ) {
+            DataResult::ERROR { errors: _ } => panic!(),
+            DataResult::OK { data } => crate::machine::from_json(data),
+        };
         let expected_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -593,17 +594,24 @@ mod tests {
     fn test_equivalent_2() {
         setup_logger();
         let proto = get_proto1();
-        let subs =
-            match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), SubscriptionsWrapped(BTreeMap::new())) {
-                DataResult::ERROR { errors: _ } => panic!(),
-                DataResult::OK { data } => data
-            };
+        let subs = match machine_core::exact_well_formed_sub(
+            InterfacingProtocols(vec![proto.clone()]),
+            SubscriptionsWrapped(BTreeMap::new()),
+        ) {
+            DataResult::ERROR { errors: _ } => panic!(),
+            DataResult::OK { data } => data,
+        };
         let role = Role::new("FL");
-        let (left, left_initial, _) =
-            match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
-                DataResult::ERROR { errors: _ } => panic!(),
-                DataResult::OK { data } => crate::machine::from_json(data),
-            };
+        let (left, left_initial, _) = match machine_core::project(
+            InterfacingProtocols(vec![proto]),
+            SubscriptionsWrapped(subs),
+            role,
+            false,
+            false,
+        ) {
+            DataResult::ERROR { errors: _ } => panic!(),
+            DataResult::OK { data } => crate::machine::from_json(data),
+        };
         let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -658,12 +666,7 @@ mod tests {
 
         assert!(errors.is_empty());
 
-        let errors = equivalent(
-            &left,
-            left_initial.unwrap(),
-            &right,
-            right_initial.unwrap(),
-        );
+        let errors = equivalent(&left, left_initial.unwrap(), &right, right_initial.unwrap());
         assert!(errors.is_empty());
     }
 
@@ -671,17 +674,24 @@ mod tests {
     fn test_equivalent_3() {
         setup_logger();
         let proto = get_proto2();
-        let subs =
-            match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), SubscriptionsWrapped(BTreeMap::new())) {
-                DataResult::ERROR { errors: _ } => panic!(),
-                DataResult::OK { data } => data
-            };
+        let subs = match machine_core::exact_well_formed_sub(
+            InterfacingProtocols(vec![proto.clone()]),
+            SubscriptionsWrapped(BTreeMap::new()),
+        ) {
+            DataResult::ERROR { errors: _ } => panic!(),
+            DataResult::OK { data } => data,
+        };
         let role = Role::new("F");
-        let (proj, proj_initial, _) =
-            match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
-                DataResult::ERROR { errors: _ } => panic!(),
-                DataResult::OK { data } => crate::machine::from_json(data),
-            };
+        let (proj, proj_initial, _) = match machine_core::project(
+            InterfacingProtocols(vec![proto]),
+            SubscriptionsWrapped(subs),
+            role,
+            false,
+            false,
+        ) {
+            DataResult::ERROR { errors: _ } => panic!(),
+            DataResult::OK { data } => crate::machine::from_json(data),
+        };
         let expected_m = MachineType {
             initial: State::new("1"),
             transitions: vec![
@@ -729,7 +739,10 @@ mod tests {
         let protos = get_interfacing_swarms_1();
         let subs = match machine_core::overapproximated_well_formed_sub(
             protos.clone(),
-            SubscriptionsWrapped(BTreeMap::from([(Role::new("T"), BTreeSet::from([EventType::new("car")]))])),
+            SubscriptionsWrapped(BTreeMap::from([(
+                Role::new("T"),
+                BTreeSet::from([EventType::new("car")]),
+            )])),
             Granularity::Coarse,
         ) {
             DataResult::ERROR { errors: _ } => panic!(),
@@ -838,17 +851,24 @@ mod tests {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let subs =
-            match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), SubscriptionsWrapped(BTreeMap::new())) {
-                DataResult::ERROR { errors: _ } => panic!(),
-                DataResult::OK { data } => data
-            };
+        let subs = match machine_core::exact_well_formed_sub(
+            InterfacingProtocols(vec![proto.clone()]),
+            SubscriptionsWrapped(BTreeMap::new()),
+        ) {
+            DataResult::ERROR { errors: _ } => panic!(),
+            DataResult::OK { data } => data,
+        };
         let role = Role::new("FL");
-        let (left, left_initial, _) =
-            match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
-                DataResult::ERROR { errors: _ } => panic!(),
-                DataResult::OK { data } => crate::machine::from_json(data),
-            };
+        let (left, left_initial, _) = match machine_core::project(
+            InterfacingProtocols(vec![proto]),
+            SubscriptionsWrapped(subs),
+            role,
+            false,
+            false,
+        ) {
+            DataResult::ERROR { errors: _ } => panic!(),
+            DataResult::OK { data } => crate::machine::from_json(data),
+        };
         let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -903,12 +923,7 @@ mod tests {
 
         assert!(errors.is_empty());
 
-        let errors = equivalent(
-            &left,
-            left_initial.unwrap(),
-            &right,
-            right_initial.unwrap(),
-        );
+        let errors = equivalent(&left, left_initial.unwrap(), &right, right_initial.unwrap());
         assert!(!errors.is_empty());
     }
 
@@ -917,17 +932,24 @@ mod tests {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let subs =
-            match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), SubscriptionsWrapped(BTreeMap::new())) {
-                DataResult::ERROR { errors: _ } => panic!(),
-                DataResult::OK { data } => data
-            };
+        let subs = match machine_core::exact_well_formed_sub(
+            InterfacingProtocols(vec![proto.clone()]),
+            SubscriptionsWrapped(BTreeMap::new()),
+        ) {
+            DataResult::ERROR { errors: _ } => panic!(),
+            DataResult::OK { data } => data,
+        };
         let role = Role::new("FL");
-        let (left, left_initial, _) =
-            match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
-                DataResult::ERROR { errors: _ } => panic!(),
-                DataResult::OK { data } => crate::machine::from_json(data),
-            };
+        let (left, left_initial, _) = match machine_core::project(
+            InterfacingProtocols(vec![proto]),
+            SubscriptionsWrapped(subs),
+            role,
+            false,
+            false,
+        ) {
+            DataResult::ERROR { errors: _ } => panic!(),
+            DataResult::OK { data } => crate::machine::from_json(data),
+        };
         let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -982,12 +1004,7 @@ mod tests {
 
         assert!(errors.is_empty());
 
-        let errors = equivalent(
-            &left,
-            left_initial.unwrap(),
-            &right,
-            right_initial.unwrap(),
-        );
+        let errors = equivalent(&left, left_initial.unwrap(), &right, right_initial.unwrap());
         assert!(!errors.is_empty());
     }
 
@@ -996,17 +1013,24 @@ mod tests {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let subs =
-            match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), SubscriptionsWrapped(BTreeMap::new())) {
-                DataResult::ERROR { errors: _ } => panic!(),
-                DataResult::OK { data } => data
-            };
+        let subs = match machine_core::exact_well_formed_sub(
+            InterfacingProtocols(vec![proto.clone()]),
+            SubscriptionsWrapped(BTreeMap::new()),
+        ) {
+            DataResult::ERROR { errors: _ } => panic!(),
+            DataResult::OK { data } => data,
+        };
         let role = Role::new("FL");
-        let (left, left_initial, _) =
-            match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
-                DataResult::ERROR { errors: _ } => panic!(),
-                DataResult::OK { data } => crate::machine::from_json(data),
-            };
+        let (left, left_initial, _) = match machine_core::project(
+            InterfacingProtocols(vec![proto]),
+            SubscriptionsWrapped(subs),
+            role,
+            false,
+            false,
+        ) {
+            DataResult::ERROR { errors: _ } => panic!(),
+            DataResult::OK { data } => crate::machine::from_json(data),
+        };
         let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -1062,12 +1086,7 @@ mod tests {
 
         assert!(errors.is_empty());
 
-        let errors = equivalent(
-            &left,
-            left_initial.unwrap(),
-            &right,
-            right_initial.unwrap(),
-        );
+        let errors = equivalent(&left, left_initial.unwrap(), &right, right_initial.unwrap());
         assert!(!errors.is_empty());
     }
 
@@ -1076,17 +1095,24 @@ mod tests {
         setup_logger();
         // warehouse example from coplaws slides
         let proto = get_proto1();
-        let subs =
-            match machine_core::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), SubscriptionsWrapped(BTreeMap::new())) {
-                DataResult::ERROR { errors: _ } => panic!(),
-                DataResult::OK { data } => data
-            };
+        let subs = match machine_core::exact_well_formed_sub(
+            InterfacingProtocols(vec![proto.clone()]),
+            SubscriptionsWrapped(BTreeMap::new()),
+        ) {
+            DataResult::ERROR { errors: _ } => panic!(),
+            DataResult::OK { data } => data,
+        };
         let role = Role::new("FL");
-        let (left, left_initial, _) =
-            match machine_core::project(InterfacingProtocols(vec![proto]), SubscriptionsWrapped(subs), role, false, false) {
-                DataResult::ERROR { errors: _ } => panic!(),
-                DataResult::OK { data } => crate::machine::from_json(data),
-            };
+        let (left, left_initial, _) = match machine_core::project(
+            InterfacingProtocols(vec![proto]),
+            SubscriptionsWrapped(subs),
+            role,
+            false,
+            false,
+        ) {
+            DataResult::ERROR { errors: _ } => panic!(),
+            DataResult::OK { data } => crate::machine::from_json(data),
+        };
         let right_m = MachineType {
             initial: State::new("0"),
             transitions: vec![
@@ -1134,12 +1160,7 @@ mod tests {
 
         assert!(errors.is_empty());
 
-        let errors = equivalent(
-            &left,
-            left_initial.unwrap(),
-            &right,
-            right_initial.unwrap(),
-        );
+        let errors = equivalent(&left, left_initial.unwrap(), &right, right_initial.unwrap());
         assert!(!errors.is_empty());
     }
 
@@ -1151,10 +1172,13 @@ mod tests {
         let subs1 = match machine_core::overapproximated_well_formed_sub(
             get_interfacing_swarms_1(),
             SubscriptionsWrapped(BTreeMap::new()),
-            Granularity::TwoStep
+            Granularity::TwoStep,
         ) {
             DataResult::OK { data } => data,
-            DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!() }
+            DataResult::ERROR { errors } => {
+                println!("{}", errors.join(", "));
+                panic!()
+            }
         };
 
         let (proj_combined1, proj_combined_initial1, _) = match machine_core::project(
@@ -1162,31 +1186,39 @@ mod tests {
             SubscriptionsWrapped(subs1.clone()),
             role.clone(),
             false,
-            false
+            false,
         ) {
             DataResult::OK { data } => crate::machine::from_json(data),
-            DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
+            DataResult::ERROR { errors } => {
+                println!("{}", errors.join(", "));
+                panic!()
+            }
         };
 
         let subs2 = match machine_core::overapproximated_well_formed_sub(
             get_interfacing_swarms_1_reversed(),
             SubscriptionsWrapped(BTreeMap::new()),
-            Granularity::TwoStep
+            Granularity::TwoStep,
         ) {
             DataResult::OK { data } => data,
-            DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!() }
+            DataResult::ERROR { errors } => {
+                println!("{}", errors.join(", "));
+                panic!()
+            }
         };
-
 
         let (proj_combined2, proj_combined_initial2, _) = match machine_core::project(
             get_interfacing_swarms_1_reversed(),
-           SubscriptionsWrapped(subs2.clone()),
-           role.clone(),
-           true,
-           false
+            SubscriptionsWrapped(subs2.clone()),
+            role.clone(),
+            true,
+            false,
         ) {
             DataResult::OK { data } => crate::machine::from_json(data),
-            DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
+            DataResult::ERROR { errors } => {
+                println!("{}", errors.join(", "));
+                panic!()
+            }
         };
 
         let (proj_expanded_proto, proj_expanded_proto_initial, _) = match machine_core::project(
@@ -1194,10 +1226,13 @@ mod tests {
             SubscriptionsWrapped(subs1.clone()),
             role.clone(),
             true,
-            true
+            true,
         ) {
             DataResult::OK { data } => crate::machine::from_json(data),
-            DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
+            DataResult::ERROR { errors } => {
+                println!("{}", errors.join(", "));
+                panic!()
+            }
         };
         // compose(a, b) should be equal to compose(b, a)
         assert_eq!(subs1, subs2);
@@ -1226,18 +1261,24 @@ mod tests {
         let subs1 = match machine_core::overapproximated_well_formed_sub(
             get_interfacing_swarms_2(),
             SubscriptionsWrapped(BTreeMap::new()),
-            Granularity::TwoStep
+            Granularity::TwoStep,
         ) {
             DataResult::OK { data } => data,
-            DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!() }
+            DataResult::ERROR { errors } => {
+                println!("{}", errors.join(", "));
+                panic!()
+            }
         };
         let subs2 = match machine_core::overapproximated_well_formed_sub(
             get_interfacing_swarms_2_reversed(),
             SubscriptionsWrapped(BTreeMap::new()),
-            Granularity::TwoStep
+            Granularity::TwoStep,
         ) {
             DataResult::OK { data } => data,
-            DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!() }
+            DataResult::ERROR { errors } => {
+                println!("{}", errors.join(", "));
+                panic!()
+            }
         };
         assert_eq!(subs1, subs2);
         let all_roles = vec![
@@ -1255,20 +1296,26 @@ mod tests {
                 SubscriptionsWrapped(subs1.clone()),
                 role.clone(),
                 false,
-                false
+                false,
             ) {
                 DataResult::OK { data } => crate::machine::from_json(data),
-                DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
+                DataResult::ERROR { errors } => {
+                    println!("{}", errors.join(", "));
+                    panic!()
+                }
             };
             let (proj_combined2, proj_combined_initial2, _) = match machine_core::project(
                 get_interfacing_swarms_2_reversed(),
                 SubscriptionsWrapped(subs2.clone()),
                 role.clone(),
                 true,
-                false
+                false,
             ) {
                 DataResult::OK { data } => crate::machine::from_json(data),
-                DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
+                DataResult::ERROR { errors } => {
+                    println!("{}", errors.join(", "));
+                    panic!()
+                }
             };
 
             // compose(a, b) should be equal to compose(b, a)
@@ -1284,10 +1331,13 @@ mod tests {
                 SubscriptionsWrapped(subs1.clone()),
                 role.clone(),
                 true,
-                true
+                true,
             ) {
                 DataResult::OK { data } => crate::machine::from_json(data),
-                DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
+                DataResult::ERROR { errors } => {
+                    println!("{}", errors.join(", "));
+                    panic!()
+                }
             };
             let errors = equivalent(
                 &proj_combined2,
@@ -1306,10 +1356,13 @@ mod tests {
         let subs = match machine_core::overapproximated_well_formed_sub(
             get_interfacing_swarms_1(),
             SubscriptionsWrapped(BTreeMap::new()),
-            Granularity::TwoStep
+            Granularity::TwoStep,
         ) {
             DataResult::OK { data } => data,
-            DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!() }
+            DataResult::ERROR { errors } => {
+                println!("{}", errors.join(", "));
+                panic!()
+            }
         };
         let expected_projs = BTreeMap::from([
             (Role::new("T"), get_whf_transport()),
@@ -1324,37 +1377,45 @@ mod tests {
                 SubscriptionsWrapped(subs.clone()),
                 role.clone(),
                 true,
-                true
+                true,
             ) {
                 DataResult::OK { data } => crate::machine::from_json(data),
-                DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
+                DataResult::ERROR { errors } => {
+                    println!("{}", errors.join(", "));
+                    panic!()
+                }
             };
             let (proj_combined, proj_combined_initial, _) = match machine_core::project(
                 get_interfacing_swarms_1(),
                 SubscriptionsWrapped(subs.clone()),
                 role.clone(),
                 false,
-                false
+                false,
             ) {
                 DataResult::OK { data } => crate::machine::from_json(data),
-                DataResult::ERROR { errors } => { println!("{}", errors.join(", ")); panic!()}
+                DataResult::ERROR { errors } => {
+                    println!("{}", errors.join(", "));
+                    panic!()
+                }
             };
             assert!(equivalent(
                 &proj_expanded_proto,
                 proj_expanded_proto_initial.unwrap(),
                 &proj_combined,
-                proj_combined_initial.unwrap())
-                .is_empty()
-            );
+                proj_combined_initial.unwrap()
+            )
+            .is_empty());
 
-            let (expected, expected_initial, _) = crate::machine::from_json(expected_projs.get(role).unwrap().clone());
+            let (expected, expected_initial, _) =
+                crate::machine::from_json(expected_projs.get(role).unwrap().clone());
 
             assert!(equivalent(
                 &expected,
                 expected_initial.unwrap(),
                 &proj_combined,
-                proj_combined_initial.unwrap())
-                .is_empty());
+                proj_combined_initial.unwrap()
+            )
+            .is_empty());
         }
     }
 }

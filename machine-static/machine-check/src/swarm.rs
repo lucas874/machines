@@ -1,14 +1,14 @@
-use machine_core::{
-    types::{
-        typescript_types::{EventType, Role, State, StateName, SwarmLabel, Subscriptions, SwarmProtocolType},
-        proto_graph::{EdgeId, NodeId}
-    },
-    errors::Error,
-};
-use crate::{
-    MapVec
-};
+use crate::MapVec;
 use bitvec::{bitvec, vec::BitVec};
+use machine_core::{
+    errors::Error,
+    types::{
+        proto_graph::{EdgeId, NodeId},
+        typescript_types::{
+            EventType, Role, State, StateName, Subscriptions, SwarmLabel, SwarmProtocolType,
+        },
+    },
+};
 use petgraph::{
     visit::{Dfs, DfsPostOrder, EdgeRef, Walker},
     Direction::{Incoming, Outgoing},
@@ -67,7 +67,11 @@ type Graph = petgraph::Graph<Node, SwarmLabel>;
 pub fn check(
     proto: SwarmProtocolType,
     subs: &Subscriptions,
-) -> (machine_core::types::proto_graph::Graph, Option<NodeId>, Vec<Error>) {
+) -> (
+    machine_core::types::proto_graph::Graph,
+    Option<NodeId>,
+    Vec<Error>,
+) {
     let (graph, initial, mut errors) = match prepare_graph(proto, &subs) {
         (g, Some(i), e) => (g, i, e),
         (g, None, e) => return (to_swarm(&g), None, e),
@@ -80,7 +84,14 @@ pub fn check(
 pub fn well_formed_sub(
     proto: SwarmProtocolType,
     subs: &Subscriptions,
-) -> Result<Subscriptions, (machine_core::types::proto_graph::Graph, Option<NodeId>, Vec<Error>)> {
+) -> Result<
+    Subscriptions,
+    (
+        machine_core::types::proto_graph::Graph,
+        Option<NodeId>,
+        Vec<Error>,
+    ),
+> {
     let (graph, initial, mut errors) = match prepare_graph(proto, &subs) {
         (g, Some(i), e) => (g, i, e),
         (g, None, e) => return Err((to_swarm(&g), None, e)),
@@ -89,9 +100,9 @@ pub fn well_formed_sub(
     match wf_sub(graph, initial, subs) {
         Err((g, _, mut e)) => {
             errors.append(&mut e);
-            return Err((to_swarm(&g), Some(initial), errors))
-        },
-        Ok(subs) => return Ok(subs)
+            return Err((to_swarm(&g), Some(initial), errors));
+        }
+        Ok(subs) => return Ok(subs),
     }
 }
 
@@ -186,7 +197,11 @@ fn well_formed(graph: &Graph, initial: NodeId, subs: &Subscriptions) -> Vec<Erro
 // If not already satisfied by subs, we add the first event type in the log in such cases.
 // Problem: We do not have the roles field of nodes. So we repeat until stable.
 // Precondition (not checked, assumed since created with prepare_graph): protocol is confusion-free.
-fn wf_sub(mut graph: Graph, initial: NodeId, subs: &Subscriptions) -> Result<Subscriptions, (Graph, NodeId, Vec<Error>)> {
+fn wf_sub(
+    mut graph: Graph,
+    initial: NodeId,
+    subs: &Subscriptions,
+) -> Result<Subscriptions, (Graph, NodeId, Vec<Error>)> {
     let _span = tracing::info_span!("wf_sub").entered();
     let mut errors = Vec::new();
     // subscriptions to construct
@@ -219,12 +234,18 @@ fn wf_sub(mut graph: Graph, initial: NodeId, subs: &Subscriptions) -> Result<Sub
     }
     // stop subscription generation if protocol is not deterministic.
     if !errors.is_empty() {
-        return Err((graph, initial, errors))
+        return Err((graph, initial, errors));
     }
-    tracing::debug!("initial sub is: {}", serde_json::to_string_pretty(&subs).unwrap());
+    tracing::debug!(
+        "initial sub is: {}",
+        serde_json::to_string_pretty(&subs).unwrap()
+    );
     let mut is_stable = wf_sub_step(&mut graph, initial, &mut subs);
     while !is_stable {
-        tracing::debug!("did a step sub is: {}", serde_json::to_string_pretty(&subs).unwrap());
+        tracing::debug!(
+            "did a step sub is: {}",
+            serde_json::to_string_pretty(&subs).unwrap()
+        );
         is_stable = wf_sub_step(&mut graph, initial, &mut subs);
     }
 
@@ -235,7 +256,7 @@ fn wf_sub(mut graph: Graph, initial: NodeId, subs: &Subscriptions) -> Result<Sub
 fn wf_sub_step(graph: &mut Graph, initial: NodeId, subs: &mut Subscriptions) -> bool {
     let _span = tracing::info_span!("wf_sub_step").entered();
     if graph.node_count() == 0 || initial == NodeId::end() {
-        return true
+        return true;
     }
     let mut is_stable = true;
     let sub = |r: &Role, subs: &Subscriptions| subs.get(r).cloned().unwrap_or_default();
@@ -244,7 +265,11 @@ fn wf_sub_step(graph: &mut Graph, initial: NodeId, subs: &mut Subscriptions) -> 
             if subs.contains_key(&role) && event_types.iter().all(|e| subs[&role].contains(e)) {
                 return true;
             }
-            tracing::debug!("adding {} to sub({})", serde_json::to_string(&event_types).unwrap(), role);
+            tracing::debug!(
+                "adding {} to sub({})",
+                serde_json::to_string(&event_types).unwrap(),
+                role
+            );
             subs.entry(role)
                 .and_modify(|curr| {
                     curr.append(&mut event_types);
@@ -253,57 +278,89 @@ fn wf_sub_step(graph: &mut Graph, initial: NodeId, subs: &mut Subscriptions) -> 
             false
         };
 
-        let mut dfs = DfsPostOrder::new(&*graph, initial);
-        while let Some(node) = dfs.next(&*graph) {
-            // `active` field of current node is set, but `roles` field is not. add `active` to `roles`
-            tracing::debug!("current node is: {}", graph[node].state_name());
-            let mut active_roles = graph[node].active.clone();
-            tracing::debug!("adding {} to {}.roles", serde_json::to_string(&active_roles).unwrap(), graph[node].state_name());
-            graph[node].roles.append(&mut active_roles);
+    let mut dfs = DfsPostOrder::new(&*graph, initial);
+    while let Some(node) = dfs.next(&*graph) {
+        // `active` field of current node is set, but `roles` field is not. add `active` to `roles`
+        tracing::debug!("current node is: {}", graph[node].state_name());
+        let mut active_roles = graph[node].active.clone();
+        tracing::debug!(
+            "adding {} to {}.roles",
+            serde_json::to_string(&active_roles).unwrap(),
+            graph[node].state_name()
+        );
+        graph[node].roles.append(&mut active_roles);
 
-            let edges: Vec<(NodeId, SwarmLabel, NodeId)> = graph.edges_directed(node, Outgoing)
-                .map(|e| (e.source(), e.weight().clone(), e.target()))
+        let edges: Vec<(NodeId, SwarmLabel, NodeId)> = graph
+            .edges_directed(node, Outgoing)
+            .map(|e| (e.source(), e.weight().clone(), e.target()))
+            .collect();
+
+        for (_source, label, target) in edges {
+            let log = label.log_type.as_slice();
+            // causal consistency
+            tracing::debug!(
+                "causal consistency for: {} --({})--> {}",
+                graph[_source].state_name(),
+                label,
+                graph[target].state_name()
+            );
+            // role in graph[target].active implies log \cap sub(role) != empty set
+            for role in &graph[target].active {
+                // check before adding first event type in transition -> role might already subscribe to another event type in the transition.
+                if log_filter(log, &sub(role, subs)).first_one().is_none() {
+                    is_stable = add_to_sub(role.clone(), BTreeSet::from([log[0].clone()]), subs)
+                        && is_stable;
+                }
+            }
+
+            // update roles of node: add active and roles of graph[target] to graph[node].roles
+            let mut roles_of_target: BTreeSet<Role> = graph[target]
+                .active
+                .clone()
+                .union(&graph[target].roles.clone())
+                .cloned()
                 .collect();
+            tracing::debug!(
+                "adding {} to {}.roles",
+                serde_json::to_string(&roles_of_target).unwrap(),
+                graph[node].state_name()
+            );
+            graph[node].roles.append(&mut roles_of_target);
 
-            for (_source, label, target) in edges {
-                let log = label.log_type.as_slice();
-                // causal consistency
-                tracing::debug!("causal consistency for: {} --({})--> {}", graph[_source].state_name(), label, graph[target].state_name());
-                // role in graph[target].active implies log \cap sub(role) != empty set
-                for role in &graph[target].active {
-                    // check before adding first event type in transition -> role might already subscribe to another event type in the transition.
-                    if log_filter(log, &sub(role, subs)).first_one().is_none() {
-                        is_stable = add_to_sub(role.clone(), BTreeSet::from([log[0].clone()]), subs) && is_stable;
-                    }
-                }
+            // for all roles r' in graph[target].roles: log \cap sub(r') \subseteq log \cap sub(label.role)
+            //      -> set sub(label.role) = \bigcup (sub(r') \cap log) for all r' graph[target].roles
+            //      -> add log[0] instead if \bigcup (sub(r') \cap log) for all r' graph[target].roles is empty (target is a final state)
+            let event_types: BTreeSet<EventType> = graph[target]
+                .roles
+                .iter()
+                .flat_map(|r| {
+                    log.iter()
+                        .filter(|event_type| sub(r, subs).contains(*event_type))
+                        .cloned()
+                })
+                .collect();
+            is_stable = add_to_sub(
+                label.role.clone(),
+                if event_types.is_empty() {
+                    BTreeSet::from([log[0].clone()])
+                } else {
+                    event_types
+                },
+                subs,
+            ) && is_stable;
 
-                // update roles of node: add active and roles of graph[target] to graph[node].roles
-                let mut roles_of_target: BTreeSet<Role> = graph[target].active.clone().union(&graph[target].roles.clone()).cloned().collect();
-                tracing::debug!("adding {} to {}.roles", serde_json::to_string(&roles_of_target).unwrap(), graph[node].state_name());
-                graph[node].roles.append(&mut roles_of_target);
-
-                // for all roles r' in graph[target].roles: log \cap sub(r') \subseteq log \cap sub(label.role)
-                //      -> set sub(label.role) = \bigcup (sub(r') \cap log) for all r' graph[target].roles
-                //      -> add log[0] instead if \bigcup (sub(r') \cap log) for all r' graph[target].roles is empty (target is a final state)
-                let event_types: BTreeSet<EventType> = graph[target]
-                    .roles
-                    .iter()
-                    .flat_map(|r|
-                        log
-                            .iter()
-                            .filter(|event_type| sub(r, subs).contains(*event_type))
-                            .cloned()
-                        )
-                        .collect();
-                is_stable = add_to_sub(label.role.clone(), if event_types.is_empty() { BTreeSet::from([log[0].clone()]) } else { event_types }, subs)
-                    && is_stable;
-
-                // determinacy
-                // role in graph[target].roles implies log[0] in sub(role)
-                tracing::debug!("determinacy for: {} --({})--> {}", graph[_source].state_name(), label, graph[target].state_name());
-                for role in &graph[target].roles {
-                    is_stable = add_to_sub(role.clone(), BTreeSet::from([log[0].clone()]), subs) && is_stable;
-                }
+            // determinacy
+            // role in graph[target].roles implies log[0] in sub(role)
+            tracing::debug!(
+                "determinacy for: {} --({})--> {}",
+                graph[_source].state_name(),
+                label,
+                graph[target].state_name()
+            );
+            for role in &graph[target].roles {
+                is_stable =
+                    add_to_sub(role.clone(), BTreeSet::from([log[0].clone()]), subs) && is_stable;
+            }
         }
     }
     is_stable
@@ -312,7 +369,11 @@ fn wf_sub_step(graph: &mut Graph, initial: NodeId, subs: &mut Subscriptions) -> 
 pub fn from_json(
     proto: SwarmProtocolType,
     subs: &Subscriptions,
-) -> (machine_core::types::proto_graph::Graph, Option<NodeId>, Vec<String>) {
+) -> (
+    machine_core::types::proto_graph::Graph,
+    Option<NodeId>,
+    Vec<String>,
+) {
     let (g, i, e) = prepare_graph(proto, subs);
     (to_swarm(&g), i, e.map(Error::convert(&g)))
 }
@@ -893,11 +954,14 @@ mod tests {
         let (g, _, e) = result_subs_generated.unwrap_err();
         let mut errors = e.map(Error::convert(&g));
         errors.sort();
-        assert_eq!(errors, vec![
-            "guard event type A appears in transitions from multiple states",
-            "non-deterministic command c for role R in state S2",
-            "non-deterministic event guard type A in state S2",
-        ]);
+        assert_eq!(
+            errors,
+            vec![
+                "guard event type A appears in transitions from multiple states",
+                "non-deterministic command c for role R in state S2",
+                "non-deterministic event guard type A in state S2",
+            ]
+        );
     }
 
     #[test]

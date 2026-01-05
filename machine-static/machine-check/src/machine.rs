@@ -1,6 +1,6 @@
 use machine_core::types::{
-    typescript_types::{Command, EventType, MachineLabel, Role, State, MachineType, Subscriptions},
-    proto_graph::{EdgeId, NodeId}
+    proto_graph::{EdgeId, NodeId},
+    typescript_types::{Command, EventType, MachineLabel, MachineType, Role, State, Subscriptions},
 };
 
 use itertools::Itertools;
@@ -315,10 +315,10 @@ pub fn equivalent(left: &Graph, li: NodeId, right: &Graph, ri: NodeId) -> Vec<Er
 
 #[cfg(test)]
 mod tests {
+    use crate::{CheckResult, MachineType, SwarmProtocolType};
+    use machine_core::types::typescript_types::{Role, Subscriptions, SubscriptionsWrapped};
     use pretty_assertions::assert_eq;
     use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
-    use machine_core::types::typescript_types::{Role, Subscriptions, SubscriptionsWrapped};
-    use crate::{CheckResult, MachineType, SwarmProtocolType};
     fn setup_logger() {
         fmt()
             .with_env_filter(EnvFilter::from_default_env())
@@ -380,7 +380,7 @@ mod tests {
         );
         let errors = match result {
             CheckResult::OK => vec![],
-            CheckResult::ERROR { errors } => errors
+            CheckResult::ERROR { errors } => errors,
         };
         assert_eq!(
             errors,

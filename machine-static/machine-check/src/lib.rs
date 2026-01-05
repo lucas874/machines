@@ -2,11 +2,13 @@ use serde::Serialize;
 use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
+pub mod composition;
 mod machine;
 mod swarm;
-pub mod composition;
 
-use machine_core::types::typescript_types::{DataResult, MachineType, Role, Subscriptions, SubscriptionsWrapped, SwarmProtocolType};
+use machine_core::types::typescript_types::{
+    DataResult, MachineType, Role, Subscriptions, SubscriptionsWrapped, SwarmProtocolType,
+};
 
 #[derive(Tsify, Serialize)]
 #[serde(tag = "type")]
@@ -22,24 +24,34 @@ pub fn check_swarm(proto: SwarmProtocolType, subs: SubscriptionsWrapped) -> Chec
     if errors.is_empty() {
         CheckResult::OK
     } else {
-        CheckResult::ERROR { errors: errors.map(machine_core::errors::Error::convert(&graph)) }
+        CheckResult::ERROR {
+            errors: errors.map(machine_core::errors::Error::convert(&graph)),
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn well_formed_sub(proto: SwarmProtocolType, subs: SubscriptionsWrapped) -> DataResult<Subscriptions> {
+pub fn well_formed_sub(
+    proto: SwarmProtocolType,
+    subs: SubscriptionsWrapped,
+) -> DataResult<Subscriptions> {
     match swarm::well_formed_sub(proto, &subs.0) {
         Ok(subscriptions) => DataResult::OK {
             data: subscriptions,
         },
         Err((graph, _, errors)) => DataResult::ERROR {
-            errors: errors.map(machine_core::errors::Error::convert(&graph))
+            errors: errors.map(machine_core::errors::Error::convert(&graph)),
         },
     }
 }
 
 #[wasm_bindgen]
-pub fn check_projection(swarm: SwarmProtocolType, subs: SubscriptionsWrapped, role: Role, machine: MachineType) -> CheckResult {
+pub fn check_projection(
+    swarm: SwarmProtocolType,
+    subs: SubscriptionsWrapped,
+    role: Role,
+    machine: MachineType,
+) -> CheckResult {
     let (swarm, initial, mut errors) = swarm::from_json(swarm, &subs.0);
     let Some(initial) = initial else {
         return CheckResult::ERROR { errors: errors };
