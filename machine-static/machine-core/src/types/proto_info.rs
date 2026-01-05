@@ -63,24 +63,6 @@ impl ProtoStruct {
     }
 }
 
-// I do not think this is the way to go. Set of event types suffices?
-#[derive(Debug, Clone)]
-pub struct InterfaceStruct {
-    pub interfacing_roles: BTreeSet<Role>,
-    pub interfacing_event_types: BTreeSet<EventType>,
-}
-
-impl InterfaceStruct {
-    // https://doc.rust-lang.org/src/alloc/vec/mod.rs.html#434
-    #[inline]
-    pub const fn new() -> Self {
-        InterfaceStruct {
-            interfacing_roles: BTreeSet::new(),
-            interfacing_event_types: BTreeSet::new(),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct ProtoInfo {
     pub protocols: Vec<ProtoStruct>,
