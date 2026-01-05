@@ -3,7 +3,6 @@ use std::fmt;
 use crate::types::{proto_graph::{EdgeId}, typescript_types::{StateName, SwarmLabel}};
 
 pub mod swarm_errors;
-pub mod composition_errors;
 
 
 const INVALID_EDGE: &str = "[invalid EdgeId]";

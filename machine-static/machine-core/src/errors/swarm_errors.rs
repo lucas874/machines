@@ -174,11 +174,3 @@ impl ErrorReport {
             .collect()
     }
 }
-
-/* pub fn error_report_to_strings(error_report: ErrorReport) -> Vec<String> {
-    error_report
-        .errors()
-        .into_iter()
-        .flat_map(|(g, e)| e.into_iter().map(Error::convert(&g)).collect::<Vec<_>>())
-        .collect()
-} */
