@@ -2,15 +2,18 @@ use wasm_bindgen::prelude::*;
 
 use crate::machine::util::to_json_machine;
 use crate::machine::{adaptation, projection};
+use crate::types::typescript_types::{
+    DataResult, Granularity, InterfacingProtocols, MachineType, ProjectionInfo, Role,
+    Subscriptions, SubscriptionsWrapped, SwarmProtocolType,
+};
 use crate::types::{proto_info, typescript_types};
-use crate::types::typescript_types::{DataResult, Granularity, InterfacingProtocols, MachineType, ProjectionInfo, Role, Subscriptions, SubscriptionsWrapped, SwarmProtocolType};
 
-pub mod types;
-pub mod errors;
 mod composability_check;
-mod subscription;
 mod composition;
+pub mod errors;
 mod machine;
+mod subscription;
+pub mod types;
 mod util;
 
 #[cfg(test)]
@@ -63,27 +66,32 @@ pub fn project(
     let machine = if expand_protos {
         match proto_info::compose_protocols(protos) {
             Ok((swarm, initial)) => {
-                let (proj, proj_initial) = projection::project(&swarm, initial, &subs.0, role, minimize);
+                let (proj, proj_initial) =
+                    projection::project(&swarm, initial, &subs.0, role, minimize);
                 to_json_machine(proj, proj_initial)
-            },
-            Err(error_report) => return DataResult::ERROR {
-                errors: error_report.to_strings(),
+            }
+            Err(error_report) => {
+                return DataResult::ERROR {
+                    errors: error_report.to_strings(),
+                };
             }
         }
     } else {
         let proto_info = proto_info::swarms_to_proto_info(protos);
         match proto_info.no_errors() {
             true => {
-                let (proj, proj_initial) = projection::project_combine(&proto_info, &subs.0, role, minimize);
+                let (proj, proj_initial) =
+                    projection::project_combine(&proto_info, &subs.0, role, minimize);
                 machine::util::from_option_to_machine(proj, proj_initial.unwrap())
-            },
-            false => return DataResult::ERROR {
-                errors: proto_info.to_error_report().to_strings() }
+            }
+            false => {
+                return DataResult::ERROR {
+                    errors: proto_info.to_error_report().to_strings(),
+                };
+            }
         }
     };
-    DataResult::OK {
-        data: machine
-    }
+    DataResult::OK { data: machine }
 }
 
 #[wasm_bindgen]

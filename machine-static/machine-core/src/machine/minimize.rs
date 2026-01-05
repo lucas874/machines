@@ -1,9 +1,16 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use itertools::Itertools;
-use petgraph::{Direction::{Incoming, Outgoing}, visit::EdgeRef};
+use petgraph::{
+    Direction::{Incoming, Outgoing},
+    visit::EdgeRef,
+};
 
-use crate::types::{projection::Graph, proto_graph::NodeId, typescript_types::{MachineLabel, State}};
+use crate::types::{
+    projection::Graph,
+    proto_graph::NodeId,
+    typescript_types::{MachineLabel, State},
+};
 
 pub fn minimal_machine(graph: &Graph, i: NodeId) -> (Graph, NodeId) {
     let _span = tracing::info_span!("minimal_machine").entered();

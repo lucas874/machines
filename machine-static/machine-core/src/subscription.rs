@@ -1,7 +1,10 @@
 use std::collections::BTreeSet;
 
-use crate::types::{proto_info::ProtoInfo, typescript_types::{EventType, Role, Subscriptions}};
 use crate::types::proto_info;
+use crate::types::{
+    proto_info::ProtoInfo,
+    typescript_types::{EventType, Role, Subscriptions},
+};
 
 pub mod exact;
 pub mod overapproximation;
@@ -49,9 +52,9 @@ fn all_roles_sub_to_same(
 ) -> bool {
     let _span = tracing::info_span!("all_roles_sub_to_same").entered();
     let empty = BTreeSet::new();
-    event_types
-        .into_iter()
-        .any(|t_|  involved_roles
+    event_types.into_iter().any(|t_| {
+        involved_roles
             .iter()
-            .all(|r| subs.get(r).unwrap_or(&empty).contains(&t_)))
+            .all(|r| subs.get(r).unwrap_or(&empty).contains(&t_))
+    })
 }

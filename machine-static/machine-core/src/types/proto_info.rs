@@ -1,21 +1,23 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
-use itertools::Itertools;
-use petgraph::Directed;
 use crate::errors::{Error, ErrorReport};
 use crate::types::proto_graph;
 use crate::types::proto_label::ProtoLabel;
-use crate::types::typescript_types::{Command, EventLabel, InterfacingProtocols, Subscriptions, SwarmProtocolType};
+use crate::types::typescript_types::{
+    Command, EventLabel, InterfacingProtocols, Subscriptions, SwarmProtocolType,
+};
 use crate::types::{
-    typescript_types::{EventType, Role, SwarmLabel},
     proto_graph::{Graph, NodeId},
+    typescript_types::{EventType, Role, SwarmLabel},
 };
-use crate::{util, composability_check, composition};
-use petgraph::{
-    visit::{Dfs, EdgeRef},
-    Direction::{Incoming, Outgoing},
-};
+use crate::{composability_check, composition, util};
+use itertools::Itertools;
+use petgraph::Directed;
 use petgraph::algo;
-use petgraph::visit::{DfsPostOrder};
+use petgraph::visit::DfsPostOrder;
+use petgraph::{
+    Direction::{Incoming, Outgoing},
+    visit::{Dfs, EdgeRef},
+};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 pub type RoleEventMap = BTreeMap<Role, BTreeSet<SwarmLabel>>;
 
@@ -150,8 +152,7 @@ impl ProtoInfo {
     // Return all values from a ProtoInfo.role_event_map field as a set of triples:
     // (Command, EventType, Role)
     fn get_labels(&self) -> BTreeSet<(Command, EventType, Role)> {
-        self
-            .role_event_map
+        self.role_event_map
             .values()
             .flat_map(|role_info| {
                 role_info
@@ -180,8 +181,7 @@ impl ProtoInfo {
     // Consumes the proto info instance to create an error report.
     pub fn to_error_report(self) -> ErrorReport {
         ErrorReport(
-            self
-                .protocols
+            self.protocols
                 .into_iter()
                 .map(|p| (p.graph, p.errors))
                 .chain([(Graph::new(), self.interface_errors)]) // NO!!! Why not?
@@ -481,7 +481,8 @@ pub(crate) fn prepare_proto_info(proto: SwarmProtocolType) -> ProtoInfo {
     let happens_after = after_not_concurrent(&graph, initial.unwrap(), &BTreeSet::new());
 
     // Nodes that can not reach a terminal node.
-    let infinitely_looping_events = proto_graph::infinitely_looping_event_types(&graph, &happens_after);
+    let infinitely_looping_events =
+        proto_graph::infinitely_looping_event_types(&graph, &happens_after);
 
     ProtoInfo::new(
         vec![ProtoStruct::new(
@@ -539,16 +540,21 @@ fn after_not_concurrent_step(
     succ_map: &mut BTreeMap<EventType, BTreeSet<EventType>>,
 ) -> bool {
     if graph.node_count() == 0 || initial == NodeId::end() {
-        return true
+        return true;
     }
     let mut is_stable = true;
     let mut walk = DfsPostOrder::new(&graph, initial);
     while let Some(node) = walk.next(&graph) {
         for edge in graph.edges_directed(node, Outgoing) {
             let event_type = edge.weight().get_event_type();
-            let active_in_successor =
-                proto_graph::active_transitions_not_conc(edge.target(), graph, &event_type, concurrent_events)
-                    .into_iter().map(|label| label.get_event_type());
+            let active_in_successor = proto_graph::active_transitions_not_conc(
+                edge.target(),
+                graph,
+                &event_type,
+                concurrent_events,
+            )
+            .into_iter()
+            .map(|label| label.get_event_type());
 
             let mut succ_events: BTreeSet<EventType> = active_in_successor
                 .clone()
@@ -645,7 +651,8 @@ pub fn explicit_composition_proto_info(proto_info: ProtoInfo) -> ProtoInfo {
     let (composed, composed_initial) = explicit_composition(&proto_info);
     let succeeding_events =
         after_not_concurrent(&composed, composed_initial, &proto_info.concurrent_events);
-    let infinitely_looping_events = proto_graph::infinitely_looping_event_types(&composed, &succeeding_events);
+    let infinitely_looping_events =
+        proto_graph::infinitely_looping_event_types(&composed, &succeeding_events);
     ProtoInfo {
         protocols: vec![ProtoStruct::new(
             composed,
@@ -676,17 +683,15 @@ fn explicit_composition(proto_info: &ProtoInfo) -> (Graph, NodeId) {
             .intersection(&p.graph.get_roles())
             .cloned()
             .flat_map(|role| {
-                proto_info.role_event_map
+                proto_info
+                    .role_event_map
                     .get(&role)
                     .unwrap_or(&empty)
                     .iter()
                     .map(|label| label.get_event_type())
             })
             .collect();
-        let acc_roles = acc_roles
-            .into_iter()
-            .chain(p.graph.get_roles())
-            .collect();
+        let acc_roles = acc_roles.into_iter().chain(p.graph.get_roles()).collect();
         let (graph, initial) = composition::compose(
             acc_g,
             acc_i,
@@ -717,7 +722,6 @@ pub fn compose_protocols(protos: InterfacingProtocols) -> Result<(Graph, NodeId)
         .unwrap();
     Ok((p.graph, p.initial.unwrap()))
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -943,7 +947,10 @@ mod tests {
         fn looping_1() {
             test_utils::setup_logger();
             // Check states that can not reach terminal state an infinitely looping event types
-            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![test_utils::get_looping_proto_1()]));
+            let proto_info =
+                swarms_to_proto_info(InterfacingProtocols(
+                    vec![test_utils::get_looping_proto_1()],
+                ));
             assert!(proto_info.no_errors());
             assert_eq!(
                 proto_info
@@ -960,7 +967,10 @@ mod tests {
         fn looping_2() {
             test_utils::setup_logger();
             // Check states that can not reach terminal state an infinitely looping event types
-            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![test_utils::get_looping_proto_2()]));
+            let proto_info =
+                swarms_to_proto_info(InterfacingProtocols(
+                    vec![test_utils::get_looping_proto_2()],
+                ));
             assert!(proto_info.no_errors());
             assert_eq!(
                 proto_info
@@ -977,7 +987,10 @@ mod tests {
         fn looping_3() {
             test_utils::setup_logger();
             // Check states that can not reach terminal state an infinitely looping event types
-            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![test_utils::get_looping_proto_3()]));
+            let proto_info =
+                swarms_to_proto_info(InterfacingProtocols(
+                    vec![test_utils::get_looping_proto_3()],
+                ));
             assert!(proto_info.no_errors());
             assert_eq!(
                 proto_info
@@ -995,7 +1008,10 @@ mod tests {
             test_utils::setup_logger();
 
             // Check states that can not reach terminal state an infinitely looping event types
-            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![test_utils::get_looping_proto_4()]));
+            let proto_info =
+                swarms_to_proto_info(InterfacingProtocols(
+                    vec![test_utils::get_looping_proto_4()],
+                ));
             assert!(proto_info.no_errors());
             assert_eq!(
                 proto_info
@@ -1012,7 +1028,10 @@ mod tests {
         fn looping_5() {
             test_utils::setup_logger();
             // Check states that can not reach terminal state an infinitely looping event types
-            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![test_utils::get_looping_proto_5()]));
+            let proto_info =
+                swarms_to_proto_info(InterfacingProtocols(
+                    vec![test_utils::get_looping_proto_5()],
+                ));
             assert!(proto_info.no_errors());
             assert_eq!(
                 proto_info
@@ -1029,7 +1048,10 @@ mod tests {
         fn looping_6() {
             test_utils::setup_logger();
             // Check states that can not reach terminal state an infinitely looping event types
-            let proto_info = swarms_to_proto_info(InterfacingProtocols(vec![test_utils::get_looping_proto_6()]));
+            let proto_info =
+                swarms_to_proto_info(InterfacingProtocols(
+                    vec![test_utils::get_looping_proto_6()],
+                ));
             assert!(proto_info.no_errors());
             assert_eq!(
                 proto_info
@@ -1042,6 +1064,4 @@ mod tests {
             );
         }
     }
-
-
 }

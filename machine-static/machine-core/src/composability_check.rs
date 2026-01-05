@@ -2,7 +2,14 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use petgraph::visit::EdgeRef;
 
-use crate::{errors::Error, types::{proto_graph::EdgeId, proto_info::{ProtoInfo, ProtoStruct}, typescript_types::{Command, EventLabel, EventType}}};
+use crate::{
+    errors::Error,
+    types::{
+        proto_graph::EdgeId,
+        proto_info::{ProtoInfo, ProtoStruct},
+        typescript_types::{Command, EventLabel, EventType},
+    },
+};
 
 // Retrieve a graph or return an error.
 macro_rules! get_ith_or_error {
@@ -193,15 +200,19 @@ pub fn check_interface(proto_info1: &ProtoInfo, proto_info2: &ProtoInfo) -> Vec<
 mod tests {
     use super::*;
     use crate::test_utils;
+    use crate::types::{
+        proto_info,
+        typescript_types::{EventType, Role, SwarmLabel},
+    };
     use std::collections::{BTreeMap, BTreeSet};
-    use crate::types::{proto_info, typescript_types::{EventType, Role, SwarmLabel}};
     // Tests relating to composability: confusion-freeness. Interface tests in proto_info, proto_info calls functions defined in composability_check.
 
     #[test]
     fn test_prepare_graph_confusionfree() {
         test_utils::setup_logger();
         let composition = test_utils::get_interfacing_swarms_1();
-        let proto_info = proto_info::combine_proto_infos(proto_info::prepare_proto_infos(composition));
+        let proto_info =
+            proto_info::combine_proto_infos(proto_info::prepare_proto_infos(composition));
         let proto_info = proto_info::explicit_composition_proto_info(proto_info);
 
         assert!(proto_info.get_ith_proto(0).is_some());
@@ -390,5 +401,4 @@ mod tests {
         expected_errors.sort();
         assert_eq!(errors, expected_errors);
     }
-
 }

@@ -1,10 +1,11 @@
 use std::collections::BTreeMap;
 
-use crate::types::{projection::{Graph, OptionGraph}, proto_graph::NodeId, typescript_types::{MachineLabel, MachineType, State, Transition}};
-use petgraph::{
-    graph::EdgeReference,
-    visit::EdgeRef,
+use crate::types::{
+    projection::{Graph, OptionGraph},
+    proto_graph::NodeId,
+    typescript_types::{MachineLabel, MachineType, State, Transition},
 };
+use petgraph::{graph::EdgeReference, visit::EdgeRef};
 
 pub fn from_json(proto: MachineType) -> (OptionGraph, Option<NodeId>, Vec<String>) {
     let _span = tracing::debug_span!("from_json").entered();

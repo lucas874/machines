@@ -1,12 +1,14 @@
 use crate::types::proto_graph::{Graph, NodeId};
-use intern_arc::{global::hash_interner, InternedHash};
+use intern_arc::{InternedHash, global::hash_interner};
+use petgraph::{graph::EdgeReference, visit::EdgeRef};
 use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, collections::{BTreeMap, BTreeSet}, fmt, ops::Deref};
-use tsify::{Tsify, declare};
-use petgraph::{
-    graph::EdgeReference,
-    visit::EdgeRef,
+use std::{
+    borrow::Borrow,
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+    ops::Deref,
 };
+use tsify::{Tsify, declare};
 
 macro_rules! decl_str {
     ($n:ident) => {

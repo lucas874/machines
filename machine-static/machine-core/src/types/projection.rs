@@ -1,5 +1,8 @@
+use crate::types::{
+    proto_graph::NodeId,
+    typescript_types::{EventType, MachineLabel, State, SwarmLabel},
+};
 use std::collections::BTreeSet;
-use crate::types::{proto_graph::NodeId, typescript_types::{EventType, MachineLabel, State, SwarmLabel}};
 
 pub type Graph = petgraph::Graph<State, MachineLabel>;
 pub type OptionGraph = petgraph::Graph<Option<State>, MachineLabel>;

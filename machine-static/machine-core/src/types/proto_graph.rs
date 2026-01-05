@@ -1,11 +1,18 @@
-use std::collections::{BTreeMap, BTreeSet};
 use itertools::Itertools;
 use petgraph::{
-    Direction::{self, Outgoing}, visit::{Dfs, EdgeRef, GraphBase, Reversed, Walker}
+    Direction::{self, Outgoing},
+    visit::{Dfs, EdgeRef, GraphBase, Reversed, Walker},
 };
+use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{errors::Error, types::{proto_info::ProtoStruct, typescript_types::{EventLabel, EventType, State, SwarmLabel, SwarmProtocolType}}};
 use crate::types::proto_info;
+use crate::{
+    errors::Error,
+    types::{
+        proto_info::ProtoStruct,
+        typescript_types::{EventLabel, EventType, State, SwarmLabel, SwarmProtocolType},
+    },
+};
 
 pub type Graph = petgraph::Graph<State, SwarmLabel>;
 pub type NodeId = <petgraph::Graph<(), ()> as GraphBase>::NodeId;
@@ -94,7 +101,10 @@ pub fn active_transitions_not_conc(
 }
 
 // Return all event types that are part of an infinte loop in a graph (according to succ_map).
-pub fn infinitely_looping_event_types(graph: &Graph, succ_map: &BTreeMap<EventType, BTreeSet<EventType>>) -> BTreeSet<EventType> {
+pub fn infinitely_looping_event_types(
+    graph: &Graph,
+    succ_map: &BTreeMap<EventType, BTreeSet<EventType>>,
+) -> BTreeSet<EventType> {
     let _span = tracing::info_span!("infinitely_looping_event_types").entered();
     let nodes = nodes_not_reaching_terminal(graph);
     nodes

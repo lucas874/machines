@@ -1,11 +1,22 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{composition, types::{projection::{Graph, OptionGraph}, proto_graph::NodeId, proto_info::{self, ProtoInfo, UnordEventPair}, typescript_types::{BranchMap, EventLabel, EventType, MachineLabel, ProjToMachineStates, ProjectionInfo, Role, State, StateName, Subscriptions}}};
 use crate::machine::{projection, util};
+use crate::{
+    composition,
+    types::{
+        projection::{Graph, OptionGraph},
+        proto_graph::NodeId,
+        proto_info::{self, ProtoInfo, UnordEventPair},
+        typescript_types::{
+            BranchMap, EventLabel, EventType, MachineLabel, ProjToMachineStates, ProjectionInfo,
+            Role, State, StateName, Subscriptions,
+        },
+    },
+};
 use itertools::Itertools;
 use petgraph::{
-    visit::{EdgeRef, IntoNodeReferences},
     Direction::Outgoing,
+    visit::{EdgeRef, IntoNodeReferences},
 };
 // Possibly move to adaptation.
 // Used for creating adapted machine.
@@ -106,10 +117,15 @@ fn adapted_projection(
     };
 
     let projections: Vec<(AdaptationGraph, NodeId, BTreeSet<EventType>)> =
-        projection::to_chained_projections(projection::to_chained_protos(proto_info), subs, role, minimize)
-            .into_iter()
-            .map(mapper)
-            .collect();
+        projection::to_chained_projections(
+            projection::to_chained_protos(proto_info),
+            subs,
+            role,
+            minimize,
+        )
+        .into_iter()
+        .map(mapper)
+        .collect();
 
     //AdaptationGraph{state: n.clone(), machine_state: Some(state.clone())}
     let (machine, machine_initial) = (from_option_graph_to_graph(&machine.0), machine.1);
@@ -231,9 +247,10 @@ fn visit_successors_stop_on_branch(
     while let Some(node) = to_visit.pop() {
         visited.insert(node);
         for e in proj.edges_directed(node, Outgoing) {
-            if !concurrent_events
-                .contains(&proto_info::unord_event_pair(e.weight().get_event_type(), et.clone()))
-            {
+            if !concurrent_events.contains(&proto_info::unord_event_pair(
+                e.weight().get_event_type(),
+                et.clone(),
+            )) {
                 event_types.insert(e.weight().get_event_type());
             }
             if !special_events.contains(&e.weight().get_event_type())
@@ -260,11 +277,13 @@ fn from_adaptation_graph_to_option_graph(graph: &AdaptationGraph) -> OptionGraph
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::machine::util;
     use crate::subscription::overapproximation;
-    use crate::types::typescript_types::{Command, Granularity, InterfacingProtocols, MachineType, State, Transition};
     use crate::test_utils;
     use crate::types::proto_info;
-    use crate::machine::util;
+    use crate::types::typescript_types::{
+        Command, Granularity, InterfacingProtocols, MachineType, State, Transition,
+    };
 
     #[test]
     fn test_adapted_projection_fl() {
@@ -439,8 +458,10 @@ mod tests {
         );
         let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
         let mut adapted_fl = util::to_json_machine(
-            from_option_graph_to_graph(&from_adaptation_graph_to_option_graph(&adapted_proj.clone())),
-            adapted_proj_initial.unwrap()
+            from_option_graph_to_graph(&from_adaptation_graph_to_option_graph(
+                &adapted_proj.clone(),
+            )),
+            adapted_proj_initial.unwrap(),
         );
 
         adapted_fl.transitions.sort();
@@ -469,8 +490,10 @@ mod tests {
         );
         let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
         let mut adapted_fl = util::to_json_machine(
-            from_option_graph_to_graph(&from_adaptation_graph_to_option_graph(&adapted_proj.clone())),
-            adapted_proj_initial.unwrap()
+            from_option_graph_to_graph(&from_adaptation_graph_to_option_graph(
+                &adapted_proj.clone(),
+            )),
+            adapted_proj_initial.unwrap(),
         );
 
         adapted_fl.transitions.sort();
@@ -584,133 +607,133 @@ mod tests {
             transitions: vec![
                 Transition {
                     label: MachineLabel::Input {
-                        event_type: EventType::new("partID")
+                        event_type: EventType::new("partID"),
                     },
                     source: State::new("{ { 0 } } || (0 || { { 0 } }) || { { 0 } }"),
-                    target: State::new("{ { 1 } } || (0 || { { 1 } }) || { { 0 } }")
+                    target: State::new("{ { 1 } } || (0 || { { 1 } }) || { { 0 } }"),
                 },
                 Transition {
                     label: MachineLabel::Input {
-                        event_type: EventType::new("time")
+                        event_type: EventType::new("time"),
                     },
                     source: State::new("{ { 0 } } || (0 || { { 0 } }) || { { 0 } }"),
-                    target: State::new("{ { 3 } } || (0 || { { 0 } }) || { { 0 } }")
+                    target: State::new("{ { 3 } } || (0 || { { 0 } }) || { { 0 } }"),
                 },
                 Transition {
                     label: MachineLabel::Input {
-                        event_type: EventType::new("observing")
+                        event_type: EventType::new("observing"),
                     },
                     source: State::new("{ { 0 } } || (0 || { { 0 } }) || { { 0 } }"),
-                    target: State::new("{ { 0 } } || (0 || { { 0 } }) || { { 1 } }")
+                    target: State::new("{ { 0 } } || (0 || { { 0 } }) || { { 1 } }"),
                 },
                 Transition {
                     label: MachineLabel::Input {
-                        event_type: EventType::new("partID")
+                        event_type: EventType::new("partID"),
                     },
                     source: State::new("{ { 0 } } || (0 || { { 0 } }) || { { 1 } }"),
-                    target: State::new("{ { 1 } } || (0 || { { 1 } }) || { { 1 } }")
+                    target: State::new("{ { 1 } } || (0 || { { 1 } }) || { { 1 } }"),
                 },
                 Transition {
                     label: MachineLabel::Input {
-                        event_type: EventType::new("time")
+                        event_type: EventType::new("time"),
                     },
                     source: State::new("{ { 0 } } || (0 || { { 0 } }) || { { 1 } }"),
-                    target: State::new("{ { 3 } } || (0 || { { 0 } }) || { { 1 } }")
+                    target: State::new("{ { 3 } } || (0 || { { 0 } }) || { { 1 } }"),
                 },
                 Transition {
                     label: MachineLabel::Input {
-                        event_type: EventType::new("part")
+                        event_type: EventType::new("part"),
                     },
                     source: State::new("{ { 1 } } || (0 || { { 1 } }) || { { 1 } }"),
-                    target: State::new("{ { 0 } } || (1 || { { 2 } }) || { { 1 } }")
+                    target: State::new("{ { 0 } } || (1 || { { 2 } }) || { { 1 } }"),
                 },
                 Transition {
                     label: MachineLabel::Input {
-                        event_type: EventType::new("time")
+                        event_type: EventType::new("time"),
                     },
                     source: State::new("{ { 0 } } || (1 || { { 2 } }) || { { 1 } }"),
-                    target: State::new("{ { 3 } } || (1 || { { 2 } }) || { { 1 } }")
+                    target: State::new("{ { 3 } } || (1 || { { 2 } }) || { { 1 } }"),
                 },
                 Transition {
                     label: MachineLabel::Execute {
                         cmd: Command::new("build"),
-                        log_type: vec![EventType::new("car")]
+                        log_type: vec![EventType::new("car")],
                     },
                     source: State::new("{ { 0 } } || (1 || { { 2 } }) || { { 1 } }"),
-                    target: State::new("{ { 0 } } || (1 || { { 2 } }) || { { 1 } }")
+                    target: State::new("{ { 0 } } || (1 || { { 2 } }) || { { 1 } }"),
                 },
                 Transition {
                     label: MachineLabel::Input {
-                        event_type: EventType::new("car")
+                        event_type: EventType::new("car"),
                     },
                     source: State::new("{ { 0 } } || (1 || { { 2 } }) || { { 1 } }"),
-                    target: State::new("{ { 0 } } || (2 || { { 3 } }) || { { 2 } }")
+                    target: State::new("{ { 0 } } || (2 || { { 3 } }) || { { 2 } }"),
                 },
                 Transition {
                     label: MachineLabel::Input {
-                        event_type: EventType::new("time")
+                        event_type: EventType::new("time"),
                     },
                     source: State::new("{ { 0 } } || (2 || { { 3 } }) || { { 2 } }"),
-                    target: State::new("{ { 3 } } || (2 || { { 3 } }) || { { 2 } }")
+                    target: State::new("{ { 3 } } || (2 || { { 3 } }) || { { 2 } }"),
                 },
                 Transition {
                     label: MachineLabel::Execute {
                         cmd: Command::new("build"),
-                        log_type: vec![EventType::new("car")]
+                        log_type: vec![EventType::new("car")],
                     },
                     source: State::new("{ { 3 } } || (1 || { { 2 } }) || { { 1 } }"),
-                    target: State::new("{ { 3 } } || (1 || { { 2 } }) || { { 1 } }")
+                    target: State::new("{ { 3 } } || (1 || { { 2 } }) || { { 1 } }"),
                 },
                 Transition {
                     label: MachineLabel::Input {
-                        event_type: EventType::new("car")
+                        event_type: EventType::new("car"),
                     },
                     source: State::new("{ { 3 } } || (1 || { { 2 } }) || { { 1 } }"),
-                    target: State::new("{ { 3 } } || (2 || { { 3 } }) || { { 2 } }")
+                    target: State::new("{ { 3 } } || (2 || { { 3 } }) || { { 2 } }"),
                 },
                 Transition {
                     label: MachineLabel::Input {
-                        event_type: EventType::new("observing")
+                        event_type: EventType::new("observing"),
                     },
                     source: State::new("{ { 3 } } || (0 || { { 0 } }) || { { 0 } }"),
-                    target: State::new("{ { 3 } } || (0 || { { 0 } }) || { { 1 } }")
+                    target: State::new("{ { 3 } } || (0 || { { 0 } }) || { { 1 } }"),
                 },
                 Transition {
                     label: MachineLabel::Input {
-                        event_type: EventType::new("part")
+                        event_type: EventType::new("part"),
                     },
                     source: State::new("{ { 1 } } || (0 || { { 1 } }) || { { 0 } }"),
-                    target: State::new("{ { 0 } } || (1 || { { 2 } }) || { { 0 } }")
+                    target: State::new("{ { 0 } } || (1 || { { 2 } }) || { { 0 } }"),
                 },
                 Transition {
                     label: MachineLabel::Input {
-                        event_type: EventType::new("observing")
+                        event_type: EventType::new("observing"),
                     },
                     source: State::new("{ { 1 } } || (0 || { { 1 } }) || { { 0 } }"),
-                    target: State::new("{ { 1 } } || (0 || { { 1 } }) || { { 1 } }")
+                    target: State::new("{ { 1 } } || (0 || { { 1 } }) || { { 1 } }"),
                 },
                 Transition {
                     label: MachineLabel::Input {
-                        event_type: EventType::new("time")
+                        event_type: EventType::new("time"),
                     },
                     source: State::new("{ { 0 } } || (1 || { { 2 } }) || { { 0 } }"),
-                    target: State::new("{ { 3 } } || (1 || { { 2 } }) || { { 0 } }")
+                    target: State::new("{ { 3 } } || (1 || { { 2 } }) || { { 0 } }"),
                 },
                 Transition {
                     label: MachineLabel::Input {
-                        event_type: EventType::new("observing")
+                        event_type: EventType::new("observing"),
                     },
                     source: State::new("{ { 0 } } || (1 || { { 2 } }) || { { 0 } }"),
-                    target: State::new("{ { 0 } } || (1 || { { 2 } }) || { { 1 } }")
+                    target: State::new("{ { 0 } } || (1 || { { 2 } }) || { { 1 } }"),
                 },
                 Transition {
                     label: MachineLabel::Input {
-                        event_type: EventType::new("observing")
+                        event_type: EventType::new("observing"),
                     },
                     source: State::new("{ { 3 } } || (1 || { { 2 } }) || { { 0 } }"),
-                    target: State::new("{ { 3 } } || (1 || { { 2 } }) || { { 1 } }")
-                }
-            ]
+                    target: State::new("{ { 3 } } || (1 || { { 2 } }) || { { 1 } }"),
+                },
+            ],
         };
 
         let (f_m_graph, f_m_graph_initial, _) = util::from_json(f_m);
@@ -738,8 +761,10 @@ mod tests {
         let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
 
         let mut adapted_f = util::to_json_machine(
-            from_option_graph_to_graph(&from_adaptation_graph_to_option_graph(&adapted_proj.clone())),
-            adapted_proj_initial.unwrap()
+            from_option_graph_to_graph(&from_adaptation_graph_to_option_graph(
+                &adapted_proj.clone(),
+            )),
+            adapted_proj_initial.unwrap(),
         );
         adapted_f.transitions.sort();
         expected_adapted_f_m_1.transitions.sort();
@@ -767,8 +792,10 @@ mod tests {
         );
         let (adapted_proj, adapted_proj_initial) = adapted.unwrap();
         let mut adapted_f = util::to_json_machine(
-            from_option_graph_to_graph(&from_adaptation_graph_to_option_graph(&adapted_proj.clone())),
-            adapted_proj_initial.unwrap()
+            from_option_graph_to_graph(&from_adaptation_graph_to_option_graph(
+                &adapted_proj.clone(),
+            )),
+            adapted_proj_initial.unwrap(),
         );
 
         adapted_f.transitions.sort();
@@ -900,9 +927,7 @@ mod tests {
         );
         let projection_info = match projection_info {
             None => panic!(),
-            Some(projection_info) => {
-                projection_info
-            }
+            Some(projection_info) => projection_info,
         };
 
         let expected_proj_to_machine_states = BTreeMap::from([
@@ -1050,12 +1075,11 @@ mod tests {
         let role = Role::new("FL");
         let swarms: InterfacingProtocols = InterfacingProtocols(vec![test_utils::get_proto1()]);
         let swarms_for_sub = test_utils::get_interfacing_swarms_1();
-        let larger_than_necessary_sub =
-            overapproximation::overapprox_well_formed_sub(
-                swarms_for_sub,
-                &BTreeMap::new(),
-                Granularity::TwoStep,
-            );
+        let larger_than_necessary_sub = overapproximation::overapprox_well_formed_sub(
+            swarms_for_sub,
+            &BTreeMap::new(),
+            Granularity::TwoStep,
+        );
         assert!(larger_than_necessary_sub.is_ok());
         let subs1 = larger_than_necessary_sub.unwrap();
         let proto_info = proto_info::swarms_to_proto_info(swarms.clone());
@@ -1070,9 +1094,7 @@ mod tests {
         );
         let projection_info = match projection_info {
             None => panic!(),
-            Some(projection_info) => {
-                projection_info
-            }
+            Some(projection_info) => projection_info,
         };
         let expected_proj_to_machine_states = BTreeMap::from([
             (State::new("(0 || { { 0 } })"), vec![State::new("0")]),

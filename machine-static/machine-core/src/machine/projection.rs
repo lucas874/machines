@@ -1,15 +1,26 @@
 use std::collections::BTreeSet;
 
 use petgraph::{
+    Direction::{Incoming, Outgoing},
     graph::EdgeReference,
     visit::{EdgeFiltered, EdgeRef, IntoEdgeReferences, IntoEdgesDirected, IntoNodeReferences},
-    Direction::{Incoming, Outgoing},
 };
 
-use crate::{machine::minimize, types::{projection::{ChainedProjections, ChainedProtos, OptionGraph}, proto_info::{ProtoInfo, ProtoStruct}, typescript_types::EventType}};
+use crate::{
+    machine::minimize,
+    types::{
+        projection::{ChainedProjections, ChainedProtos, OptionGraph},
+        proto_info::{ProtoInfo, ProtoStruct},
+        typescript_types::EventType,
+    },
+};
 
-use crate::types::{projection::Graph, proto_graph::NodeId, typescript_types::{EventLabel, MachineLabel, Role, StateName, Subscriptions, SwarmLabel}};
 use crate::composition;
+use crate::types::{
+    projection::Graph,
+    proto_graph::NodeId,
+    typescript_types::{EventLabel, MachineLabel, Role, StateName, Subscriptions, SwarmLabel},
+};
 
 // Edge reference for graphs representing protocols. Used when filtering out edges that are not to be included in projection.
 type ERef<'a> = <&'a crate::types::proto_graph::Graph as IntoEdgeReferences>::EdgeRef;
@@ -116,7 +127,7 @@ pub(crate) fn to_chained_protos(proto_info: &ProtoInfo) -> ChainedProtos {
             .chain([(proto.graph, proto.initial.unwrap(), interfacing_event_types)])
             .collect();
 
-        (acc,proto.roles.union(&roles_prev).cloned().collect())
+        (acc, proto.roles.union(&roles_prev).cloned().collect())
     };
     let (chained_protos, _) = proto_info
         .protocols
@@ -180,7 +191,9 @@ pub(crate) fn combine_projs<N: Clone, E: Clone + EventLabel>(
     let (acc_machine, acc_initial, _) = projections[0].clone();
     let (combined_projection, combined_initial) = projections[1..].to_vec().into_iter().fold(
         (acc_machine, acc_initial),
-        |(acc, acc_i), (m, i, interface)| composition::compose(acc, acc_i, m, i, interface, gen_node),
+        |(acc, acc_i), (m, i, interface)| {
+            composition::compose(acc, acc_i, m, i, interface, gen_node)
+        },
     );
     Some((combined_projection, combined_initial))
 }
@@ -194,11 +207,13 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::*;
-    use crate::subscription::{exact, overapproximation};
-    use crate::types::typescript_types::{Command, Granularity, InterfacingProtocols, MachineType, State, Transition};
-    use crate::{test_utils, types::typescript_types::SwarmProtocolType};
-    use crate::types::{proto_graph, proto_info};
     use crate::machine::util;
+    use crate::subscription::{exact, overapproximation};
+    use crate::types::typescript_types::{
+        Command, Granularity, InterfacingProtocols, MachineType, State, Transition,
+    };
+    use crate::types::{proto_graph, proto_info};
+    use crate::{test_utils, types::typescript_types::SwarmProtocolType};
 
     /* fn print_machines(m1: &MachineType, m2: &MachineType) {
         println!("{}", serde_json::to_string_pretty(&m1).unwrap());
@@ -277,8 +292,10 @@ mod tests {
         test_utils::setup_logger();
         // warehouse example from coplaws slides
         let proto = test_utils::get_proto1();
-        let result_subs =
-            exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+        let result_subs = exact::exact_well_formed_sub(
+            InterfacingProtocols(vec![proto.clone()]),
+            &BTreeMap::new(),
+        );
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("FL");
@@ -343,8 +360,10 @@ mod tests {
         test_utils::setup_logger();
         // car factory from coplaws example
         let proto = test_utils::get_proto2();
-        let result_subs =
-            exact::exact_well_formed_sub(InterfacingProtocols(vec![proto.clone()]), &BTreeMap::new());
+        let result_subs = exact::exact_well_formed_sub(
+            InterfacingProtocols(vec![proto.clone()]),
+            &BTreeMap::new(),
+        );
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
         let role = Role::new("F");
@@ -482,7 +501,7 @@ mod tests {
         assert_eq!(proj_machine, expected_machine);
     }
 
-#[test]
+    #[test]
     fn test_compose_zero() {
         let left = MachineType {
             initial: State::new("left_0"),

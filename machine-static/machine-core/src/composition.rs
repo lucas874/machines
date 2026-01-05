@@ -1,10 +1,9 @@
-use std::collections::{BTreeMap, BTreeSet};
-use crate::types::{proto_graph::NodeId, typescript_types::{EventLabel, EventType, StateName}};
-use petgraph::{
-    graph::EdgeReference,
-    visit::{EdgeRef},
-    Direction::{Outgoing},
+use crate::types::{
+    proto_graph::NodeId,
+    typescript_types::{EventLabel, EventType, StateName},
 };
+use petgraph::{Direction::Outgoing, graph::EdgeReference, visit::EdgeRef};
+use std::collections::{BTreeMap, BTreeSet};
 
 // Compose graph1 and graph2 (representing either protocols or machines)
 // synchronizing on the event types in interface.

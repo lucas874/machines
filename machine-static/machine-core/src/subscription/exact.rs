@@ -1,9 +1,19 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use petgraph::{Direction::{Incoming, Outgoing}, visit::{Dfs, EdgeRef, Walker}};
+use petgraph::{
+    Direction::{Incoming, Outgoing},
+    visit::{Dfs, EdgeRef, Walker},
+};
 
-use crate::{errors::ErrorReport, types::{proto_graph::{Graph, NodeId}, proto_info::{ProtoInfo, ProtoStruct, UnordEventPair}, typescript_types::{EventLabel, EventType, InterfacingProtocols, Role, Subscriptions}}};
 use crate::types::{proto_graph, proto_info};
+use crate::{
+    errors::ErrorReport,
+    types::{
+        proto_graph::{Graph, NodeId},
+        proto_info::{ProtoInfo, ProtoStruct, UnordEventPair},
+        typescript_types::{EventLabel, EventType, InterfacingProtocols, Role, Subscriptions},
+    },
+};
 
 // Construct a wf-subscription by constructing the composition of all protocols in protos and analyzing the result
 pub fn exact_well_formed_sub(
@@ -66,7 +76,7 @@ fn exact_wf_sub_step(
 ) -> bool {
     let _span = tracing::info_span!("exact_wf_sub_step").entered();
     if graph.node_count() == 0 || initial == NodeId::end() {
-        return true
+        return true;
     }
     let mut is_stable = true;
     let add_to_sub =
@@ -112,7 +122,8 @@ fn exact_wf_sub_step(
             }
 
             // Find all, if any, roles that subscribe to event types emitted later in the protocol.
-            let involved_roles = proto_info::roles_on_path(event_type.clone(), &proto_info, &subscriptions);
+            let involved_roles =
+                proto_info::roles_on_path(event_type.clone(), &proto_info, &subscriptions);
 
             // Determinacy 1: roles subscribe to branching events.
             // Events that are branching with event_type.
@@ -150,9 +161,9 @@ fn exact_wf_sub_step(
                         .filter(|pair| proto_info.concurrent_events.contains(pair))
                         .filter(|pair| {
                             pair.iter().all(|e| {
-                                !proto_info
-                                    .concurrent_events
-                                    .contains(&proto_info::unord_event_pair(e.clone(), event_type.clone()))
+                                !proto_info.concurrent_events.contains(
+                                    &proto_info::unord_event_pair(e.clone(), event_type.clone()),
+                                )
                             })
                         })
                         .collect();
@@ -181,41 +192,169 @@ mod tests {
         test_utils::setup_logger();
 
         // Test interfacing_swarms_1
-        let result_1 = exact_well_formed_sub(test_utils::get_interfacing_swarms_1(), &BTreeMap::new());
+        let result_1 =
+            exact_well_formed_sub(test_utils::get_interfacing_swarms_1(), &BTreeMap::new());
         assert!(result_1.is_ok());
         let subs_1 = result_1.unwrap();
         let expected_subs_1: Subscriptions = BTreeMap::from([
-            (Role::from("T"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time")])),
-            (Role::from("FL"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("time")])),
-            (Role::from("D"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time")])),
-            (Role::from("F"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car")])),
+            (
+                Role::from("T"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("pos"),
+                    EventType::from("part"),
+                    EventType::from("time"),
+                ]),
+            ),
+            (
+                Role::from("FL"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("pos"),
+                    EventType::from("time"),
+                ]),
+            ),
+            (
+                Role::from("D"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("part"),
+                    EventType::from("time"),
+                ]),
+            ),
+            (
+                Role::from("F"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("part"),
+                    EventType::from("time"),
+                    EventType::from("car"),
+                ]),
+            ),
         ]);
         assert_eq!(subs_1, expected_subs_1);
 
         // Test interfacing_swarms_2
-        let result_2 = exact_well_formed_sub(test_utils::get_interfacing_swarms_2(), &BTreeMap::new());
+        let result_2 =
+            exact_well_formed_sub(test_utils::get_interfacing_swarms_2(), &BTreeMap::new());
         assert!(result_2.is_ok());
         let subs_2 = result_2.unwrap();
         let expected_subs_2: Subscriptions = BTreeMap::from([
-            (Role::from("T"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time")])),
-            (Role::from("FL"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("time")])),
-            (Role::from("D"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time")])),
-            (Role::from("F"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1")])),
-            (Role::from("TR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2")])),
-            (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2"), EventType::from("ok"), EventType::from("notOk")])),
+            (
+                Role::from("T"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("pos"),
+                    EventType::from("part"),
+                    EventType::from("time"),
+                ]),
+            ),
+            (
+                Role::from("FL"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("pos"),
+                    EventType::from("time"),
+                ]),
+            ),
+            (
+                Role::from("D"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("part"),
+                    EventType::from("time"),
+                ]),
+            ),
+            (
+                Role::from("F"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("part"),
+                    EventType::from("time"),
+                    EventType::from("car"),
+                    EventType::from("report1"),
+                ]),
+            ),
+            (
+                Role::from("TR"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("part"),
+                    EventType::from("time"),
+                    EventType::from("car"),
+                    EventType::from("report1"),
+                    EventType::from("report2"),
+                ]),
+            ),
+            (
+                Role::from("QCR"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("part"),
+                    EventType::from("time"),
+                    EventType::from("car"),
+                    EventType::from("report1"),
+                    EventType::from("report2"),
+                    EventType::from("ok"),
+                    EventType::from("notOk"),
+                ]),
+            ),
         ]);
         assert_eq!(subs_2, expected_subs_2);
 
         // Test interfacing_swarms_3
-        let result_3 = exact_well_formed_sub(test_utils::get_interfacing_swarms_3(), &BTreeMap::new());
+        let result_3 =
+            exact_well_formed_sub(test_utils::get_interfacing_swarms_3(), &BTreeMap::new());
         assert!(result_3.is_ok());
         let subs_3 = result_3.unwrap();
         let expected_subs_3: Subscriptions = BTreeMap::from([
-            (Role::from("T"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time")])),
-            (Role::from("FL"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("time")])),
-            (Role::from("D"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time")])),
-            (Role::from("F"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report2")])),
-            (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("report1"), EventType::from("report2"), EventType::from("report3")]))
+            (
+                Role::from("T"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("pos"),
+                    EventType::from("part"),
+                    EventType::from("time"),
+                ]),
+            ),
+            (
+                Role::from("FL"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("pos"),
+                    EventType::from("time"),
+                ]),
+            ),
+            (
+                Role::from("D"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("part"),
+                    EventType::from("time"),
+                ]),
+            ),
+            (
+                Role::from("F"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("part"),
+                    EventType::from("time"),
+                    EventType::from("car"),
+                    EventType::from("report2"),
+                ]),
+            ),
+            (
+                Role::from("QCR"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("part"),
+                    EventType::from("time"),
+                    EventType::from("car"),
+                    EventType::from("report1"),
+                    EventType::from("report2"),
+                    EventType::from("report3"),
+                ]),
+            ),
         ]);
         assert_eq!(subs_3, expected_subs_3);
     }
@@ -230,26 +369,88 @@ mod tests {
         assert_eq!(empty.unwrap(), BTreeMap::new());
 
         // Test interfacing_swarms_4
-        let result_4 = exact_well_formed_sub(test_utils::get_interfacing_swarms_4(), &BTreeMap::new());
+        let result_4 =
+            exact_well_formed_sub(test_utils::get_interfacing_swarms_4(), &BTreeMap::new());
         assert!(result_4.is_ok());
         let subs_4 = result_4.unwrap();
         let expected_subs_4: Subscriptions = BTreeMap::from([
-            (Role::from("T"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("part"), EventType::from("time")])),
-            (Role::from("FL"), BTreeSet::from([EventType::from("partID"), EventType::from("pos"), EventType::from("time")])),
-            (Role::from("D"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time")])),
-            (Role::from("F"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("observing")])),
-            (Role::from("QCR"), BTreeSet::from([EventType::from("partID"), EventType::from("part"), EventType::from("time"), EventType::from("car"), EventType::from("observing"), EventType::from("report")]))
+            (
+                Role::from("T"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("pos"),
+                    EventType::from("part"),
+                    EventType::from("time"),
+                ]),
+            ),
+            (
+                Role::from("FL"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("pos"),
+                    EventType::from("time"),
+                ]),
+            ),
+            (
+                Role::from("D"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("part"),
+                    EventType::from("time"),
+                ]),
+            ),
+            (
+                Role::from("F"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("part"),
+                    EventType::from("time"),
+                    EventType::from("car"),
+                    EventType::from("observing"),
+                ]),
+            ),
+            (
+                Role::from("QCR"),
+                BTreeSet::from([
+                    EventType::from("partID"),
+                    EventType::from("part"),
+                    EventType::from("time"),
+                    EventType::from("car"),
+                    EventType::from("observing"),
+                    EventType::from("report"),
+                ]),
+            ),
         ]);
         assert_eq!(subs_4, expected_subs_4);
 
         // Test interfacing_swarms_5
-        let result_5 = exact_well_formed_sub(test_utils::get_interfacing_swarms_5(), &BTreeMap::new());
+        let result_5 =
+            exact_well_formed_sub(test_utils::get_interfacing_swarms_5(), &BTreeMap::new());
         assert!(result_5.is_ok());
         let subs_5 = result_5.unwrap();
         let expected_subs_5: Subscriptions = BTreeMap::from([
-            (Role::from("IR"), BTreeSet::from([EventType::from("e_ir_0"), EventType::from("e_ir_1"), EventType::from("e_r0_1"), EventType::from("e_r1_0")])),
-            (Role::from("R0"), BTreeSet::from([EventType::from("e_ir_0"), EventType::from("e_ir_1"), EventType::from("e_r0_0"), EventType::from("e_r0_1")])),
-            (Role::from("R1"), BTreeSet::from([EventType::from("e_ir_0"), EventType::from("e_r1_0")])),
+            (
+                Role::from("IR"),
+                BTreeSet::from([
+                    EventType::from("e_ir_0"),
+                    EventType::from("e_ir_1"),
+                    EventType::from("e_r0_1"),
+                    EventType::from("e_r1_0"),
+                ]),
+            ),
+            (
+                Role::from("R0"),
+                BTreeSet::from([
+                    EventType::from("e_ir_0"),
+                    EventType::from("e_ir_1"),
+                    EventType::from("e_r0_0"),
+                    EventType::from("e_r0_1"),
+                ]),
+            ),
+            (
+                Role::from("R1"),
+                BTreeSet::from([EventType::from("e_ir_0"), EventType::from("e_r1_0")]),
+            ),
         ]);
         assert_eq!(subs_5, expected_subs_5);
     }
@@ -261,11 +462,51 @@ mod tests {
         assert!(result.is_ok());
         let subs = result.unwrap();
         let expected_subs: Subscriptions = BTreeMap::from([
-            (Role::from("IR0"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir0_1"), EventType::from("e_ir1_0"), EventType::from("e_ra"), EventType::from("e_rb")])),
-            (Role::from("IR1"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir1_0"), EventType::from("e_ir1_1"), EventType::from("e_ra"), EventType::from("e_rc")])),
-            (Role::from("RA"), BTreeSet::from([EventType::from("e_ir0_0"), EventType::from("e_ir1_0"), EventType::from("e_ra")])),
-            (Role::from("RB"), BTreeSet::from([EventType::from("e_ir1_0"), EventType::from("e_ir1_1"), EventType::from("e_ra"), EventType::from("e_rb")])),
-            (Role::from("RC"), BTreeSet::from([EventType::from("e_ir1_0"), EventType::from("e_ra"), EventType::from("e_rc")])),
+            (
+                Role::from("IR0"),
+                BTreeSet::from([
+                    EventType::from("e_ir0_0"),
+                    EventType::from("e_ir0_1"),
+                    EventType::from("e_ir1_0"),
+                    EventType::from("e_ra"),
+                    EventType::from("e_rb"),
+                ]),
+            ),
+            (
+                Role::from("IR1"),
+                BTreeSet::from([
+                    EventType::from("e_ir0_0"),
+                    EventType::from("e_ir1_0"),
+                    EventType::from("e_ir1_1"),
+                    EventType::from("e_ra"),
+                    EventType::from("e_rc"),
+                ]),
+            ),
+            (
+                Role::from("RA"),
+                BTreeSet::from([
+                    EventType::from("e_ir0_0"),
+                    EventType::from("e_ir1_0"),
+                    EventType::from("e_ra"),
+                ]),
+            ),
+            (
+                Role::from("RB"),
+                BTreeSet::from([
+                    EventType::from("e_ir1_0"),
+                    EventType::from("e_ir1_1"),
+                    EventType::from("e_ra"),
+                    EventType::from("e_rb"),
+                ]),
+            ),
+            (
+                Role::from("RC"),
+                BTreeSet::from([
+                    EventType::from("e_ir1_0"),
+                    EventType::from("e_ra"),
+                    EventType::from("e_rc"),
+                ]),
+            ),
         ]);
         assert_eq!(subs, expected_subs);
     }

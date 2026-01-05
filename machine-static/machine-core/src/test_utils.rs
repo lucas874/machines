@@ -1,6 +1,6 @@
 use crate::types::typescript_types::{InterfacingProtocols, SwarmProtocolType};
 
-use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, fmt::format::FmtSpan};
 pub fn setup_logger() {
     fmt()
         .with_env_filter(EnvFilter::from_default_env())
@@ -343,7 +343,7 @@ pub fn get_interfacing_swarms_pat_4() -> InterfacingProtocols {
 
 // get_interfacing_swarms_3 from composition_machine.rs
 pub fn get_interfacing_swarms_3_machine() -> InterfacingProtocols {
-        InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto_41()])
+    InterfacingProtocols(vec![get_proto1(), get_proto2(), get_proto_41()])
 }
 
 pub fn get_looping_proto_1() -> SwarmProtocolType {

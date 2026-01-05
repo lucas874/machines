@@ -1,7 +1,10 @@
-use std::fmt;
+use crate::types::{
+    proto_graph::{EdgeId, Graph, NodeId},
+    typescript_types::{Command, EventType, Role, StateName, SwarmLabel},
+};
 use itertools::Itertools;
 use std::collections::BTreeSet;
-use crate::types::{proto_graph::{EdgeId, Graph, NodeId}, typescript_types::{StateName, SwarmLabel, Command, EventType, Role}};
+use std::fmt;
 
 const INVALID_EDGE: &str = "[invalid EdgeId]";
 
@@ -53,7 +56,10 @@ impl Error {
     fn to_string<N: StateName>(&self, graph: &petgraph::Graph<N, SwarmLabel>) -> String {
         match self {
             Error::ActiveRoleNotSubscribed(edge) => {
-                format!("active role does not subscribe to any of its emitted event types in transition {}", Edge(graph, *edge))
+                format!(
+                    "active role does not subscribe to any of its emitted event types in transition {}",
+                    Edge(graph, *edge)
+                )
             }
             Error::LaterActiveRoleNotSubscribed(edge, role) => {
                 format!(
@@ -120,10 +126,14 @@ impl Error {
                 )
             }
             Error::EventTypeOnDifferentLabels(event_type, command1, role1, command2, role2) => {
-                format!("Event type {event_type} appears as {command1}@{role1}<{event_type}> and as {command2}@{role2}<{event_type}>")
+                format!(
+                    "Event type {event_type} appears as {command1}@{role1}<{event_type}> and as {command2}@{role2}<{event_type}>"
+                )
             }
             Error::CommandOnDifferentLabels(command, event_type1, role1, event_type2, role2) => {
-                format!("Command {command} appears as {command}@{role1}<{event_type1}> and as {command}@{role2}<{event_type2}>")
+                format!(
+                    "Command {command} appears as {command}@{role1}<{event_type1}> and as {command}@{role2}<{event_type2}>"
+                )
             }
             Error::MoreThanOneEventTypeInCommand(edge) => {
                 format!(
@@ -184,8 +194,7 @@ impl ErrorReport {
     }
 
     pub fn to_strings(&self) -> Vec<String> {
-        self
-            .errors()
+        self.errors()
             .into_iter()
             .flat_map(|(g, e)| e.into_iter().map(Error::convert(&g)).collect::<Vec<_>>())
             .collect()
