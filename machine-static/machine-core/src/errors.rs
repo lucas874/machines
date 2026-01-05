@@ -8,6 +8,7 @@ const INVALID_EDGE: &str = "[invalid EdgeId]";
 /// helper for printing a transition
 struct Edge<'a, N: StateName>(&'a petgraph::Graph<N, SwarmLabel>, EdgeId);
 
+// Copied into test module of machine-check/swarm.rs. Consider a better solution.
 impl<'a, N: StateName> fmt::Display for Edge<'a, N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Some((source, target)) = self.0.edge_endpoints(self.1) else {
@@ -19,14 +20,6 @@ impl<'a, N: StateName> fmt::Display for Edge<'a, N> {
         write!(f, "({source})--[{label}]-->({target})")
     }
 }
-
-// use pub struct Edge... for this to work. Right now just copied whole edge and fmt implemenation to that ONE place outside of here that needed it it.
-// -- tests in machine-check
-/* impl<'a, N: StateName> Edge<'a, N> {
-    pub fn new(graph: &'a petgraph::Graph<N, SwarmLabel>, edge_id: EdgeId) -> Self {
-        Self(graph, edge_id)
-    }
-} */
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Error {
