@@ -97,10 +97,12 @@ pub fn project(
             );
         }
     }
-    //(machine, m_nodes[initial.index()])
+
     if minimize {
-        let (dfa, dfa_initial) = minimize::nfa_to_dfa(machine, m_nodes[initial.index()]); // make deterministic. slight deviation from projection operation formally.
-        minimize::minimal_machine(&dfa, dfa_initial) // when minimizing we get a machine that is a little different but equivalent to the one prescribed by the projection operator formally
+        // make deterministic.
+        let (dfa, dfa_initial) = minimize::nfa_to_dfa(machine, m_nodes[initial.index()]);
+        // when minimizing we get a machine that is a equivalent to the one prescribed by the projection operator formally, but minimal.
+        minimize::minimal_machine(&dfa, dfa_initial)
     } else {
         (machine, m_nodes[initial.index()])
     }
@@ -153,8 +155,8 @@ pub(crate) fn to_chained_projections(
     chained_protos.into_iter().map(mapper).collect()
 }
 
-// precondition: the protocols interfaces on the supplied interfaces.
-// precondition: the composition of the protocols in swarms is wwf w.r.t. subs.
+// Precondition: the protocols interfaces on the supplied interfaces.
+// Precondition: the composition of the protocols in swarms is wf w.r.t. subs.
 pub fn project_combine(
     proto_info: &ProtoInfo,
     subs: &Subscriptions,
@@ -165,7 +167,7 @@ pub fn project_combine(
 
     let projections = to_chained_projections(to_chained_protos(proto_info), subs, role, minimize);
 
-    match combine_projs(projections, composition::gen_state_name) {
+    match combine_projections(projections, composition::gen_state_name) {
         Some((combined_projection, combined_initial)) =>
         //let (combined_projection, combined_initial) = minimal_machine(&combined_projection, combined_initial);
         // option because used in equivalent. Consider changing.
@@ -179,8 +181,7 @@ pub fn project_combine(
     }
 }
 
-// rename this to combine_projections.
-pub(crate) fn combine_projs<N: Clone, E: Clone + EventLabel>(
+pub(crate) fn combine_projections<N: Clone, E: Clone + EventLabel>(
     projections: Vec<(petgraph::Graph<N, E>, NodeId, BTreeSet<EventType>)>,
     gen_node: fn(&N, &N) -> N,
 ) -> Option<(petgraph::Graph<N, E>, NodeId)> {

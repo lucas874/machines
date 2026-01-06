@@ -62,7 +62,7 @@ pub fn project(
     minimize: bool,
     expand_protos: bool,
 ) -> DataResult<MachineType> {
-    // Expand the protocol composition of expand_protos, otherwise project each protocol and compose machines.
+    // Expand the protocol composition if expand_protos, otherwise project each protocol and compose machines.
     let machine = if expand_protos {
         match proto_info::compose_protocols(protos) {
             Ok((swarm, initial)) => {
@@ -82,7 +82,7 @@ pub fn project(
             true => {
                 let (proj, proj_initial) =
                     projection::project_combine(&proto_info, &subs.0, role, minimize);
-                machine::util::from_option_to_machine(proj, proj_initial.unwrap())
+                machine::util::option_to_json_machine(proj, proj_initial.unwrap())
             }
             false => {
                 return DataResult::ERROR {
@@ -143,7 +143,7 @@ pub fn compose_protocols(protos: InterfacingProtocols) -> DataResult<SwarmProtoc
 
     match composition {
         Ok((graph, initial)) => DataResult::OK {
-            data: typescript_types::to_swarm_json(graph, initial),
+            data: typescript_types::to_json_swarm(graph, initial),
         },
         Err(errors) => DataResult::ERROR {
             errors: errors.to_strings(),

@@ -55,7 +55,7 @@ pub fn to_json_machine(graph: Graph, initial: NodeId) -> MachineType {
     }
 }
 
-pub fn from_option_to_machine(
+pub fn option_to_json_machine(
     graph: petgraph::Graph<Option<State>, MachineLabel>,
     initial: NodeId,
 ) -> MachineType {

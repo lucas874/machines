@@ -229,8 +229,8 @@ pub struct ProjectionInfo {
     pub proj_to_machine_states: ProjToMachineStates,
 }
 
-pub fn to_swarm_json(graph: Graph, initial: NodeId) -> SwarmProtocolType {
-    let _span = tracing::info_span!("to_swarm_json").entered();
+pub fn to_json_swarm(graph: Graph, initial: NodeId) -> SwarmProtocolType {
+    let _span = tracing::info_span!("to_json_swarm").entered();
     let machine_label_mapper = |g: &Graph, eref: EdgeReference<'_, SwarmLabel>| {
         let label = eref.weight().clone();
         let source = g[eref.source()].state_name().clone();

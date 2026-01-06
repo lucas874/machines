@@ -12,6 +12,7 @@ use crate::types::{
     typescript_types::{MachineLabel, State},
 };
 
+// Minimize a machine using partition refinement.
 pub fn minimal_machine(graph: &Graph, i: NodeId) -> (Graph, NodeId) {
     let _span = tracing::info_span!("minimal_machine").entered();
     let partition = partition_refinement(graph);

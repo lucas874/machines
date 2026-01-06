@@ -18,11 +18,11 @@ use petgraph::{
     Direction::Outgoing,
     visit::{EdgeRef, IntoNodeReferences},
 };
-// Possibly move to adaptation.
+
 // Used for creating adapted machine.
 // A composed state in an adapted machine contains some
-// state from the original machine to be adapted.
-// The field machine_states points to the state(s).
+// state(s) from the original machine to be adapted.
+// The field machine_states points to the(se) state(s).
 // A set of states because seems more general, maybe
 // we need that in the future.
 #[derive(Clone, PartialEq, PartialOrd, Ord, Eq, Hash, Debug)]
@@ -32,6 +32,10 @@ struct AdaptationNode {
 }
 type AdaptationGraph = petgraph::Graph<AdaptationNode, MachineLabel>;
 
+// Obtain the adaptation of a role w.r.t. some composition,
+// the set of updating event types relevant to the adaptation,
+// and the `branches` function mapping each event type to the
+// event types that follows it (until the next updating event type).
 pub fn projection_information(
     proto_info: &ProtoInfo,
     subs: &Subscriptions,
@@ -62,7 +66,7 @@ pub fn projection_information(
     let special_event_types = proto_info::get_branching_joining_proto_info(&proto_info);
 
     Some(ProjectionInfo {
-        projection: util::from_option_to_machine(proj, proj_initial),
+        projection: util::option_to_json_machine(proj, proj_initial),
         branches,
         special_event_types,
         proj_to_machine_states,
@@ -127,7 +131,6 @@ fn adapted_projection(
         .map(mapper)
         .collect();
 
-    //AdaptationGraph{state: n.clone(), machine_state: Some(state.clone())}
     let (machine, machine_initial) = (from_option_graph_to_graph(&machine.0), machine.1);
     let machine = machine.map(
         |_, n| AdaptationNode {
@@ -176,7 +179,7 @@ fn adapted_projection(
         .chain(projections[k + 1..].iter().cloned())
         .collect();
 
-    match projection::combine_projs(projections, gen_node) {
+    match projection::combine_projections(projections, gen_node) {
         Some((combined_projection, combined_initial)) => {
             Some((combined_projection, Some(combined_initial)))
         } // should we minimize here? not done to keep original shape of input machine as much as possible?
@@ -243,7 +246,7 @@ fn visit_successors_stop_on_branch(
     let mut visited = BTreeSet::new();
     let mut to_visit = Vec::from([machine_state]);
     let mut event_types = BTreeSet::new();
-    //event_types.insert(et.clone());
+
     while let Some(node) = to_visit.pop() {
         visited.insert(node);
         for e in proj.edges_directed(node, Outgoing) {
