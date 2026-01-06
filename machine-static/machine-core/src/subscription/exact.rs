@@ -36,10 +36,9 @@ pub fn exact_well_formed_sub(
     Ok(sub)
 }
 
-/*
- * Given a swarm protocol return smallest WF-subscription. WF according to new compositional definition.
- * Expand composition and apply rules from definition of WF until subscription stabilizes.
- */
+// Given a swarm protocol return the smallest wf-subscription.
+// Expand composition and apply rules from definition of wf until subscription stabilizes.
+// Uses new, compositional definition of wf.
 fn exact_wf_sub(
     proto_info: ProtoInfo,
     proto_pointer: usize,

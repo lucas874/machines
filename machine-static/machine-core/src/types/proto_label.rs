@@ -6,7 +6,7 @@ use crate::types::{
     typescript_types::{Command, EventLabel, EventType, Role},
 };
 
-/* Interface trait things */
+// Interface trait things
 pub trait ProtoLabel {
     fn get_labels(&self) -> BTreeSet<(Command, EventType, Role)>;
     fn get_roles(&self) -> BTreeSet<Role>;
