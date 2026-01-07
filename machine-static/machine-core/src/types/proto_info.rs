@@ -208,6 +208,28 @@ fn get_concurrent_events(
         .collect()
 }
 
+// Identify those infinitely looping event types G-t-> present in subscriptions of roles(t, G, subscriptions)
+// If multiple event types in the same loop satisfy the condition for being a looping event type in subscription
+// then return all of them instead of picking one which would be enough. Design choice.
+// Instead we could take the smallest event type (according to some order) from each loop? If not covered by branching?
+fn infinitely_looping_event_types_in_sub(
+    proto_info: &ProtoInfo,
+    subscriptions: &Subscriptions,
+) -> BTreeSet<EventType> {
+    // infinitely_looping.filter(|t| if all roles in roles_on_path subscribe to t then true otherwise false)
+    let _span = tracing::info_span!("infinitely_looping_event_types_in_sub").entered();
+    proto_info
+        .infinitely_looping_events
+        .iter()
+        .filter(|t|
+            roles_on_path((*t).clone(), proto_info, subscriptions)
+            .iter()
+            .all(|r| subscriptions.get(r).is_some_and(|event_types_r| event_types_r.contains(*t)))
+        )
+        .cloned()
+        .collect()
+}
+
 pub fn get_branching_joining_proto_info(proto_info: &ProtoInfo) -> BTreeSet<EventType> {
     proto_info
         .branching_events
@@ -924,6 +946,23 @@ mod tests {
 
     mod loop_tests {
         use super::*;
+        use crate::subscription::{exact, overapproximation};
+        use crate::types::typescript_types::Granularity;
+
+        macro_rules! check_looping_event_types {
+            ($protocol:expr, $expected_infinitely_looping_in_sub:expr) => {
+                let interfacing_protocols = InterfacingProtocols(vec![$protocol.clone()]);
+                let exact_subscriptions = exact::exact_well_formed_sub(interfacing_protocols.clone(), &BTreeMap::new()).unwrap();
+                let overapproximated_subscriptions = overapproximation::overapprox_well_formed_sub(interfacing_protocols.clone(), &BTreeMap::new(), Granularity::TwoStep).unwrap();
+                let proto_info = prepare_proto_info($protocol);
+                let infinitely_looping_in_exact = infinitely_looping_event_types_in_sub(&proto_info, &exact_subscriptions);
+                let infinitely_looping_in_approx = infinitely_looping_event_types_in_sub(&proto_info, &overapproximated_subscriptions);
+
+                assert_eq!(infinitely_looping_in_exact, $expected_infinitely_looping_in_sub);
+                assert_eq!(infinitely_looping_in_approx, $expected_infinitely_looping_in_sub);
+            };
+        }
+
         // This module contains tests for relating to looping event types.
         #[test]
         fn looping_1() {
@@ -1045,5 +1084,57 @@ mod tests {
                 vec!["a", "b", "c", "d", "e", "f"]
             );
         }
+
+        // Test that looping event types in subscriptions are correctly identified.
+        #[test]
+        fn identify_looping_1() {
+            test_utils::setup_logger();
+            let proto = test_utils::get_looping_proto_1();
+            // Two event types satisfy the conditions of being a looping event type. Right now we use the approach is to return all instead of picking one.
+            let expected_infinitely_looping_in_sub = BTreeSet::from([EventType::new("c"), EventType::new("d")]);
+            check_looping_event_types!(proto, expected_infinitely_looping_in_sub);
+        }
+
+         #[test]
+        fn identify_looping_2() {
+            test_utils::setup_logger();
+            let proto = test_utils::get_looping_proto_2();
+            let expected_infinitely_looping_in_sub = BTreeSet::from([EventType::new("c")]);
+            check_looping_event_types!(proto, expected_infinitely_looping_in_sub);
+        }
+
+        #[test]
+        fn identify_looping_3() {
+            test_utils::setup_logger();
+            let proto = test_utils::get_looping_proto_3();
+            let expected_infinitely_looping_in_sub = BTreeSet::from([EventType::new("c"), EventType::new("f")]);
+            check_looping_event_types!(proto, expected_infinitely_looping_in_sub);
+        }
+
+        #[test]
+        fn identify_looping_4() {
+            test_utils::setup_logger();
+            let proto = test_utils::get_looping_proto_4();
+            let expected_infinitely_looping_in_sub = BTreeSet::from([EventType::new("c")]);
+            check_looping_event_types!(proto, expected_infinitely_looping_in_sub);
+        }
+
+        #[test]
+        fn identify_looping_5() {
+            test_utils::setup_logger();
+            let proto = test_utils::get_looping_proto_5();
+            let expected_infinitely_looping_in_sub = BTreeSet::from([EventType::new("a"), EventType::new("e")]);
+            check_looping_event_types!(proto, expected_infinitely_looping_in_sub);
+        }
+
+        #[test]
+        fn identify_looping_6() {
+            test_utils::setup_logger();
+            let proto = test_utils::get_looping_proto_6();
+            // We get b and c. These are branching, so nothing was added in the looping step of computing subs. Change to just return b? Same as comment for looping_1
+            let expected_infinitely_looping_in_sub = BTreeSet::from([EventType::new("b"), EventType::new("c")]);
+            check_looping_event_types!(proto, expected_infinitely_looping_in_sub);
+        }
+
     }
 }
