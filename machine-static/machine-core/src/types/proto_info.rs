@@ -8,7 +8,7 @@ use crate::types::{
     proto_graph::{Graph, NodeId},
     typescript_types::{EventType, Role, SwarmLabel},
 };
-use crate::{composability_check, composition, util};
+use crate::{composability_check, composition};
 use itertools::Itertools;
 use petgraph::Directed;
 use petgraph::algo;
@@ -373,7 +373,7 @@ fn combine_two_proto_infos(proto_info1: ProtoInfo, proto_info2: ProtoInfo) -> Pr
     let interface_errors = composability_check::check_interface(&proto_info1, &proto_info2);
     let interfacing_event_types = get_interfacing_event_types(&proto_info1, &proto_info2);
     let protocols = vec![proto_info1.protocols.clone(), proto_info2.protocols.clone()].concat();
-    let role_event_map = util::combine_maps(
+    let role_event_map = combine_maps(
         proto_info1.role_event_map.clone(),
         proto_info2.role_event_map.clone(),
         None,
@@ -386,12 +386,12 @@ fn combine_two_proto_infos(proto_info1: ProtoInfo, proto_info2: ProtoInfo) -> Pr
         .into_iter()
         .chain(proto_info2.branching_events.into_iter())
         .collect();
-    let immediately_pre = util::combine_maps(
+    let immediately_pre = combine_maps(
         proto_info1.immediately_pre.clone(),
         proto_info2.immediately_pre.clone(),
         None,
     );
-    let happens_after = util::combine_maps(
+    let happens_after = combine_maps(
         proto_info1.succeeding_events,
         proto_info2.succeeding_events,
         None,
@@ -666,7 +666,7 @@ pub fn transitive_closure_succeeding(
     }
 
     // do this because of loops. everything reachable from itself in result from floyd_warshall(), but we filter these out. add them again if loops.
-    util::combine_maps(succ_map, succ_map_new, None)
+    combine_maps(succ_map, succ_map_new, None)
 }
 
 // The involved roles on a path are those roles that subscribe to one or
@@ -763,6 +763,29 @@ pub fn compose_protocols(protos: InterfacingProtocols) -> Result<(Graph, NodeId)
         .get_ith_proto(0)
         .unwrap();
     Ok((p.graph, p.initial.unwrap()))
+}
+
+// combine maps with sets as values
+fn combine_maps<K: Ord + Clone, V: Ord + Clone>(
+    map1: BTreeMap<K, BTreeSet<V>>,
+    map2: BTreeMap<K, BTreeSet<V>>,
+    extra: Option<BTreeSet<V>>,
+) -> BTreeMap<K, BTreeSet<V>> {
+    let all_keys: BTreeSet<K> = map1.keys().chain(map2.keys()).cloned().collect();
+    let extra = extra.unwrap_or(BTreeSet::new());
+    let extend_for_key = |k: &K| -> (K, BTreeSet<V>) {
+        (
+            k.clone(),
+            map1.get(k)
+                .unwrap_or(&BTreeSet::new())
+                .union(map2.get(k).unwrap_or(&BTreeSet::new()))
+                .chain(&extra)
+                .cloned()
+                .collect(),
+        )
+    };
+
+    all_keys.iter().map(extend_for_key).collect()
 }
 
 #[cfg(test)]

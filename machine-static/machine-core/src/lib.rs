@@ -14,7 +14,6 @@ pub mod errors;
 mod machine;
 mod subscription;
 pub mod types;
-mod util;
 
 #[cfg(test)]
 mod test_utils;
