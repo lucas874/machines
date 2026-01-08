@@ -39,7 +39,7 @@ fn overapprox_wf_sub(
     let _span = tracing::info_span!("overapprox_wf_sub").entered();
     match granularity {
         Granularity::Fine => finer_overapprox_wf_sub(proto_info, subscription, false),
-        Granularity::Medium => finer_overapprox_wf_sub(proto_info, subscription, true),
+        Granularity::Coarse => finer_overapprox_wf_sub(proto_info, subscription, true),
         Granularity::TwoStep => two_step_overapprox_wf_sub(proto_info, &mut subscription.clone()),
     }
 }
@@ -220,15 +220,15 @@ mod tests {
         test_utils::setup_logger();
 
         // Test interfacing_swarms_1
-        // Medium
-        let result_1_medium = overapprox_well_formed_sub(
+        // Coarse (this granularity used to be called medium)
+        let result_1_coarse = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_1(),
             &BTreeMap::new(),
-            Granularity::Medium,
+            Granularity::Coarse,
         );
-        assert!(result_1_medium.is_ok());
-        let subs_1_medium = result_1_medium.unwrap();
-        let expected_subs_1_medium: Subscriptions = BTreeMap::from([
+        assert!(result_1_coarse.is_ok());
+        let subs_1_coarse = result_1_coarse.unwrap();
+        let expected_subs_1_coarse: Subscriptions = BTreeMap::from([
             (
                 Role::from("T"),
                 BTreeSet::from([
@@ -265,7 +265,7 @@ mod tests {
                 ]),
             ),
         ]);
-        assert_eq!(subs_1_medium, expected_subs_1_medium);
+        assert_eq!(subs_1_coarse, expected_subs_1_coarse);
 
         // Fine. Should be equal to exact for this example.
         let result_1_fine = overapprox_well_formed_sub(
@@ -359,18 +359,18 @@ mod tests {
             ),
         ]);
         assert_eq!(subs_1_two_step, expected_subs_1_two_step);
-        assert_eq!(subs_1_two_step, subs_1_medium);
+        assert_eq!(subs_1_two_step, subs_1_coarse);
 
         // Test interfacing_swarms_2
-        // Medium
-        let result_2_medium = overapprox_well_formed_sub(
+        // Coarse (this granularity used to be called medium)
+        let result_2_coarse = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_2(),
             &BTreeMap::new(),
-            Granularity::Medium,
+            Granularity::Coarse,
         );
-        assert!(result_2_medium.is_ok());
-        let subs_2_medium = result_2_medium.unwrap();
-        let expected_subs_2_medium: Subscriptions = BTreeMap::from([
+        assert!(result_2_coarse.is_ok());
+        let subs_2_coarse = result_2_coarse.unwrap();
+        let expected_subs_2_coarse: Subscriptions = BTreeMap::from([
             (
                 Role::from("T"),
                 BTreeSet::from([
@@ -438,7 +438,7 @@ mod tests {
                 ]),
             ),
         ]);
-        assert_eq!(subs_2_medium, expected_subs_2_medium);
+        assert_eq!(subs_2_coarse, expected_subs_2_coarse);
 
         // Fine
         let result_2_fine = overapprox_well_formed_sub(
@@ -584,15 +584,15 @@ mod tests {
         assert_eq!(subs_2_two_step, expected_subs_2_two_step);
 
         // Test interfacing_swarms_3
-        // Medium
-        let result_3_medium = overapprox_well_formed_sub(
+        // Coarse
+        let result_3_coarse = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_3(),
             &BTreeMap::new(),
-            Granularity::Medium,
+            Granularity::Coarse,
         );
-        assert!(result_3_medium.is_ok());
-        let subs_3_medium = result_3_medium.unwrap();
-        let expected_subs_3_medium: Subscriptions = BTreeMap::from([
+        assert!(result_3_coarse.is_ok());
+        let subs_3_coarse = result_3_coarse.unwrap();
+        let expected_subs_3_coarse: Subscriptions = BTreeMap::from([
             (
                 Role::from("T"),
                 BTreeSet::from([
@@ -648,7 +648,7 @@ mod tests {
                 ]),
             ),
         ]);
-        assert_eq!(subs_3_medium, expected_subs_3_medium);
+        assert_eq!(subs_3_coarse, expected_subs_3_coarse);
 
         // Fine
         let result_3_fine = overapprox_well_formed_sub(
@@ -775,13 +775,13 @@ mod tests {
         test_utils::setup_logger();
 
         // Test empty set if input protocols
-        let empty_medium = overapprox_well_formed_sub(
+        let empty_coarse = overapprox_well_formed_sub(
             InterfacingProtocols(vec![]),
             &BTreeMap::new(),
-            Granularity::Medium,
+            Granularity::Coarse,
         );
-        assert!(empty_medium.is_ok());
-        assert_eq!(empty_medium.unwrap(), BTreeMap::new());
+        assert!(empty_coarse.is_ok());
+        assert_eq!(empty_coarse.unwrap(), BTreeMap::new());
 
         let empty_fine = overapprox_well_formed_sub(
             InterfacingProtocols(vec![]),
@@ -800,15 +800,15 @@ mod tests {
         assert_eq!(empty_two_step.unwrap(), BTreeMap::new());
 
         // Test interfacing_swarms_4
-        // Medium
-        let result_4_medium = overapprox_well_formed_sub(
+        // Coarse (this granularity used to be called medium)
+        let result_4_coarse = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_4(),
             &BTreeMap::new(),
-            Granularity::Medium,
+            Granularity::Coarse,
         );
-        assert!(result_4_medium.is_ok());
-        let subs_4_medium = result_4_medium.unwrap();
-        let expected_subs_4_medium: Subscriptions = BTreeMap::from([
+        assert!(result_4_coarse.is_ok());
+        let subs_4_coarse = result_4_coarse.unwrap();
+        let expected_subs_4_coarse: Subscriptions = BTreeMap::from([
             (
                 Role::from("T"),
                 BTreeSet::from([
@@ -863,7 +863,7 @@ mod tests {
                 ]),
             ),
         ]);
-        assert_eq!(subs_4_medium, expected_subs_4_medium);
+        assert_eq!(subs_4_coarse, expected_subs_4_coarse);
 
         // Fine
         let result_4_fine = overapprox_well_formed_sub(
@@ -983,15 +983,15 @@ mod tests {
         assert_eq!(subs_4_two_step, expected_subs_4_two_step);
 
         // Test interfacing_swarms_5
-        // Medium
-        let result_5_medium = overapprox_well_formed_sub(
+        // Coarse (this granularity used to be called medium)
+        let result_5_coarse = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_5(),
             &BTreeMap::new(),
-            Granularity::Medium,
+            Granularity::Coarse,
         );
-        assert!(result_5_medium.is_ok());
-        let subs_5_medium = result_5_medium.unwrap();
-        let expected_subs_5_medium: Subscriptions = BTreeMap::from([
+        assert!(result_5_coarse.is_ok());
+        let subs_5_coarse = result_5_coarse.unwrap();
+        let expected_subs_5_coarse: Subscriptions = BTreeMap::from([
             (
                 Role::from("IR"),
                 BTreeSet::from([
@@ -1023,7 +1023,7 @@ mod tests {
                 ]),
             ),
         ]);
-        assert_eq!(subs_5_medium, expected_subs_5_medium);
+        assert_eq!(subs_5_coarse, expected_subs_5_coarse);
 
         // Fine
         let result_5_fine = overapprox_well_formed_sub(
@@ -1102,15 +1102,15 @@ mod tests {
     fn test_refinement_pattern() {
         test_utils::setup_logger();
 
-        // Medium
-        let result_medium = overapprox_well_formed_sub(
+        // Coarse (this granularity used to be called medium)
+        let result_coarse = overapprox_well_formed_sub(
             test_utils::get_ref_pat_protos(),
             &BTreeMap::new(),
-            Granularity::Medium,
+            Granularity::Coarse,
         );
-        assert!(result_medium.is_ok());
-        let subs_medium = result_medium.unwrap();
-        let expected_subs_medium: Subscriptions = BTreeMap::from([
+        assert!(result_coarse.is_ok());
+        let subs_coarse = result_coarse.unwrap();
+        let expected_subs_coarse: Subscriptions = BTreeMap::from([
             (
                 Role::from("IR0"),
                 BTreeSet::from([
@@ -1166,7 +1166,7 @@ mod tests {
                 ]),
             ),
         ]);
-        assert_eq!(subs_medium, expected_subs_medium);
+        assert_eq!(subs_coarse, expected_subs_coarse);
 
         // Fine
         let result_fine = overapprox_well_formed_sub(
@@ -1293,16 +1293,16 @@ mod tests {
             (Role::new("TR"), BTreeSet::from([EventType::new("ok")])),
         ]);
 
-        // Medium
-        let result_medium = overapprox_well_formed_sub(
+        // Coarse (this granularity used to be called medium)
+        let result_coarse = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_2(),
             &sub_to_extend,
-            Granularity::Medium,
+            Granularity::Coarse,
         );
-        assert!(result_medium.is_ok());
-        let subs_medium = result_medium.unwrap();
-        assert!(subs_medium[&Role::new("D")].contains(&EventType::new("pos")));
-        assert!(subs_medium[&Role::new("TR")].contains(&EventType::new("ok")));
+        assert!(result_coarse.is_ok());
+        let subs_coarse = result_coarse.unwrap();
+        assert!(subs_coarse[&Role::new("D")].contains(&EventType::new("pos")));
+        assert!(subs_coarse[&Role::new("TR")].contains(&EventType::new("ok")));
 
         // Fine
         let result_fine = overapprox_well_formed_sub(

@@ -48,9 +48,9 @@ const Gquality: SwarmProtocolType = {
   ]}
 
 const protocols: InterfacingProtocols = [Gwarehouse, Gfactory, Gquality]
-
+const granularity = "Coarse"
 const result_subs: DataResult<Subscriptions>
-  = overapproxWFSubscriptions(protocols, {}, 'Medium')
+  = overapproxWFSubscriptions(protocols, {}, granularity)
 if (result_subs.type === 'ERROR') throw new Error(result_subs.errors.join(', '))
 const subs: Subscriptions = result_subs.data
 

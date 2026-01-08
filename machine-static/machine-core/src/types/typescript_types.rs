@@ -207,7 +207,7 @@ pub struct InterfacingProtocols(pub Vec<SwarmProtocolType>);
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum Granularity {
     Fine,
-    Medium,
+    Coarse,
     TwoStep,
 }
 

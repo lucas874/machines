@@ -630,7 +630,7 @@ proptest! {
     fn test_overapproximated_4(protos in generate_interfacing_protocols_general_pattern(5, 5, 3)) {
         setup_logger();
         let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
-        let granularity = Granularity::Medium;
+        let granularity = Granularity::Coarse;
         let subscription: Option<Subscriptions> = match machine_core::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
             DataResult::OK{data: subscriptions} => Some(subscriptions),
             DataResult::ERROR{ .. } => None,
