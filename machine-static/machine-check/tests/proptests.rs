@@ -583,31 +583,6 @@ proptest! {
     }
 }
 
-// test whether the approximated subscription for compositions
-// is contained within the 'exact' subscription.
-// i.e. is the approximation safe. max five protocols, max five roles
-// in each, max five commands per role. relatively small.
-/* proptest! {
-    #[test]
-    fn test_overapproximated_1(protos in generate_interfacing_protocols(5, 5, 5, false)) {
-        setup_logger();
-        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
-        let granularity = Granularity::Coarse;
-        let subscription: Option<Subscriptions> = match machine_core::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
-            DataResult::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::ERROR{ .. } => None,
-        };
-        assert!(subscription.is_some());
-        let subscription = subscription.unwrap();
-        let errors = check_composed_swarm(protos.clone(), SubscriptionsWrapped(subscription));
-        let ok = match errors {
-            CheckResult::OK => true,
-            CheckResult::ERROR { errors: e } => {println!("{:?}", e); false}
-        };
-        assert!(ok);
-    }
-} */
-
 // same tests as above but with refinement pattern 1
 proptest! {
     #[test]
@@ -629,27 +604,6 @@ proptest! {
     }
 }
 
-/* proptest! {
-    #[test]
-    fn test_overapproximated_2(protos in generate_interfacing_protocols_refinement(5, 5, 5)) {
-        setup_logger();
-        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
-        let granularity = Granularity::Coarse;
-        let subscription: Option<Subscriptions> = match machine_core::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
-            DataResult::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::ERROR{ .. } => None,
-        };
-        assert!(subscription.is_some());
-        let subscription = subscription.unwrap();
-        let errors = check_composed_swarm(protos.clone(), SubscriptionsWrapped(subscription.clone()));
-        let ok = match errors {
-            CheckResult::OK => true,
-            CheckResult::ERROR { .. } => false
-        };
-        assert!(ok);
-    }
-} */
-
 // same tests as above but with refinement pattern 2 fewer protocols to not have to wait so long
 proptest! {
     #[test]
@@ -670,27 +624,6 @@ proptest! {
         assert!(ok);
     }
 }
-
-/* proptest! {
-    #[test]
-    fn test_overapproximated_3(protos in generate_interfacing_protocols_general_pattern(5, 5, 3)) {
-        setup_logger();
-        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
-        let granularity = Granularity::Coarse;
-        let subscription: Option<Subscriptions> = match machine_core::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
-            DataResult::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::ERROR{ .. } => None,
-        };
-        assert!(subscription.is_some());
-        let subscription = subscription.unwrap();
-        let errors = check_composed_swarm(protos.clone(), SubscriptionsWrapped(subscription));
-        let ok = match errors {
-            CheckResult::OK => true,
-            CheckResult::ERROR { .. } => false
-        };
-        assert!(ok);
-    }
-} */
 
 proptest! {
     #[test]
@@ -775,21 +708,6 @@ proptest! {
         assert!(ok);
     }
 }
-
-/* proptest! {
-    #[test]
-    #[ignore]
-    fn test_overapproximated_refinement_2_only_generate(protos in generate_interfacing_protocols_general_pattern(7, 7, 10)) {
-        setup_logger();
-        let subs = BTreeMap::<Role, BTreeSet::<EventType>>::new();
-        let granularity = Granularity::Coarse;
-        let subscription: Option<Subscriptions> = match machine_core::overapproximated_well_formed_sub(protos.clone(), SubscriptionsWrapped(subs), granularity) {
-            DataResult::OK{data: subscriptions} => Some(subscriptions),
-            DataResult::ERROR{ .. } => None,
-        };
-        assert!(subscription.is_some());
-    }
-} */
 
 fn avg_sub_size(subscriptions: &Subscriptions) -> f32 {
     let denominator = subscriptions.keys().len();
