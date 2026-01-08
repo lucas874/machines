@@ -62,13 +62,13 @@ pub fn projection_information(
 
     let proj = from_adaptation_graph_to_option_graph(&proj);
 
-    let branches = paths_from_event_types(&proj, &proto_info);
-    let special_event_types = proto_info::get_branching_joining_proto_info(&proto_info);
+    let updating_event_types = proto_info::get_updating_event_types(&proto_info, &subs);
+    let branches = paths_from_event_types(&proj, &proto_info, &updating_event_types);
 
     Some(ProjectionInfo {
         projection: util::option_to_json_machine(proj, proj_initial),
         branches,
-        special_event_types,
+        special_event_types: updating_event_types,
         proj_to_machine_states,
     })
 }
@@ -187,10 +187,9 @@ fn adapted_projection(
     }
 }
 
-fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> BranchMap {
+fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo, updating_event_types: &BTreeSet<EventType>) -> BranchMap {
     let _span = tracing::info_span!("paths_from_event_types").entered();
     let mut m: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
-    let special_events = proto_info::get_branching_joining_proto_info(proto_info);
 
     // The reason for making set of concurrent events smaller is?
     let after_pairs: BTreeSet<UnordEventPair> =
@@ -219,7 +218,7 @@ fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo) -> BranchM
                         proj,
                         edge.target(),
                         &edge.weight().get_event_type(),
-                        &special_events,
+                        &updating_event_types,
                         &concurrent_events,
                     );
                     m.entry(edge.weight().get_event_type())
@@ -239,7 +238,7 @@ fn visit_successors_stop_on_branch(
     proj: &OptionGraph,
     machine_state: NodeId,
     et: &EventType,
-    special_events: &BTreeSet<EventType>,
+    updating_event_types: &BTreeSet<EventType>,
     concurrent_events: &BTreeSet<UnordEventPair>,
 ) -> BTreeSet<EventType> {
     let _span = tracing::info_span!("visit_successors_stop_on_branch").entered();
@@ -256,7 +255,7 @@ fn visit_successors_stop_on_branch(
             )) {
                 event_types.insert(e.weight().get_event_type());
             }
-            if !special_events.contains(&e.weight().get_event_type())
+            if !updating_event_types.contains(&e.weight().get_event_type())
                 && !visited.contains(&e.target())
             {
                 to_visit.push(e.target());

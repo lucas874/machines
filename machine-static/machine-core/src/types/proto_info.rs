@@ -120,11 +120,7 @@ impl ProtoInfo {
     }
 
     pub fn get_ith_proto(&self, i: usize) -> Option<ProtoStruct> {
-        if i >= self.protocols.len() {
-            None
-        } else {
-            Some(self.protocols[i].clone())
-        }
+        self.protocols.get(i).cloned()
     }
 
     pub fn no_errors(&self) -> bool {
@@ -170,6 +166,22 @@ impl ProtoInfo {
                 .collect(),
         )
     }
+
+    pub fn get_succeeding(&self, event_type: &EventType) -> BTreeSet<EventType> {
+        self
+            .succeeding_events
+            .get(event_type)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    pub fn get_preceding(&self, event_type: &EventType) -> BTreeSet<EventType> {
+        self
+            .immediately_pre
+            .get(event_type)
+            .cloned()
+            .unwrap_or_default()
+    }
 }
 
 // Overapproximate concurrent events.
@@ -208,29 +220,7 @@ fn get_concurrent_events(
         .collect()
 }
 
-// Identify those infinitely looping event types G-t-> present in subscriptions of roles(t, G, subscriptions)
-// If multiple event types in the same loop satisfy the condition for being a looping event type in subscription
-// then return all of them instead of picking one which would be enough. Design choice.
-// Instead we could take the smallest event type (according to some order) from each loop? If not covered by branching?
-fn infinitely_looping_event_types_in_sub(
-    proto_info: &ProtoInfo,
-    subscriptions: &Subscriptions,
-) -> BTreeSet<EventType> {
-    // infinitely_looping.filter(|t| if all roles in roles_on_path subscribe to t then true otherwise false)
-    let _span = tracing::info_span!("infinitely_looping_event_types_in_sub").entered();
-    proto_info
-        .infinitely_looping_events
-        .iter()
-        .filter(|t|
-            roles_on_path((*t).clone(), proto_info, subscriptions)
-            .iter()
-            .all(|r| subscriptions.get(r).is_some_and(|event_types_r| event_types_r.contains(*t)))
-        )
-        .cloned()
-        .collect()
-}
-
-pub fn get_branching_joining_proto_info(proto_info: &ProtoInfo) -> BTreeSet<EventType> {
+pub fn get_updating_event_types(proto_info: &ProtoInfo, subscriptions: &Subscriptions) -> BTreeSet<EventType> {
     proto_info
         .branching_events
         .clone()
@@ -243,6 +233,54 @@ pub fn get_branching_joining_proto_info(proto_info: &ProtoInfo) -> BTreeSet<Even
                 .cloned()
                 .collect::<BTreeSet<EventType>>(),
         )
+        .chain(
+            infinitely_looping_event_types_in_sub(proto_info, subscriptions)
+        )
+        .collect()
+}
+
+// Identify those infinitely looping event types G-t-> present in subscriptions of roles(t, G, subscriptions)
+// If multiple event types in the same loop satisfy the condition for being a looping event type in subscription
+// then return all of them instead of picking one which would be enough. Design choice.
+// Instead we could take the smallest event type (according to some order) from each loop? If not covered by branching?
+fn infinitely_looping_event_types_in_sub(
+    proto_info: &ProtoInfo,
+    subscriptions: &Subscriptions,
+) -> BTreeSet<EventType> {
+    // infinitely_looping.filter(|t| if all roles in roles_on_path subscribe to t then true otherwise false)
+    let _span = tracing::info_span!("infinitely_looping_event_types_in_sub").entered();
+    // all distinct loops
+    let loops: BTreeSet<BTreeSet<EventType>> = proto_info
+        .infinitely_looping_events
+        .iter()
+        .map(|t|
+            proto_info
+                .get_succeeding(t)
+                .into_iter()
+                .chain([t.clone()])
+                .collect::<BTreeSet<EventType>>()
+        ).collect();
+
+    // event types in those loops that all involved roles subscribe to
+    let loops: BTreeSet<BTreeSet<EventType>> = loops
+        .into_iter()
+        .map(|a_loop|
+            a_loop
+            .into_iter()
+            .filter(|t|
+                roles_on_path(t.clone(), proto_info, subscriptions)
+                    .iter()
+                    .all(|r| subscriptions.get(r).is_some_and(|event_types_r| event_types_r.contains(t)))
+            )
+            .collect()
+        )
+        .collect();
+
+    // first: 'Returns a reference to the first element in the set, if any. This element is always the minimum of all elements in the set.'
+    loops
+        .into_iter()
+        .map(|event_types| event_types.first().cloned())
+        .filter_map(|option_event_type| option_event_type)
         .collect()
 }
 
@@ -1090,8 +1128,9 @@ mod tests {
         fn identify_looping_1() {
             test_utils::setup_logger();
             let proto = test_utils::get_looping_proto_1();
-            // Two event types satisfy the conditions of being a looping event type. Right now we use the approach is to return all instead of picking one.
-            let expected_infinitely_looping_in_sub = BTreeSet::from([EventType::new("c"), EventType::new("d")]);
+            // c and d are part of the same loop and both satisfy the looping condition.
+            // We pick c as THE looping event type for the loop in the subscription.
+            let expected_infinitely_looping_in_sub = BTreeSet::from([EventType::new("c")]);
             check_looping_event_types!(proto, expected_infinitely_looping_in_sub);
         }
 
@@ -1123,7 +1162,11 @@ mod tests {
         fn identify_looping_5() {
             test_utils::setup_logger();
             let proto = test_utils::get_looping_proto_5();
-            let expected_infinitely_looping_in_sub = BTreeSet::from([EventType::new("a"), EventType::new("e")]);
+            // a and e are part of the same loop and both satisfy the condition for being a looping event type.
+            // They are added because they are branching, before looping step.
+            // We pick a as the looping event type in the subscription for that loop.
+            // Although it does not really matter here --> both a and e are in the set of updating event types because they are branching.
+            let expected_infinitely_looping_in_sub = BTreeSet::from([EventType::new("a")]);
             check_looping_event_types!(proto, expected_infinitely_looping_in_sub);
         }
 
@@ -1131,8 +1174,11 @@ mod tests {
         fn identify_looping_6() {
             test_utils::setup_logger();
             let proto = test_utils::get_looping_proto_6();
-            // We get b and c. These are branching, so nothing was added in the looping step of computing subs. Change to just return b? Same as comment for looping_1
-            let expected_infinitely_looping_in_sub = BTreeSet::from([EventType::new("b"), EventType::new("c")]);
+            // a and e are part of the same loop and both satisfy the condition for being a looping event type.
+            // They are added because they are branching, before looping step.
+            // We pick a as the looping event type in the subscription for that loop.
+            // Although it does not really matter here --> both a and e are in the set of updating event types because they are branching.
+            let expected_infinitely_looping_in_sub = BTreeSet::from([EventType::new("b")]);
             check_looping_event_types!(proto, expected_infinitely_looping_in_sub);
         }
 
