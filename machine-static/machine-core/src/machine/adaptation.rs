@@ -187,7 +187,11 @@ fn adapted_projection(
     }
 }
 
-fn paths_from_event_types(proj: &OptionGraph, proto_info: &ProtoInfo, updating_event_types: &BTreeSet<EventType>) -> BranchMap {
+fn paths_from_event_types(
+    proj: &OptionGraph,
+    proto_info: &ProtoInfo,
+    updating_event_types: &BTreeSet<EventType>,
+) -> BranchMap {
     let _span = tracing::info_span!("paths_from_event_types").entered();
     let mut m: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
 

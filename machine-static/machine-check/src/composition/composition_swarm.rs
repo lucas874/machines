@@ -210,13 +210,7 @@ fn well_formed(proto_info: &ProtoInfo, proto_pointer: usize, subs: &Subscription
             if proto_info.infinitely_looping_events.contains(&event_type) {
                 let t_and_after_t: BTreeSet<EventType> = [event_type.clone()]
                     .into_iter()
-                    .chain(
-                        proto_info
-                            .succeeding_events
-                            .get(&event_type)
-                            .cloned()
-                            .unwrap_or_else(|| BTreeSet::new()),
-                    )
+                    .chain(proto_info.get_succeeding(&event_type))
                     .collect();
 
                 let involved_roles =

@@ -22,13 +22,7 @@ fn add_looping_event_types(proto_info: &ProtoInfo, subscriptions: &mut Subscript
     for t in proto_info.infinitely_looping_events.iter() {
         let t_and_after_t: BTreeSet<EventType> = [t.clone()]
             .into_iter()
-            .chain(
-                proto_info
-                    .succeeding_events
-                    .get(t)
-                    .cloned()
-                    .unwrap_or_else(|| BTreeSet::new()),
-            )
+            .chain(proto_info.get_succeeding(t))
             .collect();
         let involved_roles = proto_info::roles_on_path(t.clone(), proto_info, subscriptions);
 

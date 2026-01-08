@@ -168,16 +168,14 @@ impl ProtoInfo {
     }
 
     pub fn get_succeeding(&self, event_type: &EventType) -> BTreeSet<EventType> {
-        self
-            .succeeding_events
+        self.succeeding_events
             .get(event_type)
             .cloned()
             .unwrap_or_default()
     }
 
     pub fn get_preceding(&self, event_type: &EventType) -> BTreeSet<EventType> {
-        self
-            .immediately_pre
+        self.immediately_pre
             .get(event_type)
             .cloned()
             .unwrap_or_default()
@@ -220,7 +218,10 @@ fn get_concurrent_events(
         .collect()
 }
 
-pub fn get_updating_event_types(proto_info: &ProtoInfo, subscriptions: &Subscriptions) -> BTreeSet<EventType> {
+pub fn get_updating_event_types(
+    proto_info: &ProtoInfo,
+    subscriptions: &Subscriptions,
+) -> BTreeSet<EventType> {
     proto_info
         .branching_events
         .clone()
@@ -233,9 +234,10 @@ pub fn get_updating_event_types(proto_info: &ProtoInfo, subscriptions: &Subscrip
                 .cloned()
                 .collect::<BTreeSet<EventType>>(),
         )
-        .chain(
-            infinitely_looping_event_types_in_sub(proto_info, subscriptions)
-        )
+        .chain(infinitely_looping_event_types_in_sub(
+            proto_info,
+            subscriptions,
+        ))
         .collect()
 }
 
@@ -253,27 +255,32 @@ fn infinitely_looping_event_types_in_sub(
     let loops: BTreeSet<BTreeSet<EventType>> = proto_info
         .infinitely_looping_events
         .iter()
-        .map(|t|
+        .map(|t| {
             proto_info
                 .get_succeeding(t)
                 .into_iter()
                 .chain([t.clone()])
                 .collect::<BTreeSet<EventType>>()
-        ).collect();
+        })
+        .collect();
 
     // event types in those loops that all involved roles subscribe to
     let loops: BTreeSet<BTreeSet<EventType>> = loops
         .into_iter()
-        .map(|a_loop|
+        .map(|a_loop| {
             a_loop
-            .into_iter()
-            .filter(|t|
-                roles_on_path(t.clone(), proto_info, subscriptions)
-                    .iter()
-                    .all(|r| subscriptions.get(r).is_some_and(|event_types_r| event_types_r.contains(t)))
-            )
-            .collect()
-        )
+                .into_iter()
+                .filter(|t| {
+                    roles_on_path(t.clone(), proto_info, subscriptions)
+                        .iter()
+                        .all(|r| {
+                            subscriptions
+                                .get(r)
+                                .is_some_and(|event_types_r| event_types_r.contains(t))
+                        })
+                })
+                .collect()
+        })
         .collect();
 
     // first: 'Returns a reference to the first element in the set, if any. This element is always the minimum of all elements in the set.'
@@ -328,11 +335,7 @@ fn get_interfacing_event_types(
 #[inline]
 fn joining_event_types_map(proto_info: &ProtoInfo) -> BTreeMap<EventType, BTreeSet<EventType>> {
     let pre_joins = |e: &EventType| -> BTreeSet<EventType> {
-        let pre = proto_info
-            .immediately_pre
-            .get(e)
-            .cloned()
-            .unwrap_or_default();
+        let pre = proto_info.get_preceding(e);
         let product = pre.clone().into_iter().cartesian_product(&pre);
         product
             .filter(|(e1, e2)| {
@@ -675,10 +678,7 @@ pub fn roles_on_path(
     subs: &Subscriptions,
 ) -> BTreeSet<Role> {
     let succeeding_events: BTreeSet<EventType> = proto_info
-        .succeeding_events
-        .get(&event_type)
-        .cloned()
-        .unwrap_or_default()
+        .get_succeeding(&event_type)
         .into_iter()
         .chain([event_type])
         .collect();
@@ -990,14 +990,31 @@ mod tests {
         macro_rules! check_looping_event_types {
             ($protocol:expr, $expected_infinitely_looping_in_sub:expr) => {
                 let interfacing_protocols = InterfacingProtocols(vec![$protocol.clone()]);
-                let exact_subscriptions = exact::exact_well_formed_sub(interfacing_protocols.clone(), &BTreeMap::new()).unwrap();
-                let overapproximated_subscriptions = overapproximation::overapprox_well_formed_sub(interfacing_protocols.clone(), &BTreeMap::new(), Granularity::TwoStep).unwrap();
+                let exact_subscriptions =
+                    exact::exact_well_formed_sub(interfacing_protocols.clone(), &BTreeMap::new())
+                        .unwrap();
+                let overapproximated_subscriptions = overapproximation::overapprox_well_formed_sub(
+                    interfacing_protocols.clone(),
+                    &BTreeMap::new(),
+                    Granularity::TwoStep,
+                )
+                .unwrap();
                 let proto_info = prepare_proto_info($protocol);
-                let infinitely_looping_in_exact = infinitely_looping_event_types_in_sub(&proto_info, &exact_subscriptions);
-                let infinitely_looping_in_approx = infinitely_looping_event_types_in_sub(&proto_info, &overapproximated_subscriptions);
+                let infinitely_looping_in_exact =
+                    infinitely_looping_event_types_in_sub(&proto_info, &exact_subscriptions);
+                let infinitely_looping_in_approx = infinitely_looping_event_types_in_sub(
+                    &proto_info,
+                    &overapproximated_subscriptions,
+                );
 
-                assert_eq!(infinitely_looping_in_exact, $expected_infinitely_looping_in_sub);
-                assert_eq!(infinitely_looping_in_approx, $expected_infinitely_looping_in_sub);
+                assert_eq!(
+                    infinitely_looping_in_exact,
+                    $expected_infinitely_looping_in_sub
+                );
+                assert_eq!(
+                    infinitely_looping_in_approx,
+                    $expected_infinitely_looping_in_sub
+                );
             };
         }
 
@@ -1134,7 +1151,7 @@ mod tests {
             check_looping_event_types!(proto, expected_infinitely_looping_in_sub);
         }
 
-         #[test]
+        #[test]
         fn identify_looping_2() {
             test_utils::setup_logger();
             let proto = test_utils::get_looping_proto_2();
@@ -1146,7 +1163,8 @@ mod tests {
         fn identify_looping_3() {
             test_utils::setup_logger();
             let proto = test_utils::get_looping_proto_3();
-            let expected_infinitely_looping_in_sub = BTreeSet::from([EventType::new("c"), EventType::new("f")]);
+            let expected_infinitely_looping_in_sub =
+                BTreeSet::from([EventType::new("c"), EventType::new("f")]);
             check_looping_event_types!(proto, expected_infinitely_looping_in_sub);
         }
 
@@ -1181,6 +1199,5 @@ mod tests {
             let expected_infinitely_looping_in_sub = BTreeSet::from([EventType::new("b")]);
             check_looping_event_types!(proto, expected_infinitely_looping_in_sub);
         }
-
     }
 }

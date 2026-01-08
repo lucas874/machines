@@ -71,11 +71,7 @@ fn coarse_overapprox_wf_sub(proto_info: &ProtoInfo, subscription: &Subscriptions
                     .iter()
                     .flat_map(|label| {
                         proto_info
-                            .immediately_pre
-                            .get(&label.get_event_type())
-                            .cloned()
-                            .unwrap_or_default()
-                            .clone()
+                            .get_preceding(&label.get_event_type())
                             .into_iter()
                             .chain([label.get_event_type()])
                     })
@@ -103,13 +99,7 @@ fn finer_overapprox_wf_sub(
         let event_types: BTreeSet<_> = labels.iter().map(|label| label.get_event_type()).collect();
         let preceding_event_types: BTreeSet<_> = event_types
             .iter()
-            .flat_map(|e| {
-                proto_info
-                    .immediately_pre
-                    .get(e)
-                    .cloned()
-                    .unwrap_or_default()
-            })
+            .flat_map(|e| proto_info.get_preceding(e))
             .collect();
         let mut events_to_add = event_types
             .into_iter()
@@ -185,13 +175,7 @@ fn two_step_overapprox_wf_sub(
         let event_types: BTreeSet<_> = labels.iter().map(|label| label.get_event_type()).collect();
         let preceding_event_types: BTreeSet<_> = event_types
             .iter()
-            .flat_map(|e| {
-                proto_info
-                    .immediately_pre
-                    .get(e)
-                    .cloned()
-                    .unwrap_or_default()
-            })
+            .flat_map(|e| proto_info.get_preceding(e))
             .collect();
         let mut events_to_add = event_types
             .into_iter()
