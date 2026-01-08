@@ -5,12 +5,12 @@ use petgraph::{
     visit::{Dfs, EdgeRef, Walker},
 };
 
-use crate::types::{proto_graph, proto_info};
+use crate::types::{proto_graph, proto_info, unordered_event_pair::UnordEventPair};
 use crate::{
     errors::ErrorReport,
     types::{
         proto_graph::{Graph, NodeId},
-        proto_info::{ProtoInfo, ProtoStruct, UnordEventPair},
+        proto_info::{ProtoInfo, ProtoStruct},
         typescript_types::{EventLabel, EventType, InterfacingProtocols, Role, Subscriptions},
     },
 };
@@ -161,7 +161,7 @@ fn exact_wf_sub_step(
                         .filter(|pair| {
                             pair.iter().all(|e| {
                                 !proto_info.concurrent_events.contains(
-                                    &proto_info::unord_event_pair(e.clone(), event_type.clone()),
+                                    &UnordEventPair::new(e.clone(), event_type.clone()),
                                 )
                             })
                         })

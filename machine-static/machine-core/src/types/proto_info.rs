@@ -4,6 +4,7 @@ use crate::types::proto_label::ProtoLabel;
 use crate::types::typescript_types::{
     Command, EventLabel, InterfacingProtocols, Subscriptions, SwarmProtocolType,
 };
+use crate::types::unordered_event_pair::UnordEventPair;
 use crate::types::{
     proto_graph::{Graph, NodeId},
     typescript_types::{EventType, Role, SwarmLabel},
@@ -20,12 +21,6 @@ use petgraph::{
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 pub type RoleEventMap = BTreeMap<Role, BTreeSet<SwarmLabel>>;
-
-pub type UnordEventPair = BTreeSet<EventType>;
-
-pub fn unord_event_pair(a: EventType, b: EventType) -> UnordEventPair {
-    BTreeSet::from([a, b])
-}
 
 #[derive(Debug, Clone)]
 pub struct ProtoStruct {
@@ -209,7 +204,7 @@ fn get_concurrent_events(
     let cartesian_product = events_proto1
         .into_iter()
         .cartesian_product(&events_proto2)
-        .map(|(a, b)| unord_event_pair(a, b.clone()))
+        .map(|(a, b)| UnordEventPair::new(a, b.clone()))
         .collect();
 
     concurrent_events_union
@@ -342,7 +337,7 @@ fn joining_event_types_map(proto_info: &ProtoInfo) -> BTreeMap<EventType, BTreeS
                 *e1 != **e2 // necessary? Not the case if in set of concurrent?
                     && proto_info
                         .concurrent_events
-                        .contains(&unord_event_pair(e1.clone(), (*e2).clone()))
+                        .contains(&UnordEventPair::new(e1.clone(), (*e2).clone()))
             })
             .map(|(e1, e2)| [e1, e2.clone()])
             .flatten()
@@ -561,7 +556,7 @@ fn direct_successors(graph: &Graph, node: NodeId) -> BTreeSet<NodeId> {
 fn after_not_concurrent(
     graph: &Graph,
     initial: NodeId,
-    concurrent_events: &BTreeSet<BTreeSet<EventType>>,
+    concurrent_events: &BTreeSet<UnordEventPair>,
 ) -> BTreeMap<EventType, BTreeSet<EventType>> {
     let _span = tracing::info_span!("after_not_concurrent").entered();
     let mut succ_map: BTreeMap<EventType, BTreeSet<EventType>> = BTreeMap::new();
@@ -581,7 +576,7 @@ fn after_not_concurrent(
 fn after_not_concurrent_step(
     graph: &Graph,
     initial: NodeId,
-    concurrent_events: &BTreeSet<BTreeSet<EventType>>,
+    concurrent_events: &BTreeSet<UnordEventPair>,
     succ_map: &mut BTreeMap<EventType, BTreeSet<EventType>>,
 ) -> bool {
     if graph.node_count() == 0 || initial == NodeId::end() {
@@ -850,10 +845,10 @@ mod tests {
         ]);
 
         let expected_concurrent = BTreeSet::from([
-            unord_event_pair(EventType::new("a"), EventType::new("c")),
-            unord_event_pair(EventType::new("a"), EventType::new("d")),
-            unord_event_pair(EventType::new("b"), EventType::new("c")),
-            unord_event_pair(EventType::new("b"), EventType::new("d")),
+            UnordEventPair::new(EventType::new("a"), EventType::new("c")),
+            UnordEventPair::new(EventType::new("a"), EventType::new("d")),
+            UnordEventPair::new(EventType::new("b"), EventType::new("c")),
+            UnordEventPair::new(EventType::new("b"), EventType::new("d")),
         ]);
 
         let combined_proto_info =

@@ -200,6 +200,7 @@ pub fn check_interface(proto_info1: &ProtoInfo, proto_info2: &ProtoInfo) -> Vec<
 mod tests {
     use super::*;
     use crate::test_utils;
+    use crate::types::unordered_event_pair::UnordEventPair;
     use crate::types::{
         proto_info,
         typescript_types::{EventType, Role, SwarmLabel},
@@ -220,8 +221,8 @@ mod tests {
         assert_eq!(
             proto_info.concurrent_events,
             BTreeSet::from([
-                proto_info::unord_event_pair(EventType::new("time"), EventType::new("car")),
-                proto_info::unord_event_pair(EventType::new("pos"), EventType::new("car"))
+                UnordEventPair::new(EventType::new("time"), EventType::new("car")),
+                UnordEventPair::new(EventType::new("pos"), EventType::new("car"))
             ])
         );
         assert_eq!(

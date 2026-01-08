@@ -5,7 +5,7 @@ use petgraph::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::types::proto_info;
+use crate::types::{proto_info, unordered_event_pair::UnordEventPair};
 use crate::{
     errors::Error,
     types::{
@@ -89,13 +89,13 @@ pub fn active_transitions_not_conc(
     node: NodeId,
     graph: &Graph,
     event_type: &EventType,
-    concurrent_events: &BTreeSet<BTreeSet<EventType>>,
+    concurrent_events: &BTreeSet<UnordEventPair>,
 ) -> Vec<SwarmLabel> {
     graph
         .edges_directed(node, Outgoing)
         .map(|e| e.weight().clone())
         .filter(|e| {
-            !concurrent_events.contains(&BTreeSet::from([event_type.clone(), e.get_event_type()]))
+            !concurrent_events.contains(&UnordEventPair::new(event_type.clone(), e.get_event_type()))
         })
         .collect()
 }
@@ -158,13 +158,13 @@ pub fn event_pairs_from_node(
     node: NodeId,
     graph: &Graph,
     direction: Direction,
-) -> Vec<BTreeSet<EventType>> {
+) -> Vec<UnordEventPair> {
     graph
         .edges_directed(node, direction)
         .map(|e| e.id())
         .combinations(2)
         .map(|pair| {
-            proto_info::unord_event_pair(
+            UnordEventPair::new(
                 graph[pair[0]].get_event_type(),
                 graph[pair[1]].get_event_type(),
             )

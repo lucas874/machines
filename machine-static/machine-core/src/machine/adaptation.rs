@@ -1,12 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::machine::{projection, util};
+use crate::types::unordered_event_pair::UnordEventPair;
 use crate::{
     composition,
     types::{
         projection::{Graph, OptionGraph},
         proto_graph::NodeId,
-        proto_info::{self, ProtoInfo, UnordEventPair},
+        proto_info::{self, ProtoInfo},
         typescript_types::{
             BranchMap, EventLabel, EventType, MachineLabel, ProjToMachineStates, ProjectionInfo,
             Role, State, StateName, Subscriptions,
@@ -202,7 +203,7 @@ fn paths_from_event_types(
             .map(|(e, es)| {
                 [e].into_iter()
                     .cartesian_product(&es)
-                    .map(|(e1, e2)| proto_info::unord_event_pair(e1, e2.clone()))
+                    .map(|(e1, e2)| UnordEventPair::new(e1, e2.clone()))
                     .collect::<BTreeSet<UnordEventPair>>()
             })
             .flatten()
@@ -253,7 +254,7 @@ fn visit_successors_stop_on_branch(
     while let Some(node) = to_visit.pop() {
         visited.insert(node);
         for e in proj.edges_directed(node, Outgoing) {
-            if !concurrent_events.contains(&proto_info::unord_event_pair(
+            if !concurrent_events.contains(&UnordEventPair::new(
                 e.weight().get_event_type(),
                 et.clone(),
             )) {

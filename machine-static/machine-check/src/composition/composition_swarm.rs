@@ -1,7 +1,8 @@
 use machine_core::errors::{Error, ErrorReport};
+use machine_core::types::unordered_event_pair::UnordEventPair;
 use machine_core::types::{proto_graph, proto_info};
 use machine_core::types::{
-    proto_info::{unord_event_pair, ProtoInfo, ProtoStruct, UnordEventPair},
+    proto_info::{ProtoInfo, ProtoStruct},
     typescript_types::{EventLabel, EventType, InterfacingProtocols, Role, Subscriptions},
 };
 use petgraph::{
@@ -173,7 +174,7 @@ fn well_formed(proto_info: &ProtoInfo, proto_pointer: usize, subs: &Subscription
                             pair.iter().all(|e| {
                                 !proto_info
                                     .concurrent_events
-                                    .contains(&unord_event_pair(e.clone(), event_type.clone()))
+                                    .contains(&UnordEventPair::new(e.clone(), event_type.clone()))
                             })
                         })
                         .collect();
