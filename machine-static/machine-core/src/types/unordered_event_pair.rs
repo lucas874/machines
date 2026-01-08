@@ -187,6 +187,11 @@ mod tests {
 
         assert_eq!(a.len(), 1);
         assert_eq!(a.first().cloned().unwrap(), &EventType::new("a"));
+
+        let pair_same_element = UnordEventPair::new(EventType::new("a"), EventType::new("a"));
+        let mut iter = pair_same_element.iter();
+        assert_eq!(iter.next(), Some(&EventType::new("a")));
+        assert_eq!(iter.next(), None);
     }
 
     #[test]
@@ -197,5 +202,10 @@ mod tests {
 
         assert_eq!(a.len(), 1);
         assert_eq!(a.first().cloned().unwrap(), EventType::new("a"));
+
+        let pair_same_element = UnordEventPair::new(EventType::new("a"), EventType::new("a"));
+        let mut iter = pair_same_element.into_iter();
+        assert_eq!(iter.next(), Some(EventType::new("a")));
+        assert_eq!(iter.next(), None);
     }
 }
