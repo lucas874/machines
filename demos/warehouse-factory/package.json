@@ -26,7 +26,8 @@
     "@types/yargs": "^17.0.33"
   },
   "dependencies": {
-    "@actyx/machine-check": "file:../../machine-check",
+    "machine-core": "file:../../machine-static/machine-core",
+    "@actyx/machine-check": "file:../../machine-static/machine-check",
     "@actyx/machine-runner": "file:../../machine-runner",
     "@actyx/sdk": "^0.5.10",
     "lodash.camelcase": "^4.3.0",

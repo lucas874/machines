@@ -1,4 +1,4 @@
-import { DataResult, overapproxWFSubscriptions, Subscriptions } from "@actyx/machine-check";
+import { DataResult, overapproxWFSubscriptions, Subscriptions } from "machine-core";
 import { MachineEvent, SwarmProtocol } from "@actyx/machine-runner";
 import chalk from "chalk";
 import * as fs from 'fs';
