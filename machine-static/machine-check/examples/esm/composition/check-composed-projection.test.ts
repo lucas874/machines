@@ -96,7 +96,8 @@ const G2: SwarmProtocolType = {
 }
 
 const interfacing_swarms: InterfacingProtocols = [G1, G2]
-const overapprox_result_subscriptions: DataResult<Subscriptions> = overapproxWFSubscriptions(interfacing_swarms, {}, "Coarse")
+const granularity = "TwoStep"
+const overapprox_result_subscriptions: DataResult<Subscriptions> = overapproxWFSubscriptions(interfacing_swarms, {}, granularity)
 
 describe('subscriptions', () => {
   it('overapproximation should be ok', () => {

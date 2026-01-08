@@ -208,7 +208,6 @@ pub struct InterfacingProtocols(pub Vec<SwarmProtocolType>);
 pub enum Granularity {
     Fine,
     Medium,
-    Coarse,
     TwoStep,
 }
 

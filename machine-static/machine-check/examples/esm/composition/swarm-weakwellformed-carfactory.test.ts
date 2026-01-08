@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals'
 import { checkSwarmProtocol, checkComposedSwarmProtocol } from '../../..'
-import { SwarmProtocolType, Subscriptions, DataResult, InterfacingProtocols, exactWFSubscriptions, overapproxWFSubscriptions} from 'machine-core'
+import { SwarmProtocolType, Subscriptions, DataResult, InterfacingProtocols, exactWFSubscriptions, overapproxWFSubscriptions, Granularity} from 'machine-core'
 
 import { Events } from './car-factory-protos.js'
 
@@ -162,9 +162,10 @@ describe('checkWWFSwarmProtocol for protocols with exact wwf subscription', () =
   })
 })
 
-const overapprox_result_subscriptions1: DataResult<Subscriptions> = overapproxWFSubscriptions(G1_, {}, "Coarse")
-const overapprox_result_subscriptions2: DataResult<Subscriptions> = overapproxWFSubscriptions(G2_, {}, "Coarse")
-const overapprox_result_subscriptions3: DataResult<Subscriptions> = overapproxWFSubscriptions(G3_, {}, "Coarse")
+const granularity: Granularity = "TwoStep"
+const overapprox_result_subscriptions1: DataResult<Subscriptions> = overapproxWFSubscriptions(G1_, {}, granularity)
+const overapprox_result_subscriptions2: DataResult<Subscriptions> = overapproxWFSubscriptions(G2_, {}, granularity)
+const overapprox_result_subscriptions3: DataResult<Subscriptions> = overapproxWFSubscriptions(G3_, {}, granularity)
 if (overapprox_result_subscriptions1.type === 'ERROR') throw new Error('error getting subscription')
 const overapprox_subscriptions1: Subscriptions = overapprox_result_subscriptions1.data
 

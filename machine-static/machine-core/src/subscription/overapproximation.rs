@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use crate::{
     errors::ErrorReport,
@@ -9,7 +9,7 @@ use crate::{
         },
     },
 };
-use crate::{types::proto_info, util};
+use crate::types::proto_info;
 
 // Construct wf-subscription compositionally.
 // Overapproximates the subscription one would obtain from exact_well_formed_sub().
@@ -40,48 +40,8 @@ fn overapprox_wf_sub(
     match granularity {
         Granularity::Fine => finer_overapprox_wf_sub(proto_info, subscription, false),
         Granularity::Medium => finer_overapprox_wf_sub(proto_info, subscription, true),
-        Granularity::Coarse => coarse_overapprox_wf_sub(proto_info, subscription),
         Granularity::TwoStep => two_step_overapprox_wf_sub(proto_info, &mut subscription.clone()),
     }
-}
-
-fn coarse_overapprox_wf_sub(proto_info: &ProtoInfo, subscription: &Subscriptions) -> Subscriptions {
-    let _span = tracing::info_span!("coarse_overapprox_wf_sub").entered();
-    // for each role add:
-    //      all branching.
-    //      all joining and immediately pre joining that are concurrent
-    //      all interfacing
-    //      own events and the events immediately preceding these
-    let events_to_add_to_all: BTreeSet<EventType> = proto_info
-        .branching_events
-        .clone()
-        .into_iter()
-        .flatten()
-        .chain(proto_info::flatten_joining_map(&proto_info.joining_events))
-        .chain(proto_info.interfacing_events.clone())
-        .collect();
-
-    let sub: BTreeMap<Role, BTreeSet<EventType>> = proto_info
-        .role_event_map
-        .iter()
-        .map(|(role, labels)| {
-            (
-                role.clone(),
-                labels
-                    .iter()
-                    .flat_map(|label| {
-                        proto_info
-                            .get_preceding(&label.get_event_type())
-                            .into_iter()
-                            .chain([label.get_event_type()])
-                    })
-                    .chain(events_to_add_to_all.clone().into_iter())
-                    .collect::<BTreeSet<EventType>>(),
-            )
-        })
-        .collect();
-
-    util::combine_maps(subscription.clone(), sub, None)
 }
 
 fn finer_overapprox_wf_sub(
@@ -159,8 +119,6 @@ fn finer_approx_add_branches_and_joins(proto_info: &ProtoInfo, subscription: &mu
                 is_stable = add_to_sub(role, branching_events.clone(), subscription) && is_stable;
             }
         }
-
-        // We do not add looping events, since we only consider terminating protocols.
     }
 }
 
@@ -252,6 +210,8 @@ fn add_to_sub(role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subsc
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use super::*;
     use crate::test_utils;
 
@@ -260,53 +220,6 @@ mod tests {
         test_utils::setup_logger();
 
         // Test interfacing_swarms_1
-        // Coarse
-        let result_1_coarse = overapprox_well_formed_sub(
-            test_utils::get_interfacing_swarms_1(),
-            &BTreeMap::new(),
-            Granularity::Medium,
-        );
-        assert!(result_1_coarse.is_ok());
-        let subs_1_coarse = result_1_coarse.unwrap();
-        let expected_subs_1_coarse: Subscriptions = BTreeMap::from([
-            (
-                Role::from("T"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("pos"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                ]),
-            ),
-            (
-                Role::from("FL"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("pos"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                ]),
-            ),
-            (
-                Role::from("D"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                ]),
-            ),
-            (
-                Role::from("F"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                ]),
-            ),
-        ]);
-        assert_eq!(subs_1_coarse, expected_subs_1_coarse);
-
         // Medium
         let result_1_medium = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_1(),
@@ -447,87 +360,8 @@ mod tests {
         ]);
         assert_eq!(subs_1_two_step, expected_subs_1_two_step);
         assert_eq!(subs_1_two_step, subs_1_medium);
-        assert_eq!(subs_1_two_step, subs_1_coarse);
 
         // Test interfacing_swarms_2
-        // Coarse
-        let result_2_coarse = overapprox_well_formed_sub(
-            test_utils::get_interfacing_swarms_2(),
-            &BTreeMap::new(),
-            Granularity::Coarse,
-        );
-        assert!(result_2_coarse.is_ok());
-        let subs_2_coarse = result_2_coarse.unwrap();
-        let expected_subs_2_coarse: Subscriptions = BTreeMap::from([
-            (
-                Role::from("T"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("pos"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                    EventType::from("report1"),
-                ]),
-            ),
-            (
-                Role::from("FL"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("pos"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                    EventType::from("report1"),
-                ]),
-            ),
-            (
-                Role::from("D"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                    EventType::from("report1"),
-                ]),
-            ),
-            (
-                Role::from("F"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                    EventType::from("report1"),
-                ]),
-            ),
-            (
-                Role::from("TR"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                    EventType::from("report1"),
-                    EventType::from("report2"),
-                ]),
-            ),
-            (
-                Role::from("QCR"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                    EventType::from("report1"),
-                    EventType::from("report2"),
-                    EventType::from("ok"),
-                    EventType::from("notOk"),
-                ]),
-            ),
-        ]);
-        assert_eq!(subs_2_coarse, expected_subs_2_coarse);
-
         // Medium
         let result_2_medium = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_2(),
@@ -605,7 +439,6 @@ mod tests {
             ),
         ]);
         assert_eq!(subs_2_medium, expected_subs_2_medium);
-        assert_eq!(subs_2_medium, subs_2_coarse);
 
         // Fine
         let result_2_fine = overapprox_well_formed_sub(
@@ -751,72 +584,6 @@ mod tests {
         assert_eq!(subs_2_two_step, expected_subs_2_two_step);
 
         // Test interfacing_swarms_3
-        // Coarse
-        let result_3_coarse = overapprox_well_formed_sub(
-            test_utils::get_interfacing_swarms_3(),
-            &BTreeMap::new(),
-            Granularity::Coarse,
-        );
-        assert!(result_3_coarse.is_ok());
-        let subs_3_coarse = result_3_coarse.unwrap();
-        let expected_subs_3_coarse: Subscriptions = BTreeMap::from([
-            (
-                Role::from("T"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("pos"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                    EventType::from("report2"),
-                ]),
-            ),
-            (
-                Role::from("FL"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("pos"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                    EventType::from("report2"),
-                ]),
-            ),
-            (
-                Role::from("D"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                    EventType::from("report2"),
-                ]),
-            ),
-            (
-                Role::from("F"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                    EventType::from("report2"),
-                ]),
-            ),
-            (
-                Role::from("QCR"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                    EventType::from("report1"),
-                    EventType::from("report2"),
-                    EventType::from("report3"),
-                ]),
-            ),
-        ]);
-        assert_eq!(subs_3_coarse, expected_subs_3_coarse);
-
         // Medium
         let result_3_medium = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_3(),
@@ -1008,14 +775,6 @@ mod tests {
         test_utils::setup_logger();
 
         // Test empty set if input protocols
-        let empty_coarse = overapprox_well_formed_sub(
-            InterfacingProtocols(vec![]),
-            &BTreeMap::new(),
-            Granularity::Coarse,
-        );
-        assert!(empty_coarse.is_ok());
-        assert_eq!(empty_coarse.unwrap(), BTreeMap::new());
-
         let empty_medium = overapprox_well_formed_sub(
             InterfacingProtocols(vec![]),
             &BTreeMap::new(),
@@ -1041,71 +800,6 @@ mod tests {
         assert_eq!(empty_two_step.unwrap(), BTreeMap::new());
 
         // Test interfacing_swarms_4
-        // Coarse
-        let result_4_coarse = overapprox_well_formed_sub(
-            test_utils::get_interfacing_swarms_4(),
-            &BTreeMap::new(),
-            Granularity::Coarse,
-        );
-        assert!(result_4_coarse.is_ok());
-        let subs_4_coarse = result_4_coarse.unwrap();
-        let expected_subs_4_coarse: Subscriptions = BTreeMap::from([
-            (
-                Role::from("T"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("pos"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                    EventType::from("observing"),
-                ]),
-            ),
-            (
-                Role::from("FL"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("pos"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                    EventType::from("observing"),
-                ]),
-            ),
-            (
-                Role::from("D"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                    EventType::from("observing"),
-                ]),
-            ),
-            (
-                Role::from("F"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                    EventType::from("observing"),
-                ]),
-            ),
-            (
-                Role::from("QCR"),
-                BTreeSet::from([
-                    EventType::from("partID"),
-                    EventType::from("part"),
-                    EventType::from("time"),
-                    EventType::from("car"),
-                    EventType::from("observing"),
-                    EventType::from("report"),
-                ]),
-            ),
-        ]);
-        assert_eq!(subs_4_coarse, expected_subs_4_coarse);
-
         // Medium
         let result_4_medium = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_4(),
@@ -1289,48 +983,6 @@ mod tests {
         assert_eq!(subs_4_two_step, expected_subs_4_two_step);
 
         // Test interfacing_swarms_5
-        // Coarse
-        let result_5_coarse = overapprox_well_formed_sub(
-            test_utils::get_interfacing_swarms_5(),
-            &BTreeMap::new(),
-            Granularity::Coarse,
-        );
-        assert!(result_5_coarse.is_ok());
-        let subs_5_coarse = result_5_coarse.unwrap();
-        let expected_subs_5_coarse: Subscriptions = BTreeMap::from([
-            (
-                Role::from("IR"),
-                BTreeSet::from([
-                    EventType::from("e_ir_0"),
-                    EventType::from("e_ir_1"),
-                    EventType::from("e_r0_0"),
-                    EventType::from("e_r0_1"),
-                    EventType::from("e_r1_0"),
-                ]),
-            ),
-            (
-                Role::from("R0"),
-                BTreeSet::from([
-                    EventType::from("e_ir_0"),
-                    EventType::from("e_ir_1"),
-                    EventType::from("e_r0_0"),
-                    EventType::from("e_r0_1"),
-                    EventType::from("e_r1_0"),
-                ]),
-            ),
-            (
-                Role::from("R1"),
-                BTreeSet::from([
-                    EventType::from("e_ir_0"),
-                    EventType::from("e_ir_1"),
-                    EventType::from("e_r0_0"),
-                    EventType::from("e_r0_1"),
-                    EventType::from("e_r1_0"),
-                ]),
-            ),
-        ]);
-        assert_eq!(subs_5_coarse, expected_subs_5_coarse);
-
         // Medium
         let result_5_medium = overapprox_well_formed_sub(
             test_utils::get_interfacing_swarms_5(),
@@ -1450,15 +1102,15 @@ mod tests {
     fn test_refinement_pattern() {
         test_utils::setup_logger();
 
-        // Coarse
-        let result_coarse = overapprox_well_formed_sub(
+        // Medium
+        let result_medium = overapprox_well_formed_sub(
             test_utils::get_ref_pat_protos(),
             &BTreeMap::new(),
-            Granularity::Coarse,
+            Granularity::Medium,
         );
-        assert!(result_coarse.is_ok());
-        let subs_coarse = result_coarse.unwrap();
-        let expected_subs_coarse: Subscriptions = BTreeMap::from([
+        assert!(result_medium.is_ok());
+        let subs_medium = result_medium.unwrap();
+        let expected_subs_medium: Subscriptions = BTreeMap::from([
             (
                 Role::from("IR0"),
                 BTreeSet::from([
@@ -1514,17 +1166,7 @@ mod tests {
                 ]),
             ),
         ]);
-        assert_eq!(subs_coarse, expected_subs_coarse);
-
-        // Medium
-        let result_medium = overapprox_well_formed_sub(
-            test_utils::get_ref_pat_protos(),
-            &BTreeMap::new(),
-            Granularity::Medium,
-        );
-        assert!(result_medium.is_ok());
-        let subs_medium = result_medium.unwrap();
-        assert_eq!(subs_medium, expected_subs_coarse);
+        assert_eq!(subs_medium, expected_subs_medium);
 
         // Fine
         let result_fine = overapprox_well_formed_sub(
@@ -1650,17 +1292,6 @@ mod tests {
             (Role::new("D"), BTreeSet::from([EventType::new("pos")])),
             (Role::new("TR"), BTreeSet::from([EventType::new("ok")])),
         ]);
-
-        // Coarse
-        let result_coarse = overapprox_well_formed_sub(
-            test_utils::get_interfacing_swarms_2(),
-            &sub_to_extend,
-            Granularity::Coarse,
-        );
-        assert!(result_coarse.is_ok());
-        let subs_coarse = result_coarse.unwrap();
-        assert!(subs_coarse[&Role::new("D")].contains(&EventType::new("pos")));
-        assert!(subs_coarse[&Role::new("TR")].contains(&EventType::new("ok")));
 
         // Medium
         let result_medium = overapprox_well_formed_sub(

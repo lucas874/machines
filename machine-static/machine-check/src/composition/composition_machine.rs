@@ -743,7 +743,7 @@ mod tests {
                 Role::new("T"),
                 BTreeSet::from([EventType::new("car")]),
             )])),
-            Granularity::Coarse,
+            Granularity::TwoStep,
         ) {
             DataResult::ERROR { errors: _ } => panic!(),
             DataResult::OK { data } => data,

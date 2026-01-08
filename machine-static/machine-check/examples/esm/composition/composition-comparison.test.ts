@@ -82,8 +82,9 @@ const G3: SwarmProtocolType = {
   ],
 }
 const interfacing_swarms: InterfacingProtocols = [G1, G2, G3]
+const granularity = "TwoStep"
 const exact_result_subscriptions: DataResult<Subscriptions> = exactWFSubscriptions(interfacing_swarms, {})
-const overapprox_result_subscriptions: DataResult<Subscriptions> = overapproxWFSubscriptions(interfacing_swarms, {}, "Coarse")
+const overapprox_result_subscriptions: DataResult<Subscriptions> = overapproxWFSubscriptions(interfacing_swarms, {}, granularity)
 
 describe('subscriptions', () => {
   it('exact should be ok', () => {
@@ -156,7 +157,7 @@ describe('various tests', () => {
 // fix this error being recorded twice.
 describe('various errors', () => {
   it('subscription for empty list of protocols', () => {
-    expect(overapproxWFSubscriptions([], {}, "Coarse")).toEqual({
+    expect(overapproxWFSubscriptions([], {}, granularity)).toEqual({
       type: 'OK',
       data: {}
     })

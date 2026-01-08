@@ -411,7 +411,7 @@ mod tests {
         let result_subs = overapproximation::overapprox_well_formed_sub(
             protos.clone(),
             &BTreeMap::from([(Role::new("T"), BTreeSet::from([EventType::new("car")]))]),
-            Granularity::Coarse,
+            Granularity::TwoStep,
         );
         assert!(result_subs.is_ok());
         let subs = result_subs.unwrap();
