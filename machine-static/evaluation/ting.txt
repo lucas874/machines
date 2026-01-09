@@ -1,0 +1,5 @@
+    let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
+    let output_dir = format!("{BENCHMARK_DIR}/short_subscription_size_benchmarks/ecoop23-compositional-comparison/general_pattern");
+
+    input: bench_and_results/benchmarks/general_pattern/
+    output: bench_and_results/short_subscription_size_benchmarks/ecoop23-compositional-comparison/general_pattern

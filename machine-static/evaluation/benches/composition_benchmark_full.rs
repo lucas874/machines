@@ -3,7 +3,7 @@ use machine_core::types::typescript_types::{
     EventType, Granularity, InterfacingProtocols, Role, SubscriptionsWrapped,
 };
 use serde::{Deserialize, Serialize};
-
+extern crate machine_check;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::prelude::*;
@@ -74,9 +74,9 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, InterfacingProto
     inputs
 }
 
-fn short_bench_general(c: &mut Criterion) {
+fn full_bench_general(c: &mut Criterion) {
     setup_logger();
-    let mut group = c.benchmark_group("General-pattern-algorithm1-vs.-exact-short-run");
+    let mut group = c.benchmark_group("General-pattern-algorithm1-vs.-exact-full-run");
     group.sample_size(10);
     let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
     let mut interfacing_swarms_general = prepare_files_in_directory(input_dir);
@@ -84,9 +84,8 @@ fn short_bench_general(c: &mut Criterion) {
 
     let subs = BTreeMap::<Role, BTreeSet<EventType>>::new();
     let two_step_granularity = Granularity::TwoStep;
-    let step: usize = 120;
 
-    for (size, interfacing_swarms) in interfacing_swarms_general.iter().step_by(step) {
+    for (size, interfacing_swarms) in interfacing_swarms_general.iter() {
         group.bench_with_input(
             BenchmarkId::new("Algorithm 1", size),
             interfacing_swarms,
@@ -119,5 +118,5 @@ fn short_bench_general(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, short_bench_general);
+criterion_group!(benches, full_bench_general);
 criterion_main!(benches);

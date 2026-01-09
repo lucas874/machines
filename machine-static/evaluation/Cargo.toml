@@ -1,0 +1,37 @@
+[package]
+name = "evaluation"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+path = "src/subscription_size_short.rs"
+name = "subscription_size_short"
+
+[[bin]]
+path = "src/subscription_size.rs"
+name = "subscription_size"
+
+[dependencies]
+machine-core.workspace = true
+machine-check.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+walkdir.workspace = true
+clap = { version = "4.5.54", features = ["derive"] }
+
+
+[dev-dependencies]
+tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
+criterion = "0.7.0"
+
+[[bench]]
+name = "composition_benchmark_full"
+harness = false
+
+[[bench]]
+name = "composition_benchmark_short"
+harness = false
