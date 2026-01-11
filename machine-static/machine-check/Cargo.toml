@@ -30,11 +30,3 @@ walkdir.workspace = true
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["-Os"]
-
-[[bench]]
-name = "composition_benchmark_full"
-harness = false
-
-[[bench]]
-name = "composition_benchmark_short"
-harness = false
