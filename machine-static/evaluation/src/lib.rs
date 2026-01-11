@@ -1,12 +1,11 @@
-use machine_check::{check_swarm, check_composed_swarm, well_formed_sub, CheckResult};
 
 use machine_core::types::typescript_types::{
-    DataResult, EventType, Granularity, InterfacingProtocols, Role, State, Subscriptions,
-    SubscriptionsWrapped, SwarmProtocolType,
+    InterfacingProtocols, State, Subscriptions,
+    SwarmProtocolType,
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeSet,
     fs::{File, create_dir_all},
     io::prelude::*,
     path::{Path, PathBuf},
@@ -27,249 +26,6 @@ pub struct Cli {
     #[arg(short, long)]
     pub output_dir: PathBuf,
 }
-
-
-/* #[test]
-#[ignore]
-
-
-#[test]
-#[ignore]
-fn full_simple_run_bench_sub_sizes_general() {
-    let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
-    let output_dir = format!("{BENCHMARK_DIR}/subscription_size_benchmarks/ecoop23-compositional-comparison/general_pattern");
-    create_directory(&output_dir);
-    let inputs = prepare_simple_inputs_in_directory(input_dir);
-    let subs = BTreeMap::<Role, BTreeSet<EventType>>::new();
-    let two_step_granularity = Granularity::TwoStep;
-
-    for input in inputs.iter() {
-        let subscriptions_wf_kmt =
-            match well_formed_sub(input.proto.clone(), SubscriptionsWrapped(subs.clone())) {
-                DataResult::OK {
-                    data: subscriptions,
-                } => Some(subscriptions),
-                DataResult::ERROR { .. } => None,
-            };
-        match check_swarm(
-            input.proto.clone(),
-            SubscriptionsWrapped(subscriptions_wf_kmt.clone().unwrap()),
-        ) {
-            CheckResult::OK => (),
-            CheckResult::ERROR { errors } => {
-                println!(
-                    "id: {}, cause: {},\n subscriptions: {}",
-                    input.id.clone().unwrap_or(String::from("")),
-                    errors.join(", "),
-                    serde_json::to_string_pretty(&subscriptions_wf_kmt.clone()).unwrap()
-                );
-                panic!("Not ok compositional")
-            }
-        }
-        wrap_and_write_sub_out_simple(
-            &input,
-            subscriptions_wf_kmt.unwrap(),
-            Version::KMT23,
-            &output_dir,
-        );
-
-        let subscriptions_compositional_exact = match machine_core::exact_well_formed_sub(
-            InterfacingProtocols(vec![input.proto.clone()]),
-            SubscriptionsWrapped(subs.clone()),
-        ) {
-            DataResult::OK {
-                data: subscriptions,
-            } => Some(subscriptions),
-            DataResult::ERROR { .. } => None,
-        };
-        match check_composed_swarm(
-            InterfacingProtocols(vec![input.proto.clone()]),
-            SubscriptionsWrapped(subscriptions_compositional_exact.clone().unwrap()),
-        ) {
-            CheckResult::OK => (),
-            CheckResult::ERROR { errors } => {
-                println!(
-                    "id: {}, cause: {},\n subscriptions: {}",
-                    input.id.clone().unwrap_or(String::from("")),
-                    errors.join(", "),
-                    serde_json::to_string_pretty(&subscriptions_compositional_exact.clone())
-                        .unwrap()
-                );
-                panic!("Not ok compositional")
-            }
-        }
-        wrap_and_write_sub_out_simple(
-            &input,
-            subscriptions_compositional_exact.unwrap(),
-            Version::CompositionalExact,
-            &output_dir,
-        );
-
-        let subscriptions_compositional_approx =
-            match machine_core::overapproximated_well_formed_sub(
-                InterfacingProtocols(vec![input.proto.clone()]),
-                SubscriptionsWrapped(subs.clone()),
-                two_step_granularity.clone(),
-            ) {
-                DataResult::OK {
-                    data: subscriptions,
-                } => Some(subscriptions),
-                DataResult::ERROR { .. } => None,
-            };
-        match check_composed_swarm(
-            InterfacingProtocols(vec![input.proto.clone()]),
-            SubscriptionsWrapped(subscriptions_compositional_approx.clone().unwrap()),
-        ) {
-            CheckResult::OK => (),
-            CheckResult::ERROR { errors } => {
-                println!(
-                    "id: {}, cause: {},\n subscriptions: {}",
-                    input.id.clone().unwrap_or(String::from("")),
-                    errors.join(", "),
-                    serde_json::to_string_pretty(&subscriptions_compositional_approx.clone())
-                        .unwrap()
-                );
-                panic!("Not ok compositional")
-            }
-        }
-        wrap_and_write_sub_out_simple(
-            &input,
-            subscriptions_compositional_approx.unwrap(),
-            Version::CompositionalOverapprox,
-            &output_dir,
-        );
-
-        println!("{}", SPECIAL_SYMBOL);
-    }
-}
-
-#[test]
-#[ignore]
-fn short_simple_run_bench_sub_sizes_general() {
-    let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
-    let output_dir = format!("{BENCHMARK_DIR}/short_subscription_size_benchmarks/ecoop23-compositional-comparison/general_pattern");
-    create_directory(&output_dir);
-    let inputs = prepare_simple_inputs_in_directory(input_dir);
-    let subs = BTreeMap::<Role, BTreeSet<EventType>>::new();
-    let two_step_granularity = Granularity::TwoStep;
-    let step: usize = 120;
-    for input in inputs.iter().step_by(step) {
-        let subscriptions_wf_kmt =
-            match well_formed_sub(input.proto.clone(), SubscriptionsWrapped(subs.clone())) {
-                DataResult::OK {
-                    data: subscriptions,
-                } => Some(subscriptions),
-                DataResult::ERROR { .. } => None,
-            };
-        match check_swarm(
-            input.proto.clone(),
-            SubscriptionsWrapped(subscriptions_wf_kmt.clone().unwrap()),
-        ) {
-            CheckResult::OK => (),
-            CheckResult::ERROR { errors } => {
-                println!(
-                    "id: {}, cause: {},\n subscriptions: {}",
-                    input.id.clone().unwrap_or(String::from("")),
-                    errors.join(", "),
-                    serde_json::to_string_pretty(&subscriptions_wf_kmt.clone()).unwrap()
-                );
-                panic!("Not ok compositional")
-            }
-        }
-        wrap_and_write_sub_out_simple(
-            &input,
-            subscriptions_wf_kmt.unwrap(),
-            Version::KMT23,
-            &output_dir,
-        );
-
-        let subscriptions_compositional_exact = match machine_core::exact_well_formed_sub(
-            InterfacingProtocols(vec![input.proto.clone()]),
-            SubscriptionsWrapped(subs.clone()),
-        ) {
-            DataResult::OK {
-                data: subscriptions,
-            } => Some(subscriptions),
-            DataResult::ERROR { .. } => None,
-        };
-        match check_composed_swarm(
-            InterfacingProtocols(vec![input.proto.clone()]),
-            SubscriptionsWrapped(subscriptions_compositional_exact.clone().unwrap()),
-        ) {
-            CheckResult::OK => (),
-            CheckResult::ERROR { errors } => {
-                println!(
-                    "id: {}, cause: {},\n subscriptions: {}",
-                    input.id.clone().unwrap_or(String::from("")),
-                    errors.join(", "),
-                    serde_json::to_string_pretty(&subscriptions_compositional_exact.clone())
-                        .unwrap()
-                );
-                panic!("Not ok compositional")
-            }
-        }
-        wrap_and_write_sub_out_simple(
-            &input,
-            subscriptions_compositional_exact.unwrap(),
-            Version::CompositionalExact,
-            &output_dir,
-        );
-
-        let subscriptions_compositional_approx =
-            match machine_core::overapproximated_well_formed_sub(
-                InterfacingProtocols(vec![input.proto.clone()]),
-                SubscriptionsWrapped(subs.clone()),
-                two_step_granularity.clone(),
-            ) {
-                DataResult::OK {
-                    data: subscriptions,
-                } => Some(subscriptions),
-                DataResult::ERROR { .. } => None,
-            };
-        match check_composed_swarm(
-            InterfacingProtocols(vec![input.proto.clone()]),
-            SubscriptionsWrapped(subscriptions_compositional_approx.clone().unwrap()),
-        ) {
-            CheckResult::OK => (),
-            CheckResult::ERROR { errors } => {
-                println!(
-                    "id: {}, cause: {},\n subscriptions: {}",
-                    input.id.clone().unwrap_or(String::from("")),
-                    errors.join(", "),
-                    serde_json::to_string_pretty(&subscriptions_compositional_approx.clone())
-                        .unwrap()
-                );
-                panic!("Not ok compositional")
-            }
-        }
-        wrap_and_write_sub_out_simple(
-            &input,
-            subscriptions_compositional_approx.unwrap(),
-            Version::CompositionalOverapprox,
-            &output_dir,
-        );
-
-        println!("{}", SPECIAL_SYMBOL);
-    }
-}
-
-#[test]
-#[ignore]
-fn write_flattened() {
-    let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
-    let output_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern_flattened");
-    create_directory(&output_dir);
-    let inputs = prepare_simple_inputs_in_directory(input_dir);
-
-    for input in inputs.iter() {
-        //let id = input.id.clone().unwrap_or(String::from("N/A"));
-        let file_name = format!(
-            "{output_dir}/{}.json",
-            input.id.clone().unwrap_or(String::from("NA"))
-        );
-        write_file(&file_name, serde_json::to_string(input).unwrap());
-    }
-} */
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BenchMarkInput {
@@ -495,3 +251,22 @@ pub fn wrap_and_write_sub_out_simple(
     let out = serde_json::to_string(&out).unwrap();
     write_file(&parent_path.join(file_name), out);
 }
+
+/* 
+#[test]
+#[ignore]
+fn write_flattened() {
+    let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
+    let output_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern_flattened");
+    create_directory(&output_dir);
+    let inputs = prepare_simple_inputs_in_directory(input_dir);
+
+    for input in inputs.iter() {
+        //let id = input.id.clone().unwrap_or(String::from("N/A"));
+        let file_name = format!(
+            "{output_dir}/{}.json",
+            input.id.clone().unwrap_or(String::from("NA"))
+        );
+        write_file(&file_name, serde_json::to_string(input).unwrap());
+    }
+} */

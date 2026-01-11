@@ -14,8 +14,8 @@ fn main() {
     let inputs = prepare_simple_inputs_in_directory(&input_dir);
     let subs = BTreeMap::<Role, BTreeSet<EventType>>::new();
     let two_step_granularity = Granularity::TwoStep;
-
-    for input in inputs.iter() {
+    let step: usize = 120;
+    for input in inputs.iter().step_by(step) {
         let subscriptions_wf_kmt =
             match well_formed_sub(input.proto.clone(), SubscriptionsWrapped(subs.clone())) {
                 DataResult::OK {

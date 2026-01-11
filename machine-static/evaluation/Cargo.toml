@@ -16,6 +16,10 @@ path = "src/subscription_size.rs"
 name = "subscription_size"
 
 [[bin]]
+path = "src/kmt23_compositional_short.rs"
+name = "kmt23_compositional_short"
+
+[[bin]]
 path = "src/kmt23_compositional.rs"
 name = "kmt23_compositional"
 
