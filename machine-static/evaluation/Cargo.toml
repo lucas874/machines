@@ -15,6 +15,10 @@ name = "subscription_size_short"
 path = "src/subscription_size.rs"
 name = "subscription_size"
 
+[[bin]]
+path = "src/kmt23_compositional.rs"
+name = "kmt23_compositional"
+
 [dependencies]
 machine-core.workspace = true
 machine-check.workspace = true

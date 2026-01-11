@@ -31,54 +31,7 @@ pub struct Cli {
 
 /* #[test]
 #[ignore]
-fn full_run_bench_sub_sizes_general() {
-    let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
-    let output_dir = format!("{BENCHMARK_DIR}/subscription_size_benchmarks/general_pattern");
-    create_directory(&output_dir);
-    let mut interfacing_swarms_general = prepare_files_in_directory(input_dir);
-    interfacing_swarms_general.sort_by(|(size1, _), (size2, _)| size1.cmp(size2));
-    let subs = BTreeMap::<Role, BTreeSet<EventType>>::new();
-    let two_step_granularity = Granularity::TwoStep;
 
-    for (_, bi) in interfacing_swarms_general.iter() {
-        let swarms = &bi.interfacing_swarms;
-        let subscriptions = match machine_core::overapproximated_well_formed_sub(
-            swarms.clone(),
-            SubscriptionsWrapped(subs.clone()),
-            two_step_granularity.clone(),
-        ) {
-            DataResult::OK {
-                data: subscriptions,
-            } => Some(subscriptions),
-            DataResult::ERROR { .. } => None,
-        };
-        wrap_and_write_sub_out(
-            &bi,
-            subscriptions.unwrap(),
-            serde_json::to_string(&two_step_granularity)
-                .unwrap()
-                .replace("\"", ""),
-            &output_dir,
-        );
-
-        let subscriptions = match machine_core::exact_well_formed_sub(
-            swarms.clone(),
-            SubscriptionsWrapped(subs.clone()),
-        ) {
-            DataResult::OK {
-                data: subscriptions,
-            } => Some(subscriptions),
-            DataResult::ERROR { .. } => None,
-        };
-        wrap_and_write_sub_out(
-            &bi,
-            subscriptions.unwrap(),
-            String::from("Exact"),
-            &output_dir,
-        );
-        println!("{}", SPECIAL_SYMBOL);
-    }
-}
 
 #[test]
 #[ignore]
@@ -368,9 +321,8 @@ pub struct SimpleProtoBenchmarkSubSizeOutput {
 
 /// Transform a file containing a benchmark input to a BenchmarkInput. Return the number
 /// of states in the composition of the protocols in the input and the BenchMarkInput.
-pub fn prepare_input(file_name: String) -> (usize, BenchMarkInput) {
+pub fn prepare_input(path: &Path) -> (usize, BenchMarkInput) {
     // Create a path to the desired file
-    let path = Path::new(&file_name);
     let display = path.display();
 
     // Open the path in read-only mode, returns `io::Result<File>`
@@ -401,7 +353,7 @@ pub fn prepare_files_in_directory(directory: &Path) -> Vec<(usize, BenchMarkInpu
             Ok(entry) => {
                 if entry.file_type().is_file() {
                     inputs.push(prepare_input(
-                        entry.path().as_os_str().to_str().unwrap().to_string(),
+                        entry.path(),
                     ));
                 }
             }
@@ -440,15 +392,15 @@ pub fn benchmark_input_to_simple_input(
         .collect()
 }
 
-pub fn prepare_simple_inputs_in_directory(directory: String) -> Vec<SimpleProtoBenchMarkInput> {
+pub fn prepare_simple_inputs_in_directory(path: &Path) -> Vec<SimpleProtoBenchMarkInput> {
     let mut inputs: Vec<SimpleProtoBenchMarkInput> = vec![];
 
-    for entry in WalkDir::new(directory) {
+    for entry in WalkDir::new(path) {
         match entry {
             Ok(entry) => {
                 if entry.file_type().is_file() {
                     let (_, benchmark_input) =
-                        prepare_input(entry.path().as_os_str().to_str().unwrap().to_string());
+                        prepare_input(entry.path());
                     inputs.append(&mut benchmark_input_to_simple_input(benchmark_input));
                 }
             }
