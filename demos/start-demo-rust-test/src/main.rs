@@ -1,7 +1,7 @@
-use std::{ffi::{OsStr, OsString}, fs::OpenOptions, io::Error, path::{Path, PathBuf}, process::{Child, Command, ExitCode, ExitStatus, Stdio, exit}, thread, time};
+use std::{ffi::{OsStr, OsString}, fs::OpenOptions, path::{Path, PathBuf}, process::{Child, Command, ExitCode, Stdio}, thread, time};
 use clap::Parser;
-use anyhow::{Context, Result};
-use tracing::{error, info, instrument::WithSubscriber};
+use anyhow::{Context, Error, Result};
+use tracing::{info};
 use tracing_subscriber::{EnvFilter, fmt};
 
 #[derive(Parser)]
@@ -89,8 +89,35 @@ fn rm(args: &[&OsStr], dir: Option<&OsStr>) -> Result<()> {
 fn pkill(arg: &OsStr) -> Result<()> {
     run_status(
         Command::new("pkill")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .arg(arg)
     )
+}
+
+// Ignore exit code=1.
+// manpage for pgrep
+//EXIT STATUS
+//       0      One or more processes matched the criteria. For pkill and pidwait, one or more processes must also have been successfully signalled or waited for.
+//       1      No processes matched or none of them could be signalled.
+//       2      Syntax error in the command line.
+//       3      Fatal error: out of memory etc.
+fn pkill_ignore_exit_code(arg: &OsStr) -> Result<()> {
+    let mut command = Command::new("pkill");
+    command.arg(arg);
+    tracing::info!(command = ?command, "running command");
+
+    let status = command
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .with_context(|| format!("failed to spawn {:?}", command))?;
+
+    if status.code().is_some_and(|exit_code| exit_code > 1) {
+        Err(Error::msg(format!("{:?} exited with {}", command, status.code().unwrap())))
+    } else {
+        Ok(())
+    }
 }
 
 fn spawn_ax_run(dir: Option<&OsStr>) -> Result<Child> {
@@ -157,8 +184,8 @@ fn split_and_run(session: &OsStr, commands: &[&OsStr], dir: Option<&OsStr>) -> R
 }
 
 fn start_demo(dir: &OsStr, session_name: &OsStr, commands: &[&OsStr]) -> Result<()> {
-    tracing::info!("Starting demo. Running {:#?} from {}", commands, dir.display());
-    pkill(OsStr::new("ax"))?;
+    tracing::info!("Starting demo from {}. Will run {:#?} ", dir.display(), commands);
+    pkill_ignore_exit_code(OsStr::new("ax"))?;
     rm(&[OsStr::new("-rf"), OsStr::new("ax-data")], Some(dir))?;
     spawn_ax_run(Some(dir))?;
     thread::sleep(time::Duration::from_secs(1));
