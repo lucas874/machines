@@ -1,0 +1,6 @@
+[2m2026-01-20T13:22:19.261698Z[0m [31mERROR[0m [2mstart_demo_rust_test[0m[2m:[0m command: "pkill" "ax": exited with exit status: 1
+[2m2026-01-20T13:22:26.734037Z[0m [31mERROR[0m [2mstart_demo_rust_test[0m[2m:[0m command: "pkill" "ax": exited with exit status: 1
+[2m2026-01-20T13:22:43.186122Z[0m [31mERROR[0m [2mstart_demo_rust_test[0m[2m:[0m command: "pkill" "ax": exited with exit status: 1
+[2m2026-01-20T13:24:30.865520Z[0m [31mERROR[0m [2mstart_demo_rust_test[0m[2m:[0m command: cd "../warehouse-factory" && "rm" "rf" "ax-data": exited with exit status: 1
+[2m2026-01-20T13:25:00.105347Z[0m [31mERROR[0m [2mstart_demo_rust_test[0m[2m:[0m command: "pkill" "ax": exited with exit status: 1
+[2m2026-01-20T13:25:12.975755Z[0m [31mERROR[0m [2mstart_demo_rust_test[0m[2m:[0m command: cd "../warehouse-factory" && "rm" "rf" "ax-data": exited with exit status: 1
