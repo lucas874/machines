@@ -11,7 +11,8 @@ use std::{
     path::{Path, PathBuf},
 };
 use clap::Parser;
-use walkdir::WalkDir;
+use walkdir::{DirEntry, WalkDir};
+use anyhow::{Context, Error, Result};
 
 pub const BENCHMARK_DIR: &str = "./bench_and_results";
 pub const SPECIAL_SYMBOL: &str = "done-special-symbol";
@@ -252,7 +253,7 @@ pub fn wrap_and_write_sub_out_simple(
     write_file(&parent_path.join(file_name), out);
 }
 
-/* 
+/*
 #[test]
 #[ignore]
 fn write_flattened() {
@@ -270,3 +271,21 @@ fn write_flattened() {
         write_file(&file_name, serde_json::to_string(input).unwrap());
     }
 } */
+
+// Read and extract all files containing BenchmarkSubSizeOutputs in a directory
+pub fn read_sub_size_outputs_in_directory(directory: &Path) -> Result<Vec<BenchmarkSubSizeOutput>> {
+    let results: Result<Vec<DirEntry>, _> = WalkDir::new(directory).into_iter().collect();
+    results?
+        .into_iter()
+        .filter(|entry| entry.file_type().is_file())
+        .map(|file_entry| read_sub_size_ouput(file_entry.path()))
+        .collect()
+}
+
+// Transform a file containing a sub size output to a BenchmarkSubSizeOutput.
+pub fn read_sub_size_ouput(path: &Path) -> Result<BenchmarkSubSizeOutput> {
+    println!("path: {}", path.display());
+    let sub_size_output_string = std::fs::read_to_string(path)?;
+    let sub_size_output: BenchmarkSubSizeOutput = serde_json::from_str(&sub_size_output_string)?;
+    Ok(sub_size_output)
+}
