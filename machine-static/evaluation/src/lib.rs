@@ -35,8 +35,6 @@ pub struct BenchMarkInput {
     pub interfacing_swarms: InterfacingProtocols,
 }
 
-// TODO: give this type a 'Method' field that is either a Granularity or 'Exact'.
-// Use this instead of inspecting file name later.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BenchmarkSubSizeOutput {
     pub state_space_size: usize,
@@ -45,11 +43,12 @@ pub struct BenchmarkSubSizeOutput {
     pub version: Version,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BenchmarkSubSizeOutputOld {
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, PartialOrd)]
+pub struct SubSizeProcessed {
     pub state_space_size: usize,
     pub number_of_edges: usize,
-    pub subscriptions: Subscriptions,
+    pub efrac: f64,
+    pub version: Version,
 }
 
 // The two types below are used for comparing sizes of subscriptions generated using
