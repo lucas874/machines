@@ -12,7 +12,7 @@ use std::{
 };
 use clap::Parser;
 use walkdir::{DirEntry, WalkDir};
-use anyhow::{Context, Error, Result};
+use anyhow::Result;
 
 pub const BENCHMARK_DIR: &str = "./bench_and_results";
 pub const SPECIAL_SYMBOL: &str = "done-special-symbol";
@@ -39,6 +39,14 @@ pub struct BenchMarkInput {
 // Use this instead of inspecting file name later.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BenchmarkSubSizeOutput {
+    pub state_space_size: usize,
+    pub number_of_edges: usize,
+    pub subscriptions: Subscriptions,
+    pub version: Version,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BenchmarkSubSizeOutputOld {
     pub state_space_size: usize,
     pub number_of_edges: usize,
     pub subscriptions: Subscriptions,
@@ -212,17 +220,18 @@ pub fn write_file(path: &Path, content: String) -> () {
 pub fn wrap_and_write_sub_out(
     bench_input: &BenchMarkInput,
     subscriptions: Subscriptions,
-    granularity: String,
+    version: Version,
     parent_path: &Path,
 ) {
     let out = BenchmarkSubSizeOutput {
         state_space_size: bench_input.state_space_size,
         number_of_edges: bench_input.number_of_edges,
         subscriptions: subscriptions,
+        version: version.clone()
     };
     let file_name = format!(
-        "{:010}_{}.json",
-        bench_input.state_space_size, granularity
+        "{:010}_{:?}.json",
+        bench_input.state_space_size, version
     );
     let out = serde_json::to_string(&out).unwrap();
     write_file(&parent_path.join(file_name), out);
@@ -284,7 +293,6 @@ pub fn read_sub_size_outputs_in_directory(directory: &Path) -> Result<Vec<Benchm
 
 // Transform a file containing a sub size output to a BenchmarkSubSizeOutput.
 pub fn read_sub_size_ouput(path: &Path) -> Result<BenchmarkSubSizeOutput> {
-    println!("path: {}", path.display());
     let sub_size_output_string = std::fs::read_to_string(path)?;
     let sub_size_output: BenchmarkSubSizeOutput = serde_json::from_str(&sub_size_output_string)?;
     Ok(sub_size_output)

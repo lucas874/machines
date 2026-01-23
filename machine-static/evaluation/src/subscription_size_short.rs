@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use clap::Parser;
-use evaluation::{Cli, SPECIAL_SYMBOL, create_directory, prepare_files_in_directory, wrap_and_write_sub_out};
+use evaluation::{Cli, SPECIAL_SYMBOL, Version, create_directory, prepare_files_in_directory, wrap_and_write_sub_out};
 use machine_core::types::typescript_types::{DataResult, EventType, Granularity, Role, SubscriptionsWrapped};
 
 fn main() {
@@ -31,9 +31,7 @@ fn main() {
         wrap_and_write_sub_out(
             &bi,
             subscriptions.unwrap(),
-            serde_json::to_string(&two_step_granularity)
-                .unwrap()
-                .replace("\"", ""),
+            Version::CompositionalOverapprox,
             &output_dir,
         );
 
@@ -49,7 +47,7 @@ fn main() {
         wrap_and_write_sub_out(
             &bi,
             subscriptions.unwrap(),
-            String::from("Exact"),
+            Version::CompositionalExact,
             &output_dir,
         );
         println!("{}", SPECIAL_SYMBOL);
