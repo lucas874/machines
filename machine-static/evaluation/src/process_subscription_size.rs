@@ -34,7 +34,7 @@ fn avg_subscription_size1(subscriptions: &Subscriptions) -> Option<f64> {
     Some(sub_sizes.mean())
 }
 
-fn compute_efrac(subscriptions: &Subscriptions) -> Option<f64> {
+fn compute_efrac(subscriptions: &Subscriptions) -> Result<f64> {
     // Subscription is well-formed so union of subscriptions for each role is the set of all events of the protocol
     let num_event_types = subscriptions
         .values()
@@ -43,15 +43,14 @@ fn compute_efrac(subscriptions: &Subscriptions) -> Option<f64> {
         .collect::<BTreeSet<EventType>>()
         .len() as f64;
 
-    let avg_sub_size = avg_subscription_size1(&subscriptions)?;
-    Some(avg_sub_size / num_event_types)
+    let avg_sub_size = avg_subscription_size1(&subscriptions).ok_or(Error::msg("Unable to compute average subscription size"))?;
+    Ok(avg_sub_size / num_event_types)
 }
 
 fn process_subscription_size_ouput(
     sub_result: &BenchmarkSubSizeOutput,
 ) -> Result<SubSizeProcessed> {
-
-    let efrac= compute_efrac(&sub_result.subscriptions).ok_or(Error::msg("Unable to compute average subscription size"))?;
+    let efrac = compute_efrac(&sub_result.subscriptions)?;
     Ok(SubSizeProcessed {
         state_space_size: sub_result.state_space_size,
         number_of_edges: sub_result.number_of_edges,
