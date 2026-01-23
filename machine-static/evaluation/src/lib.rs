@@ -20,10 +20,11 @@ pub const SPECIAL_SYMBOL: &str = "done-special-symbol";
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 pub struct Cli {
-    // Sets a custom config file
+    // Read input from this file
     #[arg(short, long)]
     pub input_dir: PathBuf,
 
+    // Store outputs here. Treated as a directory for benchmarks and as the name of a file when processing benchmark results.
     #[arg(short, long)]
     pub output_dir: PathBuf,
 }
@@ -45,8 +46,8 @@ pub struct BenchmarkSubSizeOutput {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, PartialOrd)]
 pub struct SubSizeProcessed {
-    pub state_space_size: usize,
     pub number_of_edges: usize,
+    pub state_space_size: usize,
     pub efrac: f64,
     pub version: Version,
 }

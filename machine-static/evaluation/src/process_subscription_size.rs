@@ -1,5 +1,5 @@
-use std::collections::BTreeSet;
-
+use std::{collections::BTreeSet, path::Path};
+// duct
 use anyhow::{Error, Result};
 use average::Mean;
 use clap::Parser;
@@ -57,14 +57,47 @@ fn process_subscription_size_ouput(
     })
 }
 
+fn to_processed(sub_size_outputs: Vec<BenchmarkSubSizeOutput>) -> Result<Vec<SubSizeProcessed>> {
+    sub_size_outputs
+        .iter()
+        .map(process_subscription_size_ouput)
+        .collect()
+}
+
+fn write_processed(processed: Vec<SubSizeProcessed>, output_file: &Path) -> Result<()> {
+    let mut wtr = csv::Writer::from_path(output_file)?;
+
+    for record in processed {
+        wtr.serialize(record)?;
+    }
+    wtr.flush()?;
+    Ok(())
+}
+
+fn process_results(input_path: &Path, output_path: &Path) -> Result<()> {
+    let prefix = output_path.parent().ok_or(Error::msg("Error: invalid output parent directory"))?;
+    create_directory(prefix);
+    let mut sub_size_outputs = read_sub_size_outputs_in_directory(&input_path)?;
+    sub_size_outputs.sort_by_key(|sub_size_outpout| sub_size_outpout.number_of_edges);
+    let processed_sub_size_outputs = to_processed(sub_size_outputs)?;
+
+    write_processed(processed_sub_size_outputs, Path::new(output_path))
+}
+
+
 fn main() {
     let cli = Cli::parse();
-    let input_dir = cli.input_dir;
-    let output_dir = cli.output_dir;
-    create_directory(&output_dir);
+    let input_path = cli.input_dir;
+    let output_path = cli.output_dir;
 
-    let results = read_sub_size_outputs_in_directory(&input_dir);
-    if results.is_ok() {
+    let result = process_results(&input_path, &output_path);
+    if result.is_err() {
+        println!("Error processing results: {:#?}", result);
+    }
+
+
+
+    /* if results.is_ok() {
         let a: Mean = (1..6).map(f64::from).collect();
         println!("The mean is {}.", a.mean());
         let _: Vec<_> = results
@@ -74,5 +107,5 @@ fn main() {
             .collect();
     } else {
         println!("oh {:#?}", results.err().unwrap())
-    }
+    } */
 }
