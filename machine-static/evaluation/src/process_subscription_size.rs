@@ -32,7 +32,7 @@ pub struct CliProcessSub {
     pub experiment: SubExperiment
 }
 
-fn avg_subscription_size(subscriptions: &Subscriptions) -> Option<f64> {
+/* fn avg_subscription_size1(subscriptions: &Subscriptions) -> Option<f64> {
     if subscriptions.is_empty() {
         return None;
     }
@@ -43,9 +43,9 @@ fn avg_subscription_size(subscriptions: &Subscriptions) -> Option<f64> {
     let denominator = subscriptions.keys().len() as f64;
 
     Some(numerator / denominator)
-}
+} */
 
-fn avg_subscription_size1(subscriptions: &Subscriptions) -> Option<f64> {
+fn avg_subscription_size(subscriptions: &Subscriptions) -> Option<f64> {
     if subscriptions.is_empty() {
         return None;
     }
@@ -66,7 +66,7 @@ fn compute_efrac(subscriptions: &Subscriptions) -> Result<f64> {
         .collect::<BTreeSet<EventType>>()
         .len() as f64;
 
-    let avg_sub_size = avg_subscription_size1(&subscriptions).ok_or(Error::msg("Unable to compute average subscription size"))?;
+    let avg_sub_size = avg_subscription_size(&subscriptions).ok_or(Error::msg("Unable to compute average subscription size"))?;
     Ok(avg_sub_size / num_event_types)
 }
 
