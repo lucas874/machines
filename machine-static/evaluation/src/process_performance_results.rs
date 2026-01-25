@@ -151,11 +151,12 @@ struct FlattenedMeasurement {
     std_dev_standard_error: f64,
 }
 
-fn flatten_measurement(named_saved_statistics: NamedSavedStatistics, benchmark_input: &BenchMarkInput, unit: Unit) -> Option<FlattenedMeasurement> {
+fn flatten_measurement(named_saved_statistics: NamedSavedStatistics, benchmark_input: &BenchMarkInput, unit: Unit) -> Result<FlattenedMeasurement> {
     let number_of_edges = benchmark_input.number_of_edges;
-    let state_space_size: usize = named_saved_statistics.value_str?.parse().ok()?;
+    let state_space_size: usize = named_saved_statistics.value_str
+        .ok_or(Error::msg("Error reading value_str from NamedSavedStatistics"))?.parse()?;
     //let state_space_size: usize = state_space_size_str.parse().ok()?;
-    let algorithm = named_saved_statistics.function_id?;
+    let algorithm = named_saved_statistics.function_id.ok_or(Error::msg("Error reading function_id from NamedSavedStatistics"))?;
 
     let mean_confidence_interval_lower_bound = named_saved_statistics.saved_statistics.estimates.mean.confidence_interval.lower_bound;
     let mean_confidence_interval_upper_bound = named_saved_statistics.saved_statistics.estimates.mean.confidence_interval.upper_bound;
@@ -181,7 +182,7 @@ fn flatten_measurement(named_saved_statistics: NamedSavedStatistics, benchmark_i
     let std_dev_point_estimate = named_saved_statistics.saved_statistics.estimates.std_dev.point_estimate;
     let std_dev_standard_error = named_saved_statistics.saved_statistics.estimates.std_dev.standard_error;
 
-    Some(
+    Ok(
         FlattenedMeasurement {
             number_of_edges,
             state_space_size,
@@ -280,12 +281,14 @@ fn benchmark_inputs(path: &Path) -> BTreeMap<usize, BenchMarkInput> {
 }
 
 // Transform a vec of NamedSavedStatistics into a vec of FlattenedMeasurements
-/* fn flatten_measurements(measurements: Vec<NamedSavedStatistics>, benchmarks: BTreeMap<usize, BenchMarkInput>, unit: Unit) -> Result<Vec<FlattenedMeasurement>> {
+fn flatten_measurements(measurements: Vec<NamedSavedStatistics>, benchmarks: BTreeMap<usize, BenchMarkInput>, unit: Unit) -> Result<Vec<FlattenedMeasurement>> {
     let mapper = |named_saved_statistics: NamedSavedStatistics| -> Result<FlattenedMeasurement> {
-        let state_space_size: usize = named_saved_statistics.value_str?.parse().ok()?;
-        let benchmark_input = benchmarks.get(&state_space_size).ok()?;
-        unimplemented!()
-        //Ok()
+        let state_space_size: usize = named_saved_statistics.value_str
+            .ok_or(Error::msg("Error reading value_str from NamedSavedStatistics"))?.parse()?;
+        let benchmark_input = benchmarks.get(&state_space_size)
+            .ok_or(Error::msg(format!("Error: no benchmark_input for key {}", state_space_size)))?;
+        
+        flatten_measurement(named_saved_statistics, benchmark_input, unit)
 
     };
     
@@ -294,7 +297,7 @@ fn benchmark_inputs(path: &Path) -> BTreeMap<usize, BenchMarkInput> {
         .map(mapper)
         .collect()   
 }
- */
+
 
 
 fn main() {
