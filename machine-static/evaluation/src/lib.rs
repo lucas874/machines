@@ -119,6 +119,7 @@ pub fn prepare_input(path: &Path) -> (usize, BenchMarkInput) {
     (state_space_size, interfacing_swarms)
 }
 
+// Return all benchmarks found in directory as Vec<(number of states in benchmark, benchmark)>
 pub fn prepare_files_in_directory(directory: &Path) -> Vec<(usize, BenchMarkInput)> {
     let mut inputs: Vec<(usize, BenchMarkInput)> = vec![];
 

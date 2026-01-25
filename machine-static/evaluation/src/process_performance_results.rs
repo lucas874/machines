@@ -1,8 +1,8 @@
-use evaluation::{Cli, create_directory};
+use evaluation::{BenchMarkInput, Cli, create_directory, prepare_files_in_directory};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use walkdir::WalkDir;
-use std::{ffi::OsStr, fs::File, path::{Path, PathBuf}};
+use std::{collections::BTreeMap, ffi::OsStr, fs::File, path::{Path, PathBuf}};
 use clap::Parser;
 use anyhow::{Context, Error, Result};
 
@@ -104,9 +104,115 @@ struct BenchmarkRecord {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct NamedSavedStatistics {
-    function_id: Option<String>,    // Name of benchmarked function e.g. Exact or Algorith 1
+    function_id: Option<String>,    // Name of benchmarked function e.g. Exact or Algorithm 1
     value_str: Option<String>,      // Name of input to benchmarked function, for us, the number of states in the composition.
+    measurement_fname: PathBuf,      // File containing statistics
     saved_statistics: SavedStatistics
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+enum Unit {
+    NS,
+    MUS
+}
+
+
+// Struct containing some of the fields from a NamedSavedStatistics + some info about input sample protocol used to generate it
+// in a format we can easily write to csv.
+#[derive(Debug, Serialize, Deserialize)]
+struct FlattenedMeasurement {
+    number_of_edges: usize,
+    state_space_size: usize,
+    algorithm: String,
+    unit: Unit,
+    
+    mean_confidence_interval_lower_bound: f64,
+    mean_confidence_interval_upper_bound: f64,
+    mean_confidence_level: f64,
+    mean_point_estimate: f64,
+    mean_standard_error: f64,
+
+    median_confidence_interval_lower_bound: f64,
+    median_confidence_interval_upper_bound: f64,
+    median_confidence_level: f64,
+    median_point_estimate: f64,
+    median_standard_error: f64,
+
+    median_abs_dev_confidence_interval_lower_bound: f64,
+    median_abs_dev_confidence_interval_upper_bound: f64,
+    median_abs_dev_confidence_level: f64,
+    median_abs_dev_point_estimate: f64,
+    median_abs_dev_standard_error: f64,
+
+    std_dev_confidence_interval_lower_bound: f64, 
+    std_dev_confidence_interval_upper_bound: f64,
+    std_dev_confidence_level: f64,
+    std_dev_point_estimate: f64, 
+    std_dev_standard_error: f64,
+}
+
+fn flatten_measurement(named_saved_statistics: NamedSavedStatistics, benchmark_input: &BenchMarkInput, unit: Unit) -> Option<FlattenedMeasurement> {
+    let number_of_edges = benchmark_input.number_of_edges;
+    let state_space_size: usize = named_saved_statistics.value_str?.parse().ok()?;
+    //let state_space_size: usize = state_space_size_str.parse().ok()?;
+    let algorithm = named_saved_statistics.function_id?;
+
+    let mean_confidence_interval_lower_bound = named_saved_statistics.saved_statistics.estimates.mean.confidence_interval.lower_bound;
+    let mean_confidence_interval_upper_bound = named_saved_statistics.saved_statistics.estimates.mean.confidence_interval.upper_bound;
+    let mean_confidence_level = named_saved_statistics.saved_statistics.estimates.mean.confidence_interval.confidence_level;
+    let mean_point_estimate = named_saved_statistics.saved_statistics.estimates.mean.point_estimate;
+    let mean_standard_error = named_saved_statistics.saved_statistics.estimates.mean.standard_error;
+
+    let median_confidence_interval_lower_bound = named_saved_statistics.saved_statistics.estimates.median.confidence_interval.lower_bound;
+    let median_confidence_interval_upper_bound = named_saved_statistics.saved_statistics.estimates.median.confidence_interval.upper_bound;
+    let median_confidence_level = named_saved_statistics.saved_statistics.estimates.median.confidence_interval.confidence_level;
+    let median_point_estimate = named_saved_statistics.saved_statistics.estimates.median.point_estimate;
+    let median_standard_error = named_saved_statistics.saved_statistics.estimates.median.standard_error;
+
+    let median_abs_dev_confidence_interval_lower_bound = named_saved_statistics.saved_statistics.estimates.median_abs_dev.confidence_interval.lower_bound;
+    let median_abs_dev_confidence_interval_upper_bound = named_saved_statistics.saved_statistics.estimates.median_abs_dev.confidence_interval.upper_bound;
+    let median_abs_dev_confidence_level = named_saved_statistics.saved_statistics.estimates.median_abs_dev.confidence_interval.confidence_level;
+    let median_abs_dev_point_estimate = named_saved_statistics.saved_statistics.estimates.median_abs_dev.point_estimate;
+    let median_abs_dev_standard_error = named_saved_statistics.saved_statistics.estimates.median_abs_dev.standard_error;
+
+    let std_dev_confidence_interval_lower_bound = named_saved_statistics.saved_statistics.estimates.std_dev.confidence_interval.lower_bound;
+    let std_dev_confidence_interval_upper_bound = named_saved_statistics.saved_statistics.estimates.std_dev.confidence_interval.upper_bound;
+    let std_dev_confidence_level = named_saved_statistics.saved_statistics.estimates.std_dev.confidence_interval.confidence_level;
+    let std_dev_point_estimate = named_saved_statistics.saved_statistics.estimates.std_dev.point_estimate;
+    let std_dev_standard_error = named_saved_statistics.saved_statistics.estimates.std_dev.standard_error;
+
+    Some(
+        FlattenedMeasurement {
+            number_of_edges,
+            state_space_size,
+            algorithm,
+            unit,
+
+            mean_confidence_interval_lower_bound,
+            mean_confidence_interval_upper_bound,
+            mean_confidence_level,
+            mean_point_estimate,
+            mean_standard_error,
+
+            median_confidence_interval_lower_bound,
+            median_confidence_interval_upper_bound,
+            median_confidence_level,
+            median_point_estimate,
+            median_standard_error,
+
+            median_abs_dev_confidence_interval_lower_bound,
+            median_abs_dev_confidence_interval_upper_bound,
+            median_abs_dev_confidence_level,
+            median_abs_dev_point_estimate,
+            median_abs_dev_standard_error,
+
+            std_dev_confidence_interval_lower_bound,
+            std_dev_confidence_interval_upper_bound,
+            std_dev_confidence_level,
+            std_dev_point_estimate,
+            std_dev_standard_error
+        }
+    )
 }
 
 // Should be called with a path contatining criterion data directories (directories containing cbors with benchmark results). 
@@ -126,7 +232,7 @@ fn load_latest_measurements(path: &Path) -> Result<Vec<NamedSavedStatistics>> {
     Ok(stats)
 }
 
-// benchmark path is the path of a "benchmark.cbor" file
+// Benchmark path should be the path of a "benchmark.cbor" file
 // Adapted from  https://github.com/bheisler/cargo-criterion/blob/main/src/model.rs/: load_stored_benchmark impl for model
 fn load_latest(benchmark_path: &Path) -> Result<NamedSavedStatistics> {
     if !benchmark_path.is_file() {
@@ -147,107 +253,49 @@ fn load_latest(benchmark_path: &Path) -> Result<NamedSavedStatistics> {
         .with_context(|| format!("Failed to read measurement file {:?}", measurement_path))?;
 
     return Ok(
-        NamedSavedStatistics { function_id: benchmark_record.id.function_id, value_str: benchmark_record.id.value_str, saved_statistics: saved_stats }
+        NamedSavedStatistics { 
+            function_id: benchmark_record.id.function_id, 
+            value_str: benchmark_record.id.value_str,
+            measurement_fname: measurement_path,
+            saved_statistics: saved_stats 
+        }
     )
 }
 
+fn write_csv<S: Serialize> (processed: Vec<S>, output_file: &Path) -> Result<()> {
+    let mut wtr = csv::Writer::from_path(output_file)?;
 
-// open a directory expecting to find a benchmark.cbor and a number of 
-// measurement_<some_number>.cbor. Inspect benchmark.cbor to find the latest 
-// measurement and the name of the benchmarked function. Read the latest and return
-// a NamedSavedStatistics.
-/* fn load_latest(dir: &Path) -> Result<NamedSavedStatistics> {
-    fn load_measurement_from(measurement_path: &Path) -> Result<SavedStatistics> {
-        let mut measurement_file = File::open(measurement_path).with_context(|| {
-            format!("Failed to open measurement file {:?}", measurement_path)
-        })?;
-        serde_cbor::from_reader(&mut measurement_file)
-            .with_context(|| format!("Failed to read measurement file {:?}", measurement_path))
+    for record in processed {
+        wtr.serialize(record)?;
     }
-    fn load_benchmark_from(measurement_path: &Path) -> Result<BenchmarkRecord> {
-        let mut measurement_file = File::open(measurement_path).with_context(|| {
-            format!("Failed to open benchmark file {:?}", measurement_path)
-        })?;
-        serde_cbor::from_reader(&mut measurement_file)
-            .with_context(|| format!("Failed to read benchmark file {:?}", measurement_path))
-    } */
-    
-
-/*             for entry in WalkDir::new(&model.data_directory)
-            .into_iter()
-            // Ignore errors.
-            .filter_map(::std::result::Result::ok)
-            .filter(|entry| entry.file_name() == OsStr::new("benchmark.cbor"))
-        {
-            if let Err(e) = model.load_stored_benchmark(entry.path()) {
-                error!("Encountered error while loading stored data: {}", e)
-            }
-        } */
-
-    /* for entry in WalkDir::new(dir)
-        .max_depth(1)
-        .into_iter()
-        // Ignore errors.
-        .filter_map(::std::result::Result::ok)
-    {
-        let name_str = entry.file_name().to_string_lossy();
-        if name_str.starts_with("benchmark") && name_str.ends_with(".cbor") {
-            match load_benchmark_from(entry.path()) {
-                Ok(saved_stats) => stats.push(saved_stats),
-                Err(e) => return Err(Error::msg(format!(
-                    "Unexpected error loading benchmark history from file {}: {:?}",
-                    entry.path().display(),
-                    e
-                ))),
-            }
-        }
-    } */
-
-/* 
-
-    unimplemented!()
-} */
-
-
-// From https://github.com/bheisler/cargo-criterion/blob/main/src/model.rs
-fn load_history(dir: &Path) -> Result<Vec<SavedStatistics>> {
-
-    fn load_from(measurement_path: &Path) -> Result<SavedStatistics> {
-        let mut measurement_file = File::open(measurement_path).with_context(|| {
-            format!("Failed to open measurement file {:?}", measurement_path)
-        })?;
-        serde_cbor::from_reader(&mut measurement_file)
-            .with_context(|| format!("Failed to read measurement file {:?}", measurement_path))
-    }
-
-    let mut stats = Vec::new();
-    for entry in WalkDir::new(dir)
-        .max_depth(1)
-        .into_iter()
-        // Ignore errors.
-        .filter_map(::std::result::Result::ok)
-    {
-        let name_str = entry.file_name().to_string_lossy();
-        if name_str.starts_with("measurement_") && name_str.ends_with(".cbor") {
-            match load_from(entry.path()) {
-                Ok(saved_stats) => stats.push(saved_stats),
-                Err(e) => return Err(Error::msg(format!(
-                    "Unexpected error loading benchmark history from file {}: {:?}",
-                    entry.path().display(),
-                    e
-                )))/* error!(
-                    "Unexpected error loading benchmark history from file {}: {:?}",
-                    entry.path().display(),
-                    e
-                ) */,
-            }
-        }
-    }
-
-    stats.sort_unstable_by_key(|st| st.datetime);
-
-    Ok(stats)
+    wtr.flush()?;
+    Ok(())
 }
+
+// Read all benchmark samples at path and return them as a map from number of states to samples
+fn benchmark_inputs(path: &Path) -> BTreeMap<usize, BenchMarkInput> {
+    prepare_files_in_directory(path)
+        .into_iter()
+        .collect()
+}
+
+// Transform a vec of NamedSavedStatistics into a vec of FlattenedMeasurements
+/* fn flatten_measurements(measurements: Vec<NamedSavedStatistics>, benchmarks: BTreeMap<usize, BenchMarkInput>, unit: Unit) -> Result<Vec<FlattenedMeasurement>> {
+    let mapper = |named_saved_statistics: NamedSavedStatistics| -> Result<FlattenedMeasurement> {
+        let state_space_size: usize = named_saved_statistics.value_str?.parse().ok()?;
+        let benchmark_input = benchmarks.get(&state_space_size).ok()?;
+        unimplemented!()
+        //Ok()
+
+    };
+    
+    measurements
+        .into_iter()
+        .map(mapper)
+        .collect()   
+}
+ */
+
 
 fn main() {
     let cli = Cli::parse();
@@ -259,7 +307,7 @@ fn main() {
         let unwrapped = measurements.unwrap();
         println!("Length: {}", unwrapped.len());
         for m in unwrapped {
-            println!("{:#?} {:#?} {}", m.function_id, m.value_str, m.saved_statistics.estimates.mean.point_estimate)
+            println!("{:#?} {:#?} {:#?} {}", m.function_id, m.value_str, m.measurement_fname.display(), m.saved_statistics.estimates.mean.point_estimate)
         }
     }
     //create_directory(&output_dir);
