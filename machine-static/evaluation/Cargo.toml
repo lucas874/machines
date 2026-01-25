@@ -27,6 +27,10 @@ name = "kmt23_compositional"
 path = "src/process_subscription_size.rs"
 name = "process_subscription_size"
 
+[[bin]]
+path = "src/process_performance_results.rs"
+name = "process_performance_results"
+
 [dependencies]
 machine-core.workspace = true
 machine-check.workspace = true
@@ -37,6 +41,8 @@ clap = { version = "4.5.54", features = ["derive"] }
 anyhow = "1.0.100"
 average = "0.16.0"
 csv = "1.4.0"
+chrono = { version = "0.4", features = ["serde"] }
+serde_cbor = "0.11"
 
 [dev-dependencies]
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
