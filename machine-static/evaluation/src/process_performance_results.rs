@@ -110,7 +110,7 @@ struct NamedSavedStatistics {
     saved_statistics: SavedStatistics
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 enum Unit {
     NS,
     MUS
@@ -281,14 +281,15 @@ fn benchmark_inputs(path: &Path) -> BTreeMap<usize, BenchMarkInput> {
 }
 
 // Transform a vec of NamedSavedStatistics into a vec of FlattenedMeasurements
-fn flatten_measurements(measurements: Vec<NamedSavedStatistics>, benchmarks: BTreeMap<usize, BenchMarkInput>, unit: Unit) -> Result<Vec<FlattenedMeasurement>> {
+fn flatten_measurements(measurements: Vec<NamedSavedStatistics>, benchmarks: BTreeMap<usize, BenchMarkInput>, unit: &Unit) -> Result<Vec<FlattenedMeasurement>> {
     let mapper = |named_saved_statistics: NamedSavedStatistics| -> Result<FlattenedMeasurement> {
         let state_space_size: usize = named_saved_statistics.value_str
+            .clone()
             .ok_or(Error::msg("Error reading value_str from NamedSavedStatistics"))?.parse()?;
         let benchmark_input = benchmarks.get(&state_space_size)
             .ok_or(Error::msg(format!("Error: no benchmark_input for key {}", state_space_size)))?;
         
-        flatten_measurement(named_saved_statistics, benchmark_input, unit)
+        flatten_measurement(named_saved_statistics, benchmark_input, unit.clone())
 
     };
     
