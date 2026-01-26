@@ -3,7 +3,7 @@
 This library forked from [machine-check](https://github.com/Actyx/machines/tree/master/machine-check) by [Actyx AG](https://github.com/Actyx) allows you to check whether the machines you implement with [machine-runner](https://www.npmjs.com/package/@actyx/machine-runner) comply with a correct overall swarm behaviour.
 Before we dive into how to use it, we need to quickly establish some notation.
 
-The library also offers functionality supporting *swarm composition*. A description of this use of the library is given in [here](../../machine-runner/#composing-swarms).
+The library also offers functionality supporting *swarm composition*. A description of this use of the library is given [here](../../machine-runner/#composing-swarms).
 
 ## Swarm Protocols
 

@@ -371,6 +371,8 @@ of the transport order and the assembly line protocols](#composition).
 We do this by first generating a subscription that works for the composed swarm:
 
 ```typescript
+import { Subscriptions, DataResult, overapproxWFSubscriptions } from 'machine-core'
+
 // subscription for the composed swarm
 const resultSubsComposition: DataResult<Subscriptions>
   = overapproxWFSubscriptions([transportOrderProtocol, assemblyLineProtocol], {}, 'TwoStep')

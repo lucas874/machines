@@ -3,7 +3,6 @@ import { TransportRobot, InitialTransport } from './transport_robot'
 import { Warehouse, InitialWarehouse } from './warehouse'
 import { transportOrderProtocol, Events, assemblyLineProtocol, subscriptions } from './protocol'
 import { AssemblyRobot, InitialAssemblyRobot } from './assembly_robot'
-import { composeProtocols, InterfacingProtocols } from 'machine-core'
 
 const transportRobotJSON =
   TransportRobot.createJSONForAnalysis(InitialTransport)

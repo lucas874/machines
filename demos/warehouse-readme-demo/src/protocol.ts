@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import { MachineEvent, SwarmProtocol } from '@actyx/machine-runner'
-import { checkComposedSwarmProtocol, CheckResult  } from '@actyx/machine-check'
 import { SwarmProtocolType, Subscriptions, DataResult, overapproxWFSubscriptions } from 'machine-core'
 import chalk from "chalk";
 
