@@ -743,5 +743,5 @@ All method calls, such as `.destroy`, create the same effect as when enacted on 
 If you have any questions, suggestions, or just want to chat with other interested folks, you’re welcome to join our discord chat. Please find a current invitation link on [the top right of the Actyx docs page](https://developer.actyx.com/).
 
 
-## Acknowledgement
+## Acknowledgements
 The development of this tool was partly funded by the Horizon Europe project 101093006 TaRDIS - [https://project-tardis.eu/](https://project-tardis.eu/ "https://project-tardis.eu/").
