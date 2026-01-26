@@ -2,10 +2,9 @@
 import { ActyxEvent, Tag, Tags } from '@actyx/sdk'
 import { StateMechanism, MachineProtocol, ReactionMap, StateFactory, CommandDefinerMap, ReactionHandler } from './state.js'
 import { Contained, MachineEvent } from './event.js'
-import { Subscriptions, projectionInformation, ProjectionInfo, InterfacingProtocols } from '@actyx/machine-check'
+import { Subscriptions, projectionInformation, ProjectionInfo, InterfacingProtocols, ProjToMachineStates } from 'machine-core'
 import chalk = require('chalk');
 import * as readline from 'readline';
-import { ProjToMachineStates } from '../../../machine-check/lib/pkg/machine_check.js';
 
 /**
  * SwarmProtocol is the entry point of designing a swarm of MachineRunners. A

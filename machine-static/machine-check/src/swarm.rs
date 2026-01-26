@@ -1,0 +1,993 @@
+use crate::MapVec;
+use bitvec::{bitvec, vec::BitVec};
+use machine_core::{
+    errors::Error,
+    types::{
+        proto_graph::{EdgeId, NodeId},
+        typescript_types::{
+            EventType, Role, State, StateName, Subscriptions, SwarmLabel, SwarmProtocolType,
+        },
+    },
+};
+use petgraph::{
+    visit::{Dfs, DfsPostOrder, EdgeRef, Walker},
+    Direction::{Incoming, Outgoing},
+};
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    mem::take,
+};
+
+#[derive(Debug)]
+struct Node {
+    name: State,
+    /**
+     * All roles that have an enabled command in this state
+     */
+    active: BTreeSet<Role>,
+    /**
+     * All roles that subscribe to at least one event emitted by a transition reachable
+     * from this state.
+     */
+    roles: BTreeSet<Role>,
+}
+
+impl Node {
+    fn new(name: State) -> Self {
+        Self {
+            name,
+            active: Default::default(),
+            roles: Default::default(),
+        }
+    }
+}
+
+impl StateName for Node {
+    fn state_name(&self) -> &State {
+        &self.name
+    }
+}
+
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
+enum Variance {
+    #[default]
+    Absent,
+    Invariant(NodeId),
+    Variant,
+}
+
+impl Variance {
+    pub fn is_variant(self) -> bool {
+        matches!(self, Self::Variant)
+    }
+}
+
+type Graph = petgraph::Graph<Node, SwarmLabel>;
+
+pub fn check(
+    proto: SwarmProtocolType,
+    subs: &Subscriptions,
+) -> (
+    machine_core::types::proto_graph::Graph,
+    Option<NodeId>,
+    Vec<Error>,
+) {
+    let (graph, initial, mut errors) = match prepare_graph(proto, &subs) {
+        (g, Some(i), e) => (g, i, e),
+        (g, None, e) => return (to_swarm(&g), None, e),
+    };
+    errors.extend(all_nodes_reachable(&graph, initial));
+    errors.extend(well_formed(&graph, initial, subs));
+    (to_swarm(&graph), Some(initial), errors)
+}
+
+pub fn well_formed_sub(
+    proto: SwarmProtocolType,
+    subs: &Subscriptions,
+) -> Result<
+    Subscriptions,
+    (
+        machine_core::types::proto_graph::Graph,
+        Option<NodeId>,
+        Vec<Error>,
+    ),
+> {
+    let (graph, initial, mut errors) = match prepare_graph(proto, &subs) {
+        (g, Some(i), e) => (g, i, e),
+        (g, None, e) => return Err((to_swarm(&g), None, e)),
+    };
+
+    match wf_sub(graph, initial, subs) {
+        Err((g, _, mut e)) => {
+            errors.append(&mut e);
+            return Err((to_swarm(&g), Some(initial), errors));
+        }
+        Ok(subs) => return Ok(subs),
+    }
+}
+
+fn to_swarm(graph: &Graph) -> machine_core::types::proto_graph::Graph {
+    graph.map(|_, n| n.name.clone(), |_, x| x.clone())
+}
+
+fn all_nodes_reachable(graph: &Graph, initial: NodeId) -> Vec<Error> {
+    // Traversal order choice (Bfs vs Dfs vs DfsPostOrder) does not matter
+    let visited = Dfs::new(&graph, initial)
+        .iter(&graph)
+        .collect::<BTreeSet<_>>();
+
+    graph
+        .node_indices()
+        .filter(|node| !visited.contains(node))
+        .map(|node| Error::StateUnreachable(node))
+        .collect()
+}
+
+fn well_formed(graph: &Graph, initial: NodeId, subs: &Subscriptions) -> Vec<Error> {
+    let mut errors = Vec::new();
+    let empty = BTreeSet::new(); // just for `sub` but needs its own lifetime
+    let sub = |r: &Role| subs.get(r).unwrap_or(&empty);
+
+    // visit all reachable nodes of the graph to check their prescribed conditions; order doesn’t matter
+    for node in Dfs::new(&graph, initial).iter(&graph) {
+        let mut guards = BTreeMap::new();
+        let mut commands = BTreeSet::new();
+        for edge in graph.edges_directed(node, Outgoing) {
+            let log = edge.weight().log_type.as_slice();
+
+            // event determinism
+            let guard = &log[0];
+            if *guards
+                .entry(guard.clone())
+                .and_modify(|count| *count += 1)
+                .or_insert(1)
+                == 2
+            {
+                errors.push(Error::NonDeterministicGuard(edge.id()));
+            }
+            // command determinism
+            let command = &edge.weight().cmd;
+            let role = &edge.weight().role;
+            if !commands.insert((role.clone(), command.clone())) {
+                errors.push(Error::NonDeterministicCommand(edge.id()));
+            }
+
+            let target = edge.target();
+
+            // causal consistency
+            if log_filter(log, sub(&role)).first_one().is_none() {
+                errors.push(Error::ActiveRoleNotSubscribed(edge.id()));
+            }
+            for active in &graph[target].active {
+                let filtered = log_filter(log, sub(active));
+                if filtered.first_one().is_none() {
+                    errors.push(Error::LaterActiveRoleNotSubscribed(
+                        edge.id(),
+                        active.clone(),
+                    ));
+                }
+                for later in &graph[target].roles {
+                    let later_log = log_filter(log, sub(later));
+                    let extra = later_log & !filtered.clone();
+                    if extra.first_one().is_some() {
+                        errors.push(Error::LaterInvolvedRoleMoreSubscribed {
+                            edge: edge.id(),
+                            later: later.clone(),
+                            active: active.clone(),
+                            events: extra.iter_ones().map(|i| log[i].clone()).collect(),
+                        });
+                    }
+                }
+            }
+
+            // choice determinacy
+            for later in &graph[target].roles {
+                if !sub(later).contains(guard) {
+                    errors.push(Error::LaterInvolvedNotGuarded(edge.id(), later.clone()));
+                }
+            }
+        }
+    }
+    errors
+}
+
+// Generate (one of) the smallest subscriptions s such that graph is well-formed w.r.t. s.
+// One of the smallest, since some conditions require a subscription to *one of* the event types
+// in the log emitted by a transition.
+// If not already satisfied by subs, we add the first event type in the log in such cases.
+// Problem: We do not have the roles field of nodes. So we repeat until stable.
+// Precondition (not checked, assumed since created with prepare_graph): protocol is confusion-free.
+fn wf_sub(
+    mut graph: Graph,
+    initial: NodeId,
+    subs: &Subscriptions,
+) -> Result<Subscriptions, (Graph, NodeId, Vec<Error>)> {
+    let _span = tracing::info_span!("wf_sub").entered();
+    let mut errors = Vec::new();
+    // subscriptions to construct
+    let mut subs = subs.clone();
+
+    // visit all reachable nodes of checking determinism; order doesn’t matter
+    for node in Dfs::new(&graph, initial).iter(&graph) {
+        let mut guards = BTreeMap::new();
+        let mut commands = BTreeSet::new();
+        for edge in graph.edges_directed(node, Outgoing) {
+            let log = edge.weight().log_type.as_slice();
+
+            // event determinism
+            let guard = &log[0];
+            if *guards
+                .entry(guard.clone())
+                .and_modify(|count| *count += 1)
+                .or_insert(1)
+                == 2
+            {
+                errors.push(Error::NonDeterministicGuard(edge.id()));
+            }
+            // command determinism
+            let command = &edge.weight().cmd;
+            let role = &edge.weight().role;
+            if !commands.insert((role.clone(), command.clone())) {
+                errors.push(Error::NonDeterministicCommand(edge.id()));
+            }
+        }
+    }
+    // stop subscription generation if protocol is not deterministic.
+    if !errors.is_empty() {
+        return Err((graph, initial, errors));
+    }
+    tracing::debug!(
+        "initial sub is: {}",
+        serde_json::to_string_pretty(&subs).unwrap()
+    );
+    let mut is_stable = wf_sub_step(&mut graph, initial, &mut subs);
+    while !is_stable {
+        tracing::debug!(
+            "did a step sub is: {}",
+            serde_json::to_string_pretty(&subs).unwrap()
+        );
+        is_stable = wf_sub_step(&mut graph, initial, &mut subs);
+    }
+
+    Ok(subs)
+}
+
+// Precondition (not checked, assumed since created with prepare_graph): the nodes of the graph contain their active roles.
+fn wf_sub_step(graph: &mut Graph, initial: NodeId, subs: &mut Subscriptions) -> bool {
+    let _span = tracing::info_span!("wf_sub_step").entered();
+    if graph.node_count() == 0 || initial == NodeId::end() {
+        return true;
+    }
+    let mut is_stable = true;
+    let sub = |r: &Role, subs: &Subscriptions| subs.get(r).cloned().unwrap_or_default();
+    let add_to_sub =
+        |role: Role, mut event_types: BTreeSet<EventType>, subs: &mut Subscriptions| -> bool {
+            if subs.contains_key(&role) && event_types.iter().all(|e| subs[&role].contains(e)) {
+                return true;
+            }
+            tracing::debug!(
+                "adding {} to sub({})",
+                serde_json::to_string(&event_types).unwrap(),
+                role
+            );
+            subs.entry(role)
+                .and_modify(|curr| {
+                    curr.append(&mut event_types);
+                })
+                .or_insert(event_types);
+            false
+        };
+
+    let mut dfs = DfsPostOrder::new(&*graph, initial);
+    while let Some(node) = dfs.next(&*graph) {
+        // `active` field of current node is set, but `roles` field is not. add `active` to `roles`
+        tracing::debug!("current node is: {}", graph[node].state_name());
+        let mut active_roles = graph[node].active.clone();
+        tracing::debug!(
+            "adding {} to {}.roles",
+            serde_json::to_string(&active_roles).unwrap(),
+            graph[node].state_name()
+        );
+        graph[node].roles.append(&mut active_roles);
+
+        let edges: Vec<(NodeId, SwarmLabel, NodeId)> = graph
+            .edges_directed(node, Outgoing)
+            .map(|e| (e.source(), e.weight().clone(), e.target()))
+            .collect();
+
+        for (_source, label, target) in edges {
+            let log = label.log_type.as_slice();
+            // causal consistency
+            tracing::debug!(
+                "causal consistency for: {} --({})--> {}",
+                graph[_source].state_name(),
+                label,
+                graph[target].state_name()
+            );
+            // role in graph[target].active implies log \cap sub(role) != empty set
+            for role in &graph[target].active {
+                // check before adding first event type in transition -> role might already subscribe to another event type in the transition.
+                if log_filter(log, &sub(role, subs)).first_one().is_none() {
+                    is_stable = add_to_sub(role.clone(), BTreeSet::from([log[0].clone()]), subs)
+                        && is_stable;
+                }
+            }
+
+            // update roles of node: add active and roles of graph[target] to graph[node].roles
+            let mut roles_of_target: BTreeSet<Role> = graph[target]
+                .active
+                .clone()
+                .union(&graph[target].roles.clone())
+                .cloned()
+                .collect();
+            tracing::debug!(
+                "adding {} to {}.roles",
+                serde_json::to_string(&roles_of_target).unwrap(),
+                graph[node].state_name()
+            );
+            graph[node].roles.append(&mut roles_of_target);
+
+            // for all roles r' in graph[target].roles: log \cap sub(r') \subseteq log \cap sub(label.role)
+            //      -> set sub(label.role) = \bigcup (sub(r') \cap log) for all r' graph[target].roles
+            //      -> add log[0] instead if \bigcup (sub(r') \cap log) for all r' graph[target].roles is empty (target is a final state)
+            let event_types: BTreeSet<EventType> = graph[target]
+                .roles
+                .iter()
+                .flat_map(|r| {
+                    log.iter()
+                        .filter(|event_type| sub(r, subs).contains(*event_type))
+                        .cloned()
+                })
+                .collect();
+            is_stable = add_to_sub(
+                label.role.clone(),
+                if event_types.is_empty() {
+                    BTreeSet::from([log[0].clone()])
+                } else {
+                    event_types
+                },
+                subs,
+            ) && is_stable;
+
+            // determinacy
+            // role in graph[target].roles implies log[0] in sub(role)
+            tracing::debug!(
+                "determinacy for: {} --({})--> {}",
+                graph[_source].state_name(),
+                label,
+                graph[target].state_name()
+            );
+            for role in &graph[target].roles {
+                is_stable =
+                    add_to_sub(role.clone(), BTreeSet::from([log[0].clone()]), subs) && is_stable;
+            }
+        }
+    }
+    is_stable
+}
+
+pub fn from_json(
+    proto: SwarmProtocolType,
+    subs: &Subscriptions,
+) -> (
+    machine_core::types::proto_graph::Graph,
+    Option<NodeId>,
+    Vec<String>,
+) {
+    let (g, i, e) = prepare_graph(proto, subs);
+    (to_swarm(&g), i, e.map(Error::convert(&g)))
+}
+
+/// unfortunately there is no walker for neighbors, so we need to handroll it
+struct Neighbors(NodeId, Option<EdgeId>);
+impl Neighbors {
+    pub fn new(node: NodeId) -> Self {
+        Self(node, None)
+    }
+
+    pub fn next(&mut self, g: &Graph) -> Option<NodeId> {
+        loop {
+            let next = match self.1 {
+                Some(edge) => g.next_edge(edge, Incoming),
+                None => g.first_edge(self.0, Incoming),
+            }?;
+            self.1 = Some(next);
+            let node = g.edge_endpoints(next)?.0;
+            if node != self.0 {
+                return Some(node);
+            }
+        }
+    }
+}
+
+fn prepare_graph(
+    proto: SwarmProtocolType,
+    subs: &Subscriptions,
+) -> (Graph, Option<NodeId>, Vec<Error>) {
+    let mut errors = Vec::new();
+    let mut graph = Graph::new();
+    let mut nodes = HashMap::new();
+    for t in proto.transitions {
+        tracing::debug!("adding {} --({:?})--> {}", t.source, t.label, t.target);
+        let source = *nodes
+            .entry(t.source.clone())
+            .or_insert_with(|| graph.add_node(Node::new(t.source)));
+        let target = *nodes
+            .entry(t.target.clone())
+            .or_insert_with(|| graph.add_node(Node::new(t.target)));
+        let edge = graph.add_edge(source, target, t.label.clone());
+        if t.label.log_type.len() == 0 {
+            errors.push(Error::LogTypeEmpty(edge));
+        }
+        tracing::debug!("added {:?} --> {:?}", source, target);
+    }
+    let initial = if let Some(idx) = nodes.get(&proto.initial) {
+        tracing::debug!("initial state {:?}", idx);
+        *idx
+    } else {
+        errors.push(Error::InitialStateDisconnected);
+        return (graph, None, errors);
+    };
+    let no_empty_logs = errors.is_empty();
+
+    // compute the needed Node information
+    // - first post-order walk to propagate non-loop roles back
+    // - then keep fixing loop-ends until graph is stable
+    let mut walk = DfsPostOrder::new(&graph, initial);
+    let mut guards = HashSet::new();
+    let mut events = HashMap::<EventType, Variance>::new();
+
+    // list of nodes that (will) have been changed and whose change needs to be propagated back
+    let mut change_nodes = BTreeSet::new();
+
+    while let Some(node_id) = walk.next(&graph) {
+        let active = active(&graph, node_id);
+        graph[node_id].active = active;
+        let roles = involved(&graph, node_id, &subs, &mut change_nodes);
+        graph[node_id].roles = roles;
+        mark_events(&graph, node_id, &mut guards, &mut events);
+    }
+
+    tracing::debug!("post-order traversal done");
+
+    while let Some(node_id) = change_nodes.pop_last() {
+        let mut neighbors = Neighbors::new(node_id);
+        let roles = take(&mut graph[node_id].roles);
+        while let Some(neighbor) = neighbors.next(&graph) {
+            let neighbor_roles = &mut graph[neighbor].roles;
+            let num_roles = neighbor_roles.len();
+            neighbor_roles.extend(roles.iter().cloned());
+            if num_roles != neighbor_roles.len() {
+                change_nodes.insert(neighbor);
+            }
+        }
+        graph[node_id].roles = roles;
+    }
+
+    // confusion-freeness
+    for guard in guards {
+        if events.get(&guard).copied().unwrap_or_default().is_variant() {
+            errors.push(Error::GuardNotInvariant(guard));
+        }
+    }
+
+    let initial = no_empty_logs.then(|| initial);
+    (graph, initial, errors)
+}
+
+/// compute a first approximation of Node::roles assuming to be called in DfsPostOrder
+fn involved(
+    g: &Graph,
+    node: NodeId,
+    subs: &Subscriptions,
+    change_nodes: &mut BTreeSet<NodeId>,
+) -> BTreeSet<Role> {
+    let _span = tracing::debug_span!("involved", node = %g[node].name).entered();
+    let mut roles = BTreeSet::new();
+    for edge in g.edges_directed(node, Outgoing) {
+        // first propagate back all roles from target state
+        let target = edge.target();
+        let target_roles = &g[target].roles;
+        if target_roles.is_empty() {
+            tracing::debug!("loop end towards {}", g[target].name);
+            change_nodes.insert(target);
+        } else {
+            tracing::debug!("propagating {:?} from {}", target_roles, g[target].name);
+            roles.extend(target_roles.iter().cloned());
+        }
+        // then add roles involved in this transition
+        for (role, types) in subs {
+            if roles.contains(role) {
+                continue;
+            }
+            let interested = edge.weight().log_type.iter().any(|t| types.contains(t));
+            if interested {
+                tracing::debug!("{:?} is interested (towards {})", role, g[target].name);
+                roles.insert(role.clone());
+            }
+        }
+    }
+    roles
+}
+
+fn active(g: &Graph, node: NodeId) -> BTreeSet<Role> {
+    let mut active = BTreeSet::new();
+    let _span = tracing::debug_span!("active", node = %g[node].name).entered();
+    for x in g.edges_directed(node, Outgoing) {
+        let role = &x.weight().role;
+        tracing::debug!("found role {} (target {})", role, g[x.target()].name);
+        active.insert(role.clone());
+    }
+    active
+}
+
+fn mark_events(
+    g: &Graph,
+    node: NodeId,
+    guards: &mut HashSet<EventType>,
+    events: &mut HashMap<EventType, Variance>,
+) {
+    let _span = tracing::debug_span!("mark_events", node = %g[node].name).entered();
+    for edge in g.edges_directed(node, Outgoing) {
+        let log = edge.weight().log_type.as_slice();
+        if log.len() < 1 {
+            continue;
+        }
+        guards.insert(log[0].clone());
+        for e in log {
+            events
+                .entry(e.clone())
+                .and_modify(|n| {
+                    if *n != Variance::Invariant(node) {
+                        *n = Variance::Variant;
+                    }
+                })
+                .or_insert(Variance::Invariant(node));
+        }
+    }
+}
+
+fn log_filter(log: &[EventType], subs: &BTreeSet<EventType>) -> BitVec {
+    let mut ret = bitvec![0; log.len()];
+    for (idx, event_type) in log.iter().enumerate() {
+        if subs.contains(event_type) {
+            ret.set(idx, true);
+        }
+    }
+    ret
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::MapVec;
+    use maplit::btreeset;
+    use petgraph::visit::{Dfs, Walker};
+    use pretty_assertions::assert_eq;
+    use std::collections::BTreeMap;
+    use tracing_subscriber::{fmt, fmt::format::FmtSpan, EnvFilter};
+
+    fn setup_logger() {
+        fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
+            .try_init()
+            .ok();
+    }
+    /// helper for printing a transition. copied from machine-core::errors::swarm_errors, not nice, but outside of there, only used here.
+    const INVALID_EDGE: &str = "[invalid EdgeId]";
+    struct Edge<'a, N: StateName>(&'a petgraph::Graph<N, SwarmLabel>, EdgeId);
+
+    impl<'a, N: StateName> core::fmt::Display for Edge<'a, N> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            let Some((source, target)) = self.0.edge_endpoints(self.1) else {
+                return f.write_str(INVALID_EDGE);
+            };
+            let source = self.0[source].state_name();
+            let target = self.0[target].state_name();
+            let label = &self.0[self.1];
+            write!(f, "({source})--[{label}]-->({target})")
+        }
+    }
+    fn r(s: &str) -> Role {
+        Role::new(s)
+    }
+    fn e(g: &Graph, s: &str) -> EdgeId {
+        g.edge_indices()
+            .map(|id| (id, Edge(g, id).to_string()))
+            .find(|x| &*x.1 == s)
+            .unwrap()
+            .0
+    }
+    fn ev(e: &str) -> EventType {
+        EventType::new(e)
+    }
+    fn prep_graph(proto: SwarmProtocolType, subs: &Subscriptions) -> (super::Graph, NodeId) {
+        let (graph, initial, e) = prepare_graph(proto, &subs);
+        assert_eq!(e.len(), 0);
+        (graph, initial.unwrap())
+    }
+
+    #[test]
+    fn prep_cycles() {
+        setup_logger();
+        // (S0) --(C0@R1<R1>)--> (S1) --(C5@R6<R6>)--> (S4)
+        // (S1) --(C1@R2<R2>)--> (S2) --(C2@R3<R3>)--> (S1)  [the first loop above S1]
+        // (S2) --(C3@R4<R4>)--> (S3) --(C4@R5<R5>)--> (S2)  [the second loop atop the first]
+        let proto = serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "S0",
+                "transitions": [
+                    { "source": "S0", "target": "S1", "label": { "cmd": "C0", "logType": ["R1"], "role": "R1" } },
+                    { "source": "S1", "target": "S2", "label": { "cmd": "C1", "logType": ["R2"], "role": "R2" } },
+                    { "source": "S2", "target": "S1", "label": { "cmd": "C2", "logType": ["R3"], "role": "R3" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "C3", "logType": ["R4"], "role": "R4" } },
+                    { "source": "S3", "target": "S2", "label": { "cmd": "C4", "logType": ["R5"], "role": "R5" } },
+                    { "source": "S1", "target": "S4", "label": { "cmd": "C5", "logType": ["R6"], "role": "R6" } }
+                ]
+            }"#,
+        )
+        .unwrap();
+        let subs = serde_json::from_str::<Subscriptions>(
+            r#"{
+                "R1": ["R1"],
+                "R2": ["R2"],
+                "R3": ["R3"],
+                "R4": ["R4"],
+                "R5": ["R5"],
+                "R6": ["R6"]
+            }"#,
+        )
+        .unwrap();
+
+        let (graph, initial) = prep_graph(proto, &subs);
+        let mut nodes = BTreeMap::new();
+        for node in Dfs::new(&graph, initial).iter(&graph) {
+            let node = &graph[node];
+            nodes.insert(node.name.clone(), (node.active.clone(), node.roles.clone()));
+        }
+        assert_eq!(nodes["S0"].0, btreeset! {r("R1")});
+        assert_eq!(nodes["S1"].0, btreeset! {r("R2"), r("R6")});
+        assert_eq!(nodes["S2"].0, btreeset! {r("R3"), r("R4")});
+        assert_eq!(nodes["S3"].0, btreeset! {r("R5")});
+        assert_eq!(nodes["S4"].0, btreeset! {});
+
+        assert_eq!(
+            nodes["S0"].1,
+            btreeset! {r("R1"), r("R2"), r("R3"), r("R4"), r("R5"), r("R6")}
+        );
+        assert_eq!(
+            nodes["S1"].1,
+            btreeset! {r("R2"), r("R3"), r("R4"), r("R5"), r("R6")}
+        );
+        assert_eq!(
+            nodes["S2"].1,
+            btreeset! {r("R2"), r("R3"), r("R4"), r("R5"), r("R6")}
+        );
+        assert_eq!(
+            nodes["S3"].1,
+            btreeset! {r("R2"), r("R3"), r("R4"), r("R5"), r("R6")}
+        );
+        assert_eq!(nodes["S4"].1, btreeset! {});
+
+        let mut errors = well_formed(&graph, initial, &subs);
+        errors.sort();
+        let g = &graph;
+        let mut expected = vec![
+            Error::LaterActiveRoleNotSubscribed(e(g, "(S0)--[C0@R1<R1>]-->(S1)"), r("R2")),
+            Error::LaterActiveRoleNotSubscribed(e(g, "(S2)--[C2@R3<R3>]-->(S1)"), r("R2")),
+            Error::LaterActiveRoleNotSubscribed(e(g, "(S1)--[C1@R2<R2>]-->(S2)"), r("R3")),
+            Error::LaterActiveRoleNotSubscribed(e(g, "(S3)--[C4@R5<R5>]-->(S2)"), r("R3")),
+            Error::LaterActiveRoleNotSubscribed(e(g, "(S1)--[C1@R2<R2>]-->(S2)"), r("R4")),
+            Error::LaterActiveRoleNotSubscribed(e(g, "(S3)--[C4@R5<R5>]-->(S2)"), r("R4")),
+            Error::LaterActiveRoleNotSubscribed(e(g, "(S2)--[C3@R4<R4>]-->(S3)"), r("R5")),
+            Error::LaterActiveRoleNotSubscribed(e(g, "(S0)--[C0@R1<R1>]-->(S1)"), r("R6")),
+            Error::LaterActiveRoleNotSubscribed(e(g, "(S2)--[C2@R3<R3>]-->(S1)"), r("R6")),
+            Error::LaterInvolvedRoleMoreSubscribed {
+                edge: e(g, "(S1)--[C1@R2<R2>]-->(S2)"),
+                later: r("R2"),
+                active: r("R3"),
+                events: btreeset![ev("R2")],
+            },
+            Error::LaterInvolvedRoleMoreSubscribed {
+                edge: e(g, "(S1)--[C1@R2<R2>]-->(S2)"),
+                later: r("R2"),
+                active: r("R4"),
+                events: btreeset![ev("R2")],
+            },
+            Error::LaterInvolvedRoleMoreSubscribed {
+                edge: e(g, "(S2)--[C2@R3<R3>]-->(S1)"),
+                later: r("R3"),
+                active: r("R2"),
+                events: btreeset![ev("R3")],
+            },
+            Error::LaterInvolvedRoleMoreSubscribed {
+                edge: e(g, "(S2)--[C2@R3<R3>]-->(S1)"),
+                later: r("R3"),
+                active: r("R6"),
+                events: btreeset![ev("R3")],
+            },
+            Error::LaterInvolvedRoleMoreSubscribed {
+                edge: e(g, "(S2)--[C3@R4<R4>]-->(S3)"),
+                later: r("R4"),
+                active: r("R5"),
+                events: btreeset![ev("R4")],
+            },
+            Error::LaterInvolvedRoleMoreSubscribed {
+                edge: e(g, "(S3)--[C4@R5<R5>]-->(S2)"),
+                later: r("R5"),
+                active: r("R3"),
+                events: btreeset![ev("R5")],
+            },
+            Error::LaterInvolvedRoleMoreSubscribed {
+                edge: e(g, "(S3)--[C4@R5<R5>]-->(S2)"),
+                later: r("R5"),
+                active: r("R4"),
+                events: btreeset![ev("R5")],
+            },
+            Error::LaterInvolvedNotGuarded(e(g, "(S0)--[C0@R1<R1>]-->(S1)"), r("R2")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S2)--[C2@R3<R3>]-->(S1)"), r("R2")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S2)--[C3@R4<R4>]-->(S3)"), r("R2")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S3)--[C4@R5<R5>]-->(S2)"), r("R2")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S0)--[C0@R1<R1>]-->(S1)"), r("R3")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S1)--[C1@R2<R2>]-->(S2)"), r("R3")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S2)--[C3@R4<R4>]-->(S3)"), r("R3")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S3)--[C4@R5<R5>]-->(S2)"), r("R3")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S0)--[C0@R1<R1>]-->(S1)"), r("R4")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S1)--[C1@R2<R2>]-->(S2)"), r("R4")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S2)--[C2@R3<R3>]-->(S1)"), r("R4")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S3)--[C4@R5<R5>]-->(S2)"), r("R4")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S0)--[C0@R1<R1>]-->(S1)"), r("R5")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S1)--[C1@R2<R2>]-->(S2)"), r("R5")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S2)--[C2@R3<R3>]-->(S1)"), r("R5")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S2)--[C3@R4<R4>]-->(S3)"), r("R5")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S0)--[C0@R1<R1>]-->(S1)"), r("R6")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S1)--[C1@R2<R2>]-->(S2)"), r("R6")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S2)--[C2@R3<R3>]-->(S1)"), r("R6")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S2)--[C3@R4<R4>]-->(S3)"), r("R6")),
+            Error::LaterInvolvedNotGuarded(e(g, "(S3)--[C4@R5<R5>]-->(S2)"), r("R6")),
+        ];
+        expected.sort();
+        assert_eq!(errors, expected);
+    }
+
+    #[test]
+    fn basics() {
+        setup_logger();
+        // (S0) --(a@R1<A,B,C>)--> (S1) --(b@R2<D,E>)--> (S2)
+        let proto = serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "S0",
+                "transitions": [
+                    { "source": "S0", "target": "S1", "label": { "cmd": "a", "logType": ["A", "B", "C"], "role": "R1" } },
+                    { "source": "S1", "target": "S2", "label": { "cmd": "b", "logType": ["D", "E"], "role": "R2" } }
+                ]
+            }"#,
+        )
+        .unwrap();
+        let subs = serde_json::from_str::<Subscriptions>(
+            r#"{
+                "R1": ["E"],
+                "R3": ["A", "B", "C", "D"]
+            }"#,
+        )
+        .unwrap();
+        let (g, _, errors) = check(proto, &subs);
+        let mut errors = errors.map(Error::convert(&g));
+        errors.sort();
+        assert_eq!(errors, vec![
+            "active role does not subscribe to any of its emitted event types in transition (S0)--[a@R1<A,B,C>]-->(S1)",
+            "active role does not subscribe to any of its emitted event types in transition (S1)--[b@R2<D,E>]-->(S2)",
+            "subsequently active role R2 does not subscribe to events in transition (S0)--[a@R1<A,B,C>]-->(S1)",
+            "subsequently involved role R1 does not subscribe to guard in transition (S0)--[a@R1<A,B,C>]-->(S1)",
+            "subsequently involved role R3 subscribes to more events than active role R2 in transition (S0)--[a@R1<A,B,C>]-->(S1), namely (A, B, C)"
+        ]);
+    }
+
+    #[test]
+    fn deterministic() {
+        setup_logger();
+        let proto = serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "S0",
+                "transitions": [
+                    { "source": "S0", "target": "S1", "label": { "cmd": "a", "logType": ["A"], "role": "R" } },
+                    { "source": "S1", "target": "S2", "label": { "cmd": "b", "logType": ["B", "A"], "role": "R" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "c", "logType": ["A"], "role": "R" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "c", "logType": ["C"], "role": "R" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "d", "logType": ["A"], "role": "R" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "c", "logType": ["A"], "role": "S" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "d", "logType": ["A"], "role": "S" } }
+                ]
+            }"#,
+        )
+        .unwrap();
+        let (g, _, errors) = check(proto, &BTreeMap::new());
+        let mut errors = errors.map(Error::convert(&g));
+        errors.sort();
+        assert_eq!(errors, vec![
+            "active role does not subscribe to any of its emitted event types in transition (S0)--[a@R<A>]-->(S1)",
+            "active role does not subscribe to any of its emitted event types in transition (S1)--[b@R<B,A>]-->(S2)",
+            "active role does not subscribe to any of its emitted event types in transition (S2)--[c@R<A>]-->(S3)",
+            "active role does not subscribe to any of its emitted event types in transition (S2)--[c@R<C>]-->(S3)",
+            "active role does not subscribe to any of its emitted event types in transition (S2)--[c@S<A>]-->(S3)",
+            "active role does not subscribe to any of its emitted event types in transition (S2)--[d@R<A>]-->(S3)",
+            "active role does not subscribe to any of its emitted event types in transition (S2)--[d@S<A>]-->(S3)",
+            "guard event type A appears in transitions from multiple states",
+            "non-deterministic command c for role R in state S2",
+            "non-deterministic event guard type A in state S2",
+            "subsequently active role R does not subscribe to events in transition (S0)--[a@R<A>]-->(S1)",
+            "subsequently active role R does not subscribe to events in transition (S1)--[b@R<B,A>]-->(S2)",
+            "subsequently active role S does not subscribe to events in transition (S1)--[b@R<B,A>]-->(S2)",
+        ]);
+    }
+
+    #[test]
+    fn empty_log() {
+        setup_logger();
+        let proto = serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "S0",
+                "transitions": [
+                    { "source": "S0", "target": "S1", "label": { "cmd": "a", "logType": ["A", "B", "C"], "role": "R1" } },
+                    { "source": "S1", "target": "S2", "label": { "cmd": "b", "logType": [], "role": "R2" } }
+                ]
+            }"#,
+        )
+        .unwrap();
+        let (g, _, errors) = check(proto, &BTreeMap::new());
+        let mut errors = errors.map(Error::convert(&g));
+        errors.sort();
+        assert_eq!(
+            errors,
+            vec!["log type must not be empty (S1)--[b@R2<>]-->(S2)"]
+        );
+    }
+
+    #[test]
+    fn disconnected_initial() {
+        setup_logger();
+        let proto = serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "S5",
+                "transitions": [
+                    { "source": "S0", "target": "S1", "label": { "cmd": "a", "logType": ["A", "B", "C"], "role": "R1" } },
+                    { "source": "S1", "target": "S2", "label": { "cmd": "b", "logType": [], "role": "R2" } }
+                ]
+            }"#,
+        )
+        .unwrap();
+        let (g, _, errors) = check(proto, &BTreeMap::new());
+        let mut errors = errors.map(Error::convert(&g));
+        errors.sort();
+        assert_eq!(
+            errors,
+            vec![
+                "initial swarm protocol state has no transitions",
+                "log type must not be empty (S1)--[b@R2<>]-->(S2)",
+            ]
+        );
+    }
+
+    #[test]
+    fn basics_sub_gen() {
+        setup_logger();
+        let proto = serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "S0",
+                "transitions": [
+                    { "source": "S0", "target": "S1", "label": { "cmd": "a", "logType": ["A", "B", "C"], "role": "R1" } },
+                    { "source": "S1", "target": "S2", "label": { "cmd": "b", "logType": ["D", "E"], "role": "R2" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "c", "logType": ["F"], "role": "R3" } },
+                    { "source": "S2", "target": "S4", "label": { "cmd": "d", "logType": ["G"], "role": "R4" } },
+                    { "source": "S4", "target": "S5", "label": { "cmd": "e", "logType": ["H", "I"], "role": "R3" } },
+                    { "source": "S5", "target": "S4", "label": { "cmd": "f", "logType": ["J"], "role": "R5" } }
+                ]
+            }"#,
+        )
+        .unwrap();
+
+        let expected_subs_1 = serde_json::from_str::<Subscriptions>(
+            r#"{
+                "R1": ["A"],
+                "R2": ["A", "D"],
+                "R3": ["A", "D", "F", "G", "H", "J"],
+                "R4": ["A", "D", "G"],
+                "R5": ["A", "D", "G", "H", "J"]
+            }"#,
+        )
+        .unwrap();
+        let result_subs_generated_1 = well_formed_sub(proto.clone(), &BTreeMap::new());
+        assert!(result_subs_generated_1.is_ok());
+        let subs_generated_1 = result_subs_generated_1.unwrap();
+        assert_eq!(expected_subs_1, subs_generated_1);
+        let (_, _, errors_1) = check(proto.clone(), &subs_generated_1);
+        assert!(errors_1.is_empty());
+
+        // Some starting point. Should be contained in output subscription. The subscriptions of some roles in output
+        // will also contain other event types not present in subs_generated_1 due to the extra initial event types.
+        let initial_subs_2 = serde_json::from_str::<Subscriptions>(
+            r#"{
+                "R1": ["B"],
+                "R5": ["I"]
+            }"#,
+        )
+        .unwrap();
+        let expected_subs_2 = serde_json::from_str::<Subscriptions>(
+            r#"{
+                "R1": ["A", "B"],
+                "R2": ["A", "D"],
+                "R3": ["A", "D", "F", "G", "H", "I", "J"],
+                "R4": ["A", "D", "G"],
+                "R5": ["A", "D", "G", "H", "I", "J"]
+            }"#,
+        )
+        .unwrap();
+        let result_subs_generated_2 = well_formed_sub(proto.clone(), &initial_subs_2);
+        assert!(result_subs_generated_2.is_ok());
+        let subs_generated_2 = result_subs_generated_2.unwrap();
+        assert_eq!(expected_subs_2, subs_generated_2);
+        let (_, _, errors_2) = check(proto.clone(), &subs_generated_1);
+        assert!(errors_2.is_empty());
+    }
+
+    #[test]
+    fn deterministic_sub_gen() {
+        setup_logger();
+        let proto = serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "S0",
+                "transitions": [
+                    { "source": "S0", "target": "S1", "label": { "cmd": "a", "logType": ["A"], "role": "R" } },
+                    { "source": "S1", "target": "S2", "label": { "cmd": "b", "logType": ["B", "A"], "role": "R" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "c", "logType": ["A"], "role": "R" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "c", "logType": ["C"], "role": "R" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "d", "logType": ["A"], "role": "R" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "c", "logType": ["A"], "role": "S" } },
+                    { "source": "S2", "target": "S3", "label": { "cmd": "d", "logType": ["A"], "role": "S" } }
+                ]
+            }"#,
+        )
+        .unwrap();
+        let result_subs_generated = well_formed_sub(proto.clone(), &BTreeMap::new());
+        assert!(result_subs_generated.is_err());
+        let (g, _, e) = result_subs_generated.unwrap_err();
+        let mut errors = e.map(Error::convert(&g));
+        errors.sort();
+        assert_eq!(
+            errors,
+            vec![
+                "guard event type A appears in transitions from multiple states",
+                "non-deterministic command c for role R in state S2",
+                "non-deterministic event guard type A in state S2",
+            ]
+        );
+    }
+
+    #[test]
+    fn disconnected_initial_sub_gen() {
+        setup_logger();
+        let proto = serde_json::from_str::<SwarmProtocolType>(
+            r#"{
+                "initial": "S5",
+                "transitions": [
+                    { "source": "S0", "target": "S1", "label": { "cmd": "a", "logType": ["A", "B", "C"], "role": "R1" } },
+                    { "source": "S1", "target": "S2", "label": { "cmd": "b", "logType": [], "role": "R2" } }
+                ]
+            }"#,
+        )
+        .unwrap();
+        let result_subs_generated = well_formed_sub(proto.clone(), &BTreeMap::new());
+        assert!(result_subs_generated.is_err());
+        let (g, _, e) = result_subs_generated.unwrap_err();
+        let mut errors = e.map(Error::convert(&g));
+        errors.sort();
+        assert_eq!(
+            errors,
+            vec![
+                "initial swarm protocol state has no transitions",
+                "log type must not be empty (S1)--[b@R2<>]-->(S2)",
+            ]
+        );
+    }
+}

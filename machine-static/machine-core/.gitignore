@@ -1,0 +1,7 @@
+/pkg/
+/target/
+/node_modules/
+/lib/
+/machine-core*.tgz
+/bench_and_results/
+/err.out

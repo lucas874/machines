@@ -4,9 +4,11 @@ This set of libraries provides a way of writing **fully decentralised** applicat
 Furthermore, the machines you deploy work together in the scope of a swarm protocol while the machine instances may play **different roles**.
 These roles may differ in their business logic as well as in the events they are allowed to consume; in other words the work can be distributed across different machines and split into separate responsibilities.
 
+This repository is a fork of [machines](https://github.com/Actyx/machines) by [Actyx AG](https://github.com/Actyx) extended to support compositional implementation and verification of swarm protocols.
+
 ## Machine Runner
 
-Library documentation: [machine-runner](https://github.com/Actyx/machines/tree/master/machine-runner)
+Library documentation: [machine-runner](https://github.com/lucas874/machines/tree/refactor-machine-check/machine-runner).
 
 This library offers a TypeScript DSL for defining machines in the above sense.
 Each such machine belongs to an overarching _swarm protocol_, i.e. it plays a role within that protocol and works together with other machines also following this protocol.
@@ -30,7 +32,7 @@ You’ll use this library in your machine’s unit tests
 - to check that your designed swarm protocol is sound
 - to check that your machines follow their prescribed role in the swarm protocol
 
-For more information please refer to the [README](./machine-check/README.md).
+For more information please refer to the [README](./machine-static/machine-check/README.md).
 
 ## Machine Visualisation
 
@@ -44,20 +46,4 @@ Please be sure to `nvm use` the right node.js version!
 
 ## Acknowledgements
 
-The implementation of these libraries and the underlying theory has been supported by the Horizon Europe EU project «TaRDIS» (grant number 101093006).
-
-
-# MSc Project: Methods and Tools for the Verification of Swarm Protocols
-Demo is found in demo/ and in machine-check/examples/composition
-
-To run the demo in demo/:
-
-1. install Actyx on your machine
-
-2. run `npm run build` in the machine-check directory and in the machine-runner directory
-
-3. move to the demo/ directory `bash demo_run_machines.sh --clean`
-
-To run the demo in machine-check:
-1. cd to the machine-check directory
-2. run `npm run test`
+The implementation of these libraries and the underlying theory has been supported by the Horizon Europe EU project «TaRDIS» (grant number 101093006) - [https://project-tardis.eu/](https://project-tardis.eu/ "https://project-tardis.eu/").

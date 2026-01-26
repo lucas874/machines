@@ -1,0 +1,62 @@
+{
+  "name": "@actyx/machine-check",
+  "version": "0.3.1",
+  "description": "Behavioural typechecking for @actyx/machine-runner machines",
+  "repository": "https://github.com/Actyx/machines",
+  "author": "Actyx AG",
+  "keywords": [
+    "local-first"
+  ],
+  "license": "Apache-2.0",
+  "files": [
+    "lib/**/*"
+  ],
+  "type": "module",
+  "main": "./lib/cjs/index.js",
+  "module": "./lib/esm/index.js",
+  "types": "./lib/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./lib/esm/index.js",
+      "require": "./lib/cjs/index.js"
+    }
+  },
+  "scripts": {
+    "clean": "rimraf pkg lib && npm run test:cjs:remove",
+    "build:rs": "wasm-pack build --target nodejs --release && cpy pkg lib",
+    "build:ts": "npm run build:ts:esm && npm run build:ts:cjs",
+    "build:ts:esm": "tsc --build tsconfig.esm.json && cpy package.esm.json lib/esm --rename package.json",
+    "build:ts:cjs": "tsc --build tsconfig.cjs.json && cpy package.cjs.json lib/cjs --rename package.json",
+    "build": "npm run build:rs && npm run build:ts",
+    "prepack:rmfiles": "rimraf lib/pkg/.gitignore && rimraf lib/esm/tsconfig.esm.tsbuildinfo && rimraf lib/cjs/tsconfig.cjs.tsbuildinfo",
+    "prepack": "npm run clean && npm run build && npm run prepack:rmfiles",
+    "test": "npm run test:esm && npm run test:cjs",
+    "test:esm": "cross-env NODE_OPTIONS=--experimental-vm-modules cross-env jest --config examples/esm/jest.config.ts",
+    "test:cjs": "npm run test:cjs:copy && jest --config examples/cjs/jest.config.ts",
+    "test:cjs:copy": "npx tsx scripts/test/cjs-copy.ts",
+    "test:cjs:remove": "npx tsx scripts/test/cjs-remove.ts"
+  },
+  "devDependencies": {
+    "@actyx/machine-runner": "file:../../machine-runner",
+    "@jest/globals": "^30.2.0",
+    "@types/glob": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.50.0",
+    "@typescript-eslint/parser": "^8.50.0",
+    "cpy-cli": "^6.0.0",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "glob": "^13.0.0",
+    "jest": "^30.2.0",
+    "prettier": "^3.7.4",
+    "rimraf": "^6.1.2",
+    "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
+    "typedoc": "^0.28.15",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "machine-core": "file:../machine-core"
+  }
+}
