@@ -135,7 +135,7 @@ DoIt.react([Events.deliver], Done, (_ctx) => {[]})
 
 ### Checking the machines
 
-<img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/refactor-machine-check/demos/warehouse-readme-demo/transport-order-protocol.svg" alt="transport order workflow" width="300" />
+<img src="../demos/warehouse-readme-demo/transport-order-protocol.svg" alt="transport order workflow" width="300" />
 
 The transport order workflow implemented in the previous section is visualized above as a UML state diagram.
 With the `@actyx/machine-check` library we can check that this workflow makes sense (i.e. it achieves eventual consensus, which is the same kind of consensus used by the bitcoin network to settle transactions), and we can also check that our state machines written down in code implement this workflow correctly.
@@ -280,7 +280,7 @@ needed on the assembly line. Instead of specifying a large workflow that combine
 workflow with a description of how delivered items are used on the assembly line, and then implementing
 the resulting workfow, we can reuse the transport order protocol and the machines that implement it.
 
-<img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/refactor-machine-check/demos/warehouse-readme-demo/assembly-protocol.svg" alt="assembly line workflow" width="300" />
+<img src="../demos/warehouse-readme-demo/assembly-protocol.svg" alt="assembly line workflow" width="300" />
 
 The workflow above specifies how the `warehouse` role requests an item and acknowledges its delivery, and how an `assemblyRobot`
 uses the delivered item to assemble a product. Unlike the transport order workflow, this workflow does not specify
@@ -290,7 +290,7 @@ We can, however, implement the `assemblyRobot` for for the workflow above and th
 and the machines from the transport order protocol to work together. The resulting machines will then implement the workflow below:
 
 <p id="composition">
-<img src="https://raw.githubusercontent.com/lucas874/machines/refs/heads/refactor-machine-check/demos/warehouse-readme-demo/composition.svg" alt="composed workflow" width="300" />
+<img src="../demos/warehouse-readme-demo/composition.svg" alt="composed workflow" width="300" />
 </p>
 
 To achieve this start by defining the event emitted by the assembly robot when a product has been finished.
@@ -407,7 +407,7 @@ const warehouse =
 ```
 
 For brevity in some of the examples above, code that resides in different files were shown together.
-The full executable example outlined above is found [here](https://github.com/lucas874/machines/tree/update-packages/demos/warehouse-readme-demo).
+The full executable example outlined above is found [here](../demos/warehouse-readme-demo).
 
 ### Errors
 
@@ -744,4 +744,4 @@ If you have any questions, suggestions, or just want to chat with other interest
 
 
 ## Acknowledgements
-The development of this tool was partly funded by the Horizon Europe project 101093006 TaRDIS - [https://project-tardis.eu/](https://project-tardis.eu/ "https://project-tardis.eu/").
+The development of this tool was partly funded by the Horizon Europe project 101093006 TaRDIS - [https://project-tardis.eu/](https://project-tardis.eu/).
