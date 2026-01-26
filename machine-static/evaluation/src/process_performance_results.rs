@@ -359,7 +359,19 @@ fn partition_measurements(flattened_measurements: Vec<FlattenedMeasurement>) -> 
     partitioned
 }
 
-// partition measurements by algorithm used in benchmark (i.e. algorithm 1 or exact) and write each such partition to its own file.
+/* // same as function below, but does not create separate files for different algorithms.
+fn process_performance_results_unpartitioned(result_dir: &Path, benchmark_dir: &Path, output_path: &Path, unit: &Unit) -> Result<()> {
+    let prefix = output_path.parent().ok_or(Error::msg("Error: invalid output parent directory"))?;
+    create_directory(prefix);
+
+    let benchmarks = benchmark_inputs(benchmark_dir);
+    let measurements = load_latest_measurements(&result_dir)?;
+    let mut flattened_measurements = flatten_measurements(measurements, benchmarks, unit)?;
+    flattened_measurements.sort_by_key(|fm| fm.number_of_edges);
+    write_csv(flattened_measurements, output_path)
+} */
+
+// partition measurements by algorithm used in benchmark (i.e. algorithm 1 or exact), sort the resulting vectors by number_of_edges and write each each vector to its own file.
 fn process_performance_results(result_dir: &Path, benchmark_dir: &Path, output_path: &Path, unit: &Unit) -> Result<()> {
     let prefix = output_path.parent().ok_or(Error::msg("Error: invalid output parent directory"))?;
     create_directory(prefix);
@@ -374,8 +386,9 @@ fn process_performance_results(result_dir: &Path, benchmark_dir: &Path, output_p
 
     let partitioned_measurements = partition_measurements(flattened_measurements);
 
-    for (algorithm, flat_measurement) in partitioned_measurements {
+    for (algorithm, mut flat_measurement) in partitioned_measurements {
         let informative_fname = format!("{}_{}_{}", algorithm.replace(" ", "_"), unit.clone(), fname);
+        flat_measurement.sort_by_key(|fm| fm.number_of_edges);
         write_csv(flat_measurement, &output_path.with_file_name(informative_fname))?;
     }
 
@@ -393,23 +406,3 @@ fn main() {
         println!("Error processing performance results: {}", e);
     }
 }
-
-/*
-
-    let mut partitioned: BTreeMap<String, Vec<FlattenedMeasurement>> = BTreeMap::new();
-
-    for measurement in flattened_measurements {
-        partitioned.entry(measurement.algorithm.clone())
-            .or_insert_with(Vec::new)
-            .push(measurement);
-    }
-
-    partitioned
-
-        for measurement in flattened_measurements{
-        partitioned
-            .entry(measurement.algorithm.clone())
-            .and_modify(|measurements| measurements.push(measurement.clone()))
-            .or_insert_with(|| vec![measurement]);
-    }
-*/
