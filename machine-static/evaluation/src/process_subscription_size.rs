@@ -127,7 +127,7 @@ fn process_results_alg1_exact(input_path: &Path, output_path: &Path) -> Result<(
     sub_size_outputs.sort_by_key(|sub_size_output| sub_size_output.number_of_edges);
     let processed_sub_size_outputs = to_processed(sub_size_outputs)?;
 
-    write_processed(processed_sub_size_outputs, Path::new(output_path))
+    write_processed(processed_sub_size_outputs, output_path)
 }
 
 fn process_results_kmt23_compositional(input_path: &Path, output_path: &Path) -> Result<()> {
@@ -137,7 +137,7 @@ fn process_results_kmt23_compositional(input_path: &Path, output_path: &Path) ->
     sub_size_outputs.sort_by_key(|sub_size_output| sub_size_output.number_of_edges);
     let processed_sub_size_outputs = to_processed_simple(sub_size_outputs)?;
 
-    write_processed(processed_sub_size_outputs, Path::new(output_path))
+    write_processed(processed_sub_size_outputs, output_path)
 }
 
 

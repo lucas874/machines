@@ -25,7 +25,7 @@ pub struct CliProcessPerf {
     pub unit: Unit,
 }
 
-#[derive(ValueEnum, Debug, Serialize, Deserialize, Clone)]
+#[derive(ValueEnum, Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Unit {
     NS,
     MUS
@@ -49,6 +49,7 @@ pub struct ConfidenceInterval {
     pub upper_bound: f64,
 }
 
+// From https://github.com/bheisler/cargo-criterion/blob/main/src/estimate.rs
 #[derive(Clone, PartialEq, Deserialize, Serialize, Debug)]
 pub struct Estimate {
     /// The confidence interval for this estimate
@@ -58,6 +59,31 @@ pub struct Estimate {
     pub standard_error: f64,
 }
 
+impl Estimate {
+    // Transform to FlattenedEstimate dividing converting to indicated unit while doing so. Estimate is in ns.
+    pub fn to_flattened_estimate(&self, unit: &Unit) -> FlattenedEstimate {
+        FlattenedEstimate {
+            confidence_interval_lower_bound: self.confidence_interval.lower_bound / unit.get_divisor(),
+            confidence_interval_upper_bound: self.confidence_interval.upper_bound / unit.get_divisor(),
+            confidence_level: self.confidence_interval.confidence_level,
+            point_estimate: self.point_estimate / unit.get_divisor(),
+            standard_error: self.standard_error / unit.get_divisor(),
+            unit: unit.clone()
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Deserialize, Serialize, Debug)]
+pub struct FlattenedEstimate {
+    confidence_interval_lower_bound: f64,
+    confidence_interval_upper_bound: f64,
+    confidence_level: f64,
+    point_estimate: f64,
+    standard_error: f64,
+    unit: Unit,
+}
+
+// From https://github.com/bheisler/cargo-criterion/blob/main/src/estimate.rs
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Estimates {
     pub mean: Estimate,
@@ -67,6 +93,7 @@ pub struct Estimates {
     pub std_dev: Estimate,
 }
 
+// From https://github.com/bheisler/cargo-criterion/blob/main/src/estimate.rs
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChangeEstimates {
     pub mean: Estimate,
@@ -146,7 +173,7 @@ struct NamedSavedStatistics {
 }
 
 // Struct containing some of the fields from a NamedSavedStatistics + some info about input sample protocol used to generate it
-// in a format we can easily write to csv.
+// in a format we can easily write to csv. Slope from Estimates not included because it is often None (we'd have run experiments for MUCH longer to get it for the big protocols.)
 #[derive(Debug, Serialize, Deserialize)]
 struct FlattenedMeasurement {
     number_of_edges: usize,
@@ -186,29 +213,10 @@ fn flatten_measurement(named_saved_statistics: NamedSavedStatistics, benchmark_i
     //let state_space_size: usize = state_space_size_str.parse().ok()?;
     let algorithm = named_saved_statistics.function_id.ok_or(Error::msg("Error reading function_id from NamedSavedStatistics"))?;
 
-    let mean_confidence_interval_lower_bound = named_saved_statistics.saved_statistics.estimates.mean.confidence_interval.lower_bound / unit.get_divisor();
-    let mean_confidence_interval_upper_bound = named_saved_statistics.saved_statistics.estimates.mean.confidence_interval.upper_bound / unit.get_divisor();
-    let mean_confidence_level = named_saved_statistics.saved_statistics.estimates.mean.confidence_interval.confidence_level / unit.get_divisor();
-    let mean_point_estimate = named_saved_statistics.saved_statistics.estimates.mean.point_estimate / unit.get_divisor();
-    let mean_standard_error = named_saved_statistics.saved_statistics.estimates.mean.standard_error / unit.get_divisor();
-
-    let median_confidence_interval_lower_bound = named_saved_statistics.saved_statistics.estimates.median.confidence_interval.lower_bound / unit.get_divisor();
-    let median_confidence_interval_upper_bound = named_saved_statistics.saved_statistics.estimates.median.confidence_interval.upper_bound / unit.get_divisor();
-    let median_confidence_level = named_saved_statistics.saved_statistics.estimates.median.confidence_interval.confidence_level / unit.get_divisor();
-    let median_point_estimate = named_saved_statistics.saved_statistics.estimates.median.point_estimate / unit.get_divisor();
-    let median_standard_error = named_saved_statistics.saved_statistics.estimates.median.standard_error / unit.get_divisor();
-
-    let median_abs_dev_confidence_interval_lower_bound = named_saved_statistics.saved_statistics.estimates.median_abs_dev.confidence_interval.lower_bound / unit.get_divisor();
-    let median_abs_dev_confidence_interval_upper_bound = named_saved_statistics.saved_statistics.estimates.median_abs_dev.confidence_interval.upper_bound / unit.get_divisor();
-    let median_abs_dev_confidence_level = named_saved_statistics.saved_statistics.estimates.median_abs_dev.confidence_interval.confidence_level / unit.get_divisor();
-    let median_abs_dev_point_estimate = named_saved_statistics.saved_statistics.estimates.median_abs_dev.point_estimate / unit.get_divisor();
-    let median_abs_dev_standard_error = named_saved_statistics.saved_statistics.estimates.median_abs_dev.standard_error / unit.get_divisor();
-
-    let std_dev_confidence_interval_lower_bound = named_saved_statistics.saved_statistics.estimates.std_dev.confidence_interval.lower_bound / unit.get_divisor();
-    let std_dev_confidence_interval_upper_bound = named_saved_statistics.saved_statistics.estimates.std_dev.confidence_interval.upper_bound / unit.get_divisor();
-    let std_dev_confidence_level = named_saved_statistics.saved_statistics.estimates.std_dev.confidence_interval.confidence_level / unit.get_divisor();
-    let std_dev_point_estimate = named_saved_statistics.saved_statistics.estimates.std_dev.point_estimate / unit.get_divisor();
-    let std_dev_standard_error = named_saved_statistics.saved_statistics.estimates.std_dev.standard_error / unit.get_divisor();
+    let mean_flattened_estimate = named_saved_statistics.saved_statistics.estimates.mean.to_flattened_estimate(&unit);
+    let median_flattened_estimate = named_saved_statistics.saved_statistics.estimates.median.to_flattened_estimate(&unit);
+    let median_abs_dev_flattened_estimate = named_saved_statistics.saved_statistics.estimates.median_abs_dev.to_flattened_estimate(&unit);
+    let std_dev_flattened_estimate = named_saved_statistics.saved_statistics.estimates.std_dev.to_flattened_estimate(&unit);
 
     Ok(
         FlattenedMeasurement {
@@ -217,29 +225,29 @@ fn flatten_measurement(named_saved_statistics: NamedSavedStatistics, benchmark_i
             algorithm,
             unit,
 
-            mean_confidence_interval_lower_bound,
-            mean_confidence_interval_upper_bound,
-            mean_confidence_level,
-            mean_point_estimate,
-            mean_standard_error,
+            mean_confidence_interval_lower_bound: mean_flattened_estimate.confidence_interval_lower_bound,
+            mean_confidence_interval_upper_bound: mean_flattened_estimate.confidence_interval_upper_bound,
+            mean_confidence_level: mean_flattened_estimate.confidence_level,
+            mean_point_estimate: mean_flattened_estimate.point_estimate,
+            mean_standard_error: mean_flattened_estimate.standard_error,
 
-            median_confidence_interval_lower_bound,
-            median_confidence_interval_upper_bound,
-            median_confidence_level,
-            median_point_estimate,
-            median_standard_error,
+            median_confidence_interval_lower_bound: median_flattened_estimate.confidence_interval_lower_bound,
+            median_confidence_interval_upper_bound: median_flattened_estimate.confidence_interval_upper_bound,
+            median_confidence_level: median_flattened_estimate.confidence_level,
+            median_point_estimate: median_flattened_estimate.point_estimate,
+            median_standard_error: median_flattened_estimate.standard_error,
 
-            median_abs_dev_confidence_interval_lower_bound,
-            median_abs_dev_confidence_interval_upper_bound,
-            median_abs_dev_confidence_level,
-            median_abs_dev_point_estimate,
-            median_abs_dev_standard_error,
+            median_abs_dev_confidence_interval_lower_bound: median_abs_dev_flattened_estimate.confidence_interval_lower_bound,
+            median_abs_dev_confidence_interval_upper_bound: median_abs_dev_flattened_estimate.confidence_interval_upper_bound,
+            median_abs_dev_confidence_level: median_abs_dev_flattened_estimate.confidence_level,
+            median_abs_dev_point_estimate: median_abs_dev_flattened_estimate.point_estimate,
+            median_abs_dev_standard_error: median_abs_dev_flattened_estimate.standard_error,
 
-            std_dev_confidence_interval_lower_bound,
-            std_dev_confidence_interval_upper_bound,
-            std_dev_confidence_level,
-            std_dev_point_estimate,
-            std_dev_standard_error
+            std_dev_confidence_interval_lower_bound: std_dev_flattened_estimate.confidence_interval_lower_bound,
+            std_dev_confidence_interval_upper_bound: std_dev_flattened_estimate.confidence_interval_upper_bound,
+            std_dev_confidence_level: std_dev_flattened_estimate.confidence_level,
+            std_dev_point_estimate: std_dev_flattened_estimate.point_estimate,
+            std_dev_standard_error: std_dev_flattened_estimate.standard_error
         }
     )
 }
