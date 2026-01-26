@@ -2,6 +2,7 @@ use evaluation::{BenchMarkInput, create_directory, prepare_files_in_directory};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use walkdir::WalkDir;
+use core::fmt;
 use std::{collections::BTreeMap, ffi::OsStr, fs::File, path::{Path, PathBuf}};
 use clap::{Parser, ValueEnum};
 use anyhow::{Context, Error, Result};
@@ -37,6 +38,15 @@ impl Unit {
         match self {
             Unit::NS => 1.0,
             Unit::MUS => 1000.0
+        }
+    }
+}
+
+impl fmt::Display for Unit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Unit::NS => write!(f, "ns"),
+            Unit::MUS => write!(f, "mus")
         }
     }
 }
@@ -335,15 +345,41 @@ fn flatten_measurements(measurements: Vec<NamedSavedStatistics>, benchmarks: BTr
         .collect()
 }
 
+fn partition_measurements(flattened_measurements: Vec<FlattenedMeasurement>) -> BTreeMap<String, Vec<FlattenedMeasurement>> {
+    let mut partitioned: BTreeMap<String, Vec<FlattenedMeasurement>> = BTreeMap::new();
+
+    for measurement in flattened_measurements {
+        partitioned
+            .entry(measurement.algorithm.clone())
+            .or_insert_with(|| Vec::new())
+            .push(measurement);
+    }
+
+
+    partitioned
+}
+
+// partition measurements by algorithm used in benchmark (i.e. algorithm 1 or exact) and write each such partition to its own file.
 fn process_performance_results(result_dir: &Path, benchmark_dir: &Path, output_path: &Path, unit: &Unit) -> Result<()> {
     let prefix = output_path.parent().ok_or(Error::msg("Error: invalid output parent directory"))?;
     create_directory(prefix);
+    let fname = output_path
+        .file_name()
+        .ok_or(Error::msg(format!("Could not get file name for {}", output_path.display())))?
+        .to_str().ok_or(Error::msg(format!("{} is not valid Unicode", output_path.display())))?;
 
     let benchmarks = benchmark_inputs(benchmark_dir);
     let measurements = load_latest_measurements(&result_dir)?;
     let flattened_measurements = flatten_measurements(measurements, benchmarks, unit)?;
 
-    write_csv(flattened_measurements, output_path)
+    let partitioned_measurements = partition_measurements(flattened_measurements);
+
+    for (algorithm, flat_measurement) in partitioned_measurements {
+        let informative_fname = format!("{}_{}_{}", algorithm.replace(" ", "_"), unit.clone(), fname);
+        write_csv(flat_measurement, &output_path.with_file_name(informative_fname))?;
+    }
+
+    Ok(())
 }
 
 fn main() {
@@ -357,3 +393,23 @@ fn main() {
         println!("Error processing performance results: {}", e);
     }
 }
+
+/*
+
+    let mut partitioned: BTreeMap<String, Vec<FlattenedMeasurement>> = BTreeMap::new();
+
+    for measurement in flattened_measurements {
+        partitioned.entry(measurement.algorithm.clone())
+            .or_insert_with(Vec::new)
+            .push(measurement);
+    }
+
+    partitioned
+
+        for measurement in flattened_measurements{
+        partitioned
+            .entry(measurement.algorithm.clone())
+            .and_modify(|measurements| measurements.push(measurement.clone()))
+            .or_insert_with(|| vec![measurement]);
+    }
+*/
