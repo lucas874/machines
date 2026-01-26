@@ -1,9 +1,9 @@
 # Machine Check
 
-This library allows you to check whether the machines you implement with [machine-runner](https://www.npmjs.com/package/@actyx/machine-runner) comply with a correct overall swarm behaviour.
+This library forked from [machine-check](https://github.com/Actyx/machines/tree/master/machine-check) by [Actyx AG](https://github.com/Actyx) allows you to check whether the machines you implement with [machine-runner](https://www.npmjs.com/package/@actyx/machine-runner) comply with a correct overall swarm behaviour.
 Before we dive into how to use it, we need to quickly establish some notation.
 
-The library also offers functionality supporting *swarm composition*. A description of this use of the library is given in [here](https://github.com/lucas874/machines/tree/update-packages/machine-runner#composing-swarms).
+The library also offers functionality supporting *swarm composition*. A description of this use of the library is given in [here](https://github.com/lucas874/machines/tree/refactor-machine-check/machine-runner#composing-swarms).
 
 ## Swarm Protocols
 
@@ -136,3 +136,7 @@ In the example as given you’ll be notified that the overall protocol has a fla
 This means that our clever reuse of the `opening` and `closing` event types for dual purposes (i.e. as transition to a moving door as well as progress update) may not be so clever after all — the `update` commands should yield more specific `openingProgress` and `closingProgress` event types instead.
 Other than that, our machines are implemented correctly.
 You can try to remove a command or reaction from the code to observe how this this pointed out by `checkProjection()`.
+
+
+## Acknowledgement
+The development of this tool was partly funded by the Horizon Europe project 101093006 TaRDIS - [https://project-tardis.eu/](https://project-tardis.eu/ "https://project-tardis.eu/").
