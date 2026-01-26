@@ -1,8 +1,9 @@
-import { checkComposedProjection, checkComposedSwarmProtocol, composeProtocols } from '@actyx/machine-check'
+import { checkComposedProjection, checkComposedSwarmProtocol } from '@actyx/machine-check'
 import { TransportRobot, InitialTransport } from './transport_robot'
 import { Warehouse, InitialWarehouse } from './warehouse'
-import { transportOrderProtocol, Events, assemblyLineProtocol } from './protocol'
+import { transportOrderProtocol, Events, assemblyLineProtocol, subscriptions } from './protocol'
 import { AssemblyRobot, InitialAssemblyRobot } from './assembly_robot'
+import { composeProtocols, InterfacingProtocols } from 'machine-core'
 
 const transportRobotJSON =
   TransportRobot.createJSONForAnalysis(InitialTransport)
@@ -19,9 +20,7 @@ const subscriptionsForAssemblyLine = {
   warehouse: [Events.request.type, Events.ack.type],
 }
 
-// these should all print `{ type: 'OK' }`, otherwise there’s a mistake in
-// the code (you would normally verify this using your favorite unit
-// testing framework)
+// these should all print `{ type: 'OK' }`, otherwise there’s a mistake in the code
 console.log(
   checkComposedSwarmProtocol([transportOrderProtocol], subscriptionsTransportOrder),
   checkComposedProjection([transportOrderProtocol], subscriptionsTransportOrder, 'transportRobot', transportRobotJSON),
@@ -34,7 +33,7 @@ console.log(
   checkComposedProjection([assemblyLineProtocol], subscriptionsForAssemblyLine, 'assemblyRobot', assemblyRobotJSON)
 )
 
-/* const thing = composeProtocols([transportOrderProtocol, assemblyLineProtocol])
-if (thing.type === 'OK') {
-    console.log(JSON.stringify(thing.data, null, 2))
-} */
+// check that the subscription generated for the composition is indeed well-formed: this should print `{ type: 'OK' }`
+console.log(
+  checkComposedSwarmProtocol([transportOrderProtocol, assemblyLineProtocol], subscriptions)
+)

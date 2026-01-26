@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import { MachineEvent, SwarmProtocol } from '@actyx/machine-runner'
-import { SwarmProtocolType, Subscriptions, Result, DataResult, overapproxWFSubscriptions, checkComposedSwarmProtocol, InterfacingProtocols, composeProtocols} from '@actyx/machine-check'
+import { checkComposedSwarmProtocol, CheckResult  } from '@actyx/machine-check'
+import { SwarmProtocolType, Subscriptions, DataResult, overapproxWFSubscriptions } from 'machine-core'
 import chalk from "chalk";
 
 export const manifest = {
@@ -73,10 +74,6 @@ const resultSubsComposition: DataResult<Subscriptions>
   = overapproxWFSubscriptions([transportOrderProtocol, assemblyLineProtocol], {}, 'TwoStep')
 if (resultSubsComposition.type === 'ERROR') throw new Error(resultSubsComposition.errors.join(', '))
 export var subscriptions: Subscriptions = resultSubsComposition.data
-
-// check that the subscription generated for the composition is indeed well-formed
-const resultCheckWf: Result = checkComposedSwarmProtocol([transportOrderProtocol, assemblyLineProtocol], subscriptions)
-if (resultCheckWf.type === 'ERROR') throw new Error(resultCheckWf.errors.join(', \n'))
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
 export function getRandomInt(min: number, max: number) {
