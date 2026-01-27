@@ -10,7 +10,7 @@ use std::{
     io::prelude::*,
     path::{Path, PathBuf},
 };
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use walkdir::{DirEntry, WalkDir};
 use anyhow::Result;
 
@@ -68,7 +68,7 @@ pub struct SimpleProtoBenchMarkInput {
     pub proto: SwarmProtocolType,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(ValueEnum, Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Version {
     KMT23,                   // Kuhn, Melgratti, Tuosto 23
     CompositionalExact,      // expand protocol and compute subscription

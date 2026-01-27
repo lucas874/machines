@@ -1,4 +1,4 @@
-use evaluation::{BenchMarkInput, create_directory, prepare_files_in_directory};
+use evaluation::{BenchMarkInput, Version, create_directory, prepare_files_in_directory};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use walkdir::WalkDir;
@@ -24,6 +24,9 @@ pub struct CliProcessPerf {
 
     #[arg(short, long)]
     pub unit: Unit,
+
+    #[arg(short, long)]
+    pub algorithm: Version,
 }
 
 #[derive(ValueEnum, Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -184,7 +187,7 @@ struct NamedSavedStatistics {
 
 // Struct containing some of the fields from a NamedSavedStatistics + some info about input sample protocol used to generate it
 // in a format we can easily write to csv. Slope from Estimates not included because it is often None (we'd have run experiments for MUCH longer to get it for the big protocols.)
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct FlattenedMeasurement {
     number_of_edges: usize,
     state_space_size: usize,
@@ -372,7 +375,7 @@ fn process_performance_results_unpartitioned(result_dir: &Path, benchmark_dir: &
 } */
 
 // partition measurements by algorithm used in benchmark (i.e. algorithm 1 or exact), sort the resulting vectors by number_of_edges and write each each vector to its own file.
-fn process_performance_results(result_dir: &Path, benchmark_dir: &Path, output_path: &Path, unit: &Unit) -> Result<()> {
+/* fn process_performance_results(result_dir: &Path, benchmark_dir: &Path, output_path: &Path, unit: &Unit) -> Result<()> {
     let prefix = output_path.parent().ok_or(Error::msg("Error: invalid output parent directory"))?;
     create_directory(prefix);
     let fname = output_path
@@ -393,6 +396,33 @@ fn process_performance_results(result_dir: &Path, benchmark_dir: &Path, output_p
     }
 
     Ok(())
+} */
+
+fn get_measurements_for_version(version: &Version, measurements: &BTreeMap<String, Vec<FlattenedMeasurement>>) -> Result<Vec<FlattenedMeasurement>> {
+    let exact_str = String::from("Exact");
+    let alg1_str = String::from("Algorithm 1");
+
+    match version {
+        Version::CompositionalExact => measurements.get(&exact_str).cloned().ok_or(Error::msg(format!("Key: {} not found in map", exact_str))),
+        Version::CompositionalOverapprox => measurements.get(&alg1_str).cloned().ok_or(Error::msg(format!("Key: {} not found in map", exact_str))),
+        _ => Err(Error::msg(format!("Invalid version: {:#?}", version)))
+    }
+}
+
+// partition measurements by algorithm used in benchmark (i.e. algorithm 1 or exact),
+// sort the resulting vectors by number_of_edges, extract measurements for 'version' and write it to a file.
+fn process_performance_results_by_alg(result_dir: &Path, benchmark_dir: &Path, output_path: &Path, unit: &Unit, version: &Version) -> Result<()> {
+    let prefix = output_path.parent().ok_or(Error::msg("Error: invalid output parent directory"))?;
+    create_directory(prefix);
+
+    let benchmarks = benchmark_inputs(benchmark_dir);
+    let measurements = load_latest_measurements(&result_dir)?;
+    let flattened_measurements = flatten_measurements(measurements, benchmarks, unit)?;
+    let partitioned_measurements = partition_measurements(flattened_measurements);
+    let mut measurement_for_version = get_measurements_for_version(version, &partitioned_measurements)?;
+    measurement_for_version.sort_by_key(|fm| fm.number_of_edges);
+
+    write_csv(measurement_for_version, output_path)
 }
 
 fn main() {
@@ -401,8 +431,9 @@ fn main() {
     let benchmark_dir = cli.benchmark_dir;
     let output_path = cli.output_path;
     let unit = cli.unit;
+    let algorithm = cli.algorithm;
 
-    if let Err(e) =  process_performance_results(&result_dir, &benchmark_dir, &output_path, &unit) {
+    if let Err(e) =  process_performance_results_by_alg(&result_dir, &benchmark_dir, &output_path, &unit, &algorithm) {
         println!("Error processing performance results: {}", e);
     }
 }

@@ -2,7 +2,7 @@ use std::{collections::BTreeSet, path::{Path, PathBuf}};
 // duct
 use anyhow::{Error, Result};
 use average::Mean;
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use evaluation::{
     BenchmarkSubSizeOutput, SimpleProtoBenchmarkSubSizeOutput, SubSizeProcessed, SubSizeSimpleProcessed, create_directory, read_sub_size_outputs_in_directory
 };
@@ -11,7 +11,7 @@ use serde::Serialize;
 
 
 //#[derive(Parser, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(clap::ValueEnum, Clone, Debug)]
+#[derive(ValueEnum, Clone, Debug)]
 pub enum SubExperiment {
     KMT23VsComp,    // Kuhn, Melgratti, Tuosto 23 vs compositional
     ApproxVsExact,  // 'Algorithm 1' vs. 'Exact'
