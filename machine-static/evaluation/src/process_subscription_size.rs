@@ -124,7 +124,8 @@ fn process_results_alg1_exact(input_path: &Path, output_path: &Path) -> Result<(
     let prefix = output_path.parent().ok_or(Error::msg("Error: invalid output parent directory"))?;
     create_directory(prefix);
     let mut sub_size_outputs: Vec<BenchmarkSubSizeOutput> = read_sub_size_outputs_in_directory(&input_path)?;
-    sub_size_outputs.sort_by_key(|sub_size_output| sub_size_output.number_of_edges);
+    // Sort lexicographically on (number_of_edges, version).
+    sub_size_outputs.sort_unstable_by_key(|sub_size_output| (sub_size_output.number_of_edges, sub_size_output.version.clone()));
     let processed_sub_size_outputs = to_processed(sub_size_outputs)?;
 
     write_processed(processed_sub_size_outputs, output_path)
@@ -134,7 +135,8 @@ fn process_results_kmt23_compositional(input_path: &Path, output_path: &Path) ->
     let prefix = output_path.parent().ok_or(Error::msg("Error: invalid output parent directory"))?;
     create_directory(prefix);
     let mut sub_size_outputs: Vec<SimpleProtoBenchmarkSubSizeOutput> = read_sub_size_outputs_in_directory(&input_path)?;
-    sub_size_outputs.sort_by_key(|sub_size_output| sub_size_output.number_of_edges);
+    // Sort lexicographically on (number_of_edges, version).
+    sub_size_outputs.sort_unstable_by_key(|sub_size_output| (sub_size_output.number_of_edges, sub_size_output.version.clone()));
     let processed_sub_size_outputs = to_processed_simple(sub_size_outputs)?;
 
     write_processed(processed_sub_size_outputs, output_path)

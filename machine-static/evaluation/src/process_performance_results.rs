@@ -420,7 +420,8 @@ fn process_performance_results_by_alg(result_dir: &Path, benchmark_dir: &Path, o
     let flattened_measurements = flatten_measurements(measurements, benchmarks, unit)?;
     let partitioned_measurements = partition_measurements(flattened_measurements);
     let mut measurement_for_version = get_measurements_for_version(version, &partitioned_measurements)?;
-    measurement_for_version.sort_by_key(|fm| fm.number_of_edges);
+    // Sort lexicographically on (number_of_edges, algorithm). Should not matter here, we only have one instance for some number_of_edges but still.
+    measurement_for_version.sort_unstable_by_key(|fm| (fm.number_of_edges, fm.algorithm.clone()));
 
     write_csv(measurement_for_version, output_path)
 }
