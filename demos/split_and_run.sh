@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-# In artifact redirect ax output to log file.
-CMD_START_AX="rm -rf ax-data; echo 'Silently running Actyx middleware in this window. Press Ctrl + C to quit.'; ax run &> /dev/null"
-
 split_and_run() {
     # store remanining arguments in an array, "$@" expands to "$1" "$2" "$3" ...
     local cmds=("$@")
@@ -52,6 +49,13 @@ pkill tmux;
 session=$1
 # shift arguments making the old $2 the new $1 etc.
 shift
+
+ax_log=$1
+# shift arguments making the old $2 the new $1 etc.
+shift
+
+# Redirect ax output to log file.
+CMD_START_AX="rm -rf ax-data; echo 'Silently running Actyx middleware in this window. Press Ctrl + C to quit.'; ax run >> $ax_log 2>&1"
 
 # Sketchy because ax could be some other program.... but we assume that it is called ax anyway when running it...
 if pgrep ax; then
