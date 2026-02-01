@@ -136,7 +136,7 @@ fn process_results_kmt23_compositional(input_path: &Path, output_path: &Path) ->
     create_directory(prefix);
     let mut sub_size_outputs: Vec<SimpleProtoBenchmarkSubSizeOutput> = read_sub_size_outputs_in_directory(&input_path)?;
     // Sort lexicographically on (number_of_edges, version).
-    sub_size_outputs.sort_unstable_by_key(|sub_size_output| (sub_size_output.number_of_edges, sub_size_output.version.clone()));
+    sub_size_outputs.sort_unstable_by_key(|sub_size_output| (sub_size_output.number_of_edges, sub_size_output.version.clone(), sub_size_output.id.clone()));
     let processed_sub_size_outputs = to_processed_simple(sub_size_outputs)?;
 
     write_processed(processed_sub_size_outputs, output_path)
