@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
 
+# $1 is tmux session name
+# $2 is ax log
+# $3 is build log
+
+session_name=$1
+ax_log=$2
+build_log=$3
+
 DEMO_NAME="car-factory"
-DISPLAY_NAME="${DEMO_NAME}-${1}"
+DISPLAY_NAME="${DEMO_NAME}-${session_name}"
 APP_ID_PREFIX="com.example.${DEMO_NAME}."
-APP_ID="${APP_ID_PREFIX}${1}"
+APP_ID="${APP_ID_PREFIX}${session_name}"
 START_STEEL_TRANSPORT="npm run start-steel-transport -- -n ${DISPLAY_NAME} -i ${APP_ID}; exec bash"
 START_STAMP="npm run start-stamp -- -n ${DISPLAY_NAME} -i ${APP_ID}; exec bash"
 START_BODY_ASSEMBLER="npm run start-body-assembler -- -n ${DISPLAY_NAME} -i ${APP_ID}; exec bash"
@@ -21,9 +29,9 @@ START_WINDOW_INSTALLER="npm run start-window-installer -- -n ${DISPLAY_NAME} -i 
 START_WINDOW_CHECKER="npm run start-window-checker -- -n ${DISPLAY_NAME} -i ${APP_ID}; exec bash"
 START_QUALITY_CONTROL="npm run start-quality-control -- -n ${DISPLAY_NAME} -i ${APP_ID}; exec bash"
 
-npm run build
+npm run build >> $build_log 2>&1
 
-bash ../split_and_run.sh $1 "$START_STEEL_TRANSPORT" "$START_STAMP" "$START_BODY_ASSEMBLER" \
+bash ../split_and_run.sh $session_name $ax_log "$START_STEEL_TRANSPORT" "$START_STAMP" "$START_BODY_ASSEMBLER" \
     "$START_CAR_BODY_CHECKER" "$START_PAINTER" "$START_BASIC_TRANSPORT" "$START_SMART_TRANSPORT" \
     "$START_BASIC_TRANSPORT" "$START_BASIC_TRANSPORT" "$START_SMART_TRANSPORT" "$START_SMART_TRANSPORT" \
     "$START_BASE_STATION" "$START_ENGINE_INSTALLER" "$START_WAREHOUSE" "$START_ENGINE_CHECKER" "$START_WHEEL_INSTALLER" \
