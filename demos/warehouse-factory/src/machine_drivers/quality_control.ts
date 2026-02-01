@@ -10,7 +10,7 @@ async function main() {
     throw Error(`Invalid version: ${process.argv[2]}`)
   }
   const app = await Actyx.of(manifest)
-  const tags = Protocol.tagWithEntityId('warehouse-factory')
+  const tags = Protocol.tagWithEntityId(machineRunnerProtoName)
   const machine = selectMachine(process.argv[2], app, tags)
   printState(qualityWarehouseFactoryQuality.machineName, initialStateWarehouseFactoryQuality.mechanism.name, undefined, [Events.observingEvent.type])
   for await (const state of machine) {
