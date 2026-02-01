@@ -3,9 +3,11 @@ import { MachineEvent, SwarmProtocol } from '@actyx/machine-runner'
 import { SwarmProtocolType, Subscriptions, DataResult, overapproxWFSubscriptions } from 'machine-core'
 import chalk from "chalk";
 
+export const machineRunnerProtoName = "warehouse-readme" as const
+
 export const manifest = {
-  appId: 'com.example.warehouse-factory',
-  displayName: 'warehouse-factory',
+  appId: `com.example.${machineRunnerProtoName}`,
+  displayName: machineRunnerProtoName,
   version: '1.0.0',
 }
 
@@ -33,7 +35,8 @@ export namespace Events {
     export const allEvents = [request, bid, selected, deliver, ack, product] as const
 }
 
-export const TransportOrder = SwarmProtocol.make('warehouse-factory', Events.allEvents)
+
+export const TransportOrder = SwarmProtocol.make(machineRunnerProtoName, Events.allEvents)
 
 export const transportOrderProtocol: SwarmProtocolType = {
   initial: 'initial',
@@ -54,7 +57,6 @@ export const assemblyLineProtocol: SwarmProtocolType = {
     {source: 'assemble', target: 'done', label: { cmd: 'assemble', role: 'assemblyRobot', logType: [Events.product.type] }},
   ]
 }
-
 
 // Well-formed subscription for the warehouse protocol
 const result_subs_warehouse: DataResult<Subscriptions>

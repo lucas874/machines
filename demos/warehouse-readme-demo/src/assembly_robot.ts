@@ -1,7 +1,7 @@
 import { SwarmProtocol } from '@actyx/machine-runner';
-import { Events, transportOrderProtocol, assemblyLineProtocol, subscriptions } from './protocol'
+import { Events, transportOrderProtocol, assemblyLineProtocol, subscriptions, machineRunnerProtoName } from './protocol'
 
-export const AssemblyLine = SwarmProtocol.make('warehouse-factory', Events.allEvents)
+export const AssemblyLine = SwarmProtocol.make(machineRunnerProtoName, Events.allEvents)
 
 export const AssemblyRobot = AssemblyLine.makeMachine('assemblyRobot')
 
