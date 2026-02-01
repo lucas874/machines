@@ -30,6 +30,7 @@ split_and_run() {
             fi
             tmux -L "$session" select-pane -t "%$i"
             tmux -L "$session" split-window "$split" "${cmds[n]}"
+            tmux -L "$session" select-layout -t "$session" tiled
             ((n=n+1))
             done
         ((n_split_rounds=n_split_rounds+1))
