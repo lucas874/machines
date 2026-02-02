@@ -34,7 +34,7 @@ async function main() {
     } else if (state.isLike(s2)) {
       // Break out of loop if this transport did not win the auction
       const IamWinner = state.payload.id === state.payload.winner
-      if (!IamWinner) { console.log("Final state reached, press CTRL + D to quit."); break }
+      if (!IamWinner) { console.log("Lost auction, left swarm. Press CTRL + D to quit."); console.log(); break }
       setTimeout(() => {
         const stateAfterTimeOut = machine.get()
         if (stateAfterTimeOut?.isLike(s2)) {
