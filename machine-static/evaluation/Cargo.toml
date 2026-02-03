@@ -53,5 +53,9 @@ name = "composition_benchmark_full"
 harness = false
 
 [[bench]]
+name = "composition_benchmark_medium"
+harness = false
+
+[[bench]]
 name = "composition_benchmark_short"
 harness = false

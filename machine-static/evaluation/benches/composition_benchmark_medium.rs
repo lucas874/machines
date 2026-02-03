@@ -76,7 +76,7 @@ fn prepare_files_in_directory(directory: String) -> Vec<(usize, InterfacingProto
 
 fn short_bench_general(c: &mut Criterion) {
     setup_logger();
-    let mut group = c.benchmark_group("General-pattern-algorithm1-vs.-exact-short-run");
+    let mut group = c.benchmark_group("General-pattern-algorithm1-vs.-exact-medium-run");
     group.sample_size(10);
     let input_dir = format!("{BENCHMARK_DIR}/benchmarks/general_pattern/");
     let mut interfacing_swarms_general = prepare_files_in_directory(input_dir);
@@ -84,7 +84,7 @@ fn short_bench_general(c: &mut Criterion) {
 
     let subs = BTreeMap::<Role, BTreeSet<EventType>>::new();
     let two_step_granularity = Granularity::TwoStep;
-    let step: usize = 120;
+    let step: usize = 10;
 
     for (size, interfacing_swarms) in interfacing_swarms_general.iter().step_by(step) {
         group.bench_with_input(
