@@ -1,9 +1,10 @@
 import { checkComposedProjection } from "@actyx/machine-check";
 import { closeDoor, Door, Events, factory, Protocol, subsWarehouseFactory, subsWarehouse, throwMachineImplementationErrors, warehouse, quality, subsWarehouseFactoryQuality } from "../protocol";
 
-// Door machine using the Actyx machine-runner library
+// Door machine implementation using the Actyx toolkit
 export const door = Protocol.makeMachine(Door)
 
+// States
 export const initialState = door.designEmpty("initialState")
     .command(closeDoor, [Events.closingTimeEvent], () =>
         [Events.closingTimeEvent.make({ timeOfDay: new Date().toLocaleTimeString() })])
@@ -11,13 +12,18 @@ export const initialState = door.designEmpty("initialState")
 export const requestedState = door.designEmpty("requestedState").finish()
 export const closedState = door.designEmpty("closedState").finish()
 
-// Add reactions
+// Accept events and change states
 initialState.react([Events.partReqEvent], requestedState, () => requestedState.make())
 requestedState.react([Events.partOKEvent], initialState, () => initialState.make())
 initialState.react([Events.closingTimeEvent], closedState, () => closedState.make())
 
 // Check that the machine is a correct implementation w.r.t. the warehouse protocol.
-const checkMachineResult = checkComposedProjection([warehouse], subsWarehouse, Door, door.createJSONForAnalysis(initialState))
+const checkMachineResult = checkComposedProjection(
+    [warehouse],    // Swarm protocol to check machine against.
+    subsWarehouse,  // Subscriptions for the (generated in src/protocol.ts)
+    Door,           // Role played by the machine
+    door.createJSONForAnalysis(initialState) // Exctracted structure of machine implementation.
+)
 if (checkMachineResult.type === "ERROR") {
     throwMachineImplementationErrors(checkMachineResult)
 }
