@@ -2,7 +2,7 @@ import { DataResult, overapproxWFSubscriptions, Subscriptions } from "machine-co
 import { MachineEvent, SwarmProtocol } from "@actyx/machine-runner";
 import chalk from "chalk";
 import * as fs from 'fs';
-import { checkComposedSwarmProtocol, CheckResult } from "@actyx/machine-check";
+// import { checkComposedSwarmProtocol, CheckResult } from "@actyx/machine-check";
 
 export const manifest = {
   appId: 'com.example.car-factory',
