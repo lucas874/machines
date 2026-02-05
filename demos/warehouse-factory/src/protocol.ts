@@ -2,6 +2,7 @@ import { DataResult, overapproxWFSubscriptions, Subscriptions } from "machine-co
 import { MachineEvent, SwarmProtocol } from "@actyx/machine-runner";
 import chalk from "chalk";
 import * as fs from 'fs';
+import { checkComposedSwarmProtocol, CheckResult } from "@actyx/machine-check";
 
 export const manifest = {
   appId: 'com.example.car-factory',
@@ -102,6 +103,10 @@ export const subsQuality: Subscriptions = resultSubsQuality.data
 const resultSubsWarehouseFactory: DataResult<Subscriptions> = overapproxWFSubscriptions([warehouse, factory], {}, 'TwoStep')
 if (resultSubsWarehouseFactory.type === 'ERROR') throw new Error(resultSubsWarehouseFactory.errors.join(', '))
 export const subsWarehouseFactory: Subscriptions = resultSubsWarehouseFactory.data
+
+// subsWarehouseFactory[Transport] = [Events.partReqEvent.type, Events.closingTimeEvent.type]
+// const wellFormednessCheck: CheckResult = checkComposedSwarmProtocol([warehouse, factory], subsWarehouseFactory)
+// if (wellFormednessCheck.type === 'ERROR') throw new Error(wellFormednessCheck.errors.join(', '))
 
 const resultSubsWarehouseFactoryQuality: DataResult<Subscriptions>
   = overapproxWFSubscriptions([warehouse, factory, quality], {}, 'TwoStep')
