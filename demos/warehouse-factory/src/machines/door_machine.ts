@@ -24,13 +24,13 @@ if (checkMachineResult.type === "ERROR") {
 
 // Adapted machine for warehouse || factory
 export const [doorWarehouseFactory, initialStateWarehouseFactory] = Protocol.adaptMachine(
-    Door,                   // The role played by the machine to adapt.
-    [warehouse, factory],   // The swarm protocols in the composition.
-    0,                      // The index of the warehouse protocol in the array above.
-    subsWarehouseFactory,   // The subscriptions for the composition. Automatically generated in src/protocol.ts.
-    [door, initialState],   // The original door implementation and its initial state.
-    true                    // Optional parameter to make the machine 'verbose', printing its current state and transitions.
-).data!                     // Unwrapping the result returned by adaptMachine().
+    Door,                 // Role played by the machine to adapt.
+    [warehouse, factory], // Swarm protocols in the composition.
+    0,                    // Index of the warehouse protocol in the array above.
+    subsWarehouseFactory, // Subscriptions for the composition (generated in src/protocol.ts)
+    [door, initialState], // Original door machine implementation and its initial state.
+    true                  // 'Verbose' option: print machine state and transitions.
+).data!                   // Unwrapping the result returned by adaptMachine().
 
 // Original but branch tracking machine
 export const [doorBT, initialStateBT] = Protocol.adaptMachine(
